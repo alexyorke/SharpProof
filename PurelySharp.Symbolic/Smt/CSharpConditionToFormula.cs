@@ -138,6 +138,45 @@ namespace PurelySharp.Symbolic.Smt
             }
         }
 
+        private readonly struct IndexExpressionShape
+        {
+            public IndexExpressionShape(ExpressionSyntax valueExpression, bool fromEnd, bool requiresNonNegativeValue)
+            {
+                ValueExpression = valueExpression;
+                FromEnd = fromEnd;
+                RequiresNonNegativeValue = requiresNonNegativeValue;
+            }
+
+            public ExpressionSyntax ValueExpression { get; }
+
+            public bool FromEnd { get; }
+
+            public bool RequiresNonNegativeValue { get; }
+        }
+
+        private readonly struct RangeExpressionShape
+        {
+            public RangeExpressionShape(
+                bool hasStart,
+                IndexExpressionShape start,
+                bool hasEnd,
+                IndexExpressionShape end)
+            {
+                HasStart = hasStart;
+                Start = start;
+                HasEnd = hasEnd;
+                End = end;
+            }
+
+            public bool HasStart { get; }
+
+            public IndexExpressionShape Start { get; }
+
+            public bool HasEnd { get; }
+
+            public IndexExpressionShape End { get; }
+        }
+
         public static bool TryTranslate(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -3006,8 +3045,13 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (!TryCreateEffectiveBuiltInIndexFormula(
+            if (!TryResolveBuiltInIndexAccessIndexShape(
                     elementAccess.ArgumentList.Arguments[0].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexShape) ||
+                !TryCreateEffectiveBuiltInIndexFormula(
+                    indexShape,
                     lengthFormula,
                     semanticModel,
                     cancellationToken,
@@ -3027,6 +3071,18 @@ namespace PurelySharp.Symbolic.Smt
                 indexFormula,
                 lengthFormula);
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+            if (!TryCreateIndexShapeWellFormedFormula(
+                    indexShape,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexWellFormed,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            formula = ApplyWellFormedPrecondition(indexWellFormed, formula);
             return true;
         }
 
@@ -5226,51 +5282,32 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth)
         {
-            if (!TryResolveBuiltInIndexAccessIndexExpression(
+            if (!TryResolveBuiltInIndexAccessIndexShape(
                     indexExpression,
                     semanticModel,
                     cancellationToken,
-                    out indexExpression))
+                    out var indexShape))
             {
                 indexText = string.Empty;
                 return false;
-            }
-
-            indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
-            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
-                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
-            {
-                if (!TryTranslateValue(
-                        fromEndIndex.Operand,
-                        semanticModel,
-                        cancellationToken,
-                        out var fromEndOffset,
-                        getSymbolVersion,
-                        inlineDepth) ||
-                    fromEndOffset is not { Kind: SmtValueKind.Int })
-                {
-                    indexText = string.Empty;
-                    return false;
-                }
-
-                indexText = "^" + CreateElementAccessIndexText(fromEndOffset);
-                return true;
             }
 
             if (!TryTranslateValue(
-                    indexExpression,
+                    indexShape.ValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var ordinaryIndex,
+                    out var indexFormula,
                     getSymbolVersion,
                     inlineDepth) ||
-                ordinaryIndex is not { Kind: SmtValueKind.Int })
+                indexFormula is not { Kind: SmtValueKind.Int })
             {
                 indexText = string.Empty;
                 return false;
             }
 
-            indexText = CreateElementAccessIndexText(ordinaryIndex);
+            indexText = indexShape.FromEnd
+                ? "^" + CreateElementAccessIndexText(indexFormula)
+                : CreateElementAccessIndexText(indexFormula);
             return indexText.Length > 0;
         }
 
@@ -5717,6 +5754,40 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryGetObjectCreationArgumentExpression(
+            IObjectCreationOperation objectCreationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            if (objectCreationOperation.Constructor == null ||
+                parameterIndex < 0 ||
+                parameterIndex >= objectCreationOperation.Constructor.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = objectCreationOperation.Constructor.Parameters[parameterIndex];
+            foreach (var argument in objectCreationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < objectCreationOperation.Arguments.Length &&
+                objectCreationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                expression = fallbackExpression;
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool TryCreateBuiltInRangeAccessResultLengthFormula(
             ExpressionSyntax receiverExpression,
             SemanticModel semanticModel,
@@ -5739,11 +5810,11 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            if (!TryResolveBuiltInRangeAccessRangeExpression(
+            if (!TryResolveBuiltInRangeAccessRangeShape(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     semanticModel,
                     cancellationToken,
-                    out var rangeExpression) ||
+                    out var rangeShape) ||
                 !TryCreateBuiltInElementAccessLengthFormula(
                     elementAccess.Expression,
                     semanticModel,
@@ -5752,7 +5823,8 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth) ||
                 !TryCreateEffectiveRangeEndpointFormula(
-                    rangeExpression.LeftOperand,
+                    rangeShape,
+                    useStart: true,
                     sourceLengthFormula,
                     defaultWhenOmitted: new SmtIntegerConstant(0),
                     semanticModel,
@@ -5761,7 +5833,8 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth) ||
                 !TryCreateEffectiveRangeEndpointFormula(
-                    rangeExpression.RightOperand,
+                    rangeShape,
+                    useStart: false,
                     sourceLengthFormula,
                     defaultWhenOmitted: sourceLengthFormula,
                     semanticModel,
@@ -5777,32 +5850,35 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
-        private static bool TryResolveBuiltInRangeAccessRangeExpression(
+        private static bool TryResolveBuiltInRangeAccessRangeShape(
             ExpressionSyntax argumentExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out RangeExpressionSyntax rangeExpression)
+            out RangeExpressionShape rangeShape)
         {
             argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
-            if (argumentExpression is RangeExpressionSyntax directRangeExpression)
+            if (TryCreateDirectRangeExpressionShape(
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out rangeShape))
             {
-                rangeExpression = directRangeExpression;
                 return true;
             }
 
             if (!IsSystemRangeExpression(argumentExpression, semanticModel, cancellationToken) ||
                 !TryGetLocalOrParameterRangeSymbol(argumentExpression, semanticModel, cancellationToken, out var rangeSymbol))
             {
-                rangeExpression = null!;
+                rangeShape = default;
                 return false;
             }
 
-            return TryResolveAssignedRangeExpression(
+            return TryResolveAssignedRangeShape(
                 argumentExpression,
                 rangeSymbol,
                 semanticModel,
                 cancellationToken,
-                out rangeExpression);
+                out rangeShape);
         }
 
         private static bool TryGetLocalOrParameterRangeSymbol(
@@ -5830,14 +5906,14 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
-        private static bool TryResolveAssignedRangeExpression(
+        private static bool TryResolveAssignedRangeShape(
             ExpressionSyntax useExpression,
             ISymbol rangeSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out RangeExpressionSyntax rangeExpression)
+            out RangeExpressionShape rangeShape)
         {
-            rangeExpression = null!;
+            rangeShape = default;
             var foundAssignment = false;
             foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
             {
@@ -5854,27 +5930,27 @@ namespace PurelySharp.Symbolic.Smt
                         semanticModel,
                         cancellationToken,
                         out var writesRangeSymbol,
-                        out var assignedRangeExpression);
+                        out var assignedRangeShape);
                     if (!writesRangeSymbol)
                     {
                         continue;
                     }
 
                     if (foundAssignment ||
-                        assignedRangeExpression == null)
+                        !assignedRangeShape.HasValue)
                     {
-                        rangeExpression = null!;
+                        rangeShape = default;
                         return false;
                     }
 
-                    rangeExpression = assignedRangeExpression;
+                    rangeShape = assignedRangeShape.GetValueOrDefault();
                     foundAssignment = true;
                 }
             }
 
             if (!foundAssignment)
             {
-                rangeExpression = null!;
+                rangeShape = default;
                 return false;
             }
 
@@ -5899,9 +5975,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesRangeSymbol,
-            out RangeExpressionSyntax? rangeExpression)
+            out RangeExpressionShape? rangeShape)
         {
-            rangeExpression = null;
+            rangeShape = null;
             writesRangeSymbol = false;
 
             if (TryGetRangeAssignmentFromLocalDeclaration(
@@ -5910,7 +5986,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out writesRangeSymbol,
-                    out rangeExpression))
+                    out rangeShape))
             {
                 return;
             }
@@ -5921,7 +5997,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out writesRangeSymbol,
-                    out rangeExpression))
+                    out rangeShape))
             {
                 return;
             }
@@ -5935,9 +6011,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesRangeSymbol,
-            out RangeExpressionSyntax? rangeExpression)
+            out RangeExpressionShape? rangeShape)
         {
-            rangeExpression = null;
+            rangeShape = null;
             writesRangeSymbol = false;
             if (statement is not LocalDeclarationStatementSyntax localDeclaration)
             {
@@ -5959,12 +6035,16 @@ namespace PurelySharp.Symbolic.Smt
 
                 writesRangeSymbol = true;
                 if (localDeclaration.Declaration.Variables.Count != 1 ||
-                    UnwrapElementAccessIndexExpression(variable.Initializer.Value) is not RangeExpressionSyntax assignedRangeExpression)
+                    !TryCreateDirectRangeExpressionShape(
+                        variable.Initializer.Value,
+                        semanticModel,
+                        cancellationToken,
+                        out var assignedRangeShape))
                 {
                     return true;
                 }
 
-                rangeExpression = assignedRangeExpression;
+                rangeShape = assignedRangeShape;
                 return true;
             }
 
@@ -5977,9 +6057,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesRangeSymbol,
-            out RangeExpressionSyntax? rangeExpression)
+            out RangeExpressionShape? rangeShape)
         {
-            rangeExpression = null;
+            rangeShape = null;
             writesRangeSymbol = false;
             if (statement is not ExpressionStatementSyntax
                 {
@@ -5992,9 +6072,13 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             writesRangeSymbol = true;
-            if (UnwrapElementAccessIndexExpression(assignment.Right) is RangeExpressionSyntax assignedRangeExpression)
+            if (TryCreateDirectRangeExpressionShape(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var assignedRangeShape))
             {
-                rangeExpression = assignedRangeExpression;
+                rangeShape = assignedRangeShape;
             }
 
             return true;
@@ -6056,6 +6140,181 @@ namespace PurelySharp.Symbolic.Smt
             return IsSameSymbol(
                 semanticModel.GetSymbolInfo(UnwrapElementAccessIndexExpression(expression), cancellationToken).Symbol,
                 rangeSymbol);
+        }
+
+        private static bool TryCreateDirectRangeExpressionShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionShape rangeShape)
+        {
+            expression = UnwrapElementAccessIndexExpression(expression);
+            if (expression is RangeExpressionSyntax rangeExpression)
+            {
+                if (!TryCreateRangeEndpointShape(
+                        rangeExpression.LeftOperand,
+                        semanticModel,
+                        cancellationToken,
+                        out var hasStart,
+                        out var start) ||
+                    !TryCreateRangeEndpointShape(
+                        rangeExpression.RightOperand,
+                        semanticModel,
+                        cancellationToken,
+                        out var hasEnd,
+                        out var end))
+                {
+                    rangeShape = default;
+                    return false;
+                }
+
+                rangeShape = new RangeExpressionShape(hasStart, start, hasEnd, end);
+                return true;
+            }
+
+            if (TryCreateRangeInvocationShape(expression, semanticModel, cancellationToken, out rangeShape) ||
+                TryCreateRangeObjectCreationShape(expression, semanticModel, cancellationToken, out rangeShape) ||
+                TryCreateRangeAllPropertyShape(expression, semanticModel, cancellationToken, out rangeShape))
+            {
+                return true;
+            }
+
+            rangeShape = default;
+            return false;
+        }
+
+        private static bool TryCreateRangeEndpointShape(
+            ExpressionSyntax? expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool hasEndpoint,
+            out IndexExpressionShape endpoint)
+        {
+            if (expression == null)
+            {
+                hasEndpoint = false;
+                endpoint = default;
+                return true;
+            }
+
+            if (!TryResolveBuiltInIndexAccessIndexShape(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out endpoint))
+            {
+                hasEndpoint = false;
+                return false;
+            }
+
+            hasEndpoint = true;
+            return true;
+        }
+
+        private static bool TryCreateRangeInvocationShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionShape rangeShape)
+        {
+            rangeShape = default;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
+                invocationOperation.TargetMethod.ReturnType is not { } returnType ||
+                !IsSystemRangeType(returnType, semanticModel.Compilation) ||
+                invocationOperation.TargetMethod.ContainingType is not { } containingType ||
+                !IsSystemRangeType(containingType, semanticModel.Compilation))
+            {
+                return false;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "StartAt")
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
+                    !TryResolveBuiltInIndexAccessIndexShape(
+                        startExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var start))
+                {
+                    return false;
+                }
+
+                rangeShape = new RangeExpressionShape(hasStart: true, start, hasEnd: false, end: default);
+                return true;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "EndAt")
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
+                    !TryResolveBuiltInIndexAccessIndexShape(
+                        endExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var end))
+                {
+                    return false;
+                }
+
+                rangeShape = new RangeExpressionShape(hasStart: false, start: default, hasEnd: true, end);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateRangeObjectCreationShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionShape rangeShape)
+        {
+            rangeShape = default;
+            if (expression is not ObjectCreationExpressionSyntax objectCreation ||
+                semanticModel.GetOperation(objectCreation, cancellationToken) is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Constructor == null ||
+                !IsSystemRangeType(objectCreationOperation.Constructor.ContainingType, semanticModel.Compilation) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var startExpression) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var endExpression) ||
+                !TryResolveBuiltInIndexAccessIndexShape(
+                    startExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var start) ||
+                !TryResolveBuiltInIndexAccessIndexShape(
+                    endExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var end))
+            {
+                return false;
+            }
+
+            rangeShape = new RangeExpressionShape(hasStart: true, start, hasEnd: true, end);
+            return true;
+        }
+
+        private static bool TryCreateRangeAllPropertyShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionShape rangeShape)
+        {
+            rangeShape = default;
+            if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not IPropertySymbol
+                {
+                    Name: "All",
+                    IsStatic: true
+                } propertySymbol ||
+                !IsSystemRangeType(propertySymbol.ContainingType, semanticModel.Compilation) ||
+                !IsSystemRangeType(propertySymbol.Type, semanticModel.Compilation))
+            {
+                return false;
+            }
+
+            rangeShape = new RangeExpressionShape(hasStart: false, start: default, hasEnd: false, end: default);
+            return true;
         }
 
         private static bool IsSameSymbol(ISymbol? candidate, ISymbol target)
@@ -6170,26 +6429,35 @@ namespace PurelySharp.Symbolic.Smt
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
         }
 
-        private static bool TryResolveBuiltInIndexAccessIndexExpression(
+        private static bool TryResolveBuiltInIndexAccessIndexShape(
             ExpressionSyntax argumentExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out ExpressionSyntax indexExpression)
+            out IndexExpressionShape indexShape)
         {
             argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
-            if (!IsSystemIndexExpression(argumentExpression, semanticModel, cancellationToken) ||
-                !TryGetLocalOrParameterIndexSymbol(argumentExpression, semanticModel, cancellationToken, out var indexSymbol))
+            if (TryCreateDirectIndexExpressionShape(
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out indexShape))
             {
-                indexExpression = argumentExpression;
                 return true;
             }
 
-            return TryResolveAssignedIndexExpression(
+            if (!IsSystemIndexExpression(argumentExpression, semanticModel, cancellationToken) ||
+                !TryGetLocalOrParameterIndexSymbol(argumentExpression, semanticModel, cancellationToken, out var indexSymbol))
+            {
+                indexShape = default;
+                return false;
+            }
+
+            return TryResolveAssignedIndexShape(
                 argumentExpression,
                 indexSymbol,
                 semanticModel,
                 cancellationToken,
-                out indexExpression);
+                out indexShape);
         }
 
         private static bool TryGetLocalOrParameterIndexSymbol(
@@ -6217,14 +6485,14 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
-        private static bool TryResolveAssignedIndexExpression(
+        private static bool TryResolveAssignedIndexShape(
             ExpressionSyntax useExpression,
             ISymbol indexSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out ExpressionSyntax indexExpression)
+            out IndexExpressionShape indexShape)
         {
-            indexExpression = null!;
+            indexShape = default;
             var foundAssignment = false;
             foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
             {
@@ -6241,27 +6509,27 @@ namespace PurelySharp.Symbolic.Smt
                         semanticModel,
                         cancellationToken,
                         out var writesIndexSymbol,
-                        out var assignedIndexExpression);
+                        out var assignedIndexShape);
                     if (!writesIndexSymbol)
                     {
                         continue;
                     }
 
                     if (foundAssignment ||
-                        assignedIndexExpression == null)
+                        !assignedIndexShape.HasValue)
                     {
-                        indexExpression = null!;
+                        indexShape = default;
                         return false;
                     }
 
-                    indexExpression = assignedIndexExpression;
+                    indexShape = assignedIndexShape.GetValueOrDefault();
                     foundAssignment = true;
                 }
             }
 
             if (!foundAssignment)
             {
-                indexExpression = null!;
+                indexShape = default;
                 return false;
             }
 
@@ -6274,9 +6542,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesIndexSymbol,
-            out ExpressionSyntax? indexExpression)
+            out IndexExpressionShape? indexShape)
         {
-            indexExpression = null;
+            indexShape = null;
             writesIndexSymbol = false;
 
             if (TryGetIndexAssignmentFromLocalDeclaration(
@@ -6285,7 +6553,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out writesIndexSymbol,
-                    out indexExpression))
+                    out indexShape))
             {
                 return;
             }
@@ -6296,7 +6564,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out writesIndexSymbol,
-                    out indexExpression))
+                    out indexShape))
             {
                 return;
             }
@@ -6310,9 +6578,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesIndexSymbol,
-            out ExpressionSyntax? indexExpression)
+            out IndexExpressionShape? indexShape)
         {
-            indexExpression = null;
+            indexShape = null;
             writesIndexSymbol = false;
             if (statement is not LocalDeclarationStatementSyntax localDeclaration)
             {
@@ -6334,15 +6602,16 @@ namespace PurelySharp.Symbolic.Smt
 
                 writesIndexSymbol = true;
                 if (localDeclaration.Declaration.Variables.Count != 1 ||
-                    !TryGetSupportedAssignedIndexExpression(
+                    !TryCreateDirectIndexExpressionShape(
                         variable.Initializer.Value,
                         semanticModel,
                         cancellationToken,
-                        out indexExpression))
+                        out var assignedIndexShape))
                 {
                     return true;
                 }
 
+                indexShape = assignedIndexShape;
                 return true;
             }
 
@@ -6355,9 +6624,9 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out bool writesIndexSymbol,
-            out ExpressionSyntax? indexExpression)
+            out IndexExpressionShape? indexShape)
         {
-            indexExpression = null;
+            indexShape = null;
             writesIndexSymbol = false;
             if (statement is not ExpressionStatementSyntax
                 {
@@ -6370,25 +6639,38 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             writesIndexSymbol = true;
-            TryGetSupportedAssignedIndexExpression(
-                assignment.Right,
-                semanticModel,
-                cancellationToken,
-                out indexExpression);
+            if (TryCreateDirectIndexExpressionShape(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var assignedIndexShape))
+            {
+                indexShape = assignedIndexShape;
+            }
+
             return true;
         }
 
-        private static bool TryGetSupportedAssignedIndexExpression(
+        private static bool TryCreateDirectIndexExpressionShape(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out ExpressionSyntax indexExpression)
+            out IndexExpressionShape indexShape)
         {
             expression = UnwrapElementAccessIndexExpression(expression);
             if (expression is PrefixUnaryExpressionSyntax fromEndIndex &&
                 fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
             {
-                indexExpression = expression;
+                indexShape = new IndexExpressionShape(
+                    fromEndIndex.Operand,
+                    fromEnd: true,
+                    requiresNonNegativeValue: true);
+                return true;
+            }
+
+            if (TryCreateIndexInvocationShape(expression, semanticModel, cancellationToken, out indexShape) ||
+                TryCreateIndexObjectCreationShape(expression, semanticModel, cancellationToken, out indexShape))
+            {
                 return true;
             }
 
@@ -6396,12 +6678,92 @@ namespace PurelySharp.Symbolic.Smt
             if (typeInfo.Type != null &&
                 IsIntegralOrEnumType(typeInfo.Type))
             {
-                indexExpression = expression;
+                indexShape = new IndexExpressionShape(
+                    expression,
+                    fromEnd: false,
+                    requiresNonNegativeValue: false);
                 return true;
             }
 
-            indexExpression = null!;
+            indexShape = default;
             return false;
+        }
+
+        private static bool TryCreateIndexInvocationShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IndexExpressionShape indexShape)
+        {
+            indexShape = default;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
+                invocationOperation.TargetMethod.ReturnType is not { } returnType ||
+                !IsSystemIndexType(returnType, semanticModel.Compilation) ||
+                invocationOperation.TargetMethod.ContainingType is not { } containingType ||
+                !IsSystemIndexType(containingType, semanticModel.Compilation) ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
+            {
+                return false;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "FromStart")
+            {
+                indexShape = new IndexExpressionShape(
+                    valueExpression,
+                    fromEnd: false,
+                    requiresNonNegativeValue: true);
+                return true;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "FromEnd")
+            {
+                indexShape = new IndexExpressionShape(
+                    valueExpression,
+                    fromEnd: true,
+                    requiresNonNegativeValue: true);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateIndexObjectCreationShape(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IndexExpressionShape indexShape)
+        {
+            indexShape = default;
+            if (expression is not ObjectCreationExpressionSyntax objectCreation ||
+                semanticModel.GetOperation(objectCreation, cancellationToken) is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Constructor == null ||
+                !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, semanticModel.Compilation) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var valueExpression))
+            {
+                return false;
+            }
+
+            if (!TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var fromEndExpression))
+            {
+                indexShape = new IndexExpressionShape(
+                    valueExpression,
+                    fromEnd: false,
+                    requiresNonNegativeValue: true);
+                return true;
+            }
+
+            if (!TryGetConstantBool(fromEndExpression, semanticModel, cancellationToken, out var fromEnd))
+            {
+                return false;
+            }
+
+            indexShape = new IndexExpressionShape(
+                valueExpression,
+                fromEnd,
+                requiresNonNegativeValue: true);
+            return true;
         }
 
         private static bool ContainsIndexSymbolWrite(
@@ -6598,6 +6960,24 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryGetConstantBool(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool value)
+        {
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue &&
+                constantValue.Value is bool booleanValue)
+            {
+                value = booleanValue;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
         private static bool TryCreateCollectionExpressionLengthFormula(
             ExpressionSyntax receiverExpression,
             out SmtFormula lengthFormula)
@@ -6636,55 +7016,162 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth)
         {
-            if (!TryResolveBuiltInIndexAccessIndexExpression(
+            if (!TryResolveBuiltInIndexAccessIndexShape(
                     indexExpression,
                     semanticModel,
                     cancellationToken,
-                    out indexExpression))
+                    out var indexShape) ||
+                !TryCreateEffectiveBuiltInIndexFormula(
+                    indexShape,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out indexFormula,
+                    getSymbolVersion,
+                    inlineDepth))
             {
                 indexFormula = null!;
                 return false;
             }
 
-            indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
-            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
-                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
-            {
-                if (!TryTranslateValue(
-                        fromEndIndex.Operand,
-                        semanticModel,
-                        cancellationToken,
-                        out var fromEndOffset,
-                        getSymbolVersion,
-                        inlineDepth) ||
-                    fromEndOffset is not { Kind: SmtValueKind.Int })
-                {
-                    indexFormula = null!;
-                    return false;
-                }
+            return true;
+        }
 
-                indexFormula = new SmtIntegerBinaryTerm(
-                    SmtIntegerBinaryOperator.Subtract,
-                    lengthFormula,
-                    fromEndOffset);
+        private static bool TryCreateEffectiveBuiltInIndexFormula(
+            IndexExpressionShape indexShape,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula indexFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (!TryTranslateValue(
+                    indexShape.ValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rawIndex,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                rawIndex is not { Kind: SmtValueKind.Int })
+            {
+                indexFormula = null!;
+                return false;
+            }
+
+            indexFormula = indexShape.FromEnd
+                ? new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, lengthFormula, rawIndex)
+                : rawIndex;
+            return true;
+        }
+
+        private static bool TryCreateIndexShapeWellFormedFormula(
+            IndexExpressionShape indexShape,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            if (!indexShape.RequiresNonNegativeValue)
+            {
                 return true;
             }
 
             if (!TryTranslateValue(
-                    indexExpression,
+                    indexShape.ValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var ordinaryIndex,
+                    out var rawIndex,
                     getSymbolVersion,
                     inlineDepth) ||
-                ordinaryIndex is not { Kind: SmtValueKind.Int })
+                rawIndex is not { Kind: SmtValueKind.Int })
             {
-                indexFormula = null!;
                 return false;
             }
 
-            indexFormula = ordinaryIndex;
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                rawIndex,
+                new SmtIntegerConstant(0));
             return true;
+        }
+
+        private static bool TryCreateRangeShapeWellFormedFormula(
+            RangeExpressionShape rangeShape,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            SmtFormula? startWellFormed = null;
+            SmtFormula? endWellFormed = null;
+            if (rangeShape.HasStart &&
+                !TryCreateIndexShapeWellFormedFormula(
+                    rangeShape.Start,
+                    semanticModel,
+                    cancellationToken,
+                    out startWellFormed,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            if (rangeShape.HasEnd &&
+                !TryCreateIndexShapeWellFormedFormula(
+                    rangeShape.End,
+                    semanticModel,
+                    cancellationToken,
+                    out endWellFormed,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            if (startWellFormed != null)
+            {
+                formula = startWellFormed;
+            }
+
+            if (endWellFormed != null)
+            {
+                formula = CombineConjunction(formula, endWellFormed);
+            }
+
+            return true;
+        }
+
+        private static SmtFormula CombineConjunction(SmtFormula? left, SmtFormula? right)
+        {
+            if (left == null)
+            {
+                return right ?? new SmtBooleanConstant(true);
+            }
+
+            if (right == null)
+            {
+                return left;
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+        }
+
+        private static SmtFormula ApplyWellFormedPrecondition(SmtFormula? wellFormed, SmtFormula inRange)
+        {
+            if (wellFormed == null)
+            {
+                return inRange;
+            }
+
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, wellFormed),
+                inRange);
         }
 
         private static bool TryCreateBuiltInRangeAccessInRangeFormula(
@@ -6697,13 +7184,14 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null!;
-            if (!TryResolveBuiltInRangeAccessRangeExpression(
+            if (!TryResolveBuiltInRangeAccessRangeShape(
                     argumentExpression,
                     semanticModel,
                     cancellationToken,
-                    out var rangeExpression) ||
+                    out var rangeShape) ||
                 !TryCreateEffectiveRangeEndpointFormula(
-                    rangeExpression.LeftOperand,
+                    rangeShape,
+                    useStart: true,
                     lengthFormula,
                     defaultWhenOmitted: new SmtIntegerConstant(0),
                     semanticModel,
@@ -6712,7 +7200,8 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth) ||
                 !TryCreateEffectiveRangeEndpointFormula(
-                    rangeExpression.RightOperand,
+                    rangeShape,
+                    useStart: false,
                     lengthFormula,
                     defaultWhenOmitted: lengthFormula,
                     semanticModel,
@@ -6740,11 +7229,24 @@ namespace PurelySharp.Symbolic.Smt
                 SmtBinaryOperator.And,
                 nonNegativeStart,
                 new SmtBinaryFormula(SmtBinaryOperator.And, orderedEndpoints, endWithinLength));
+            if (!TryCreateRangeShapeWellFormedFormula(
+                    rangeShape,
+                    semanticModel,
+                    cancellationToken,
+                    out var rangeWellFormed,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            formula = ApplyWellFormedPrecondition(rangeWellFormed, formula);
             return true;
         }
 
         private static bool TryCreateEffectiveRangeEndpointFormula(
-            ExpressionSyntax? endpointExpression,
+            RangeExpressionShape rangeShape,
+            bool useStart,
             SmtFormula lengthFormula,
             SmtFormula defaultWhenOmitted,
             SemanticModel semanticModel,
@@ -6753,14 +7255,15 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth)
         {
-            if (endpointExpression == null)
+            var hasEndpoint = useStart ? rangeShape.HasStart : rangeShape.HasEnd;
+            if (!hasEndpoint)
             {
                 endpointFormula = defaultWhenOmitted;
                 return true;
             }
 
             return TryCreateEffectiveBuiltInIndexFormula(
-                endpointExpression,
+                useStart ? rangeShape.Start : rangeShape.End,
                 lengthFormula,
                 semanticModel,
                 cancellationToken,
