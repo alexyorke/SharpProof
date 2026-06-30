@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -1006,25 +1007,42 @@ namespace PurelySharp.Symbolic.Smt
             string? pattern = null;
             if (method.IsStatic)
             {
-                if (invocationOperation.Arguments.Length < 2 ||
-                    !TryGetNoRegexOptions(invocationOperation.Arguments, startIndex: 2, semanticModel, cancellationToken))
+                if (!TryGetSupportedRegexOptionLetters(
+                        invocationOperation.Arguments,
+                        startIndex: 2,
+                        semanticModel,
+                        cancellationToken,
+                        out var optionLetters))
                 {
                     return false;
                 }
 
-                inputExpression = invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax;
+                if (invocationOperation.Arguments.Length < 2 ||
+                    invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax staticInputExpression)
+                {
+                    return false;
+                }
+
+                inputExpression = staticInputExpression;
                 pattern = TryGetConstantString(invocationOperation.Arguments[1].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken);
+                if (pattern != null)
+                {
+                    pattern = WrapRegexPatternWithInlineOptions(pattern, optionLetters);
+                }
             }
             else
             {
-                if (invocationOperation.Arguments.Length < 1 ||
-                    !TryGetNoRegexOptions(invocationOperation.Arguments, startIndex: 1, semanticModel, cancellationToken))
+                if (invocationOperation.Arguments.Length != 1 ||
+                    invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInputExpression)
                 {
                     return false;
                 }
 
-                inputExpression = invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax;
-                pattern = TryGetRegexPatternFromReceiver(invocationExpression, semanticModel, cancellationToken);
+                inputExpression = instanceInputExpression;
+                if (!TryGetRegexPatternFromReceiver(invocationExpression, semanticModel, cancellationToken, out pattern))
+                {
+                    return false;
+                }
             }
 
             if (inputExpression == null ||
@@ -1338,32 +1356,58 @@ namespace PurelySharp.Symbolic.Smt
             return type?.ToDisplayString() == "System.Text.RegularExpressions.Regex";
         }
 
-        private static string? TryGetRegexPatternFromReceiver(
+        private static bool TryGetRegexPatternFromReceiver(
             InvocationExpressionSyntax invocationExpression,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            out string? pattern)
         {
+            pattern = null;
             if (invocationExpression.Expression is not MemberAccessExpressionSyntax memberAccess)
             {
-                return null;
+                return false;
             }
 
             var receiver = UnwrapExpression(memberAccess.Expression);
-            if (receiver is ObjectCreationExpressionSyntax objectCreation &&
-                objectCreation.ArgumentList?.Arguments.Count >= 1)
+            if (receiver is not ObjectCreationExpressionSyntax objectCreation ||
+                semanticModel.GetOperation(objectCreation, cancellationToken) is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Constructor?.ContainingType is not { } constructedType ||
+                !IsRegexType(constructedType) ||
+                objectCreationOperation.Arguments.Length < 1 ||
+                !TryGetSupportedRegexOptionLetters(
+                    objectCreationOperation.Arguments,
+                    startIndex: 1,
+                    semanticModel,
+                    cancellationToken,
+                    out var optionLetters))
             {
-                return TryGetConstantString(objectCreation.ArgumentList.Arguments[0].Expression, semanticModel, cancellationToken);
+                return false;
             }
 
-            return null;
+            var rawPattern = TryGetConstantString(objectCreationOperation.Arguments[0].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken);
+            if (rawPattern == null)
+            {
+                return false;
+            }
+
+            pattern = WrapRegexPatternWithInlineOptions(rawPattern, optionLetters);
+            return true;
         }
 
-        private static bool TryGetNoRegexOptions(
+        private static bool TryGetSupportedRegexOptionLetters(
             ImmutableArray<IArgumentOperation> arguments,
             int startIndex,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            out string optionLetters)
         {
+            const long supportedOptions =
+                (long)RegexOptions.ExplicitCapture |
+                (long)RegexOptions.Singleline |
+                (long)RegexOptions.IgnorePatternWhitespace;
+
+            optionLetters = string.Empty;
+            long options = 0;
             for (var index = startIndex; index < arguments.Length; index++)
             {
                 var parameterType = arguments[index].Parameter?.Type;
@@ -1373,14 +1417,88 @@ namespace PurelySharp.Symbolic.Smt
                     continue;
                 }
 
-                if (!TryGetIntegralConstantValue(arguments[index].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var options) ||
-                    options != 0)
+                if (!TryGetIntegralConstantValue(arguments[index].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var argumentOptions) ||
+                    (argumentOptions & ~supportedOptions) != 0)
                 {
                     return false;
                 }
+
+                options |= argumentOptions;
             }
 
+            optionLetters = CreateInlineRegexOptionLetters(options);
             return true;
+        }
+
+        private static string CreateInlineRegexOptionLetters(long options)
+        {
+            var letters = string.Empty;
+            if ((options & (long)RegexOptions.ExplicitCapture) != 0)
+            {
+                letters += "n";
+            }
+
+            if ((options & (long)RegexOptions.Singleline) != 0)
+            {
+                letters += "s";
+            }
+
+            if ((options & (long)RegexOptions.IgnorePatternWhitespace) != 0)
+            {
+                letters += "x";
+            }
+
+            return letters;
+        }
+
+        private static string WrapRegexPatternWithInlineOptions(string pattern, string optionLetters)
+        {
+            if (optionLetters.Length == 0)
+            {
+                return pattern;
+            }
+
+            var bodyStart = pattern.StartsWith(@"\A", StringComparison.Ordinal)
+                ? 2
+                : pattern.StartsWith("^", StringComparison.Ordinal)
+                    ? 1
+                    : 0;
+            var bodyEndTrim = EndsWithUnescapedRegexAnchor(pattern, @"\z") ||
+                EndsWithUnescapedRegexAnchor(pattern, @"\Z")
+                    ? 2
+                    : pattern.EndsWith("$", StringComparison.Ordinal) && !IsRegexCharacterEscaped(pattern, pattern.Length - 1)
+                        ? 1
+                        : 0;
+            var bodyEnd = pattern.Length - bodyEndTrim;
+            if (bodyEnd < bodyStart)
+            {
+                return pattern;
+            }
+
+            return pattern.Substring(0, bodyStart) +
+                "(?" +
+                optionLetters +
+                ":" +
+                pattern.Substring(bodyStart, bodyEnd - bodyStart) +
+                ")" +
+                pattern.Substring(bodyEnd);
+        }
+
+        private static bool EndsWithUnescapedRegexAnchor(string value, string anchor)
+        {
+            return value.EndsWith(anchor, StringComparison.Ordinal) &&
+                !IsRegexCharacterEscaped(value, value.Length - anchor.Length);
+        }
+
+        private static bool IsRegexCharacterEscaped(string value, int index)
+        {
+            var slashCount = 0;
+            for (var current = index - 1; current >= 0 && value[current] == '\\'; current--)
+            {
+                slashCount++;
+            }
+
+            return slashCount % 2 == 1;
         }
 
         private static bool HasOrdinalStringComparison(

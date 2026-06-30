@@ -6500,6 +6500,50 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StaticExplicitCaptureRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A(A)B\z"", RegexOptions.ExplicitCapture) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticSinglelineRegexOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Singleline) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticIgnorePatternWhitespaceRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace) && text != ""A B""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticCombinedSupportedRegexOptionsContradictsNegatedNewlineMatch()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!Regex.IsMatch(text, @""\A . \z"", RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace | RegexOptions.ExplicitCapture) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_ScopedSinglelineDisableRegexDotRejectsNewline()
         {
             Assert.That(
@@ -6550,6 +6594,28 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceSinglelineRegexOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!new Regex(@""\A.\z"", RegexOptions.Singleline).IsMatch(text) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceIgnorePatternWhitespaceRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\A A\ B \z"", RegexOptions.IgnorePatternWhitespace).IsMatch(text) && text != ""A B""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }
@@ -6627,6 +6693,17 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"AB\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceUnsupportedRegexOptionsRemainConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
                     "using System.Text.RegularExpressions;"),
                 Is.False);
         }
