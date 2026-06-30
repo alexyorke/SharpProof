@@ -662,6 +662,19 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case LockStatementSyntax lockStatement:
+                    if (TryCreateArgumentNullCandidate(
+                            lockStatement,
+                            lockStatement.Expression,
+                            "definite_lock_null",
+                            semanticModel,
+                            cancellationToken,
+                            out var lockNullCandidate))
+                    {
+                        yield return lockNullCandidate;
+                    }
+
+                    break;
                 case InvocationExpressionSyntax invocation:
                     if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
                     {
@@ -1090,6 +1103,32 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.NullReferenceException",
                 "definite_null_dereference");
+            return true;
+        }
+
+        private static bool TryCreateArgumentNullCandidate(
+            SyntaxNode site,
+            ExpressionSyntax expression,
+            string category,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
+            if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
+                !IsReferenceType(expressionType) ||
+                !TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var trigger))
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                site,
+                SymbolicRuntimeHazardKind.ArgumentNull,
+                trigger,
+                "System.ArgumentNullException",
+                category);
             return true;
         }
 
@@ -2762,6 +2801,7 @@ namespace PurelySharp.Symbolic
         InvalidCast,
         DynamicNullBinding,
         NegativeArrayLength,
+        ArgumentNull,
     }
 
     public enum SymbolicRuntimeHazardStatus

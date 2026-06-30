@@ -349,6 +349,107 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesLockNullSourceArgumentNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate is null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "lock (gate)",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentNull }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_lock_null"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.LockStatement.ToString()));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_PrunesLockNullSourceAfterNonNullGuard()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate is not null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "lock (gate)",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentNull }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ClassifiesLockNullSourceAfterNonNullGuardAsUnreachableCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate is not null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "lock (gate)",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentNull }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.LockStatement.ToString()));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesDynamicMemberNullBinding()
         {
             const string source = @"
