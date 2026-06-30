@@ -698,6 +698,10 @@ namespace PurelySharp.Analyzer
                     minValue = int.MinValue;
                     maxValue = int.MaxValue;
                     return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
+                    return true;
                 case SpecialType.System_Int64:
                     minValue = long.MinValue;
                     maxValue = long.MaxValue;

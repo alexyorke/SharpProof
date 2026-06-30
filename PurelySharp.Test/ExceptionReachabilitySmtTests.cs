@@ -567,6 +567,76 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_CheckedUIntAdditionOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public uint TestMethod(uint value)
+    {
+        if (value == uint.MaxValue)
+        {
+            return checked(value + 1u);
+        }
+
+        return 0u;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedUIntSubtractionOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public uint TestMethod(uint value)
+    {
+        if (value == uint.MinValue)
+        {
+            return checked(value - 1u);
+        }
+
+        return 0u;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedUIntMultiplicationOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public uint TestMethod(uint value)
+    {
+        if (value == uint.MaxValue)
+        {
+            return checked(value * 2u);
+        }
+
+        return 0u;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
         public async Task Ps0010_CheckedIntUnaryMinusOverflow_Reports()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -906,6 +976,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_CheckedUIntAdditionGuardedUnreachableOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public uint TestMethod(uint value)
+    {
+        if (value == uint.MaxValue)
+        {
+            return 0u;
+        }
+
+        if (value == uint.MaxValue)
+        {
+            return checked(value + 1u);
+        }
+
+        return 1u;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_UncheckedIntAdditionOverflow_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -923,6 +1018,30 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_CheckedUIntAdditionOverflow_ReportsSite()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public uint TestMethod(uint value)
+    {
+        if (value == uint.MaxValue)
+        {
+            return checked(value + 1u);
+        }
+
+        return 0u;
+    }
+}");
+
+            var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
         }
 
         [Test]
