@@ -285,6 +285,12 @@ namespace PurelySharp.Symbolic
                              cancellationToken))
                 {
                     AddReachabilityCondition(builder, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    builder.AddRange(CollectLoopBodyInvariantFacts(whileStatementSyntax, semanticModel, cancellationToken));
+                }
+                else if (ancestor is DoStatementSyntax doStatementSyntax &&
+                         doStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    builder.AddRange(CollectLoopBodyInvariantFacts(doStatementSyntax, semanticModel, cancellationToken));
                 }
                 else if (ancestor is ForStatementSyntax forStatementSyntax &&
                          forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
@@ -300,7 +306,7 @@ namespace PurelySharp.Symbolic
                         AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                     }
 
-                    builder.AddRange(CollectForLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken));
+                    builder.AddRange(CollectLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken));
                 }
                 else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
                          forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -424,9 +430,31 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            return CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken);
+        }
+
+        public static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
             var builder = ImmutableArray.CreateBuilder<SmtFormula>();
-            AddForLoopMonotonicLowerBoundFacts(builder, forStatement, semanticModel, cancellationToken);
-            AddForLoopMonotonicUpperBoundFacts(builder, forStatement, semanticModel, cancellationToken);
+            switch (loopStatement)
+            {
+                case ForStatementSyntax forStatement:
+                    AddForLoopMonotonicLowerBoundFacts(builder, forStatement, semanticModel, cancellationToken);
+                    AddForLoopMonotonicUpperBoundFacts(builder, forStatement, semanticModel, cancellationToken);
+                    break;
+                case WhileStatementSyntax whileStatement:
+                    AddPreLoopMonotonicLowerBoundFacts(builder, whileStatement, whileStatement.Statement, semanticModel, cancellationToken);
+                    AddPreLoopMonotonicUpperBoundFacts(builder, whileStatement, whileStatement.Statement, semanticModel, cancellationToken);
+                    break;
+                case DoStatementSyntax doStatement:
+                    AddPreLoopMonotonicLowerBoundFacts(builder, doStatement, doStatement.Statement, semanticModel, cancellationToken);
+                    AddPreLoopMonotonicUpperBoundFacts(builder, doStatement, doStatement.Statement, semanticModel, cancellationToken);
+                    break;
+            }
+
             return builder.ToImmutable();
         }
 
@@ -580,6 +608,243 @@ namespace PurelySharp.Symbolic
             {
                 if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken) ||
                     NodeMayMutateSymbolThroughReference(incrementor, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void AddPreLoopMonotonicLowerBoundFacts(
+            ICollection<SmtFormula> facts,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerBounds(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
+                    symbolFormula.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveLowerBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    symbolFormula,
+                    initializer.Bound));
+            }
+        }
+
+        private static void AddPreLoopMonotonicUpperBoundFacts(
+            ICollection<SmtFormula> facts,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddPreLoopMonotonicInitialUpperBoundFacts(facts, loopStatement, loopBody, semanticModel, cancellationToken);
+
+            foreach (var initializer in EnumeratePreLoopStrictUpperBoundInitializers(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
+                    symbolFormula.Kind != SmtValueKind.Int ||
+                    initializer.UpperBound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    symbolFormula,
+                    initializer.UpperBound));
+            }
+        }
+
+        private static void AddPreLoopMonotonicInitialUpperBoundFacts(
+            ICollection<SmtFormula> facts,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerBounds(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
+                    symbolFormula.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    symbolFormula,
+                    initializer.Bound));
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SmtFormula Bound, IReadOnlyList<ISymbol> BoundSymbols)> EnumeratePreLoopInitializerBounds(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel, cancellationToken))
+            {
+                if (TryTranslateInitializerBound(
+                        initializer.Value,
+                        initializer.Symbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var bound,
+                        out var boundSymbols) &&
+                    !AnyPriorStatementsInvalidateInitializer(
+                        initializer,
+                        loopStatement,
+                        boundSymbols,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    yield return (initializer.Symbol, bound, boundSymbols);
+                }
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SmtFormula UpperBound, IReadOnlyList<ISymbol> BoundSymbols)> EnumeratePreLoopStrictUpperBoundInitializers(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel, cancellationToken))
+            {
+                if (TryGetStrictUpperBoundInitializer(
+                        initializer.Value,
+                        initializer.Symbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var upperBound,
+                        out var boundSymbols) &&
+                    !AnyPriorStatementsInvalidateInitializer(
+                        initializer,
+                        loopStatement,
+                        boundSymbols,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    yield return (initializer.Symbol, upperBound, boundSymbols);
+                }
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, ExpressionSyntax Value, int StatementIndex)> EnumeratePreLoopInitializerExpressions(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (loopStatement.Parent is not BlockSyntax containingBlock)
+            {
+                yield break;
+            }
+
+            var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
+            for (var statementIndex = 0; statementIndex < loopIndex; statementIndex++)
+            {
+                var statement = containingBlock.Statements[statementIndex];
+                if (statement is LocalDeclarationStatementSyntax { Declaration.Variables.Count: 1 } localDeclaration)
+                {
+                    var declarator = localDeclaration.Declaration.Variables[0];
+                    if (declarator.Initializer != null &&
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    {
+                        yield return (localSymbol.OriginalDefinition, declarator.Initializer.Value, statementIndex);
+                    }
+
+                    continue;
+                }
+
+                if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
+                    assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } symbol &&
+                    symbol is ILocalSymbol or IParameterSymbol)
+                {
+                    yield return (symbol.OriginalDefinition, assignment.Right, statementIndex);
+                }
+            }
+        }
+
+        private static bool AnyPriorStatementsInvalidateInitializer(
+            (ISymbol Symbol, ExpressionSyntax Value, int StatementIndex) initializer,
+            StatementSyntax loopStatement,
+            IReadOnlyList<ISymbol> boundSymbols,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (loopStatement.Parent is not BlockSyntax containingBlock)
+            {
+                return true;
+            }
+
+            var loopIndex = containingBlock.Statements.IndexOf(loopStatement);
+            for (var statementIndex = initializer.StatementIndex + 1; statementIndex < loopIndex; statementIndex++)
+            {
+                var statement = containingBlock.Statements[statementIndex];
+                if (StatementInvalidatesSymbolValue(statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    boundSymbols.Any(symbol => StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool LoopHeaderInvalidatesSymbolValue(
+            StatementSyntax loopStatement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var headerExpression = loopStatement switch
+            {
+                WhileStatementSyntax whileStatement => whileStatement.Condition,
+                DoStatementSyntax doStatement => doStatement.Condition,
+                ForStatementSyntax forStatement => forStatement.Condition,
+                _ => null
+            };
+
+            return headerExpression != null &&
+                SyntaxNodeInvalidatesSymbolValue(headerExpression, symbol, semanticModel, cancellationToken);
+        }
+
+        private static bool SyntaxNodeInvalidatesSymbolValue(
+            SyntaxNode root,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken) ||
+                    NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -750,6 +1015,35 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool LoopBodyMutationsPreserveLowerBound(
+            StatementSyntax loopBody,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in loopBody.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+
+                if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (node is not ExpressionSyntax expression ||
+                    !IncrementorPreservesLowerBound(expression, symbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static bool IncrementorPreservesLowerBound(
             ExpressionSyntax expression,
             ISymbol symbol,
@@ -832,6 +1126,35 @@ namespace PurelySharp.Symbolic
                 }
 
                 if (!IncrementorPreservesUpperBound(incrementor, symbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool LoopBodyMutationsPreserveUpperBound(
+            StatementSyntax loopBody,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in loopBody.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+
+                if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (node is not ExpressionSyntax expression ||
+                    !IncrementorPreservesUpperBound(expression, symbol, semanticModel, cancellationToken))
                 {
                     return false;
                 }
@@ -1326,6 +1649,10 @@ namespace PurelySharp.Symbolic
                     break;
                 case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
                     AddBranchConditionFacts(whileStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
+                    builder.AddRange(CollectLoopBodyInvariantFacts(whileStatement, semanticModel, cancellationToken));
+                    break;
+                case DoStatementSyntax doStatement when ReferenceEquals(doStatement.Statement, block):
+                    builder.AddRange(CollectLoopBodyInvariantFacts(doStatement, semanticModel, cancellationToken));
                     break;
                 case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
                     if (forStatement.Condition != null)
@@ -1333,7 +1660,7 @@ namespace PurelySharp.Symbolic
                         AddBranchConditionFacts(forStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
                     }
 
-                    builder.AddRange(CollectForLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken));
+                    builder.AddRange(CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken));
                     break;
                 case ForEachStatementSyntax forEachStatement when ReferenceEquals(forEachStatement.Statement, block):
                     AddForeachBodyEntryFacts(
@@ -2614,6 +2941,7 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken,
                         facts);
+                    AddLoopBodyInvariantFacts(facts, whileStatement, semanticModel, cancellationToken);
                     break;
                 case WhileStatementSyntax whileStatement
                     when TryCreateGuardedBreakLoopExitConditionFact(
@@ -2624,6 +2952,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var exitCondition):
                     facts.Add(exitCondition);
+                    AddLoopBodyInvariantFacts(facts, whileStatement, semanticModel, cancellationToken);
                     break;
                 case ForStatementSyntax { Condition: { } condition } forStatement
                     when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
@@ -2633,8 +2962,7 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken,
                         facts);
-                    AddForLoopMonotonicLowerBoundFacts(facts, forStatement, semanticModel, cancellationToken);
-                    AddForLoopMonotonicUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
+                    AddLoopBodyInvariantFacts(facts, forStatement, semanticModel, cancellationToken);
                     break;
                 case ForStatementSyntax { Condition: { } condition } forStatement
                     when TryCreateGuardedBreakLoopExitConditionFact(
@@ -2645,8 +2973,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var exitCondition):
                     facts.Add(exitCondition);
-                    AddForLoopMonotonicLowerBoundFacts(facts, forStatement, semanticModel, cancellationToken);
-                    AddForLoopMonotonicUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
+                    AddLoopBodyInvariantFacts(facts, forStatement, semanticModel, cancellationToken);
                     break;
                 case ForStatementSyntax { Condition: null } forStatement
                     when TryCreateGuardedBreakLoopExitConditionFact(
@@ -2657,8 +2984,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var exitCondition):
                     facts.Add(exitCondition);
-                    AddForLoopMonotonicLowerBoundFacts(facts, forStatement, semanticModel, cancellationToken);
-                    AddForLoopMonotonicUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
+                    AddLoopBodyInvariantFacts(facts, forStatement, semanticModel, cancellationToken);
                     break;
                 case DoStatementSyntax doStatement
                     when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
@@ -2668,6 +2994,7 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken,
                         facts);
+                    AddLoopBodyInvariantFacts(facts, doStatement, semanticModel, cancellationToken);
                     break;
                 case DoStatementSyntax doStatement
                     when TryCreateGuardedBreakLoopExitConditionFact(
@@ -2678,6 +3005,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var exitCondition):
                     facts.Add(exitCondition);
+                    AddLoopBodyInvariantFacts(facts, doStatement, semanticModel, cancellationToken);
                     break;
                 case ForEachStatementSyntax forEachStatement:
                     AddCompletedForeachStatementFacts(
@@ -2702,6 +3030,18 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         facts);
                     break;
+            }
+        }
+
+        private static void AddLoopBodyInvariantFacts(
+            ICollection<SmtFormula> facts,
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var loopFact in CollectLoopBodyInvariantFacts(loopStatement, semanticModel, cancellationToken))
+            {
+                facts.Add(loopFact);
             }
         }
 

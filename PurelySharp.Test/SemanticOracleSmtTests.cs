@@ -3626,6 +3626,103 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesWhileLoopMonotonicIndexBounds()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        var index = 0;
+        while (index < values.Length)
+        {
+            sum += values[index];
+            index++;
+        }
+
+        return sum;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "WhileLoopMonotonicIndexBounds.cs",
+                FindLine(source, "sum += values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0", "index < values.Length" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
+            Assert.That(result.ConditionProofs.Select(static proof => proof.TruthValue), Is.All.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesReverseWhileLoopMonotonicIndexBounds()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        var index = values.Length - 1;
+        while (index >= 0)
+        {
+            sum += values[index];
+            index--;
+        }
+
+        return sum;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "ReverseWhileLoopMonotonicIndexBounds.cs",
+                FindLine(source, "sum += values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0", "index < values.Length" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
+            Assert.That(result.ConditionProofs.Select(static proof => proof.TruthValue), Is.All.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesDoLoopPreEntryLowerBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var sum = 0;
+        var index = 0;
+        do
+        {
+            sum += index;
+            index++;
+        }
+        while (index < 10);
+
+        return sum;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "DoLoopPreEntryLowerBound.cs",
+                FindLine(source, "sum += index;"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_DoesNotInferForLoopLowerBoundWhenUpdaterDecrements()
         {
             const string source = @"
@@ -3655,6 +3752,38 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_DoesNotInferWhileLoopLowerBoundWhenBodyDecrements()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var index = 1;
+        while (index < values.Length)
+        {
+            var current = values[index];
+            index--;
+            return current;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "WhileLoopDecrementNoLowerBound.cs",
+                FindLine(source, "var current = values[index];"),
+                24,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseForLoopUpperBoundWhenUpdaterIncrements()
         {
             const string source = @"
@@ -3675,6 +3804,38 @@ public class TestClass
                 "ReverseForLoopIncrementNoUpperBound.cs",
                 FindLine(source, "return values[index];"),
                 20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index < values.Length" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.Not.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseWhileLoopUpperBoundWhenBodyIncrements()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var index = values.Length - 1;
+        while (index >= 0)
+        {
+            var current = values[index];
+            index++;
+            return current;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "ReverseWhileLoopIncrementNoUpperBound.cs",
+                FindLine(source, "var current = values[index];"),
+                24,
                 AnalyzerTestHost.GetTrustedPlatformReferences(),
                 smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
                 impliedConditions: new[] { "index < values.Length" });

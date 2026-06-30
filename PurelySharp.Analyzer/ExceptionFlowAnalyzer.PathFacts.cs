@@ -287,6 +287,24 @@ namespace PurelySharp.Analyzer
                 }
 
                 TryAddPathCondition(whileStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(whileStatement, semanticModel, cancellationToken))
+                {
+                    pathConditions.Add(loopFact);
+                }
+            }
+
+            foreach (var doStatement in useNode.Ancestors().OfType<DoStatementSyntax>())
+            {
+                if (!doStatement.Statement.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolAssignedBeforeUse(doStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(doStatement, semanticModel, cancellationToken))
+                {
+                    pathConditions.Add(loopFact);
+                }
             }
 
             foreach (var forStatement in useNode.Ancestors().OfType<ForStatementSyntax>())
@@ -300,7 +318,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 TryAddPathCondition(forStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
-                foreach (var loopFact in SymbolicProgramPointFacts.CollectForLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken))
+                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken))
                 {
                     pathConditions.Add(loopFact);
                 }

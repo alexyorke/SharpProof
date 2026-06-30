@@ -1430,6 +1430,52 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_WhileLoopMonotonicIndexBounds_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        var index = 0;
+        while (index < values.Length)
+        {
+            sum += values[index];
+            index++;
+        }
+
+        return sum;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_WhileLoopReverseIndexBounds_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        var index = values.Length - 1;
+        while (index >= 0)
+        {
+            sum += values[index];
+            index--;
+        }
+
+        return sum;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_LoopConditionIndexReassignedBeforeUse_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
