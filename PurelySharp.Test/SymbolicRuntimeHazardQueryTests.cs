@@ -138,6 +138,142 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = null;
+        return (int)value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.UnboxNull }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.UnboxNull));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_unbox_null"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownUnboxNullCastCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        return (int)value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.UnboxNull }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.UnboxNull }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.UnboxNull));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesInvalidReferenceCast()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod()
+    {
+        object value = new object();
+        return (string)value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (string)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesInvalidUnboxCast()
+        {
+            const string source = @"
+public class TestClass
+{
+    public long TestMethod()
+    {
+        object value = 1;
+        return (long)value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (long)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleCast()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod()
+    {
+        object value = ""text"";
+        return (string)value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (string)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesBuiltInIndexOutOfRange()
         {
             const string source = @"

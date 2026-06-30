@@ -435,6 +435,16 @@ namespace PurelySharp.Symbolic
                         yield return conversionOverflowCandidate;
                     }
 
+                    if (TryCreateUnboxNullCastCandidate(castExpression, semanticModel, cancellationToken, out var unboxNullCandidate))
+                    {
+                        yield return unboxNullCandidate;
+                    }
+
+                    if (TryCreateInvalidCastCandidate(castExpression, semanticModel, cancellationToken, out var invalidCastCandidate))
+                    {
+                        yield return invalidCastCandidate;
+                    }
+
                     break;
                 case MemberAccessExpressionSyntax memberAccess:
                     if (TryCreateNullableValueCandidate(memberAccess, semanticModel, cancellationToken, out var nullableCandidate))
@@ -747,6 +757,117 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.OverflowException",
                 "definite_checked_numeric_conversion_overflow");
+            return true;
+        }
+
+        private static bool TryCreateUnboxNullCastCandidate(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+                conversionOperation.Conversion.IsUserDefined ||
+                !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            var trigger = TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger)
+                ? nullTrigger
+                : CreateUnknownTrigger(castExpression, "unbox_null");
+
+            candidate = new RuntimeHazardCandidate(
+                castExpression,
+                SymbolicRuntimeHazardKind.UnboxNull,
+                trigger,
+                "System.NullReferenceException",
+                "definite_unbox_null");
+            return true;
+        }
+
+        private static bool TryCreateInvalidCastCandidate(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+                conversionOperation.Conversion.IsUserDefined ||
+                conversionOperation.Conversion.IsIdentity ||
+                conversionOperation.Type is not { } targetType ||
+                targetType.TypeKind == TypeKind.Dynamic)
+            {
+                return false;
+            }
+
+            SmtFormula mismatchTrigger;
+            if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
+            {
+                if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger) &&
+                    nullTrigger is SmtBooleanConstant { Value: true })
+                {
+                    return false;
+                }
+
+                mismatchTrigger = TryGetExactRuntimeType(
+                    castExpression.Expression,
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var exactRuntimeType)
+                    ? new SmtBooleanConstant(!CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
+                    : CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
+            }
+            else
+            {
+                var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+                if (!IsReferenceType(targetType) ||
+                    !IsReferenceType(operandType))
+                {
+                    return false;
+                }
+
+                if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger) &&
+                    nullTrigger is SmtBooleanConstant { Value: true })
+                {
+                    return false;
+                }
+
+                mismatchTrigger = TryGetExactRuntimeType(
+                    castExpression.Expression,
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var exactRuntimeType)
+                    ? new SmtBooleanConstant(!CanCastExactRuntimeTypeToReferenceType(
+                        exactRuntimeType,
+                        targetType,
+                        semanticModel.Compilation))
+                    : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
+            }
+
+            if (mismatchTrigger is SmtBooleanConstant { Value: false })
+            {
+                return false;
+            }
+
+            var trigger = Conjoin(
+                CreateNonNullTrigger(castExpression.Expression, castExpression, semanticModel, cancellationToken),
+                mismatchTrigger);
+            if (trigger is SmtBooleanConstant { Value: false })
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                castExpression,
+                SymbolicRuntimeHazardKind.InvalidCast,
+                trigger,
+                "System.InvalidCastException",
+                "definite_invalid_cast");
             return true;
         }
 
@@ -1555,6 +1676,38 @@ namespace PurelySharp.Symbolic
                 (conversion.IsIdentity || conversion.IsImplicit);
         }
 
+        private static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType)
+        {
+            if (!IsNonNullableValueType(targetType))
+            {
+                return false;
+            }
+
+            return SymbolEqualityComparer.Default.Equals(exactRuntimeType, targetType);
+        }
+
+        private static bool CanCastExactRuntimeTypeToReferenceType(
+            ITypeSymbol exactRuntimeType,
+            ITypeSymbol targetType,
+            Compilation compilation)
+        {
+            if (targetType.TypeKind == TypeKind.Dynamic ||
+                exactRuntimeType.TypeKind == TypeKind.Dynamic)
+            {
+                return true;
+            }
+
+            if (IsReferenceType(targetType) &&
+                targetType.SpecialType == SpecialType.System_Object)
+            {
+                return true;
+            }
+
+            var conversion = compilation.ClassifyCommonConversion(exactRuntimeType, targetType);
+            return conversion.Exists &&
+                (conversion.IsIdentity || conversion.IsImplicit);
+        }
+
         private static SmtFormula Conjoin(SmtFormula left, SmtFormula right)
         {
             if (left is SmtBooleanConstant leftConstant)
@@ -1568,6 +1721,17 @@ namespace PurelySharp.Symbolic
             }
 
             return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+        }
+
+        private static SmtFormula CreateNonNullTrigger(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
+                ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
+                : CreateUnknownTrigger(site, "cast_operand_not_null");
         }
 
         private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)
@@ -1715,6 +1879,33 @@ namespace PurelySharp.Symbolic
                     Name: "Value",
                     ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
                 };
+        }
+
+        private static bool IsUnboxingCastShape(
+            CastExpressionSyntax castExpression,
+            ITypeSymbol? targetType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+            return IsNonNullableValueType(targetType) &&
+                IsReferenceType(operandType);
+        }
+
+        private static bool TryGetConversionOperation(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IConversionOperation conversionOperation)
+        {
+            if (semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation operation)
+            {
+                conversionOperation = operation;
+                return true;
+            }
+
+            conversionOperation = null!;
+            return false;
         }
 
         private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
@@ -2213,6 +2404,8 @@ namespace PurelySharp.Symbolic
         ArgumentOutOfRange,
         CheckedIntegralOverflow,
         ArrayTypeMismatch,
+        UnboxNull,
+        InvalidCast,
     }
 
     public enum SymbolicRuntimeHazardStatus
