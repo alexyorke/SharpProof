@@ -393,6 +393,7 @@ Options:
   --max-conditions <n>
                       Maximum condition strings included in --compact-json output. Default: 50.
   --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
+  --summary-only      Shorthand for --compact-json with --max-lines 0 and --max-points 0.
 """;
 
     public string? FilePath { get; private set; }
@@ -476,6 +477,8 @@ Options:
     public int CompactMaxProofs { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProofs;
 
     public bool HasCompactOutputLimit { get; private set; }
+
+    public bool CompactSummaryOnly { get; private set; }
 
     public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
 
@@ -618,6 +621,10 @@ Options:
                     options.CompactMaxProofs = ReadNonNegativeInt(args, ref index, arg);
                     options.HasCompactOutputLimit = true;
                     break;
+                case "--summary-only":
+                    options.CompactSummaryOnly = true;
+                    options.CompactJson = true;
+                    break;
                 case "--check-reachability":
                     options.CheckReachability = true;
                     break;
@@ -646,6 +653,12 @@ Options:
 
         if (!options.ShowHelp)
         {
+            if (options.CompactSummaryOnly)
+            {
+                options.CompactMaxLines = SymbolicCompactQueryOptions.SummaryOnly.MaxLines;
+                options.CompactMaxProgramPoints = SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints;
+            }
+
             if (options.Json && options.CompactJson)
             {
                 throw new ArgumentException("--json cannot be combined with --compact-json.");

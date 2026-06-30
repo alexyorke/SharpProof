@@ -149,5 +149,230 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task SwitchStatementCustomListPatternWithCount_FeedsLengthFact()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [_]:
+                if (bag.Count != 1)
+                {
+                    Console.WriteLine(bag.Count);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementCustomListPatternWithSlice_FeedsMinimumLengthFact()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [_, ..]:
+                if (bag.Count < 1)
+                {
+                    Console.WriteLine(bag.Count);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task NestedSwitchStatementCustomListPatternElementContradiction_PrunesSection()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [> 0, ..]:
+                switch (bag)
+                {
+                    case [< 0, ..]:
+                        Console.WriteLine(bag.Count);
+                        break;
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task NestedSwitchExpressionCustomListPatternTrailingElementContradiction_PrunesArm()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [.., > 0]:
+                return bag switch
+                {
+                    [.., < 0] => Console.ReadLine(),
+                    _ => string.Empty
+                };
+            default:
+                return string.Empty;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementRelationalPropertyConjunction_PrunesContradictoryGuard()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    [Pure]
+    public int Count { get; init; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Count: > 0 and < 10 }:
+                if (box.Count <= 0 || box.Count >= 10)
+                {
+                    Console.WriteLine(box.Count);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementExtendedPropertyPattern_FeedsIntermediateNonNullFact()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Child
+{
+    [Pure]
+    public int Value { get; init; }
+}
+
+public sealed class Box
+{
+    [Pure]
+    public Child Child { get; init; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Child.Value: > 0 }:
+                if (box.Child == null)
+                {
+                    Console.WriteLine(box);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

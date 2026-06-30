@@ -645,6 +645,15 @@ public class TestClass
             Assert.That(compact.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
             Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
             Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
+            Assert.That(compact.AnalysisSummary.ProgramPointCount, Is.EqualTo(1));
+            Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
+            Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
+            Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
+            Assert.That(compact.AnalysisSummary.ReachabilityCheckedCount, Is.EqualTo(1));
+            Assert.That(compact.AnalysisSummary.ReachabilityKnownCount, Is.EqualTo(1));
+            Assert.That(compact.AnalysisSummary.ProofResolvedCount, Is.EqualTo(1));
+            Assert.That(compact.AnalysisSummary.SmtEnabled, Is.True);
+            Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.False);
             Assert.That(compact.ProgramPoints, Is.Empty);
             Assert.That(compact.Truncation.ProgramPoints, Is.True);
             Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
@@ -678,6 +687,13 @@ public class TestClass
             Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
             Assert.That(root.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
             Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(result.ProofOutcomes.TotalCount));
+            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(analysisSummary.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(analysisSummary.GetProperty("invariantConditionCount").GetInt32(), Is.EqualTo(result.Invariant.ConditionCount));
+            Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+            Assert.That(analysisSummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
             Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         }
@@ -820,6 +836,73 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicFileQueryResult_ToCompactResult_SummaryOnlyOmitsNestedResults()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactSummaryOnlyQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactSummaryOnlyQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+            var compact = result.ToCompactResult(SymbolicCompactQueryOptions.SummaryOnly);
+
+            Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
+            Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);
+            Assert.That(compact.Kind, Is.EqualTo("file"));
+            Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
+            Assert.That(compact.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
+            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(compact.Lines, Is.Empty);
+            Assert.That(compact.ProgramPoints, Is.Empty);
+            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+            Assert.That(compact.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointSummary.ProgramPointCount));
+            Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+            Assert.That(compact.AnalysisSummary.ConservativeUnknownCount, Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
+            Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
+            Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
+            Assert.That(
+                compact.AnalysisSummary.ReachabilityCheckedCount,
+                Is.EqualTo(
+                    result.Reachability.ReachableCount +
+                    result.Reachability.UnreachableCount +
+                    result.Reachability.UnknownCount));
+            Assert.That(
+                compact.AnalysisSummary.ReachabilityKnownCount,
+                Is.EqualTo(result.Reachability.ReachableCount + result.Reachability.UnreachableCount));
+            Assert.That(compact.AnalysisSummary.ProofTotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+            Assert.That(
+                compact.AnalysisSummary.ProofResolvedCount,
+                Is.EqualTo(
+                    result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount +
+                    result.ProgramPointSummary.ProofOutcomes.ProvenFalseCount +
+                    result.ProgramPointSummary.ProofOutcomes.UnreachableCount));
+            Assert.That(compact.AnalysisSummary.SmtConfigured, Is.True);
+            Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 0));
+            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 0));
+        }
+
+        [Test]
         public async Task SymbolicCli_CompactJson_EmitsPerPointMetadataWhenDetailsAreBounded()
         {
             var source = @"
@@ -891,6 +974,69 @@ public class TestClass
                 Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
                 Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
                 Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_SummaryOnly_EmitsAggregateCompactJsonWithoutNestedResults()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliSummaryOnly-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--all-lines",
+                    "--check-reachability",
+                    "--implies",
+                    "value > 0",
+                    "--summary-only");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(root.GetProperty("linesWithProgramPoints").GetInt32(), Is.GreaterThan(0));
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.Not.Empty);
+                Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.GreaterThan(0));
+                var analysisSummary = root.GetProperty("analysisSummary");
+                Assert.That(
+                    analysisSummary.GetProperty("programPointCount").GetInt32(),
+                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+                Assert.That(analysisSummary.GetProperty("reachabilityCheckedCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(analysisSummary.GetProperty("smtConfigured").GetBoolean(), Is.True);
+                Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+                Assert.That(root.GetProperty("lines").GetArrayLength(), Is.Zero);
+                Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
+                Assert.That(root.GetProperty("truncation").GetProperty("lines").GetBoolean(), Is.True);
+                Assert.That(root.GetProperty("truncation").GetProperty("programPoints").GetBoolean(), Is.True);
             }
             finally
             {

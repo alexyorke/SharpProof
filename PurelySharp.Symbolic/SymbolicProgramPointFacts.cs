@@ -2284,7 +2284,7 @@ namespace PurelySharp.Symbolic
         {
             exitCondition = null!;
             if (LoopBodyContainsGoto(loopBody) ||
-                !TryCreateSingleTopLevelGuardedBreakCondition(
+                !TryCreateTopLevelGuardedBreakCondition(
                     loopStatement,
                     loopBody,
                     semanticModel,
@@ -2314,7 +2314,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static bool TryCreateSingleTopLevelGuardedBreakCondition(
+        private static bool TryCreateTopLevelGuardedBreakCondition(
             StatementSyntax loopStatement,
             StatementSyntax loopBody,
             SemanticModel semanticModel,
@@ -2327,25 +2327,48 @@ namespace PurelySharp.Symbolic
                 .OfType<BreakStatementSyntax>()
                 .Where(breakStatement => BreakTargetsLoop(breakStatement, loopStatement))
                 .ToArray();
-            if (loopBreaks.Length != 1)
+            if (loopBreaks.Length == 0)
             {
                 return false;
             }
 
-            var breakStatement = loopBreaks[0];
-            return TryCreateDirectGuardedBreakCondition(
+            if (loopBreaks.Length == 1)
+            {
+                var breakStatement = loopBreaks[0];
+                return TryCreateDirectGuardedBreakCondition(
                     breakStatement,
                     loopBody,
                     semanticModel,
                     cancellationToken,
                     out breakCondition) ||
-                TryCreateGuardedContinueBeforeBreakCondition(
-                    loopStatement,
-                    loopBody,
-                    breakStatement,
-                    semanticModel,
-                    cancellationToken,
-                    out breakCondition);
+                    TryCreateGuardedContinueBeforeBreakCondition(
+                        loopStatement,
+                        loopBody,
+                        breakStatement,
+                        semanticModel,
+                        cancellationToken,
+                        out breakCondition);
+            }
+
+            var breakConditions = new List<SmtFormula>(loopBreaks.Length);
+            foreach (var breakStatement in loopBreaks)
+            {
+                if (!TryCreateDirectGuardedBreakCondition(
+                        breakStatement,
+                        loopBody,
+                        semanticModel,
+                        cancellationToken,
+                        out var directBreakCondition))
+                {
+                    breakCondition = null!;
+                    return false;
+                }
+
+                breakConditions.Add(directBreakCondition);
+            }
+
+            breakCondition = CreateDisjunction(breakConditions);
+            return true;
         }
 
         private static bool TryCreateDirectGuardedBreakCondition(
@@ -2399,21 +2422,38 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            if (breakIndex <= 0 ||
-                block.Statements[breakIndex - 1] is not IfStatementSyntax ifStatement ||
-                !TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue) ||
-                AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, ifStatement.SpanStart, semanticModel, cancellationToken) ||
-                !TryCreateBranchConditionFormula(
-                    ifStatement.Condition,
-                    !continueBranchWhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    out breakCondition))
+            if (breakIndex <= 0)
             {
-                breakCondition = null!;
                 return false;
             }
 
+            SmtFormula? combinedCondition = null;
+            for (var index = breakIndex - 1; index >= 0; index--)
+            {
+                if (block.Statements[index] is not IfStatementSyntax ifStatement ||
+                    !TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue) ||
+                    AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, ifStatement.SpanStart, semanticModel, cancellationToken) ||
+                    !TryCreateBranchConditionFormula(
+                        ifStatement.Condition,
+                        !continueBranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        out var guardFallThroughCondition))
+                {
+                    break;
+                }
+
+                combinedCondition = combinedCondition == null
+                    ? guardFallThroughCondition
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, guardFallThroughCondition, combinedCondition);
+            }
+
+            if (combinedCondition == null)
+            {
+                return false;
+            }
+
+            breakCondition = combinedCondition;
             return true;
         }
 

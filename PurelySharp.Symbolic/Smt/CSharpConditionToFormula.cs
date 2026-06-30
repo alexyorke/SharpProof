@@ -845,14 +845,14 @@ namespace PurelySharp.Symbolic.Smt
             if (method.Name != "Equals" ||
                 method.ReturnType.SpecialType != SpecialType.System_Boolean ||
                 method.ContainingType?.SpecialType != SpecialType.System_String ||
-                !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+                !IsSupportedOrdinalStringEqualsInvocation(invocationOperation, semanticModel, cancellationToken))
             {
                 return false;
             }
 
             if (method.IsStatic)
             {
-                if (invocationOperation.Arguments.Length < 3 ||
+                if (invocationOperation.Arguments.Length < 2 ||
                     invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax leftExpression ||
                     invocationOperation.Arguments[1].Value.Syntax is not ExpressionSyntax rightExpression ||
                     !TryTranslateStringValue(leftExpression, semanticModel, cancellationToken, out var left, getSymbolVersion, inlineDepth) ||
@@ -875,7 +875,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (invocationOperation.Arguments.Length < 2 ||
+            if (invocationOperation.Arguments.Length < 1 ||
                 invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
                 invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax argumentExpression ||
                 !TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
@@ -893,6 +893,44 @@ namespace PurelySharp.Symbolic.Smt
                 receiverNonNull,
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, receiver, argument));
             return true;
+        }
+
+        private static bool IsSupportedOrdinalStringEqualsInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var method = invocationOperation.TargetMethod;
+            if (method.ContainingType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            var parameters = method.Parameters;
+            if (method.IsStatic)
+            {
+                if (parameters.Length == 2)
+                {
+                    return IsStringParameter(parameters[0]) &&
+                        IsStringParameter(parameters[1]);
+                }
+
+                return parameters.Length == 3 &&
+                    IsStringParameter(parameters[0]) &&
+                    IsStringParameter(parameters[1]) &&
+                    IsStringComparisonParameter(parameters[2]) &&
+                    HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+            }
+
+            if (parameters.Length == 1)
+            {
+                return IsStringParameter(parameters[0]);
+            }
+
+            return parameters.Length == 2 &&
+                IsStringParameter(parameters[0]) &&
+                IsStringComparisonParameter(parameters[1]) &&
+                HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
         }
 
         private static bool TryTranslateRegexIsMatchInvocation(
@@ -1154,6 +1192,16 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool IsStringParameter(IParameterSymbol parameter)
+        {
+            return parameter.Type.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsStringComparisonParameter(IParameterSymbol parameter)
+        {
+            return string.Equals(parameter.Type.ToDisplayString(), "System.StringComparison", StringComparison.Ordinal);
         }
 
         private static string? TryGetConstantString(
@@ -6709,6 +6757,19 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax asExpression &&
+                asExpression.IsKind(SyntaxKind.AsExpression) &&
+                TryTranslateIdentityPreservingAsValue(
+                    asExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is ElementAccessExpressionSyntax elementAccessExpression &&
                 TryTranslateBuiltInElementAccessValue(
                     elementAccessExpression,
@@ -7512,13 +7573,47 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryTranslateIdentityPreservingAsValue(
+            BinaryExpressionSyntax asExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (asExpression.Right is not TypeSyntax typeSyntax ||
+                !IsIdentityPreservingReferenceConversion(asExpression.Left, typeSyntax, semanticModel, cancellationToken) ||
+                !TryTranslateValue(asExpression.Left, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth) ||
+                operand is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = operand;
+            return true;
+        }
+
         private static bool IsIdentityPreservingReferenceCast(
             CastExpressionSyntax castExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
-            var targetType = semanticModel.GetTypeInfo(castExpression.Type, cancellationToken).Type;
+            return IsIdentityPreservingReferenceConversion(
+                castExpression.Expression,
+                castExpression.Type,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static bool IsIdentityPreservingReferenceConversion(
+            ExpressionSyntax expression,
+            TypeSyntax targetTypeSyntax,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var sourceType = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+            var targetType = semanticModel.GetTypeInfo(targetTypeSyntax, cancellationToken).Type;
             return IsTypeKnownAssignableTo(sourceType, targetType);
         }
 

@@ -205,6 +205,29 @@ namespace SearchLib.Smt
                 CollectStringEqualities(condition, stringEqualities);
             }
 
+            var stringLengthEqualities = new Dictionary<SmtFormula, long>();
+            foreach (var condition in normalizedConditions)
+            {
+                if (!TryCollectStringLengthEqualities(condition, stringLengthEqualities))
+                {
+                    preparedConditions = Array.Empty<SmtFormula>();
+                    return ConcreteFactPreparationStatus.Unsatisfiable;
+                }
+            }
+
+            foreach (var condition in normalizedConditions)
+            {
+                var status = TryInferStringEqualitiesFromLengthConstrainedPredicates(
+                    condition,
+                    stringLengthEqualities,
+                    stringEqualities);
+                if (status != ConcreteFactPreparationStatus.Ready)
+                {
+                    preparedConditions = Array.Empty<SmtFormula>();
+                    return status;
+                }
+            }
+
             var builder = new List<SmtFormula>(normalizedConditions.Count);
             foreach (var condition in normalizedConditions)
             {
@@ -351,6 +374,109 @@ namespace SearchLib.Smt
             {
                 stringEqualities.Add(formula, value);
             }
+        }
+
+        private static bool TryCollectStringLengthEqualities(
+            SmtFormula formula,
+            Dictionary<SmtFormula, long> stringLengthEqualities)
+        {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
+            {
+                return TryCollectStringLengthEqualities(andFormula.Left, stringLengthEqualities) &&
+                    TryCollectStringLengthEqualities(andFormula.Right, stringLengthEqualities);
+            }
+
+            if (!TryGetStringLengthEquality(formula, out var value, out var length))
+            {
+                return true;
+            }
+
+            if (length < 0)
+            {
+                return false;
+            }
+
+            if (stringLengthEqualities.TryGetValue(value, out var existing))
+            {
+                return existing == length;
+            }
+
+            stringLengthEqualities.Add(value, length);
+            return true;
+        }
+
+        private static bool TryGetStringLengthEquality(
+            SmtFormula formula,
+            out SmtFormula value,
+            out long length)
+        {
+            value = null!;
+            length = default;
+            if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equalFormula)
+            {
+                return false;
+            }
+
+            if (equalFormula.Left is SmtStringLengthTerm leftLength &&
+                equalFormula.Right is SmtIntegerConstant rightConstant)
+            {
+                value = leftLength.Value;
+                length = rightConstant.Value;
+                return true;
+            }
+
+            if (equalFormula.Left is SmtIntegerConstant leftConstant &&
+                equalFormula.Right is SmtStringLengthTerm rightLength)
+            {
+                value = rightLength.Value;
+                length = leftConstant.Value;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static ConcreteFactPreparationStatus TryInferStringEqualitiesFromLengthConstrainedPredicates(
+            SmtFormula formula,
+            IReadOnlyDictionary<SmtFormula, long> stringLengthEqualities,
+            Dictionary<SmtFormula, string> stringEqualities)
+        {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
+            {
+                var leftStatus = TryInferStringEqualitiesFromLengthConstrainedPredicates(
+                    andFormula.Left,
+                    stringLengthEqualities,
+                    stringEqualities);
+                if (leftStatus != ConcreteFactPreparationStatus.Ready)
+                {
+                    return leftStatus;
+                }
+
+                return TryInferStringEqualitiesFromLengthConstrainedPredicates(
+                    andFormula.Right,
+                    stringLengthEqualities,
+                    stringEqualities);
+            }
+
+            if (!TryGetPositiveStringPredicateFact(formula, out var predicate) ||
+                predicate.Kind is not (StringPredicateKind.StartsWith or StringPredicateKind.EndsWith) ||
+                !stringLengthEqualities.TryGetValue(predicate.Value, out var knownLength) ||
+                !TryGetConcreteString(predicate.Argument, stringEqualities, out var concreteArgument))
+            {
+                return ConcreteFactPreparationStatus.Ready;
+            }
+
+            if (knownLength < concreteArgument.Length)
+            {
+                return ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            if (knownLength == concreteArgument.Length)
+            {
+                AddStringEquality(stringEqualities, predicate.Value, concreteArgument);
+            }
+
+            return ConcreteFactPreparationStatus.Ready;
         }
 
         private ConcreteFactPreparationStatus SimplifyConcreteFacts(

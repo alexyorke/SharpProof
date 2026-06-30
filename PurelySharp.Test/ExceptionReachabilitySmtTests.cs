@@ -221,6 +221,162 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_CoalesceAssignmentThrowProvesNonNullContinuation_DoesNotReportNullDereference()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value ??= throw new InvalidOperationException();
+        if (value == null)
+        {
+            return value.Length;
+        }
+
+        return value.Length;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_SelfCoalesceAssignmentThrowProvesNonNullContinuation_DoesNotReportNullDereference()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value = value ?? throw new InvalidOperationException();
+        if (value == null)
+        {
+            return value.Length;
+        }
+
+        return value.Length;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_SelfConditionalThrowNullGuardProvesNonNullContinuation_DoesNotReportNullDereference()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value = value is not null ? value : throw new InvalidOperationException();
+        if (value == null)
+        {
+            return value.Length;
+        }
+
+        return value.Length;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_SelfConditionalThrowDivideGuardPrunesImpossibleDivideByZeroBranch()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        divisor = divisor != 0 ? divisor : throw new InvalidOperationException();
+        if (divisor == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 10 / divisor;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_SelfConditionalThrowIndexGuardPrunesImpossibleIndexOutOfRangeBranch()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        index = index >= 0 && index < values.Length ? index : throw new InvalidOperationException();
+        if (index >= values.Length)
+        {
+            return values[index];
+        }
+
+        return values[index];
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_SelfConditionalThrowPatternGuardPrunesImpossibleLengthBranch()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value = value is { Length: > 0 } ? value : throw new InvalidOperationException();
+        if (value.Length == 0)
+        {
+            return 1 / 0;
+        }
+
+        return value.Length;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
         public async Task Ps0010_EarlyReturnGuardContradictsDivideByZeroBranch_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

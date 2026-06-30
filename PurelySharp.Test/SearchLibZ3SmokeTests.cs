@@ -172,7 +172,7 @@ namespace PurelySharp.Test
                 {
                     new SmtUnaryFormula(
                         SmtUnaryOperator.Not,
-                        new SmtRegexMatchFormula(text, @"\A\d\z")),
+                        new SmtRegexMatchFormula(text, @"\A\bA\z")),
                     new SmtBinaryFormula(
                         SmtBinaryOperator.Equal,
                         new SmtStringLengthTerm(text),
@@ -201,6 +201,219 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_DigitRegexContradictsNonDigitPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\d\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NonDigitRegexContradictsSingleDigitPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\D\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("5")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegatedDigitClassContradictsSingleDigitPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[^\d]\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("5")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_WhitespaceRegexContradictsNonWhitespacePrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\s\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NonWhitespaceRegexContradictsNewlinePrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\S\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("\n")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_WordRegexContradictsPunctuationPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\w\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("!")),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NonWordRegexContradictsUnderscorePrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\W\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("_")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_UnicodeCategoryRegexContradictsLetterPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\p{P}\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegatedUnicodeCategoryRegexContradictsPunctuationPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\P{P}\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("!")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegatedUnicodeCategoryClassContradictsPunctuationPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[^\p{P}]\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("!")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_LargeUnicodeCategoryConclusionDoesNotBecomeProof()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var lengthIsOne = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(1));
+            var textIsUppercaseLetter = new SmtRegexMatchFormula(text, @"\A\p{Lu}\z");
+
+            var result = solver.Implies(
+                new[] { lengthIsOne },
+                textIsUppercaseLetter,
+                TimeSpan.FromMilliseconds(250));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_ApproximateRegexPathStillProvesLengthImplication()
         {
             using var solver = new SmtSolver();
@@ -213,7 +426,7 @@ namespace PurelySharp.Test
             var result = solver.Implies(
                 new[]
                 {
-                    new SmtRegexMatchFormula(text, @"\A\d\z"),
+                    new SmtRegexMatchFormula(text, @"\A\bA\z"),
                 },
                 lengthIsOne,
                 TimeSpan.FromMilliseconds(50));
@@ -230,11 +443,11 @@ namespace PurelySharp.Test
                 SmtBinaryOperator.Equal,
                 new SmtStringLengthTerm(text),
                 new SmtIntegerConstant(1));
-            var textIsDigit = new SmtRegexMatchFormula(text, @"\A\d\z");
+            var textIsBoundaryA = new SmtRegexMatchFormula(text, @"\A\bA\z");
 
             var result = solver.Implies(
                 new[] { lengthIsOne },
-                textIsDigit,
+                textIsBoundaryA,
                 TimeSpan.FromMilliseconds(50));
 
             Assert.That(result, Is.EqualTo(Feasibility.Unknown));
@@ -310,6 +523,67 @@ namespace PurelySharp.Test
             var result = solver.Implies(
                 new[] { guard },
                 conclusion,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_MultiplicationByConstantContradictsRange()
+        {
+            using var solver = new SmtSolver();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, new SmtIntegerConstant(2));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(5)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, twiceX, new SmtIntegerConstant(10)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_StringPrefixSuffixAndLengthFactsCombine()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
+                    new SmtStringEndsWithFormula(text, new SmtStringConstant("CD")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(3)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_StringContainsAndConcatFactsCombine()
+        {
+            using var solver = new SmtSolver();
+            var left = new SmtVariable("left", SmtValueKind.String);
+            var right = new SmtVariable("right", SmtValueKind.String);
+            var combined = new SmtStringConcatTerm(left, right);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, left, new SmtStringConstant("A")),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, right, new SmtStringConstant("B")),
+                    new SmtUnaryFormula(
+                        SmtUnaryOperator.Not,
+                        new SmtStringContainsFormula(combined, new SmtStringConstant("AB"))),
+                },
                 TimeSpan.FromMilliseconds(50));
 
             Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));

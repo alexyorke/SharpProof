@@ -449,6 +449,91 @@ namespace PurelySharp.Analyzer
             {
                 pathConditions.Add(fact);
             }
+
+            AddPriorCoalesceAssignmentThrowFacts(useNode, semanticModel, cancellationToken, pathConditions);
+            AddPriorSelfThrowGuardedAssignmentFacts(useNode, semanticModel, cancellationToken, pathConditions);
+        }
+
+        private static void AddPriorCoalesceAssignmentThrowFacts(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingStatement))
+                    {
+                        break;
+                    }
+
+                    if (statement is not ExpressionStatementSyntax
+                        {
+                            Expression: AssignmentExpressionSyntax assignment
+                        } ||
+                        !assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) ||
+                        UnwrapFactExpression(assignment.Right) is not ThrowExpressionSyntax ||
+                        GetLocalOrParameterSymbol(assignment.Left, semanticModel, cancellationToken) is not { } assignedSymbol ||
+                        IsSymbolAssignedBetween(block, assignment.Span.End, useNode.SpanStart, assignedSymbol, semanticModel, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    AddSymbolNonNullFact(assignedSymbol, pathConditions);
+                }
+            }
+        }
+
+        private static void AddPriorSelfThrowGuardedAssignmentFacts(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingStatement))
+                    {
+                        break;
+                    }
+
+                    if (statement is not ExpressionStatementSyntax
+                        {
+                            Expression: AssignmentExpressionSyntax assignment
+                        } ||
+                        !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                        GetLocalOrParameterSymbol(assignment.Left, semanticModel, cancellationToken) is not { } assignedSymbol ||
+                        !TryGetThrowGuardedValue(
+                            assignment.Right,
+                            out var effectiveValueExpression,
+                            out var guardExpression,
+                            out var guardBranchWhenTrue,
+                            out var requiresNonNullValue) ||
+                        !ExpressionMatchesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) ||
+                        IsSymbolAssignedBetween(block, assignment.Span.End, useNode.SpanStart, assignedSymbol, semanticModel, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    if (guardExpression != null)
+                    {
+                        if (AnyReferencedSymbolAssignedBetween(guardExpression, block, assignment.Span.End, useNode.SpanStart, semanticModel, cancellationToken))
+                        {
+                            continue;
+                        }
+
+                        TryAddPathCondition(guardExpression, guardBranchWhenTrue, semanticModel, cancellationToken, pathConditions);
+                    }
+                    else if (requiresNonNullValue)
+                    {
+                        AddSymbolNonNullFact(assignedSymbol, pathConditions);
+                    }
+                }
+            }
         }
 
         private static bool IsExceptionPathReachable(
@@ -642,6 +727,22 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static void AddSymbolNonNullFact(
+            ISymbol symbol,
+            ICollection<SmtFormula> facts)
+        {
+            if (!TryCreateSymbolSmtValue(symbol, out var formula) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
+        }
+
         private static void AddCompletedIfStatementFacts(
             IfStatementSyntax ifStatement,
             SemanticModel semanticModel,
@@ -722,6 +823,9 @@ namespace PurelySharp.Analyzer
             var effectiveValueExpression = hasThrowGuard
                 ? throwGuardedValue
                 : valueExpression;
+            var effectiveValueIsTarget =
+                hasThrowGuard &&
+                ExpressionMatchesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken);
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
@@ -779,7 +883,8 @@ namespace PurelySharp.Analyzer
 
             if (hasThrowGuard &&
                 guardExpression != null &&
-                !ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken))
+                (!ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken) ||
+                 effectiveValueIsTarget))
             {
                 CSharpConditionToFormula.TryCollectBranchAssumptions(
                     guardExpression,
@@ -793,6 +898,12 @@ namespace PurelySharp.Analyzer
                      !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+            else if (hasThrowGuard &&
+                     requiresNonNullValue &&
+                     effectiveValueIsTarget)
+            {
+                AddSymbolNonNullFact(targetSymbol, facts);
             }
         }
 

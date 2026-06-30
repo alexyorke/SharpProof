@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
 
@@ -428,8 +429,14 @@ namespace SearchLib.Smt
         private sealed class Z3RegexTranslator
         {
             private const int MaxBoundedRepeat = 64;
+            // Keep large Unicode category unions conservative; Z3 range-heavy regexes can get expensive
+            // and smaller shorthand/category classes cover the common analyzer facts precisely.
             private const int MaxCharacterClassRangeCount = 512;
             private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
+            private static readonly ConcurrentDictionary<string, CharacterRange[]> RegexCharacterRangeCache = new(StringComparer.Ordinal);
+            private static readonly Lazy<CharacterRange[]> DecimalDigitRanges = new(() => CreateRegexCharacterRanges(@"\d"));
+            private static readonly Lazy<CharacterRange[]> WhitespaceRanges = new(() => CreateRegexCharacterRanges(@"\s"));
+            private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRanges(@"\w"));
             private readonly Context _context;
             private readonly string _pattern;
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
@@ -762,16 +769,22 @@ namespace SearchLib.Smt
 
             private readonly struct CharacterClassPart
             {
-                public CharacterClassPart(ReExpr regex, char? exactCharacter, bool isApproximation)
+                public CharacterClassPart(
+                    ReExpr regex,
+                    char? exactCharacter,
+                    bool isApproximation,
+                    CharacterRange[]? ranges)
                 {
                     Regex = regex;
                     ExactCharacter = exactCharacter;
                     IsApproximation = isApproximation;
+                    Ranges = ranges;
                 }
 
                 public ReExpr Regex { get; }
                 public char? ExactCharacter { get; }
                 public bool IsApproximation { get; }
+                public CharacterRange[]? Ranges { get; }
             }
 
             private bool TryParseCharClass(out ReExpr regex)
@@ -816,7 +829,8 @@ namespace SearchLib.Smt
                                 _context.MkString(startCharacter.ToString()),
                                 _context.MkString(endCharacter.ToString())),
                             exactCharacter: null,
-                            isApproximation: false));
+                            isApproximation: false,
+                            ranges: new[] { new CharacterRange(startCharacter, endCharacter) }));
                     }
                     else
                     {
@@ -833,12 +847,16 @@ namespace SearchLib.Smt
                 regex = parts.Count == 1 ? parts[0].Regex : _context.MkUnion(parts.Select(static part => part.Regex).ToArray());
                 if (negate)
                 {
-                    if (parts.Any(static part => part.IsApproximation))
+                    if (parts.Any(static part => part.IsApproximation || part.Ranges == null))
                     {
                         return false;
                     }
 
-                    regex = _context.MkDiff(CreateAnyCharRegex(), regex);
+                    var complementRanges = ComplementRanges(MergeRanges(parts.SelectMany(static part => part.Ranges!)));
+                    if (!TryCreateCharacterRangesRegex(complementRanges, out regex))
+                    {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -871,7 +889,8 @@ namespace SearchLib.Smt
                     part = new CharacterClassPart(
                         escapedClass.Regex,
                         exactCharacter: null,
-                        isApproximation: !escapedClass.IsExact);
+                        isApproximation: !escapedClass.IsExact,
+                        ranges: escapedClass.Ranges);
                     return true;
                 }
 
@@ -939,49 +958,279 @@ namespace SearchLib.Smt
                 return new CharacterClassPart(
                     CreateLiteralRegex(value.ToString()),
                     exactCharacter: value,
-                    isApproximation: false);
+                    isApproximation: false,
+                    ranges: new[] { new CharacterRange(value, value) });
             }
 
             private readonly struct RegexClassTranslation
             {
-                public RegexClassTranslation(ReExpr regex, bool isExact)
+                public RegexClassTranslation(ReExpr regex, bool isExact, CharacterRange[]? ranges)
                 {
                     Regex = regex;
                     IsExact = isExact;
+                    Ranges = ranges;
                 }
 
                 public ReExpr Regex { get; }
 
                 public bool IsExact { get; }
+
+                public CharacterRange[]? Ranges { get; }
             }
 
             private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex)
             {
                 regex = default;
+                if (escaped is 'd' or 'D')
+                {
+                    var digitRanges = DecimalDigitRanges.Value;
+                    var ranges = escaped == 'd' ? digitRanges : ComplementRanges(digitRanges);
+                    if (!TryCreateCharacterRangesRegex(ranges, out var digitRegex))
+                    {
+                        regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false, ranges: null);
+                        return true;
+                    }
+
+                    regex = new RegexClassTranslation(digitRegex, isExact: true, ranges);
+                    return true;
+                }
+
+                if (escaped is 's' or 'S')
+                {
+                    var whitespaceRanges = WhitespaceRanges.Value;
+                    var ranges = escaped == 's' ? whitespaceRanges : ComplementRanges(whitespaceRanges);
+                    if (!TryCreateCharacterRangesRegex(ranges, out var whitespaceRegex))
+                    {
+                        regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false, ranges: null);
+                        return true;
+                    }
+
+                    regex = new RegexClassTranslation(whitespaceRegex, isExact: true, ranges);
+                    return true;
+                }
+
+                if (escaped is 'w' or 'W')
+                {
+                    var wordRanges = WordRanges.Value;
+                    var ranges = escaped == 'w' ? wordRanges : ComplementRanges(wordRanges);
+                    if (!TryCreateCharacterRangesRegex(ranges, out var wordRegex))
+                    {
+                        regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false, ranges: null);
+                        return true;
+                    }
+
+                    regex = new RegexClassTranslation(wordRegex, isExact: true, ranges);
+                    return true;
+                }
+
                 if (escaped is 'p' or 'P')
                 {
-                    if (!TryReadRegexCategoryName())
+                    if (!TryReadRegexCategoryName(out var categoryName))
                     {
                         return false;
                     }
 
-                    regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false);
+                    if (!TryGetCharacterRanges(@"\p{" + categoryName + "}", out var categoryRanges))
+                    {
+                        regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false, ranges: null);
+                        return true;
+                    }
+
+                    var ranges = escaped == 'p' ? categoryRanges : ComplementRanges(categoryRanges);
+                    if (!TryCreateCharacterRangesRegex(ranges, out var categoryRegex))
+                    {
+                        regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false, ranges: null);
+                        return true;
+                    }
+
+                    regex = new RegexClassTranslation(categoryRegex, isExact: true, ranges);
                     return true;
                 }
 
-                if (escaped is not ('d' or 'D' or 's' or 'S' or 'w' or 'W'))
+                return false;
+            }
+
+            private ReExpr CreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges)
+            {
+                if (ranges.Count == 0 || ranges.Count > MaxCharacterClassRangeCount)
+                {
+                    throw new InvalidOperationException("Unsupported character class range count.");
+                }
+
+                var regexes = new ReExpr[ranges.Count];
+                for (var index = 0; index < ranges.Count; index++)
+                {
+                    regexes[index] = _context.MkRange(
+                        _context.MkString(ranges[index].Start.ToString()),
+                        _context.MkString(ranges[index].End.ToString()));
+                }
+
+                return regexes.Length == 1 ? regexes[0] : _context.MkUnion(regexes);
+            }
+
+            private bool TryCreateCharacterRangesRegex(IReadOnlyList<CharacterRange> ranges, out ReExpr regex)
+            {
+                regex = null!;
+                try
+                {
+                    regex = CreateCharacterRangesRegex(ranges);
+                    return true;
+                }
+                catch (InvalidOperationException)
                 {
                     return false;
                 }
-
-                // .NET's shorthand classes are Unicode-aware by default. One-char over-approximation
-                // still exposes length facts; satisfiable results are downgraded by the solver.
-                regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false);
-                return true;
             }
 
-            private bool TryReadRegexCategoryName()
+            private bool TryCreateCharacterRangesRegex(string atomPattern, out ReExpr regex)
             {
+                regex = null!;
+                try
+                {
+                    if (!TryGetCharacterRanges(atomPattern, out var ranges))
+                    {
+                        return false;
+                    }
+
+                    regex = CreateCharacterRangesRegex(ranges);
+                    return true;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    return false;
+                }
+            }
+
+            private static bool TryGetCharacterRanges(string atomPattern, out CharacterRange[] ranges)
+            {
+                ranges = Array.Empty<CharacterRange>();
+                try
+                {
+                    ranges = RegexCharacterRangeCache.GetOrAdd(atomPattern, CreateRegexCharacterRanges);
+                    return ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    return false;
+                }
+            }
+
+            private static CharacterRange[] CreateRegexCharacterRanges(string atomPattern)
+            {
+                var ranges = new List<CharacterRange>();
+                char? rangeStart = null;
+                var previous = '\0';
+                var regex = new Regex(@"\A(?:" + atomPattern + @")\z", RegexOptions.None, RegexSyntaxValidationTimeout);
+                for (var codePoint = 0; codePoint <= char.MaxValue; codePoint++)
+                {
+                    var current = (char)codePoint;
+                    if (regex.IsMatch(current.ToString()))
+                    {
+                        rangeStart ??= current;
+                        previous = current;
+                        continue;
+                    }
+
+                    if (rangeStart is { } start)
+                    {
+                        ranges.Add(new CharacterRange(start, previous));
+                        rangeStart = null;
+                    }
+                }
+
+                if (rangeStart is { } finalStart)
+                {
+                    ranges.Add(new CharacterRange(finalStart, previous));
+                }
+
+                return ranges.ToArray();
+            }
+
+            private static CharacterRange[] MergeRanges(IEnumerable<CharacterRange> ranges)
+            {
+                var ordered = ranges
+                    .OrderBy(static range => range.Start)
+                    .ThenBy(static range => range.End)
+                    .ToArray();
+                if (ordered.Length == 0)
+                {
+                    return Array.Empty<CharacterRange>();
+                }
+
+                var merged = new List<CharacterRange>();
+                var currentStart = ordered[0].Start;
+                var currentEnd = ordered[0].End;
+                for (var index = 1; index < ordered.Length; index++)
+                {
+                    var range = ordered[index];
+                    if (range.Start <= currentEnd ||
+                        currentEnd != char.MaxValue && range.Start == currentEnd + 1)
+                    {
+                        if (range.End > currentEnd)
+                        {
+                            currentEnd = range.End;
+                        }
+
+                        continue;
+                    }
+
+                    merged.Add(new CharacterRange(currentStart, currentEnd));
+                    currentStart = range.Start;
+                    currentEnd = range.End;
+                }
+
+                merged.Add(new CharacterRange(currentStart, currentEnd));
+                return merged.ToArray();
+            }
+
+            private static CharacterRange[] ComplementRanges(IEnumerable<CharacterRange> ranges)
+            {
+                var merged = MergeRanges(ranges);
+                var complement = new List<CharacterRange>();
+                var nextStart = 0;
+                foreach (var range in merged)
+                {
+                    if (nextStart < range.Start)
+                    {
+                        complement.Add(new CharacterRange((char)nextStart, (char)(range.Start - 1)));
+                    }
+
+                    if (range.End == char.MaxValue)
+                    {
+                        nextStart = char.MaxValue + 1;
+                        break;
+                    }
+
+                    nextStart = range.End + 1;
+                }
+
+                if (nextStart <= char.MaxValue)
+                {
+                    complement.Add(new CharacterRange((char)nextStart, char.MaxValue));
+                }
+
+                return complement.ToArray();
+            }
+
+            private bool TryReadRegexCategoryName(out string categoryName)
+            {
+                categoryName = string.Empty;
                 if (!Peek('{'))
                 {
                     return false;
@@ -1006,6 +1255,7 @@ namespace SearchLib.Smt
                 }
 
                 _position++;
+                categoryName = _pattern.Substring(start, _position - start - 1);
                 return true;
             }
 
@@ -1052,6 +1302,19 @@ namespace SearchLib.Smt
                 }
 
                 return -1;
+            }
+
+            private readonly struct CharacterRange
+            {
+                public CharacterRange(char start, char end)
+                {
+                    Start = start;
+                    End = end;
+                }
+
+                public char Start { get; }
+
+                public char End { get; }
             }
 
             private bool TryReadNumber(out uint value)

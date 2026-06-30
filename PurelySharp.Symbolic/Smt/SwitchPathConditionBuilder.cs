@@ -769,7 +769,7 @@ namespace PurelySharp.Symbolic.Smt
                     lengthFormula,
                     new SmtIntegerConstant(minimumLength)));
 
-            if (!TryGetBuiltInListPatternElementType(valueType, out var elementType) ||
+            if (!TryGetListPatternElementType(valueType, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind))
             {
                 return;
@@ -807,18 +807,14 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula lengthFormula)
         {
             lengthFormula = null!;
-            if (!IsSupportedBuiltInListPatternReceiver(valueType))
-            {
-                return false;
-            }
-
             if (valueType?.SpecialType == SpecialType.System_String)
             {
                 return TryCreateStringLengthFormula(value, out lengthFormula);
             }
 
             var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (!TryCreateMemberFormula(value, "Length", intType, out var memberFormula) ||
+            if (!TryGetListPatternLengthMemberName(valueType, out var memberName) ||
+                !TryCreateMemberFormula(value, memberName, intType, out var memberFormula) ||
                 memberFormula == null)
             {
                 return false;
@@ -828,13 +824,72 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
-        private static bool IsSupportedBuiltInListPatternReceiver(ITypeSymbol? valueType)
+        private static bool TryGetListPatternLengthMemberName(ITypeSymbol? valueType, out string memberName)
         {
-            return valueType is IArrayTypeSymbol { Rank: 1 } ||
-                valueType?.SpecialType == SpecialType.System_String;
+            if (valueType is IArrayTypeSymbol { Rank: 1 })
+            {
+                memberName = "Length";
+                return true;
+            }
+
+            if (HasInstanceInt32Member(valueType, "Length"))
+            {
+                memberName = "Length";
+                return true;
+            }
+
+            if (HasInstanceInt32Member(valueType, "Count"))
+            {
+                memberName = "Count";
+                return true;
+            }
+
+            memberName = string.Empty;
+            return false;
         }
 
-        private static bool TryGetBuiltInListPatternElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
+        private static bool HasInstanceInt32Member(ITypeSymbol? valueType, string memberName)
+        {
+            if (valueType == null)
+            {
+                return false;
+            }
+
+            for (var current = valueType; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInstanceInt32Member(current, memberName))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in valueType.AllInterfaces)
+            {
+                if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInstanceInt32Member(ITypeSymbol type, string memberName)
+        {
+            foreach (var member in type.GetMembers(memberName))
+            {
+                switch (member)
+                {
+                    case IPropertySymbol { IsStatic: false, Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
+                    case IFieldSymbol { IsStatic: false, Type.SpecialType: SpecialType.System_Int32 }:
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetListPatternElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
         {
             if (valueType is IArrayTypeSymbol { Rank: 1 } arrayType)
             {
@@ -842,8 +897,79 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryGetSingleIntIndexerElementType(valueType, out elementType))
+            {
+                return true;
+            }
+
             elementType = null!;
             return false;
+        }
+
+        private static bool TryGetSingleIntIndexerElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
+        {
+            elementType = null!;
+            if (valueType == null)
+            {
+                return false;
+            }
+
+            for (var current = valueType; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (TryGetSingleDeclaredIntIndexerElementType(current, out elementType))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in valueType.AllInterfaces)
+            {
+                if (TryGetSingleDeclaredIntIndexerElementType(interfaceType, out elementType))
+                {
+                    return true;
+                }
+            }
+
+            elementType = null!;
+            return false;
+        }
+
+        private static bool TryGetSingleDeclaredIntIndexerElementType(ITypeSymbol type, out ITypeSymbol elementType)
+        {
+            ITypeSymbol? candidateType = null;
+            foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (!IsSupportedListPatternIndexer(property))
+                {
+                    continue;
+                }
+
+                if (candidateType != null &&
+                    !SymbolEqualityComparer.Default.Equals(candidateType, property.Type))
+                {
+                    elementType = null!;
+                    return false;
+                }
+
+                candidateType = property.Type;
+            }
+
+            if (candidateType == null)
+            {
+                elementType = null!;
+                return false;
+            }
+
+            elementType = candidateType;
+            return true;
+        }
+
+        private static bool IsSupportedListPatternIndexer(IPropertySymbol property)
+        {
+            return property.IsIndexer &&
+                !property.IsStatic &&
+                property.Parameters.Length == 1 &&
+                property.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
         }
 
         private static bool TryGetListPatternElementPosition(

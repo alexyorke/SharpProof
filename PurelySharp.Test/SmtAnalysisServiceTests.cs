@@ -166,6 +166,54 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_SyntacticIntegerIntervalContradiction_BypassesBudgetsAndSolver()
+        {
+            var x = new SmtVariable("interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(50),
+                TimeSpan.FromMilliseconds(500),
+                maxPathConditions: 1,
+                maxExpressionNodes: 3));
+
+            var result = service.Classify(CreateQuery(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(10)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(10)),
+                },
+                new SmtBooleanConstant(true)));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Classify_NestedConjunctIntegerContradiction_BypassesSolver()
+        {
+            var x = new SmtVariable("nested_interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var nestedBounds = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(3)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(3)));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.Classify(CreateQuery(
+                new[] { nestedBounds },
+                new SmtBooleanConstant(true)));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyImplication_DirectPathFact_BypassesSolver()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);

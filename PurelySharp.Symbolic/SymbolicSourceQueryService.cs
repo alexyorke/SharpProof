@@ -1580,6 +1580,10 @@ namespace PurelySharp.Symbolic
 
         public static readonly SymbolicCompactQueryOptions Default = new SymbolicCompactQueryOptions();
 
+        public static readonly SymbolicCompactQueryOptions SummaryOnly = new SymbolicCompactQueryOptions(
+            maxLines: 0,
+            maxProgramPoints: 0);
+
         public SymbolicCompactQueryOptions(
             int maxLines = DefaultMaxLines,
             int maxProgramPoints = DefaultMaxProgramPoints,
@@ -1678,6 +1682,10 @@ namespace PurelySharp.Symbolic
             Lines = lines ?? throw new ArgumentNullException(nameof(lines));
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
             SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+            AnalysisSummary = SymbolicCompactAnalysisSummary.From(
+                ConservativeInvariant,
+                ProgramPointSummary,
+                SmtDiagnostics);
             Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
         }
 
@@ -1742,6 +1750,8 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints { get; }
 
         public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
 
         public SymbolicCompactOutputTruncation Truncation { get; }
 
@@ -2541,6 +2551,131 @@ namespace PurelySharp.Symbolic
                 diagnostics.MaxExpressionNodes,
                 diagnostics.ExecutedQueryCount,
                 diagnostics.CacheEntryCount);
+        }
+    }
+
+    public sealed class SymbolicCompactAnalysisSummary
+    {
+        private SymbolicCompactAnalysisSummary(
+            int programPointCount,
+            int invariantConditionCount,
+            int conservativeUnknownCount,
+            int totalPathConditionCount,
+            int maxPathConditionCount,
+            int reachabilityCheckedCount,
+            int reachabilityKnownCount,
+            int reachabilityUnknownCount,
+            int reachabilityNotCheckedCount,
+            int proofTotalCount,
+            int proofResolvedCount,
+            int proofUnknownCount,
+            bool smtConfigured,
+            bool smtEnabled,
+            int smtExecutedQueryCount)
+        {
+            ProgramPointCount = programPointCount;
+            InvariantConditionCount = invariantConditionCount;
+            ConservativeUnknownCount = conservativeUnknownCount;
+            TotalPathConditionCount = totalPathConditionCount;
+            MaxPathConditionCount = maxPathConditionCount;
+            ReachabilityCheckedCount = reachabilityCheckedCount;
+            ReachabilityKnownCount = reachabilityKnownCount;
+            ReachabilityUnknownCount = reachabilityUnknownCount;
+            ReachabilityNotCheckedCount = reachabilityNotCheckedCount;
+            ProofTotalCount = proofTotalCount;
+            ProofResolvedCount = proofResolvedCount;
+            ProofUnknownCount = proofUnknownCount;
+            SmtConfigured = smtConfigured;
+            SmtEnabled = smtEnabled;
+            SmtExecutedQueryCount = smtExecutedQueryCount;
+        }
+
+        public int ProgramPointCount { get; }
+
+        public int InvariantConditionCount { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public int TotalPathConditionCount { get; }
+
+        public int MaxPathConditionCount { get; }
+
+        public int ReachabilityCheckedCount { get; }
+
+        public int ReachabilityKnownCount { get; }
+
+        public int ReachabilityUnknownCount { get; }
+
+        public int ReachabilityNotCheckedCount { get; }
+
+        public int ProofTotalCount { get; }
+
+        public int ProofResolvedCount { get; }
+
+        public int ProofUnknownCount { get; }
+
+        public bool SmtConfigured { get; }
+
+        public bool SmtEnabled { get; }
+
+        public int SmtExecutedQueryCount { get; }
+
+        public bool HasUnresolvedAnalysis =>
+            ConservativeUnknownCount != 0 ||
+            ReachabilityUnknownCount != 0 ||
+            ReachabilityNotCheckedCount != 0 ||
+            ProofUnknownCount != 0;
+
+        internal static SymbolicCompactAnalysisSummary From(
+            SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicProgramPointSummary programPointSummary,
+            SymbolicCompactSmtDiagnostics smtDiagnostics)
+        {
+            if (conservativeInvariant == null)
+            {
+                throw new ArgumentNullException(nameof(conservativeInvariant));
+            }
+
+            if (programPointSummary == null)
+            {
+                throw new ArgumentNullException(nameof(programPointSummary));
+            }
+
+            if (smtDiagnostics == null)
+            {
+                throw new ArgumentNullException(nameof(smtDiagnostics));
+            }
+
+            var reachability = programPointSummary.Reachability;
+            var proofOutcomes = programPointSummary.ProofOutcomes;
+            var reachabilityCheckedCount =
+                reachability.ReachableCount +
+                reachability.UnreachableCount +
+                reachability.UnknownCount;
+            var reachabilityKnownCount =
+                reachability.ReachableCount +
+                reachability.UnreachableCount;
+            var proofResolvedCount =
+                proofOutcomes.ProvenTrueCount +
+                proofOutcomes.ProvenFalseCount +
+                proofOutcomes.UnreachableCount;
+
+            return new SymbolicCompactAnalysisSummary(
+                programPointSummary.ProgramPointCount,
+                conservativeInvariant.ConditionCount,
+                conservativeInvariant.ConservativeUnknownCount,
+                programPointSummary.TotalPathConditionCount,
+                programPointSummary.MaxPathConditionCount,
+                reachabilityCheckedCount,
+                reachabilityKnownCount,
+                reachability.UnknownCount,
+                reachability.NotCheckedCount,
+                proofOutcomes.TotalCount,
+                proofResolvedCount,
+                proofOutcomes.UnknownCount,
+                smtDiagnostics.IsConfigured,
+                smtDiagnostics.IsEnabled,
+                smtDiagnostics.ExecutedQueryCount);
         }
     }
 

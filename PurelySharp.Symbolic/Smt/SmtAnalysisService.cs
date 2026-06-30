@@ -324,25 +324,217 @@ namespace PurelySharp.Symbolic.Smt
         private static bool ContainsSyntacticContradiction(ImmutableArray<SmtFormula> pathConditions)
         {
             var seen = new List<SmtFormula>(pathConditions.Length);
+            var integerIntervals = new Dictionary<SmtFormula, IntegerInterval>();
             foreach (var pathCondition in pathConditions)
             {
-                if (pathCondition is SmtBooleanConstant { Value: false })
+                foreach (var conjunct in EnumerateConjuncts(pathCondition))
                 {
-                    return true;
-                }
-
-                foreach (var existing in seen)
-                {
-                    if (AreSyntacticComplements(pathCondition, existing))
+                    if (conjunct is SmtBooleanConstant { Value: false })
                     {
                         return true;
                     }
-                }
 
-                seen.Add(pathCondition);
+                    foreach (var existing in seen)
+                    {
+                        if (AreSyntacticComplements(conjunct, existing))
+                        {
+                            return true;
+                        }
+                    }
+
+                    if (TryAddIntegerIntervalFact(conjunct, integerIntervals, out var hasContradiction) &&
+                        hasContradiction)
+                    {
+                        return true;
+                    }
+
+                    seen.Add(conjunct);
+                }
             }
 
             return false;
+        }
+
+        private static IEnumerable<SmtFormula> EnumerateConjuncts(SmtFormula formula)
+        {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary)
+            {
+                foreach (var left in EnumerateConjuncts(binary.Left))
+                {
+                    yield return left;
+                }
+
+                foreach (var right in EnumerateConjuncts(binary.Right))
+                {
+                    yield return right;
+                }
+
+                yield break;
+            }
+
+            yield return formula;
+        }
+
+        private static bool TryAddIntegerIntervalFact(
+            SmtFormula formula,
+            Dictionary<SmtFormula, IntegerInterval> intervals,
+            out bool hasContradiction)
+        {
+            hasContradiction = false;
+            if (!TryGetIntegerComparison(formula, out var term, out var op, out var constant))
+            {
+                return false;
+            }
+
+            var interval = intervals.TryGetValue(term, out var existing)
+                ? existing
+                : IntegerInterval.Unbounded;
+            interval = interval.Apply(op, constant);
+            hasContradiction = interval.IsContradictory;
+            intervals[term] = interval;
+            return true;
+        }
+
+        private static bool TryGetIntegerComparison(
+            SmtFormula formula,
+            out SmtFormula term,
+            out SmtBinaryOperator op,
+            out long constant)
+        {
+            term = null!;
+            op = default;
+            constant = default;
+            if (formula is not SmtBinaryFormula binary ||
+                binary.Operator is not (SmtBinaryOperator.Equal or
+                    SmtBinaryOperator.NotEqual or
+                    SmtBinaryOperator.LessThan or
+                    SmtBinaryOperator.LessThanOrEqual or
+                    SmtBinaryOperator.GreaterThan or
+                    SmtBinaryOperator.GreaterThanOrEqual))
+            {
+                return false;
+            }
+
+            if (binary.Left.Kind == SmtValueKind.Int &&
+                binary.Right is SmtIntegerConstant rightConstant)
+            {
+                term = binary.Left;
+                op = binary.Operator;
+                constant = rightConstant.Value;
+                return true;
+            }
+
+            if (binary.Left is SmtIntegerConstant leftConstant &&
+                binary.Right.Kind == SmtValueKind.Int)
+            {
+                term = binary.Right;
+                op = ReverseComparison(binary.Operator);
+                constant = leftConstant.Value;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static SmtBinaryOperator ReverseComparison(SmtBinaryOperator op)
+        {
+            return op switch
+            {
+                SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
+                SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
+                SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
+                SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
+                _ => op,
+            };
+        }
+
+        private readonly struct IntegerInterval
+        {
+            private IntegerInterval(
+                long? lowerBound,
+                long? upperBound,
+                ImmutableHashSet<long> excludedValues,
+                bool isImpossible)
+            {
+                LowerBound = lowerBound;
+                UpperBound = upperBound;
+                ExcludedValues = excludedValues;
+                IsImpossible = isImpossible;
+            }
+
+            public static IntegerInterval Unbounded { get; } = new IntegerInterval(
+                lowerBound: null,
+                upperBound: null,
+                excludedValues: ImmutableHashSet<long>.Empty,
+                isImpossible: false);
+
+            public long? LowerBound { get; }
+            public long? UpperBound { get; }
+            public ImmutableHashSet<long> ExcludedValues { get; }
+            public bool IsImpossible { get; }
+
+            public bool IsContradictory =>
+                IsImpossible ||
+                LowerBound.HasValue &&
+                UpperBound.HasValue &&
+                LowerBound.Value > UpperBound.Value ||
+                LowerBound.HasValue &&
+                UpperBound.HasValue &&
+                LowerBound.Value == UpperBound.Value &&
+                ExcludedValues.Contains(LowerBound.Value);
+
+            public IntegerInterval Apply(SmtBinaryOperator op, long constant)
+            {
+                return op switch
+                {
+                    SmtBinaryOperator.Equal => new IntegerInterval(
+                        constant,
+                        constant,
+                        ExcludedValues,
+                        IsImpossible),
+                    SmtBinaryOperator.NotEqual => new IntegerInterval(
+                        LowerBound,
+                        UpperBound,
+                        ExcludedValues.Add(constant),
+                        IsImpossible),
+                    SmtBinaryOperator.GreaterThan => constant == long.MaxValue
+                        ? Impossible()
+                        : WithLowerBound(constant + 1),
+                    SmtBinaryOperator.GreaterThanOrEqual => WithLowerBound(constant),
+                    SmtBinaryOperator.LessThan => constant == long.MinValue
+                        ? Impossible()
+                        : WithUpperBound(constant - 1),
+                    SmtBinaryOperator.LessThanOrEqual => WithUpperBound(constant),
+                    _ => this,
+                };
+            }
+
+            private IntegerInterval WithLowerBound(long lowerBound)
+            {
+                return new IntegerInterval(
+                    LowerBound.HasValue ? Math.Max(LowerBound.Value, lowerBound) : lowerBound,
+                    UpperBound,
+                    ExcludedValues,
+                    IsImpossible);
+            }
+
+            private IntegerInterval WithUpperBound(long upperBound)
+            {
+                return new IntegerInterval(
+                    LowerBound,
+                    UpperBound.HasValue ? Math.Min(UpperBound.Value, upperBound) : upperBound,
+                    ExcludedValues,
+                    IsImpossible);
+            }
+
+            private IntegerInterval Impossible()
+            {
+                return new IntegerInterval(
+                    LowerBound,
+                    UpperBound,
+                    ExcludedValues,
+                    isImpossible: true);
+            }
         }
 
         private static bool IsHazardTriggerSyntacticallyUnreachable(

@@ -164,6 +164,98 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesDefaultStaticStringEqualsFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string left, string right)
+    {
+        if (string.Equals(left, right))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "left == right");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesDefaultInstanceStringEqualsFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && text.Equals(""ABC""))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text == \"ABC\"");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesDefaultStringContainsFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && text.Contains(""Z""))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text != \"ABC\"");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, string prefix)
+    {
+        if (text != null && prefix != null && text.StartsWith(prefix))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return 1;",
+                "text.StartsWith(prefix, System.StringComparison.Ordinal)");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
         {
             const string source = @"
@@ -207,6 +299,29 @@ public class TestClass
                 source,
                 "return 1;",
                 "text != null");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesAsExpressionPreservesNullEquality()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if ((text as object) == null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text == null");
         }
 
         [Test]

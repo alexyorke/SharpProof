@@ -200,6 +200,69 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesMultipleTopLevelGuardedBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        for (;;)
+        {
+            if (value < 0)
+            {
+                break;
+            }
+
+            if (value > 10)
+            {
+                break;
+            }
+
+            value++;
+        }
+
+        return value;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotProveMultipleGuardedBreakExitWhenGuardValueMutates()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        for (;;)
+        {
+            if (value < 0)
+            {
+                break;
+            }
+
+            value = 100;
+            if (value > 10)
+            {
+                break;
+            }
+        }
+
+        return value;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesGuardedContinueBeforeBreakExitCondition()
         {
             const string source = @"
@@ -224,6 +287,66 @@ public class TestClass
             var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesMultipleGuardedContinuesBeforeBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready, bool blocked)
+    {
+        for (;;)
+        {
+            if (!ready)
+            {
+                continue;
+            }
+
+            if (blocked)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotProveGuardedContinueConditionWhenInterveningStatementMutatesGuard()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready)
+    {
+        for (;;)
+        {
+            if (!ready)
+            {
+                continue;
+            }
+
+            ready = false;
+            break;
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         }
 
         [Test]
