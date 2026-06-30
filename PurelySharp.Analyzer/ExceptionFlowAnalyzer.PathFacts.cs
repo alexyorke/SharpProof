@@ -861,6 +861,12 @@ namespace PurelySharp.Analyzer
                     }
 
                     AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    AddArrayCreationNormalCompletionFacts(
+                        declarator.Initializer.Value,
+                        localDeclaration,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
                 }
 
                 return;
@@ -908,6 +914,12 @@ namespace PurelySharp.Analyzer
                     }
                 }
 
+                AddArrayCreationNormalCompletionFacts(
+                    assignment.Right,
+                    expressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 return;
             }
 
@@ -942,12 +954,55 @@ namespace PurelySharp.Analyzer
             {
                 AddCompletedIfStatementFacts(ifStatement, semanticModel, cancellationToken, facts);
             }
+            else if (statement is ExpressionStatementSyntax completedExpressionStatement)
+            {
+                AddArrayCreationNormalCompletionFacts(
+                    completedExpressionStatement.Expression,
+                    completedExpressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
             else
             {
                 foreach (var loopFact in SymbolicProgramPointFacts.CollectCompletedLoopExitInvariantFacts(statement, semanticModel, cancellationToken))
                 {
                     facts.Add(loopFact);
                 }
+            }
+        }
+
+        private static void AddArrayCreationNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapFactExpression(expression);
+            if (expression is not ArrayCreationExpressionSyntax arrayCreation)
+            {
+                return;
+            }
+
+            foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
+            {
+                if (AnyConditionSymbolMutatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
+                    !CSharpConditionToFormula.TryTranslateValue(
+                        sizeExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var sizeFormula,
+                        getSymbolVersion: null) ||
+                    sizeFormula is not { Kind: SmtValueKind.Int })
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    sizeFormula,
+                    new SmtIntegerConstant(0)));
             }
         }
 
@@ -1072,6 +1127,11 @@ namespace PurelySharp.Analyzer
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
+            {
+                AddArrayDimensionLengthAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
             if (TryCreateStringContentFormula(targetSymbol, out var targetStringFormula) &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 CSharpConditionToFormula.TryTranslateStringValue(
@@ -1129,6 +1189,98 @@ namespace PurelySharp.Analyzer
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
             }
+        }
+
+        private static void AddArrayDimensionLengthAssignedValueFacts(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < targetArrayType.Rank; dimension++)
+            {
+                if (!TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength) ||
+                    !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    targetDimensionLength,
+                    valueDimensionLength));
+            }
+        }
+
+        private static bool TryCreateArrayDimensionLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            int dimension,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation &&
+                TryGetExplicitArraySizeExpression(arrayCreation, dimension, out var sizeExpression) &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    sizeExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sizeFormula,
+                    getSymbolVersion: null) &&
+                sizeFormula is { Kind: SmtValueKind.Int })
+            {
+                formula = sizeFormula;
+                return true;
+            }
+
+            var sourceSymbol = GetLocalOrParameterSymbol(valueExpression, semanticModel, cancellationToken);
+            if (sourceSymbol != null &&
+                TryCreateArrayDimensionLengthFormula(sourceSymbol, dimension, out formula))
+            {
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
+        {
+            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
+            {
+                foreach (var sizeExpression in rankSpecifier.Sizes)
+                {
+                    if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    {
+                        yield return sizeExpression;
+                    }
+                }
+            }
+        }
+
+        private static bool TryGetExplicitArraySizeExpression(
+            ArrayCreationExpressionSyntax arrayCreation,
+            int dimension,
+            out ExpressionSyntax sizeExpression)
+        {
+            if (dimension >= 0 &&
+                arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                arrayCreation.Type.RankSpecifiers[0].Sizes.Count > dimension &&
+                !arrayCreation.Type.RankSpecifiers[0].Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression))
+            {
+                sizeExpression = arrayCreation.Type.RankSpecifiers[0].Sizes[dimension];
+                return true;
+            }
+
+            sizeExpression = null!;
+            return false;
         }
 
         private static bool TryGetThrowGuardedValue(
@@ -1309,6 +1461,27 @@ namespace PurelySharp.Analyzer
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateArrayDimensionLengthFormula(
+            ISymbol symbol,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (dimension < 0 ||
+                GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType ||
+                dimension >= arrayType.Rank ||
+                !TryCreateSymbolSmtValue(symbol, out var receiverFormula) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference })
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(
+                receiverFormula + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                SmtValueKind.Int);
+            return true;
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(

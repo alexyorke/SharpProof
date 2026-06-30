@@ -639,6 +639,38 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazards_ArrayCreationNormalCompletionPrunesNegativeLengthBranch()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        var values = new int[length];
+        if (length < 0)
+        {
+            return new int[length + 0];
+        }
+
+        return values;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return new int[length + 0];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NegativeArrayLength }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeArrayLength));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazards_MultidimensionalArrayNegativeLength_ProvesOverflow()
         {
             const string source = @"
@@ -662,6 +694,32 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeArrayLength));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_AssignedMultidimensionalArrayDimensionLengthProvesIndexOutOfRange()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int rows, int columns)
+    {
+        var values = new int[rows, columns];
+        return values[rows, 0];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values[rows, 0];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
         }
 
         [Test]

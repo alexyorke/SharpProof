@@ -311,6 +311,76 @@ public class TestClass
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }
 
+        [Test]
+        public void ProgramPointFacts_ArrayCreationNormalCompletionProvesLengthNonNegative()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        var values = new int[length];
+        if (length < 0)
+        {
+            return new int[0];
+        }
+
+        return values;
+    }
+}";
+
+            var marker = FindMarker(source, "if (length < 0)");
+            var proof = ProveAtMarker(source, marker, "length >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_ArrayCreationNormalCompletionDoesNotSurviveLengthReassignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        var values = new int[length];
+        length = -1;
+        if (length < 0)
+        {
+            return new int[0];
+        }
+
+        return values;
+    }
+}";
+
+            var marker = FindMarker(source, "if (length < 0)");
+            var proof = ProveAtMarker(source, marker, "length >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int rows, int columns)
+    {
+        var values = new int[rows, columns];
+        return values[0, 0];
+    }
+}";
+
+            var marker = FindMarker(source, "return values[0, 0];");
+            var rowProof = ProveAtMarker(source, marker, "values.GetLength(0) == rows");
+            var columnProof = ProveAtMarker(source, marker, "values.GetLength(1) == columns");
+
+            Assert.That(rowProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), rowProof.Reason);
+            Assert.That(columnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), columnProof.Reason);
+        }
+
         private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(

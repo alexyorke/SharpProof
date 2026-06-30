@@ -689,6 +689,23 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_AssignedMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int rows, int columns)
+    {
+        var values = new int[rows, columns];
+        return values[rows, 0];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_ReadOnlySpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

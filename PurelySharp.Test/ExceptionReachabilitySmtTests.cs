@@ -1159,6 +1159,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NegativeArrayLengthAfterSuccessfulCreation_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        var values = new int[length];
+        if (length < 0)
+        {
+            return new int[length];
+        }
+
+        return values;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ConditionalExpressionUnreachableNullDerefArm_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
