@@ -1365,6 +1365,33 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsLocalRegexReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        var regex = new Regex(@""\A[A-Z][0-9]\z"");
+        if (regex.IsMatch(input))
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\A[A-Z][0-9]\z", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsStringPredicateReachabilityFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -7046,6 +7073,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_LocalInstanceRegexLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        var regex = new Regex(@""\AAB\z"");
+        if (regex.IsMatch(text) && text != ""AB"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_InstanceCompiledRegexOptionContradictsStringEquality()
         {
             Assert.That(
@@ -7076,6 +7127,55 @@ public class TestClass
                     @"!new Regex(@""\A.\z"", RegexOptions.Singleline).IsMatch(text) && text == ""\n""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalInstanceSinglelineRegexOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        var regex = new Regex(@""\A.\z"", RegexOptions.Singleline);
+        if (!regex.IsMatch(text) && text == ""\n"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ReassignedLocalRegexRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        var regex = new Regex(@""\ACD\z"");
+        regex = new Regex(@""\AAB\z"");
+        if (regex.IsMatch(text) && text != ""AB"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
         }
 
         [Test]

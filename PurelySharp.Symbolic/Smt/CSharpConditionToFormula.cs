@@ -1498,7 +1498,38 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var receiver = UnwrapExpression(memberAccess.Expression);
-            if (receiver is not ObjectCreationExpressionSyntax objectCreation ||
+            if (TryGetRegexPatternFromObjectCreation(receiver, semanticModel, cancellationToken, out pattern, out options))
+            {
+                return true;
+            }
+
+            if (semanticModel.GetSymbolInfo(receiver, cancellationToken).Symbol is not ILocalSymbol localSymbol ||
+                localSymbol.Type is not INamedTypeSymbol localType ||
+                !IsRegexType(localType))
+            {
+                return false;
+            }
+
+            return TryResolveAssignedRegexObjectCreation(
+                receiver,
+                localSymbol.OriginalDefinition,
+                semanticModel,
+                cancellationToken,
+                out pattern,
+                out options);
+        }
+
+        private static bool TryGetRegexPatternFromObjectCreation(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            expression = UnwrapExpression(expression);
+            if (expression is not ObjectCreationExpressionSyntax objectCreation ||
                 semanticModel.GetOperation(objectCreation, cancellationToken) is not IObjectCreationOperation objectCreationOperation ||
                 objectCreationOperation.Constructor?.ContainingType is not { } constructedType ||
                 !IsRegexType(constructedType) ||
@@ -1523,6 +1554,214 @@ namespace PurelySharp.Symbolic.Smt
                 ? WrapRegexPatternWithInlineOptions(rawPattern, CreateInlineRegexOptionLetters(options))
                 : rawPattern;
             return true;
+        }
+
+        private static bool TryResolveAssignedRegexObjectCreation(
+            ExpressionSyntax useExpression,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            var foundAssignment = false;
+            foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+            {
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (statement == containingBlock.ContainingStatement)
+                    {
+                        break;
+                    }
+
+                    TryGetRegexAssignmentFromPrecedingStatement(
+                        statement,
+                        regexSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var writesRegexSymbol,
+                        out var assignedPattern,
+                        out var assignedOptions);
+                    if (!writesRegexSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (foundAssignment ||
+                        assignedPattern == null)
+                    {
+                        pattern = null;
+                        options = RegexOptions.None;
+                        return false;
+                    }
+
+                    pattern = assignedPattern;
+                    options = assignedOptions;
+                    foundAssignment = true;
+                }
+            }
+
+            return foundAssignment;
+        }
+
+        private static void TryGetRegexAssignmentFromPrecedingStatement(
+            StatementSyntax statement,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRegexSymbol,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            writesRegexSymbol = false;
+
+            if (TryGetRegexAssignmentFromLocalDeclaration(
+                    statement,
+                    regexSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesRegexSymbol,
+                    out pattern,
+                    out options))
+            {
+                return;
+            }
+
+            if (TryGetRegexAssignmentFromExpressionStatement(
+                    statement,
+                    regexSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesRegexSymbol,
+                    out pattern,
+                    out options))
+            {
+                return;
+            }
+
+            writesRegexSymbol = ContainsRegexSymbolWrite(statement, regexSymbol, semanticModel, cancellationToken);
+        }
+
+        private static bool TryGetRegexAssignmentFromLocalDeclaration(
+            StatementSyntax statement,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRegexSymbol,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            writesRegexSymbol = false;
+            if (statement is not LocalDeclarationStatementSyntax localDeclaration)
+            {
+                return false;
+            }
+
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = semanticModel.GetDeclaredSymbol(variable, cancellationToken);
+                if (!IsSameSymbol(declaredSymbol, regexSymbol))
+                {
+                    continue;
+                }
+
+                writesRegexSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count != 1 ||
+                    variable.Initializer == null ||
+                    !TryGetRegexPatternFromObjectCreation(
+                        variable.Initializer.Value,
+                        semanticModel,
+                        cancellationToken,
+                        out pattern,
+                        out options))
+                {
+                    pattern = null;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetRegexAssignmentFromExpressionStatement(
+            StatementSyntax statement,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRegexSymbol,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            writesRegexSymbol = false;
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !IsRegexSymbolReference(assignment.Left, regexSymbol, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            writesRegexSymbol = true;
+            if (!TryGetRegexPatternFromObjectCreation(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out pattern,
+                    out options))
+            {
+                pattern = null;
+            }
+
+            return true;
+        }
+
+        private static bool ContainsRegexSymbolWrite(
+            SyntaxNode node,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (IsRegexSymbolReference(assignment.Left, regexSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+            {
+                if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                     argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
+                    IsRegexSymbolReference(argument.Expression, regexSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsRegexSymbolReference(
+            ExpressionSyntax expression,
+            ISymbol regexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return IsSameSymbol(
+                semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol,
+                regexSymbol);
         }
 
         private static bool TryGetRegexOptions(
