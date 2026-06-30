@@ -733,6 +733,7 @@ namespace PurelySharp.Symbolic.Smt
             private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
             private readonly Dictionary<SmtFormula, string> _exactStrings = new();
             private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
+            private readonly Dictionary<SmtFormula, bool> _referenceNullStates = new();
             private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
             private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
 
@@ -798,6 +799,12 @@ namespace PurelySharp.Symbolic.Smt
                 {
                     added = true;
                     hasContradiction |= stringContradiction;
+                }
+
+                if (TryAddReferenceNullFact(formula, out var referenceContradiction))
+                {
+                    added = true;
+                    hasContradiction |= referenceContradiction;
                 }
 
                 if (TryEvaluateBoolean(formula, out var value) &&
@@ -880,7 +887,8 @@ namespace PurelySharp.Symbolic.Smt
                 _aliases[alias] = canonical;
                 MergeIntegerFacts(canonical, alias, out var integerContradiction);
                 MergeStringFacts(canonical, alias, out var stringContradiction);
-                hasContradiction = integerContradiction || stringContradiction;
+                MergeReferenceFacts(canonical, alias, out var referenceContradiction);
+                hasContradiction = integerContradiction || stringContradiction || referenceContradiction;
                 return true;
             }
 
@@ -954,6 +962,29 @@ namespace PurelySharp.Symbolic.Smt
                 _exactStrings.Remove(alias);
                 AddStringLengthFact(canonical, aliasExact.Length, out var lengthContradiction);
                 hasContradiction |= lengthContradiction;
+            }
+
+            private void MergeReferenceFacts(
+                SmtFormula canonical,
+                SmtFormula alias,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!_referenceNullStates.TryGetValue(alias, out var aliasIsNull))
+                {
+                    return;
+                }
+
+                if (_referenceNullStates.TryGetValue(canonical, out var canonicalIsNull))
+                {
+                    hasContradiction = canonicalIsNull != aliasIsNull;
+                }
+                else
+                {
+                    _referenceNullStates[canonical] = aliasIsNull;
+                }
+
+                _referenceNullStates.Remove(alias);
             }
 
             public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
@@ -1218,6 +1249,11 @@ namespace PurelySharp.Symbolic.Smt
                     return binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
                 }
 
+                if (TryEvaluateReferenceComparison(binary, out value))
+                {
+                    return true;
+                }
+
                 value = false;
                 return false;
             }
@@ -1261,6 +1297,143 @@ namespace PurelySharp.Symbolic.Smt
                 AddStringLengthFact(term, value.Length, out var lengthContradiction);
                 hasContradiction |= lengthContradiction;
                 return true;
+            }
+
+            private bool TryAddReferenceNullFact(SmtFormula formula, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!TryGetReferenceNullComparison(formula, out var term, out var isNull))
+                {
+                    return false;
+                }
+
+                term = NormalizeAliases(term);
+                if (term is SmtNullConstant)
+                {
+                    hasContradiction = !isNull;
+                    return hasContradiction;
+                }
+
+                if (_referenceNullStates.TryGetValue(term, out var existing) &&
+                    existing != isNull)
+                {
+                    hasContradiction = true;
+                }
+                else
+                {
+                    _referenceNullStates[term] = isNull;
+                }
+
+                return true;
+            }
+
+            private static bool TryGetReferenceNullComparison(
+                SmtFormula formula,
+                out SmtFormula term,
+                out bool isNull)
+            {
+                term = null!;
+                isNull = false;
+
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
+                    TryGetReferenceNullComparison(negated.Operand, out term, out isNull))
+                {
+                    isNull = !isNull;
+                    return true;
+                }
+
+                if (formula is not SmtBinaryFormula binary ||
+                    binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual))
+                {
+                    return false;
+                }
+
+                var comparisonIsNull = binary.Operator == SmtBinaryOperator.Equal;
+                if (binary.Left is SmtNullConstant && binary.Right is SmtNullConstant)
+                {
+                    term = binary.Right;
+                    isNull = comparisonIsNull;
+                    return true;
+                }
+
+                if (binary.Left is SmtNullConstant && binary.Right.Kind == SmtValueKind.Reference)
+                {
+                    term = binary.Right;
+                    isNull = comparisonIsNull;
+                    return true;
+                }
+
+                if (binary.Right is SmtNullConstant && binary.Left.Kind == SmtValueKind.Reference)
+                {
+                    term = binary.Left;
+                    isNull = comparisonIsNull;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool TryEvaluateReferenceComparison(SmtBinaryFormula binary, out bool value)
+            {
+                value = false;
+                if (binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
+                    binary.Left.Kind != SmtValueKind.Reference ||
+                    binary.Right.Kind != SmtValueKind.Reference)
+                {
+                    return false;
+                }
+
+                var left = NormalizeAliases(binary.Left);
+                var right = NormalizeAliases(binary.Right);
+                if (left.Equals(right))
+                {
+                    value = binary.Operator == SmtBinaryOperator.Equal;
+                    return true;
+                }
+
+                var hasLeftNullState = TryGetKnownReferenceNullState(left, out var leftIsNull);
+                var hasRightNullState = TryGetKnownReferenceNullState(right, out var rightIsNull);
+                if (!hasLeftNullState || !hasRightNullState)
+                {
+                    return false;
+                }
+
+                if (!leftIsNull && !rightIsNull)
+                {
+                    return false;
+                }
+
+                var areEqual = leftIsNull && rightIsNull;
+                value = binary.Operator == SmtBinaryOperator.Equal
+                    ? areEqual
+                    : !areEqual;
+                return true;
+            }
+
+            private bool TryGetKnownReferenceNullState(SmtFormula formula, out bool isNull)
+            {
+                formula = NormalizeAliases(formula);
+                if (formula is SmtNullConstant)
+                {
+                    isNull = true;
+                    return true;
+                }
+
+                if (_referenceNullStates.TryGetValue(formula, out isNull))
+                {
+                    return true;
+                }
+
+                if (formula is SmtConditionalFormula { Kind: SmtValueKind.Reference } conditional &&
+                    TryEvaluateBoolean(conditional.Condition, out var conditionValue))
+                {
+                    return TryGetKnownReferenceNullState(
+                        conditionValue ? conditional.WhenTrue : conditional.WhenFalse,
+                        out isNull);
+                }
+
+                isNull = false;
+                return false;
             }
 
             private void AddStringLengthFact(

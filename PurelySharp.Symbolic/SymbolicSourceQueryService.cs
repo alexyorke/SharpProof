@@ -2752,6 +2752,212 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    public sealed class SymbolicInvariantQueryFocus
+    {
+        private SymbolicInvariantQueryFocus(
+            string scopeKind,
+            string filePath,
+            bool hasSourceLocation,
+            int? line,
+            int? column,
+            int? position,
+            int? requestedLine,
+            int? requestedColumn,
+            int? requestedPosition,
+            int? requestedPositionDistance,
+            bool? containsRequestedPosition,
+            int? spanStart,
+            int? spanEnd,
+            int? spanLength,
+            int? startLine,
+            int? startColumn,
+            int? endLine,
+            int? endColumn,
+            string? nodeKind,
+            string? methodName,
+            string? programPointKind,
+            string reachabilityStatus,
+            string reachabilityReason,
+            int programPointCount,
+            int reachabilityKnownCount)
+        {
+            ScopeKind = scopeKind ?? string.Empty;
+            FilePath = filePath ?? string.Empty;
+            HasSourceLocation = hasSourceLocation;
+            Line = line;
+            Column = column;
+            Position = position;
+            RequestedLine = requestedLine;
+            RequestedColumn = requestedColumn;
+            RequestedPosition = requestedPosition;
+            RequestedPositionDistance = requestedPositionDistance;
+            ContainsRequestedPosition = containsRequestedPosition;
+            SpanStart = spanStart;
+            SpanEnd = spanEnd;
+            SpanLength = spanLength;
+            StartLine = startLine;
+            StartColumn = startColumn;
+            EndLine = endLine;
+            EndColumn = endColumn;
+            NodeKind = nodeKind;
+            MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+            ProgramPointKind = programPointKind;
+            ReachabilityStatus = reachabilityStatus ?? string.Empty;
+            ReachabilityReason = reachabilityReason ?? string.Empty;
+            ProgramPointCount = programPointCount;
+            ReachabilityKnownCount = reachabilityKnownCount;
+        }
+
+        public string ScopeKind { get; }
+
+        public string FilePath { get; }
+
+        public bool HasSourceLocation { get; }
+
+        public int? Line { get; }
+
+        public int? Column { get; }
+
+        public int? Position { get; }
+
+        public int? RequestedLine { get; }
+
+        public int? RequestedColumn { get; }
+
+        public int? RequestedPosition { get; }
+
+        public int? RequestedPositionDistance { get; }
+
+        public bool? ContainsRequestedPosition { get; }
+
+        public int? SpanStart { get; }
+
+        public int? SpanEnd { get; }
+
+        public int? SpanLength { get; }
+
+        public int? StartLine { get; }
+
+        public int? StartColumn { get; }
+
+        public int? EndLine { get; }
+
+        public int? EndColumn { get; }
+
+        public string? NodeKind { get; }
+
+        public string? MethodName { get; }
+
+        public string? ProgramPointKind { get; }
+
+        public string ReachabilityStatus { get; }
+
+        public string ReachabilityReason { get; }
+
+        public int ProgramPointCount { get; }
+
+        public int ReachabilityKnownCount { get; }
+
+        public bool HasKnownReachability => ReachabilityKnownCount != 0;
+
+        internal static SymbolicInvariantQueryFocus FromCompactResult(SymbolicCompactQueryResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var reachabilityStatus = ResolveReachabilityStatus(result);
+            return new SymbolicInvariantQueryFocus(
+                result.Kind,
+                result.FilePath,
+                result.Line.HasValue ||
+                    result.Position.HasValue ||
+                    result.QuerySpanStart.HasValue ||
+                    result.QueryStartLine.HasValue,
+                result.Line,
+                result.Column,
+                result.Position,
+                result.RequestedLine,
+                result.RequestedColumn,
+                result.RequestedPosition,
+                result.RequestedPositionDistance,
+                result.ContainsRequestedPosition,
+                result.QuerySpanStart,
+                result.QuerySpanEnd,
+                result.QuerySpanLength,
+                result.QueryStartLine,
+                result.QueryStartColumn,
+                result.QueryEndLine,
+                result.QueryEndColumn,
+                result.NodeKind,
+                result.MethodName,
+                result.ProgramPointKind,
+                reachabilityStatus,
+                ResolveReachabilityReason(result, reachabilityStatus),
+                result.ProgramPointCount,
+                result.Reachability.ReachableCount + result.Reachability.UnreachableCount);
+        }
+
+        private static string ResolveReachabilityStatus(SymbolicCompactQueryResult result)
+        {
+            if (!string.IsNullOrWhiteSpace(result.PointReachability))
+            {
+                return result.PointReachability!;
+            }
+
+            if (result.ProgramPointCount == 0)
+            {
+                return "NoProgramPoints";
+            }
+
+            var reachability = result.Reachability;
+            if (reachability.ReachableCount == result.ProgramPointCount)
+            {
+                return SymbolicReachability.Reachable.ToString();
+            }
+
+            if (reachability.UnreachableCount == result.ProgramPointCount)
+            {
+                return SymbolicReachability.Unreachable.ToString();
+            }
+
+            if (reachability.UnknownCount == result.ProgramPointCount)
+            {
+                return SymbolicReachability.Unknown.ToString();
+            }
+
+            if (reachability.NotCheckedCount == result.ProgramPointCount)
+            {
+                return SymbolicReachability.NotChecked.ToString();
+            }
+
+            return "Mixed";
+        }
+
+        private static string ResolveReachabilityReason(
+            SymbolicCompactQueryResult result,
+            string reachabilityStatus)
+        {
+            if (!string.IsNullOrWhiteSpace(result.ReachabilityReason))
+            {
+                return result.ReachabilityReason!;
+            }
+
+            if (result.ProgramPointCount == 0)
+            {
+                return "no_program_points";
+            }
+
+            if (string.Equals(reachabilityStatus, "Mixed", StringComparison.Ordinal))
+            {
+                return "mixed_program_point_reachability";
+            }
+
+            return "uniform_program_point_reachability";
+        }
+    }
+
     public sealed class SymbolicCompactQueryResult
     {
         private SymbolicCompactQueryResult(
@@ -3214,6 +3420,7 @@ namespace PurelySharp.Symbolic
             string scopeKind,
             string filePath,
             SymbolicCompactSourceQueryDescriptor queryDescriptor,
+            SymbolicInvariantQueryFocus focus,
             string mergedInvariantText,
             SymbolicCompactInvariantQueryView invariantQuery,
             SymbolicCompactAnalysisSummary analysisSummary,
@@ -3229,6 +3436,7 @@ namespace PurelySharp.Symbolic
             ScopeKind = scopeKind ?? string.Empty;
             FilePath = filePath ?? string.Empty;
             QueryDescriptor = queryDescriptor ?? throw new ArgumentNullException(nameof(queryDescriptor));
+            Focus = focus ?? throw new ArgumentNullException(nameof(focus));
             MergedInvariantText = mergedInvariantText ?? string.Empty;
             InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
             AnalysisSummary = analysisSummary ?? throw new ArgumentNullException(nameof(analysisSummary));
@@ -3252,6 +3460,8 @@ namespace PurelySharp.Symbolic
         public string FilePath { get; }
 
         public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
+
+        public SymbolicInvariantQueryFocus Focus { get; }
 
         public string MergedInvariantText { get; }
 
@@ -3313,6 +3523,7 @@ namespace PurelySharp.Symbolic
                 result.Kind,
                 result.FilePath,
                 result.QueryDescriptor,
+                SymbolicInvariantQueryFocus.FromCompactResult(result),
                 result.MergedInvariantText,
                 result.InvariantQuery,
                 result.AnalysisSummary,

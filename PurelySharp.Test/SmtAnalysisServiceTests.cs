@@ -1030,6 +1030,68 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyPathFeasibility_ReferenceAliasNullContradiction_BypassesSolver()
+        {
+            var left = new SmtVariable("alias_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var right = new SmtVariable("alias_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, new SmtNullConstant()),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant()),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_ReferenceAliasNonNullEntailment_BypassesSolver()
+        {
+            var left = new SmtVariable("alias_ref_entail_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var right = new SmtVariable("alias_ref_entail_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, new SmtNullConstant()),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant());
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_NullConstantInequality_BypassesSolver()
+        {
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, new SmtNullConstant(), new SmtNullConstant()),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver()
         {
             var x = new SmtVariable("expr_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);

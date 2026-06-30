@@ -381,6 +381,75 @@ public class TestClass
         }
 
         [Test]
+        public void TryFinallyAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+        }
+        finally
+        {
+            value = 1;
+        }
+
+        return value == 0 ? Impure() : value;
+    }
+
+    private static int Impure() => 1;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
+        public void TryFinallyGuardedThrow_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+        }
+        finally
+        {
+            if (value <= 0)
+            {
+                throw new InvalidOperationException();
+            }
+        }
+
+        return value <= 0 ? Impure() : value;
+    }
+
+    private static int Impure() => 1;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
         public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
         {
             var test = @"

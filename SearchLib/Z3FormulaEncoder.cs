@@ -570,23 +570,28 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                var startAnchored = pattern.StartsWith("^", StringComparison.Ordinal);
-                var strictStartAnchored = pattern.StartsWith(@"\A", StringComparison.Ordinal);
+                var startAnchored = TryFindLeadingStartAnchor(pattern, options, out var startAnchorStart, out var startAnchorLength);
                 var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
                 var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
                 var dollarEndAnchored = !strictEndAnchored &&
                     !finalNewlineEndAnchored &&
                     pattern.EndsWith("$", StringComparison.Ordinal) &&
                     !IsEscaped(pattern, pattern.Length - 1);
-                var bodyStart = strictStartAnchored ? 2 : startAnchored ? 1 : 0;
                 var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
-                var bodyLength = pattern.Length - bodyStart - bodyEndTrim;
-                if (bodyLength < 0)
+                var bodyEnd = pattern.Length - bodyEndTrim;
+                if (bodyEnd < 0 ||
+                    (startAnchored && startAnchorStart + startAnchorLength > bodyEnd))
                 {
                     return false;
                 }
 
-                var translator = new Z3RegexTranslator(context, pattern.Substring(bodyStart, bodyLength), options);
+                var bodyPattern = pattern.Substring(0, bodyEnd);
+                if (startAnchored)
+                {
+                    bodyPattern = bodyPattern.Remove(startAnchorStart, startAnchorLength);
+                }
+
+                var translator = new Z3RegexTranslator(context, bodyPattern, options);
                 if (!translator.TryParseExpression(out var body))
                 {
                     return false;
@@ -600,7 +605,7 @@ namespace SearchLib.Smt
 
                 regex = body;
                 isExact = translator._isExact;
-                if (!startAnchored && !strictStartAnchored)
+                if (!startAnchored)
                 {
                     regex = context.MkConcat(new[] { translator.CreateAnyStringRegex(), regex });
                 }
@@ -614,6 +619,145 @@ namespace SearchLib.Smt
                     regex = context.MkConcat(new[] { regex, translator.CreateAnyStringRegex() });
                 }
 
+                return true;
+            }
+
+            private static bool TryFindLeadingStartAnchor(
+                string pattern,
+                RegexOptions options,
+                out int anchorStart,
+                out int anchorLength)
+            {
+                anchorStart = -1;
+                anchorLength = 0;
+                var index = 0;
+                var optionScope = CreateInitialOptionScope(options);
+                var canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
+                while (true)
+                {
+                    SkipIgnoredPatternTrivia(pattern, ref index, optionScope.IgnorePatternWhitespace);
+                    if (!TryReadInlineOptionGroup(pattern, index, optionScope, canUseIgnoreCase, out var nextScope, out var nextIndex))
+                    {
+                        break;
+                    }
+
+                    optionScope = nextScope;
+                    index = nextIndex;
+                }
+
+                if (index >= pattern.Length)
+                {
+                    return false;
+                }
+
+                if (pattern[index] == '^')
+                {
+                    anchorStart = index;
+                    anchorLength = 1;
+                    return true;
+                }
+
+                if (index + 1 < pattern.Length &&
+                    pattern[index] == '\\' &&
+                    pattern[index + 1] == 'A')
+                {
+                    anchorStart = index;
+                    anchorLength = 2;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private static RegexOptionScope CreateInitialOptionScope(RegexOptions options)
+            {
+                return new RegexOptionScope(
+                    (options & RegexOptions.IgnorePatternWhitespace) != 0,
+                    (options & RegexOptions.Singleline) != 0,
+                    (options & RegexOptions.IgnoreCase) != 0);
+            }
+
+            private static bool TryReadInlineOptionGroup(
+                string pattern,
+                int start,
+                RegexOptionScope currentScope,
+                bool canUseIgnoreCase,
+                out RegexOptionScope nextScope,
+                out int nextIndex)
+            {
+                nextScope = currentScope;
+                nextIndex = start;
+                if (start + 2 >= pattern.Length ||
+                    pattern[start] != '(' ||
+                    pattern[start + 1] != '?')
+                {
+                    return false;
+                }
+
+                var index = start + 2;
+                var nextIgnorePatternWhitespace = currentScope.IgnorePatternWhitespace;
+                var nextSingleline = currentScope.Singleline;
+                var nextIgnoreCase = currentScope.IgnoreCase;
+                var sawOption = false;
+                var sawDisableSeparator = false;
+                while (index < pattern.Length && pattern[index] != ')')
+                {
+                    var current = pattern[index];
+                    if (current == '-')
+                    {
+                        if (sawDisableSeparator)
+                        {
+                            return false;
+                        }
+
+                        sawDisableSeparator = true;
+                        index++;
+                        continue;
+                    }
+
+                    if (current == 'n')
+                    {
+                        sawOption = true;
+                        index++;
+                        continue;
+                    }
+
+                    if (current == 'x')
+                    {
+                        sawOption = true;
+                        nextIgnorePatternWhitespace = !sawDisableSeparator;
+                        index++;
+                        continue;
+                    }
+
+                    if (current == 's')
+                    {
+                        sawOption = true;
+                        nextSingleline = !sawDisableSeparator;
+                        index++;
+                        continue;
+                    }
+
+                    if (current == 'i' && canUseIgnoreCase)
+                    {
+                        sawOption = true;
+                        nextIgnoreCase = !sawDisableSeparator;
+                        index++;
+                        continue;
+                    }
+
+                    return false;
+                }
+
+                if (!sawOption ||
+                    index >= pattern.Length ||
+                    pattern[index] != ')')
+                {
+                    return false;
+                }
+
+                nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
+                nextIndex = index + 1;
                 return true;
             }
 
@@ -1827,6 +1971,39 @@ namespace SearchLib.Smt
                                _pattern[_position] != '\n')
                         {
                             _position++;
+                        }
+
+                        continue;
+                    }
+
+                    return;
+                }
+            }
+
+            private static void SkipIgnoredPatternTrivia(string pattern, ref int position, bool ignorePatternWhitespace)
+            {
+                if (!ignorePatternWhitespace)
+                {
+                    return;
+                }
+
+                while (position < pattern.Length)
+                {
+                    var current = pattern[position];
+                    if (char.IsWhiteSpace(current))
+                    {
+                        position++;
+                        continue;
+                    }
+
+                    if (current == '#')
+                    {
+                        position++;
+                        while (position < pattern.Length &&
+                               pattern[position] != '\r' &&
+                               pattern[position] != '\n')
+                        {
+                            position++;
                         }
 
                         continue;

@@ -664,6 +664,17 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case SwitchExpressionSyntax switchExpression:
+                    if (TryCreateSwitchExpressionNoMatchCandidate(
+                            switchExpression,
+                            semanticModel,
+                            cancellationToken,
+                            out var switchNoMatchCandidate))
+                    {
+                        yield return switchNoMatchCandidate;
+                    }
+
+                    break;
                 case ForEachStatementSyntax forEachStatement:
                     if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel, cancellationToken, out var foreachNullCandidate))
                     {
@@ -1579,6 +1590,51 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateSwitchExpressionNoMatchCandidate(
+            SwitchExpressionSyntax switchExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            SmtFormula? anyArmSelected = null;
+            foreach (var arm in switchExpression.Arms)
+            {
+                if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                        switchExpression.GoverningExpression,
+                        arm,
+                        semanticModel,
+                        cancellationToken,
+                        out var armCondition))
+                {
+                    return false;
+                }
+
+                anyArmSelected = anyArmSelected == null
+                    ? armCondition
+                    : Disjoin(anyArmSelected, armCondition);
+            }
+
+            if (anyArmSelected == null)
+            {
+                return false;
+            }
+
+            SmtFormula trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, anyArmSelected);
+            if (trigger is SmtBooleanConstant { Value: false })
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                switchExpression,
+                SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+                trigger,
+                "System.Runtime.CompilerServices.SwitchExpressionException",
+                "definite_switch_expression_no_match");
+            return true;
+        }
+
         private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
             BinaryExpressionSyntax binaryExpression,
             SmtIntegerBinaryOperator smtOperator,
@@ -2423,6 +2479,21 @@ namespace PurelySharp.Symbolic
             }
 
             return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+        }
+
+        private static SmtFormula Disjoin(SmtFormula left, SmtFormula right)
+        {
+            if (left is SmtBooleanConstant leftConstant)
+            {
+                return leftConstant.Value ? left : right;
+            }
+
+            if (right is SmtBooleanConstant rightConstant)
+            {
+                return rightConstant.Value ? right : left;
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
         }
 
         private static SmtFormula CreateNonNullTrigger(
@@ -3596,6 +3667,7 @@ namespace PurelySharp.Symbolic
         UnboxNull,
         InvalidCast,
         DynamicNullBinding,
+        SwitchExpressionNoMatch,
         NegativeArrayLength,
         NegativeStackAllocLength,
         ArgumentNull,

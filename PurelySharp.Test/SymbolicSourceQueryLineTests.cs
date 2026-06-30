@@ -245,6 +245,24 @@ public class TestClass
             Assert.That(compactPoint.RequestedPosition, Is.EqualTo(requestedPosition));
             Assert.That(compactPoint.RequestedPositionDistance, Is.EqualTo(0));
             Assert.That(compactPoint.ContainsRequestedPosition, Is.True);
+
+            var invariantResult = result.ToInvariantQueryResult();
+            Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("point"));
+            Assert.That(invariantResult.Focus.FilePath, Is.EqualTo(result.FilePath));
+            Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
+            Assert.That(invariantResult.Focus.Line, Is.EqualTo(result.Line));
+            Assert.That(invariantResult.Focus.Column, Is.EqualTo(result.Column));
+            Assert.That(invariantResult.Focus.Position, Is.EqualTo(result.Position));
+            Assert.That(invariantResult.Focus.RequestedLine, Is.EqualTo(line));
+            Assert.That(invariantResult.Focus.RequestedColumn, Is.EqualTo(column));
+            Assert.That(invariantResult.Focus.RequestedPosition, Is.EqualTo(requestedPosition));
+            Assert.That(invariantResult.Focus.RequestedPositionDistance, Is.EqualTo(0));
+            Assert.That(invariantResult.Focus.ContainsRequestedPosition, Is.True);
+            Assert.That(invariantResult.Focus.NodeKind, Is.EqualTo("AddExpression"));
+            Assert.That(invariantResult.Focus.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(invariantResult.Focus.ReachabilityStatus, Is.EqualTo(result.Reachability.ToString()));
+            Assert.That(invariantResult.Focus.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
+            Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(1));
         }
 
         [Test]
@@ -1413,6 +1431,15 @@ public class TestClass
             Assert.That(invariantResult.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
             Assert.That(invariantResult.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
             Assert.That(invariantResult.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("span"));
+            Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
+            Assert.That(invariantResult.Focus.SpanStart, Is.EqualTo(spanStart));
+            Assert.That(invariantResult.Focus.SpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(invariantResult.Focus.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(invariantResult.Focus.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(invariantResult.Focus.ReachabilityStatus, Is.Not.Empty);
+            Assert.That(invariantResult.Focus.ReachabilityReason, Is.Not.Empty);
             Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
             Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
             Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
@@ -1973,6 +2000,19 @@ public class TestClass
                 Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
                 Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
                 Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+
+                var focus = root.GetProperty("focus");
+                Assert.That(focus.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+                Assert.That(focus.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+                Assert.That(focus.GetProperty("hasSourceLocation").GetBoolean(), Is.True);
+                Assert.That(focus.TryGetProperty("line", out _), Is.False);
+                Assert.That(focus.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+                Assert.That(focus.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+                Assert.That(focus.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+                Assert.That(focus.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+                Assert.That(focus.GetProperty("programPointCount").GetInt32(), Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+                Assert.That(focus.GetProperty("reachabilityStatus").GetString(), Is.Not.Empty);
+                Assert.That(focus.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
 
                 var invariantQuery = root.GetProperty("invariantQuery");
                 Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));

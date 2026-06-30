@@ -704,7 +704,7 @@ Options:
                       Maximum formula nodes before conservative fallback.
   --json              Emit JSON instead of text.
   --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
-  --invariant-json    Emit only the compact invariant query answer, proof summaries, query descriptor, and analysis summary.
+  --invariant-json    Emit only the compact invariant query answer, focus location/status, proof summaries, query descriptor, and analysis summary.
   --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
   --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
   --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.

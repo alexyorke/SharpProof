@@ -360,6 +360,20 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateCheckedIntegralCastComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var checkedIntegralCastComparison,
+                        getSymbolVersion,
+                        inlineDepth,
+                        nonZeroDivisors) &&
+                    checkedIntegralCastComparison != null)
+                {
+                    formula = checkedIntegralCastComparison;
+                    return true;
+                }
+
                 if (TryTranslateNotNullIfNotNullNullComparison(
                         binaryExpression,
                         semanticModel,
@@ -1180,6 +1194,184 @@ namespace PurelySharp.Symbolic.Smt
         private static SmtFormula CreateNonNullFormula(SmtFormula value)
         {
             return new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
+        }
+
+        private static bool TryTranslateCheckedIntegralCastComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors)
+        {
+            if (TryTranslateCheckedIntegralCastComparisonSide(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    binaryExpression.Kind(),
+                    castOnLeft: true,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors))
+            {
+                return true;
+            }
+
+            return TryTranslateCheckedIntegralCastComparisonSide(
+                binaryExpression.Right,
+                binaryExpression.Left,
+                binaryExpression.Kind(),
+                castOnLeft: false,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                nonZeroDivisors);
+        }
+
+        private static bool TryTranslateCheckedIntegralCastComparisonSide(
+            ExpressionSyntax castCandidate,
+            ExpressionSyntax otherExpression,
+            SyntaxKind comparisonKind,
+            bool castOnLeft,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors)
+        {
+            formula = null;
+            if (!TryGetCheckedIntegralCastOperand(
+                    castCandidate,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandExpression,
+                    out var targetSpecialType) ||
+                !TryGetSupportedIntegralRange(targetSpecialType, out var targetMin, out var targetMax) ||
+                !TryTranslateValueWithSafeDivisors(
+                    operandExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandFormula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    Array.Empty<SmtFormula>(),
+                    nonZeroDivisors) ||
+                operandFormula is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateValueWithSafeDivisors(
+                    otherExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var otherFormula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    Array.Empty<SmtFormula>(),
+                    nonZeroDivisors) ||
+                otherFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var leftFormula = castOnLeft ? operandFormula : otherFormula;
+            var rightFormula = castOnLeft ? otherFormula : operandFormula;
+            if (!TryTranslateComparison(comparisonKind, leftFormula, rightFormula, out var comparisonFormula) ||
+                comparisonFormula == null)
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                CreateIntegralRangeFormula(operandFormula, targetMin, targetMax),
+                comparisonFormula);
+            return true;
+        }
+
+        private static bool TryGetCheckedIntegralCastOperand(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax operand,
+            out SpecialType targetSpecialType)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is not CastExpressionSyntax castExpression ||
+                semanticModel.GetOperation(castExpression, cancellationToken) is not IConversionOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                } conversionOperation ||
+                conversionOperation.Operand.Type is not { } sourceType ||
+                conversionOperation.Type is not { } targetType ||
+                !IsIntegralOrEnumType(sourceType) ||
+                !IsIntegralOrEnumType(targetType) ||
+                !TryGetIntegralSpecialType(targetType, out targetSpecialType))
+            {
+                operand = null!;
+                targetSpecialType = SpecialType.None;
+                return false;
+            }
+
+            operand = castExpression.Expression;
+            return true;
+        }
+
+        private static bool TryGetSupportedIntegralRange(SpecialType specialType, out long min, out long max)
+        {
+            switch (specialType)
+            {
+                case SpecialType.System_SByte:
+                    min = sbyte.MinValue;
+                    max = sbyte.MaxValue;
+                    return true;
+                case SpecialType.System_Byte:
+                    min = byte.MinValue;
+                    max = byte.MaxValue;
+                    return true;
+                case SpecialType.System_Int16:
+                    min = short.MinValue;
+                    max = short.MaxValue;
+                    return true;
+                case SpecialType.System_UInt16:
+                case SpecialType.System_Char:
+                    min = ushort.MinValue;
+                    max = ushort.MaxValue;
+                    return true;
+                case SpecialType.System_Int32:
+                    min = int.MinValue;
+                    max = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    min = uint.MinValue;
+                    max = uint.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    min = long.MinValue;
+                    max = long.MaxValue;
+                    return true;
+                default:
+                    min = default;
+                    max = default;
+                    return false;
+            }
+        }
+
+        private static SmtFormula CreateIntegralRangeFormula(SmtFormula value, long min, long max)
+        {
+            var lowerBound = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                value,
+                new SmtIntegerConstant(min));
+            var upperBound = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                value,
+                new SmtIntegerConstant(max));
+            return new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
         }
 
         private static bool IsNullLikeNullableComparisonOperand(

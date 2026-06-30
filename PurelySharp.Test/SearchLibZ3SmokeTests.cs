@@ -242,6 +242,83 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_InlineOptionBeforeStrictAnchorsImpliesLiteralLength()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var lengthIsTwo = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(2));
+
+            var result = solver.Implies(
+                new[]
+                {
+                    new SmtRegexMatchFormula(text, @"(?i)\Aab\z", RegexOptions.CultureInvariant),
+                },
+                lengthIsTwo,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_IgnorePatternWhitespaceBeforeStrictStartAnchorSkipsTrivia()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var pattern = "(?x) # leading trivia\n \\A A B \\z";
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, pattern),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineSinglelineBeforeCaretAnchorAllowsNewlineDot()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"(?s)^.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineOptionBeforeDollarAnchorImpliesBoundedFinalNewlineLength()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var boundedLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(2));
+
+            var result = solver.Implies(
+                new[]
+                {
+                    new SmtRegexMatchFormula(text, "(?x)^ A $"),
+                },
+                boundedLength,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_IgnorePatternWhitespaceGroupSkipsWhitespaceAndComments()
         {
             using var solver = new SmtSolver();

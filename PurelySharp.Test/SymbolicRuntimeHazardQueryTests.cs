@@ -2466,6 +2466,115 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedSwitchExpressionNoMatch()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0,
+            };
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value switch",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_switch_expression_no_match"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedSwitchExpressionNoMatchIsPruned()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value <= 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0,
+            };
+        }
+
+        return 1;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value switch",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Category, Is.EqualTo("definite_switch_expression_no_match"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownSwitchExpressionNoMatchCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            < 0 => -1,
+            0 => 0,
+        };
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return value switch",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return value switch",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
+
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.Category, Is.EqualTo("definite_switch_expression_no_match"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsSpan_FiltersToRequestedSpan()
         {
             const string source = @"

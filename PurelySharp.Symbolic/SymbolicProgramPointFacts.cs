@@ -1861,6 +1861,10 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedSwitchStatementFacts(switchStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             }
+            else if (statement is TryStatementSyntax tryStatement)
+            {
+                AddCompletedTryStatementFacts(tryStatement, semanticModel, cancellationToken, facts);
+            }
             else if (statement is ExpressionStatementSyntax completedExpressionStatement)
             {
                 AddNormalCompletionFacts(
@@ -1906,6 +1910,38 @@ namespace PurelySharp.Symbolic
             }
 
             AddVisibleSingleBranchFacts(blockFacts, block, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedTryStatementFacts(
+            TryStatementSyntax tryStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (tryStatement.Finally?.Block is not { } finallyBlock ||
+                StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var finallyFacts = new List<SmtFormula>(facts);
+            var processedStatementCount = 0;
+            foreach (var statement in finallyBlock.Statements)
+            {
+                if (processedStatementCount >= MaxScopedBlockCompletionStatements)
+                {
+                    return;
+                }
+
+                processedStatementCount++;
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, finallyFacts);
+                if (StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+                {
+                    break;
+                }
+            }
+
+            AddVisibleSingleBranchFacts(finallyFacts, finallyBlock, semanticModel, cancellationToken, facts);
         }
 
         private static void AddNormalCompletionFacts(

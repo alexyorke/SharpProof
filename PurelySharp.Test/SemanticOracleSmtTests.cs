@@ -7054,6 +7054,22 @@ public static class UnknownFallback
         }
 
         [Test]
+        public void ExecutionVisibility_CheckedNarrowingIntegralCastContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "checked((byte)value) == 5 && value != 5"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_CheckedNarrowingIntegralCastOutOfRangeComparison_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "checked((byte)value) > 255"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_PropertyPatternContradiction_IsAlwaysFalse()
         {
             Assert.That(
