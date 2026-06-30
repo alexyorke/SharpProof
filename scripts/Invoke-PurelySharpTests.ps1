@@ -116,7 +116,7 @@ function Get-PurelySharpTestWorkerProcesses
         [string]$RepoRoot
     )
 
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe'" -ErrorAction SilentlyContinue
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe' OR Name = 'MSBuild.exe' OR Name = 'VBCSCompiler.exe'" -ErrorAction SilentlyContinue
     foreach ($process in $processes)
     {
         $commandLine = [string]$process.CommandLine
@@ -152,7 +152,8 @@ function Stop-NewPurelySharpTestWorkerProcesses
     }
 
     $stoppedCount = 0
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe'" -ErrorAction SilentlyContinue
+    $stoppedProcessIds = New-Object System.Collections.Generic.List[int]
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe' OR Name = 'MSBuild.exe' OR Name = 'VBCSCompiler.exe'" -ErrorAction SilentlyContinue
     foreach ($process in $processes)
     {
         $processId = [int]$process.ProcessId
@@ -195,11 +196,13 @@ function Stop-NewPurelySharpTestWorkerProcesses
         }
 
         Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        $stoppedProcessIds.Add($processId)
         $stoppedCount++
     }
 
     if ($stoppedCount -gt 0)
     {
+        Wait-Process -Id $stoppedProcessIds.ToArray() -Timeout 5 -ErrorAction SilentlyContinue
         Write-Host "Stopped $stoppedCount orphaned test worker process(es)."
     }
 }

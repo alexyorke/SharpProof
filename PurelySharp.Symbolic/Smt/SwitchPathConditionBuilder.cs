@@ -445,6 +445,16 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var conditions = new List<SmtFormula> { patternFormula };
+            var bindingFacts = new List<SmtFormula>();
+            CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                governingValue,
+                governingType,
+                pattern,
+                semanticModel,
+                cancellationToken,
+                bindingFacts,
+                getSymbolVersion);
+
             if (whenClause != null)
             {
                 if (!CSharpConditionToFormula.TryTranslate(
@@ -458,10 +468,156 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
-                conditions.Add(guardFormula);
+                conditions.Add(SubstitutePatternBindingFacts(guardFormula, bindingFacts));
             }
 
             return TryCreateConjunction(conditions, out formula);
+        }
+
+        private static SmtFormula SubstitutePatternBindingFacts(
+            SmtFormula formula,
+            IEnumerable<SmtFormula> bindingFacts)
+        {
+            var substitutions = new Dictionary<SmtVariable, SmtFormula>();
+            foreach (var bindingFact in bindingFacts)
+            {
+                if (bindingFact is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equality)
+                {
+                    continue;
+                }
+
+                AddBindingSubstitution(equality.Left, equality.Right, substitutions);
+                AddBindingSubstitution(equality.Right, equality.Left, substitutions);
+            }
+
+            return substitutions.Count == 0
+                ? formula
+                : SubstitutePatternBindingFacts(formula, substitutions);
+        }
+
+        private static void AddBindingSubstitution(
+            SmtFormula source,
+            SmtFormula replacement,
+            IDictionary<SmtVariable, SmtFormula> substitutions)
+        {
+            if (source is not SmtVariable variable ||
+                variable.Kind != replacement.Kind ||
+                ReferencesFormula(replacement, variable))
+            {
+                return;
+            }
+
+            substitutions[variable] = replacement;
+        }
+
+        private static SmtFormula SubstitutePatternBindingFacts(
+            SmtFormula formula,
+            IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable when substitutions.TryGetValue(variable, out var replacement):
+                    return replacement;
+                case SmtUnaryFormula unary:
+                    return new SmtUnaryFormula(
+                        unary.Operator,
+                        SubstitutePatternBindingFacts(unary.Operand, substitutions));
+                case SmtBinaryFormula binary:
+                    return new SmtBinaryFormula(
+                        binary.Operator,
+                        SubstitutePatternBindingFacts(binary.Left, substitutions),
+                        SubstitutePatternBindingFacts(binary.Right, substitutions));
+                case SmtIntegerUnaryTerm integerUnary:
+                    return new SmtIntegerUnaryTerm(
+                        integerUnary.Operator,
+                        SubstitutePatternBindingFacts(integerUnary.Operand, substitutions));
+                case SmtIntegerBinaryTerm integerBinary:
+                    return new SmtIntegerBinaryTerm(
+                        integerBinary.Operator,
+                        SubstitutePatternBindingFacts(integerBinary.Left, substitutions),
+                        SubstitutePatternBindingFacts(integerBinary.Right, substitutions));
+                case SmtStringLengthTerm stringLength:
+                    return new SmtStringLengthTerm(SubstitutePatternBindingFacts(stringLength.Value, substitutions));
+                case SmtStringConcatTerm stringConcat:
+                    return new SmtStringConcatTerm(
+                        SubstitutePatternBindingFacts(stringConcat.Left, substitutions),
+                        SubstitutePatternBindingFacts(stringConcat.Right, substitutions));
+                case SmtStringContainsFormula stringContains:
+                    return new SmtStringContainsFormula(
+                        SubstitutePatternBindingFacts(stringContains.Value, substitutions),
+                        SubstitutePatternBindingFacts(stringContains.Search, substitutions));
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return new SmtStringStartsWithFormula(
+                        SubstitutePatternBindingFacts(stringStartsWith.Value, substitutions),
+                        SubstitutePatternBindingFacts(stringStartsWith.Prefix, substitutions));
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return new SmtStringEndsWithFormula(
+                        SubstitutePatternBindingFacts(stringEndsWith.Value, substitutions),
+                        SubstitutePatternBindingFacts(stringEndsWith.Suffix, substitutions));
+                case SmtRegexMatchFormula regexMatch:
+                    return new SmtRegexMatchFormula(
+                        SubstitutePatternBindingFacts(regexMatch.Value, substitutions),
+                        regexMatch.Pattern,
+                        regexMatch.Options);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return new SmtRuntimeTypeTestFormula(
+                        SubstitutePatternBindingFacts(runtimeTypeTest.Value, substitutions),
+                        runtimeTypeTest.TypeKey);
+                case SmtConditionalFormula conditional:
+                    return new SmtConditionalFormula(
+                        SubstitutePatternBindingFacts(conditional.Condition, substitutions),
+                        SubstitutePatternBindingFacts(conditional.WhenTrue, substitutions),
+                        SubstitutePatternBindingFacts(conditional.WhenFalse, substitutions),
+                        conditional.ResultKind);
+                default:
+                    return formula;
+            }
+        }
+
+        private static bool ReferencesFormula(SmtFormula formula, SmtFormula target)
+        {
+            if (formula.Equals(target))
+            {
+                return true;
+            }
+
+            switch (formula)
+            {
+                case SmtUnaryFormula unary:
+                    return ReferencesFormula(unary.Operand, target);
+                case SmtBinaryFormula binary:
+                    return ReferencesFormula(binary.Left, target) ||
+                        ReferencesFormula(binary.Right, target);
+                case SmtIntegerUnaryTerm integerUnary:
+                    return ReferencesFormula(integerUnary.Operand, target);
+                case SmtIntegerBinaryTerm integerBinary:
+                    return ReferencesFormula(integerBinary.Left, target) ||
+                        ReferencesFormula(integerBinary.Right, target);
+                case SmtStringLengthTerm stringLength:
+                    return ReferencesFormula(stringLength.Value, target);
+                case SmtStringConcatTerm stringConcat:
+                    return ReferencesFormula(stringConcat.Left, target) ||
+                        ReferencesFormula(stringConcat.Right, target);
+                case SmtStringContainsFormula stringContains:
+                    return ReferencesFormula(stringContains.Value, target) ||
+                        ReferencesFormula(stringContains.Search, target);
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return ReferencesFormula(stringStartsWith.Value, target) ||
+                        ReferencesFormula(stringStartsWith.Prefix, target);
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return ReferencesFormula(stringEndsWith.Value, target) ||
+                        ReferencesFormula(stringEndsWith.Suffix, target);
+                case SmtRegexMatchFormula regexMatch:
+                    return ReferencesFormula(regexMatch.Value, target);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return ReferencesFormula(runtimeTypeTest.Value, target);
+                case SmtConditionalFormula conditional:
+                    return ReferencesFormula(conditional.Condition, target) ||
+                        ReferencesFormula(conditional.WhenTrue, target) ||
+                        ReferencesFormula(conditional.WhenFalse, target);
+                default:
+                    return false;
+            }
         }
 
         private static bool TryCreatePatternSelectionCondition(

@@ -319,6 +319,13 @@ namespace PurelySharp.Analyzer.Engine
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
+            CSharpConditionToFormula.TryCollectDomainFacts(
+                expression,
+                semanticModel,
+                cancellationToken,
+                pathConditions,
+                getSymbolVersion);
+
             var originalCount = pathConditions.Count;
             CSharpConditionToFormula.TryCollectBranchAssumptions(
                 expression,

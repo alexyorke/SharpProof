@@ -1464,6 +1464,12 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking ForEach enumerator runtime purity...");
                         foreach (var forEachOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IForEachLoopOperation>())
                         {
+                            if (ShouldSkipPostCfgDirectPurityProbe(forEachOp, semanticModel, activeSmtAnalysis))
+                            {
+                                LogDebug($"{indent}    Post-CFG: Skipping statically unreachable foreach enumerator runtime check: {forEachOp.Syntax}");
+                                continue;
+                            }
+
                             var forEachResult = LoopPurityRule.CheckForEachEnumeratorPurity(forEachOp.Collection, postCfgContext);
                             if (!forEachResult.IsPure)
                             {
@@ -1650,6 +1656,11 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Checked Operations...");
                         foreach (var operation in ExecutionVisibility.VisibleDescendants(methodBodyIOperation))
                         {
+                            if (ShouldSkipPostCfgDirectPurityProbe(operation, semanticModel, activeSmtAnalysis))
+                            {
+                                continue;
+                            }
+
                             bool isChecked = false;
                             IMethodSymbol? operatorMethod = null;
 
@@ -1716,6 +1727,15 @@ namespace PurelySharp.Analyzer.Engine
                 visited.Remove(methodSymbol);
                 LogDebug($"{indent}-- Removed Walker for: {methodSymbol.ToDisplayString()}");
             }
+        }
+
+        private static bool ShouldSkipPostCfgDirectPurityProbe(
+            IOperation operation,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis)
+        {
+            return operation.Syntax != null &&
+                IsInStaticallyUnreachableBranch(operation.Syntax, semanticModel, smtAnalysis);
         }
 
 
@@ -2634,7 +2654,14 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService smtAnalysis)
         {
             var pathConditionsBuilder = currentState.PathConditions.ToBuilder();
-            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectBranchAssumptions(
+            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectDomainFacts(
+                expressionSyntax,
+                semanticModel,
+                CancellationToken.None,
+                pathConditionsBuilder,
+                currentState.GetSmtSymbolVersion);
+
+            addedBranchAssumptions |= CSharpConditionToFormula.TryCollectBranchAssumptions(
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,

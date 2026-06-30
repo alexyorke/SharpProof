@@ -12,12 +12,14 @@ function Initialize-PurelySharpJobObjectInterop {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace PurelySharp
 {
     public static class JobObjectNative
     {
         public const int JobObjectExtendedLimitInformation = 9;
+        public const uint CreateSuspended = 0x00000004;
 
         [Flags]
         public enum JobObjectLimitFlags : uint
@@ -62,6 +64,38 @@ namespace PurelySharp
             public UIntPtr PeakJobMemoryUsed;
         }
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct STARTUPINFO
+        {
+            public uint cb;
+            public string lpReserved;
+            public string lpDesktop;
+            public string lpTitle;
+            public uint dwX;
+            public uint dwY;
+            public uint dwXSize;
+            public uint dwYSize;
+            public uint dwXCountChars;
+            public uint dwYCountChars;
+            public uint dwFillAttribute;
+            public uint dwFlags;
+            public ushort wShowWindow;
+            public ushort cbReserved2;
+            public IntPtr lpReserved2;
+            public IntPtr hStdInput;
+            public IntPtr hStdOutput;
+            public IntPtr hStdError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct PROCESS_INFORMATION
+        {
+            public IntPtr hProcess;
+            public IntPtr hThread;
+            public uint dwProcessId;
+            public uint dwThreadId;
+        }
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
 
@@ -80,6 +114,27 @@ namespace PurelySharp
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CreateProcess(
+            string lpApplicationName,
+            StringBuilder lpCommandLine,
+            IntPtr lpProcessAttributes,
+            IntPtr lpThreadAttributes,
+            bool bInheritHandles,
+            uint dwCreationFlags,
+            IntPtr lpEnvironment,
+            string lpCurrentDirectory,
+            ref STARTUPINFO lpStartupInfo,
+            out PROCESS_INFORMATION lpProcessInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern uint ResumeThread(IntPtr hThread);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -112,6 +167,15 @@ function ConvertTo-WindowsCommandLineArgument {
     return '"' + $escaped + '"'
 }
 
+function ConvertTo-SignedProcessExitCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [uint32]$ExitCode
+    )
+
+    return [BitConverter]::ToInt32([BitConverter]::GetBytes($ExitCode), 0)
+}
+
 function Invoke-ProcessUnderJobObject {
     [CmdletBinding()]
     param(
@@ -130,6 +194,14 @@ function Invoke-ProcessUnderJobObject {
     )
 
     Initialize-PurelySharpJobObjectInterop
+    $resolvedFilePath = $FilePath
+    $resolvedCommand = Get-Command -CommandType Application -Name $FilePath -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $resolvedCommand -and -not [string]::IsNullOrWhiteSpace($resolvedCommand.Source)) {
+        $resolvedFilePath = $resolvedCommand.Source
+    }
+    elseif (Test-Path -LiteralPath $FilePath) {
+        $resolvedFilePath = (Resolve-Path -LiteralPath $FilePath).Path
+    }
 
     $jobHandle = [PurelySharp.JobObjectNative]::CreateJobObject([IntPtr]::Zero, $null)
     if ($jobHandle -eq [IntPtr]::Zero) {
@@ -148,6 +220,9 @@ function Invoke-ProcessUnderJobObject {
     $limitInfoBuffer = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$limitInfoSize)
 
     $process = $null
+    $processInformation = New-Object PurelySharp.JobObjectNative+PROCESS_INFORMATION
+    $processHandleOwned = $false
+    $threadHandleOwned = $false
     try {
         [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
         if (-not [PurelySharp.JobObjectNative]::SetInformationJobObject(
@@ -159,22 +234,39 @@ function Invoke-ProcessUnderJobObject {
             throw "SetInformationJobObject failed with Win32 error $win32Error."
         }
 
-        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $startInfo.FileName = $FilePath
-        $startInfo.WorkingDirectory = $WorkingDirectory
-        $startInfo.UseShellExecute = $false
-        $startInfo.Arguments = (($ArgumentList | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
-
-        $process = [System.Diagnostics.Process]::Start($startInfo)
-        if ($null -eq $process) {
-            throw "Failed to start process '$FilePath'."
+        $commandLine = ((@($resolvedFilePath) + $ArgumentList | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
+        $commandLineBuilder = [System.Text.StringBuilder]::new($commandLine)
+        $startupInfo = New-Object PurelySharp.JobObjectNative+STARTUPINFO
+        $startupInfo.cb = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][PurelySharp.JobObjectNative+STARTUPINFO])
+        if (-not [PurelySharp.JobObjectNative]::CreateProcess(
+                $resolvedFilePath,
+                $commandLineBuilder,
+                [IntPtr]::Zero,
+                [IntPtr]::Zero,
+                $true,
+                [PurelySharp.JobObjectNative]::CreateSuspended,
+                [IntPtr]::Zero,
+                $WorkingDirectory,
+                [ref]$startupInfo,
+                [ref]$processInformation)) {
+            $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            throw "CreateProcess failed for '$FilePath' with Win32 error $win32Error."
         }
 
-        if (-not [PurelySharp.JobObjectNative]::AssignProcessToJobObject($jobHandle, $process.Handle)) {
+        $processHandleOwned = $true
+        $threadHandleOwned = $true
+        if (-not [PurelySharp.JobObjectNative]::AssignProcessToJobObject($jobHandle, $processInformation.hProcess)) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            if (-not $process.HasExited) {
-                throw "AssignProcessToJobObject failed with Win32 error $win32Error."
-            }
+            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            throw "AssignProcessToJobObject failed with Win32 error $win32Error."
+        }
+
+        $process = [System.Diagnostics.Process]::GetProcessById([int]$processInformation.dwProcessId)
+        $resumeResult = [PurelySharp.JobObjectNative]::ResumeThread($processInformation.hThread)
+        if ($resumeResult -eq [uint32]::MaxValue) {
+            $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            throw "ResumeThread failed with Win32 error $win32Error."
         }
 
         if ($TimeoutSeconds -gt 0) {
@@ -190,8 +282,15 @@ function Invoke-ProcessUnderJobObject {
             $process.WaitForExit()
         }
 
-        $global:LASTEXITCODE = $process.ExitCode
-        return $process.ExitCode
+        $nativeExitCode = [uint32]0
+        if (-not [PurelySharp.JobObjectNative]::GetExitCodeProcess($processInformation.hProcess, [ref]$nativeExitCode)) {
+            $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            throw "GetExitCodeProcess failed with Win32 error $win32Error."
+        }
+
+        $exitCode = ConvertTo-SignedProcessExitCode -ExitCode $nativeExitCode
+        $global:LASTEXITCODE = $exitCode
+        return $exitCode
     }
     finally {
         if ($null -ne $process -and -not $process.HasExited) {
@@ -199,6 +298,14 @@ function Invoke-ProcessUnderJobObject {
         }
 
         [Runtime.InteropServices.Marshal]::FreeHGlobal($limitInfoBuffer)
+        if ($threadHandleOwned) {
+            [void][PurelySharp.JobObjectNative]::CloseHandle($processInformation.hThread)
+        }
+
+        if ($processHandleOwned) {
+            [void][PurelySharp.JobObjectNative]::CloseHandle($processInformation.hProcess)
+        }
+
         [void][PurelySharp.JobObjectNative]::CloseHandle($jobHandle)
     }
 }

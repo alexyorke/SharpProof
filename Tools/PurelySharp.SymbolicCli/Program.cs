@@ -73,16 +73,28 @@ try
                 impliedConditions: options.ImpliedConditions,
                 includeExpressionProgramPoints: options.LineExpressions,
                 includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-            : options.IsSpanQuery
-            ? queryService.QueryFileSpan(
-                options.FilePath,
-                options.SpanStart!.Value,
-                options.SpanEnd!.Value,
-                options.CreateReferences(),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions,
-                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
+            : options.IsAnySpanQuery
+            ? options.IsLineColumnSpanQuery
+                ? queryService.QueryFileLineSpan(
+                    options.FilePath,
+                    options.SpanStartLine!.Value,
+                    options.SpanStartColumn!.Value,
+                    options.SpanEndLine!.Value,
+                    options.SpanEndColumn!.Value,
+                    options.CreateReferences(),
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: options.ImpliedConditions,
+                    includeExpressionProgramPoints: options.LineExpressions,
+                    includeCurrentStatementCompletionFacts: options.PostLineInvariants)
+                : queryService.QueryFileSpan(
+                    options.FilePath,
+                    options.SpanStart!.Value,
+                    options.SpanEnd!.Value,
+                    options.CreateReferences(),
+                    smtAnalysis: smtAnalysis,
+                    impliedConditions: options.ImpliedConditions,
+                    includeExpressionProgramPoints: options.LineExpressions,
+                    includeCurrentStatementCompletionFacts: options.PostLineInvariants)
             : options.Position.HasValue
             ? queryService.QueryFileAtPosition(
                 options.FilePath,
@@ -618,6 +630,13 @@ Options:
   --line-invariants   Query every statement/expression program point on the line, or the nearest point when --column is supplied.
   --span-start <n>    0-based inclusive source span start to query.
   --span-end <n>      0-based exclusive source span end to query.
+  --span-start-line <n>
+                      1-based span start line for line/column span queries.
+  --span-start-column <n>
+                      1-based span start column for line/column span queries.
+  --span-end-line <n> 1-based span end line for line/column span queries.
+  --span-end-column <n>
+                      1-based span end column for line/column span queries.
   --all-lines         Query every line that contains statement/expression program points.
   --line-expressions  Include expression program points in --line-invariants, --span-start/--span-end, or --all-lines.
   --post-line-invariants
@@ -706,6 +725,14 @@ Examples:
     public int? SpanStart { get; private set; }
 
     public int? SpanEnd { get; private set; }
+
+    public int? SpanStartLine { get; private set; }
+
+    public int? SpanStartColumn { get; private set; }
+
+    public int? SpanEndLine { get; private set; }
+
+    public int? SpanEndColumn { get; private set; }
 
     public bool LineInvariants { get; private set; }
 
@@ -807,6 +834,14 @@ Examples:
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
+    public bool IsLineColumnSpanQuery =>
+        SpanStartLine.HasValue ||
+        SpanStartColumn.HasValue ||
+        SpanEndLine.HasValue ||
+        SpanEndColumn.HasValue;
+
+    public bool IsAnySpanQuery => IsSpanQuery || IsLineColumnSpanQuery;
+
     public bool HasRuntimeHazardFilter =>
         HazardStatuses.Count != 0 ||
         HazardExceptionTypes.Count != 0 ||
@@ -861,6 +896,18 @@ Examples:
                     break;
                 case "--span-end":
                     options.SpanEnd = ReadNonNegativeInt(args, ref index, arg);
+                    break;
+                case "--span-start-line":
+                    options.SpanStartLine = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--span-start-column":
+                    options.SpanStartColumn = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--span-end-line":
+                    options.SpanEndLine = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--span-end-column":
+                    options.SpanEndColumn = ReadPositiveInt(args, ref index, arg);
                     break;
                 case "--line-invariants":
                 case "--all-line-points":
@@ -1074,29 +1121,43 @@ Examples:
                 throw new ArgumentException("--position cannot be combined with --line.");
             }
 
-            if (options.Position.HasValue && options.IsSpanQuery)
+            if (options.Position.HasValue && options.IsAnySpanQuery)
             {
-                throw new ArgumentException("--position cannot be combined with --span-start or --span-end.");
+                throw new ArgumentException("--position cannot be combined with span query options.");
             }
 
-            if (options.IsSpanQuery && options.Line != 0)
+            if (options.IsAnySpanQuery && options.Line != 0)
             {
-                throw new ArgumentException("--span-start and --span-end cannot be combined with --line.");
+                throw new ArgumentException("Span query options cannot be combined with --line.");
             }
 
-            if (options.IsSpanQuery && options.LineInvariants)
+            if (options.IsAnySpanQuery && options.LineInvariants)
             {
-                throw new ArgumentException("--span-start and --span-end cannot be combined with --line-invariants.");
+                throw new ArgumentException("Span query options cannot be combined with --line-invariants.");
             }
 
-            if (options.IsSpanQuery && options.Column != 1)
+            if (options.IsAnySpanQuery && options.Column != 1)
             {
-                throw new ArgumentException("--span-start and --span-end cannot be combined with --column.");
+                throw new ArgumentException("Span query options cannot be combined with --column.");
             }
 
             if (options.IsSpanQuery && (!options.SpanStart.HasValue || !options.SpanEnd.HasValue))
             {
                 throw new ArgumentException("--span-start and --span-end must be provided together.");
+            }
+
+            if (options.IsLineColumnSpanQuery &&
+                (!options.SpanStartLine.HasValue ||
+                 !options.SpanStartColumn.HasValue ||
+                 !options.SpanEndLine.HasValue ||
+                 !options.SpanEndColumn.HasValue))
+            {
+                throw new ArgumentException("--span-start-line, --span-start-column, --span-end-line, and --span-end-column must be provided together.");
+            }
+
+            if (options.IsSpanQuery && options.IsLineColumnSpanQuery)
+            {
+                throw new ArgumentException("Absolute span options cannot be combined with line/column span options.");
             }
 
             if (options.SpanEnd.HasValue &&
@@ -1106,10 +1167,19 @@ Examples:
                 throw new ArgumentException("--span-end cannot be less than --span-start.");
             }
 
-            if (options.AllLines &&
-                (options.Position.HasValue || options.IsSpanQuery || options.Line != 0 || options.Column != 1 || options.LineInvariants))
+            if (options.SpanStartLine.HasValue &&
+                options.SpanEndLine.HasValue &&
+                (options.SpanEndLine.Value < options.SpanStartLine.Value ||
+                 (options.SpanEndLine.Value == options.SpanStartLine.Value &&
+                  options.SpanEndColumn!.Value < options.SpanStartColumn!.Value)))
             {
-                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, --span-start, --span-end, or --line-invariants.");
+                throw new ArgumentException("Line/column span end cannot be before span start.");
+            }
+
+            if (options.AllLines &&
+                (options.Position.HasValue || options.IsAnySpanQuery || options.Line != 0 || options.Column != 1 || options.LineInvariants))
+            {
+                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, span query options, or --line-invariants.");
             }
 
             if (options.Position.HasValue && options.LineInvariants)
@@ -1122,9 +1192,9 @@ Examples:
                 throw new ArgumentException("--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
             }
 
-            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1))
+            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1 || options.IsLineColumnSpanQuery))
             {
-                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, or --column.");
+                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
             }
 
             if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability || options.HasResultFilter))
@@ -1132,12 +1202,12 @@ Examples:
                 throw new ArgumentException("--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
             }
 
-            if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)
+            if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
             {
                 throw new ArgumentException("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
             }
 
-            if (options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)
+            if (options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
             {
                 throw new ArgumentException("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
             }
@@ -1149,12 +1219,12 @@ Examples:
                 throw new ArgumentException("--line-start cannot be greater than --line-end.");
             }
 
-            if (!options.AllLines && !options.Position.HasValue && !options.IsSpanQuery && options.Line == 0)
+            if (!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0)
             {
                 throw new ArgumentException("--line, --position, --span-start/--span-end, or --all-lines is required.");
             }
 
-            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsSpanQuery)
+            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsAnySpanQuery)
             {
                 throw new ArgumentException("Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
             }

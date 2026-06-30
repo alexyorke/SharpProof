@@ -795,5 +795,61 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task SwitchStatementPriorPropertyBindingGuardExcludesLaterSection()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    [Pure]
+    public int Count { get; init; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Count: var count } when count > 0:
+                return;
+            case { Count: > 0 }:
+                Console.WriteLine(box.Count);
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchExpressionPriorListBindingGuardExcludesLaterArm()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int[] values)
+    {
+        return values switch
+        {
+            [var first, ..] when first > 0 => string.Empty,
+            [> 0, ..] => Console.ReadLine(),
+            _ => string.Empty
+        };
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

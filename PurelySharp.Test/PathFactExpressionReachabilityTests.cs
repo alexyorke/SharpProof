@@ -289,5 +289,100 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public static class GlobalState
+{
+    public static int Count;
+}
+
+public sealed class Sequence
+{
+    [EnforcePure]
+    public Enumerator GetEnumerator() => new Enumerator();
+
+    public sealed class Enumerator
+    {
+        public int Current => 1;
+
+        public bool MoveNext()
+        {
+            GlobalState.Count++;
+            return false;
+        }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value, Sequence values)
+    {
+        if (value <= 0)
+        {
+            return;
+        }
+
+        if (value <= 0)
+        {
+            foreach (var item in values)
+            {
+            }
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task UnknownBranchWithImpureForeachEnumeratorRuntime_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public static class GlobalState
+{
+    public static int Count;
+}
+
+public sealed class Sequence
+{
+    [EnforcePure]
+    public Enumerator GetEnumerator() => new Enumerator();
+
+    public sealed class Enumerator
+    {
+        public int Current => 1;
+
+        public bool MoveNext()
+        {
+            GlobalState.Count++;
+            return false;
+        }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(int value, Sequence values)
+    {
+        if (value <= 0)
+        {
+            foreach (var item in values)
+            {
+            }
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
     }
 }

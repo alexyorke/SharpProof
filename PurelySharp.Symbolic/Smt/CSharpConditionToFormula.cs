@@ -1312,7 +1312,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return expression is MemberAccessExpressionSyntax memberAccess &&
-                IsBuiltInNonNegativeLengthAccess(memberAccess, semanticModel, cancellationToken);
+                IsKnownNonNegativeIntegralMemberAccess(memberAccess, semanticModel, cancellationToken);
         }
 
         private static bool TryTranslateSourceBooleanInvocation(
@@ -4584,7 +4584,7 @@ namespace PurelySharp.Symbolic.Smt
 
             foreach (var memberAccess in expression.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>())
             {
-                if (!IsBuiltInNonNegativeLengthAccess(memberAccess, semanticModel, cancellationToken) ||
+                if (!IsKnownNonNegativeIntegralMemberAccess(memberAccess, semanticModel, cancellationToken) ||
                     !TryTranslateValue(memberAccess, semanticModel, cancellationToken, out var lengthFormula, getSymbolVersion) ||
                     lengthFormula is not { Kind: SmtValueKind.Int })
                 {
@@ -9797,6 +9797,110 @@ namespace PurelySharp.Symbolic.Smt
             var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
             return IsSupportedBuiltInLengthReceiver(receiverType);
+        }
+
+        private static bool IsKnownNonNegativeIntegralMemberAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return IsBuiltInNonNegativeLengthAccess(memberAccess, semanticModel, cancellationToken) ||
+                IsKnownNonNegativeCollectionCountAccess(memberAccess, semanticModel, cancellationToken);
+        }
+
+        private static bool IsKnownNonNegativeCollectionCountAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (memberAccess.Name.Identifier.ValueText != "Count" ||
+                semanticModel.GetSymbolInfo(memberAccess.Name, cancellationToken).Symbol is not IPropertySymbol
+                {
+                    IsStatic: false,
+                    Parameters.Length: 0,
+                    Type.SpecialType: SpecialType.System_Int32
+                } propertySymbol)
+            {
+                return false;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
+            return IsKnownNonNegativeCollectionCountProperty(propertySymbol, receiverType, semanticModel.Compilation);
+        }
+
+        private static bool IsKnownNonNegativeCollectionCountProperty(
+            IPropertySymbol propertySymbol,
+            ITypeSymbol? receiverType,
+            Compilation compilation)
+        {
+            if (receiverType == null)
+            {
+                return false;
+            }
+
+            foreach (var interfaceType in EnumerateKnownNonNegativeCountInterfaces(receiverType, compilation))
+            {
+                foreach (var interfaceCount in interfaceType.GetMembers("Count").OfType<IPropertySymbol>())
+                {
+                    if (interfaceCount is not
+                        {
+                            IsStatic: false,
+                            Parameters.Length: 0,
+                            Type.SpecialType: SpecialType.System_Int32
+                        })
+                    {
+                        continue;
+                    }
+
+                    if (IsSameSymbol(propertySymbol, interfaceCount))
+                    {
+                        return true;
+                    }
+
+                    if (receiverType is INamedTypeSymbol namedReceiver &&
+                        namedReceiver.FindImplementationForInterfaceMember(interfaceCount) is { } implementation &&
+                        implementation.DeclaringSyntaxReferences.Length == 0 &&
+                        IsSameSymbol(propertySymbol, implementation))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<INamedTypeSymbol> EnumerateKnownNonNegativeCountInterfaces(
+            ITypeSymbol receiverType,
+            Compilation compilation)
+        {
+            if (receiverType is INamedTypeSymbol namedReceiver &&
+                IsKnownNonNegativeCountInterface(namedReceiver, compilation))
+            {
+                yield return namedReceiver;
+            }
+
+            foreach (var interfaceType in receiverType.AllInterfaces)
+            {
+                if (IsKnownNonNegativeCountInterface(interfaceType, compilation))
+                {
+                    yield return interfaceType;
+                }
+            }
+        }
+
+        private static bool IsKnownNonNegativeCountInterface(INamedTypeSymbol typeSymbol, Compilation compilation)
+        {
+            return IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.ICollection")) ||
+                IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")) ||
+                IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.Generic.IReadOnlyCollection`1"));
+        }
+
+        private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target)
+        {
+            return target != null &&
+                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target);
         }
 
         private static bool TryTranslateComparison(

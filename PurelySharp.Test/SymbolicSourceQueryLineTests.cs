@@ -603,6 +603,56 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLineSpan_ConvertsLineColumnsToSourceSpan()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LineColumnSpanQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "LineColumnSpanQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLineSpan(
+                syntaxTree,
+                compilation,
+                FindLine(source, "if (copy > 0)"),
+                FindColumn(source, "if (copy > 0)"),
+                FindLine(source, "return 0;"),
+                FindColumn(source, "return 0;") + "return 0;".Length,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0" });
+
+            Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+            Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+            Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
+            var guardedReturn = result.ProgramPoints
+                .Where(static point => point.NodeKind == "ReturnStatement")
+                .Single(point => point.PathConditions.Any(static condition => condition.Text == "copy > 0"));
+            Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void QuerySyntaxTreeLine_ClassifiesImpossibleReturnAsUnreachable()
         {
             const string source = @"
@@ -1727,6 +1777,69 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_LineColumnSpan_QueriesSpanWithoutAbsoluteOffsets()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliLineColumnSpanQuery-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var spanStart = FindPosition(source, "if (copy > 0)");
+                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--span-start-line",
+                    FindLine(source, "if (copy > 0)").ToString(),
+                    "--span-start-column",
+                    FindColumn(source, "if (copy > 0)").ToString(),
+                    "--span-end-line",
+                    FindLine(source, "return 0;").ToString(),
+                    "--span-end-column",
+                    (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
+                    "--implies",
+                    "copy > 0",
+                    "--compact-json",
+                    "--max-points",
+                    "3");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
+                Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
+                Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(
+                    root.GetProperty("programPoints")
+                        .EnumerateArray()
+                        .SelectMany(static point => point.GetProperty("conditionProofs").EnumerateArray())
+                        .Any(static proof => proof.GetProperty("truthValue").GetString() == SymbolicTruthValue.ProvenTrue.ToString()),
+                    Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_LineExpressions_AllowsFilteringToExpressionProgramPoint()
         {
             var source = @"
@@ -1982,7 +2095,7 @@ public class TestClass
 
                 Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
                 Assert.That(result.StandardOutput, Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
-                Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' summary: Status=AlwaysTrue"));
+                Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' target=value kind=SmtBinary summary: Status=AlwaysTrue"));
                 Assert.That(result.StandardOutput, Does.Contain("Proof summary: The condition is proven true at every reachable candidate program point."));
             }
             finally

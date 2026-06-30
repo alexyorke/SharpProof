@@ -565,6 +565,32 @@ namespace PurelySharp.Symbolic.Smt
                 };
             }
 
+            public IntegerInterval Intersect(IntegerInterval other)
+            {
+                var interval = this;
+                if (other.IsImpossible)
+                {
+                    interval = interval.Impossible();
+                }
+
+                if (other.LowerBound.HasValue)
+                {
+                    interval = interval.WithLowerBound(other.LowerBound.Value);
+                }
+
+                if (other.UpperBound.HasValue)
+                {
+                    interval = interval.WithUpperBound(other.UpperBound.Value);
+                }
+
+                foreach (var excludedValue in other.ExcludedValues)
+                {
+                    interval = interval.Apply(SmtBinaryOperator.NotEqual, excludedValue);
+                }
+
+                return interval;
+            }
+
             private IntegerInterval WithLowerBound(long lowerBound)
             {
                 return new IntegerInterval(
@@ -706,6 +732,7 @@ namespace PurelySharp.Symbolic.Smt
             private readonly Dictionary<SmtFormula, string> _exactStrings = new();
             private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
             private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
+            private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
 
             public static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
             {
@@ -746,7 +773,13 @@ namespace PurelySharp.Symbolic.Smt
             {
                 hasContradiction = false;
                 var added = false;
-                if (TryAddIntegerIntervalFact(formula, _integerIntervals, out var integerContradiction))
+                if (TryAddAliasFact(formula, out var aliasContradiction))
+                {
+                    added = true;
+                    hasContradiction |= aliasContradiction;
+                }
+
+                if (TryAddIntegerIntervalFact(formula, out var integerContradiction))
                 {
                     added = true;
                     hasContradiction |= integerContradiction;
@@ -771,6 +804,153 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 return added || hasContradiction;
+            }
+
+            private bool TryAddAliasFact(SmtFormula formula, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+                {
+                    if (TryGetAliasComparison(negated.Operand, out var negatedLeft, out var negatedRight))
+                    {
+                        hasContradiction = FindCanonical(negatedLeft).Equals(FindCanonical(negatedRight));
+                        return hasContradiction;
+                    }
+
+                    return false;
+                }
+
+                if (!TryGetAliasComparison(formula, out var left, out var right))
+                {
+                    return false;
+                }
+
+                return UnionAliases(left, right, out hasContradiction);
+            }
+
+            private static bool TryGetAliasComparison(
+                SmtFormula formula,
+                out SmtFormula left,
+                out SmtFormula right)
+            {
+                left = null!;
+                right = null!;
+                if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binary ||
+                    binary.Left.Kind != binary.Right.Kind ||
+                    binary.Left.Kind == SmtValueKind.Bool ||
+                    !CanAliasTerm(binary.Left) ||
+                    !CanAliasTerm(binary.Right))
+                {
+                    return false;
+                }
+
+                left = binary.Left;
+                right = binary.Right;
+                return true;
+            }
+
+            private static bool CanAliasTerm(SmtFormula formula)
+            {
+                return formula is not SmtBooleanConstant and
+                    not SmtIntegerConstant and
+                    not SmtStringConstant and
+                    not SmtNullConstant;
+            }
+
+            private bool UnionAliases(
+                SmtFormula left,
+                SmtFormula right,
+                out bool hasContradiction)
+            {
+                left = FindCanonical(left);
+                right = FindCanonical(right);
+                hasContradiction = false;
+                if (left.Equals(right))
+                {
+                    return false;
+                }
+
+                var leftText = left.ToString();
+                var rightText = right.ToString();
+                var canonical = string.CompareOrdinal(leftText, rightText) <= 0 ? left : right;
+                var alias = canonical.Equals(left) ? right : left;
+                _aliases[alias] = canonical;
+                MergeIntegerFacts(canonical, alias, out var integerContradiction);
+                MergeStringFacts(canonical, alias, out var stringContradiction);
+                hasContradiction = integerContradiction || stringContradiction;
+                return true;
+            }
+
+            private SmtFormula FindCanonical(SmtFormula formula)
+            {
+                if (!_aliases.TryGetValue(formula, out var parent))
+                {
+                    return formula;
+                }
+
+                var canonical = FindCanonical(parent);
+                if (!canonical.Equals(parent))
+                {
+                    _aliases[formula] = canonical;
+                }
+
+                return canonical;
+            }
+
+            private void MergeIntegerFacts(
+                SmtFormula canonical,
+                SmtFormula alias,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!_integerIntervals.TryGetValue(alias, out var aliasInterval))
+                {
+                    return;
+                }
+
+                var interval = _integerIntervals.TryGetValue(canonical, out var existing)
+                    ? existing.Intersect(aliasInterval)
+                    : aliasInterval;
+                hasContradiction = interval.IsContradictory;
+                _integerIntervals[canonical] = interval;
+                _integerIntervals.Remove(alias);
+            }
+
+            private void MergeStringFacts(
+                SmtFormula canonical,
+                SmtFormula alias,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (_excludedStrings.TryGetValue(alias, out var aliasExcluded))
+                {
+                    _excludedStrings[canonical] = _excludedStrings.TryGetValue(canonical, out var existingExcluded)
+                        ? existingExcluded.Union(aliasExcluded)
+                        : aliasExcluded;
+                    _excludedStrings.Remove(alias);
+                }
+
+                if (!_exactStrings.TryGetValue(alias, out var aliasExact))
+                {
+                    return;
+                }
+
+                if (_exactStrings.TryGetValue(canonical, out var existingExact) &&
+                    !string.Equals(existingExact, aliasExact, StringComparison.Ordinal))
+                {
+                    hasContradiction = true;
+                }
+
+                if (_excludedStrings.TryGetValue(canonical, out var excluded) &&
+                    excluded.Contains(aliasExact))
+                {
+                    hasContradiction = true;
+                }
+
+                _exactStrings[canonical] = aliasExact;
+                _exactStrings.Remove(alias);
+                AddStringLengthFact(canonical, aliasExact.Length, out var lengthContradiction);
+                hasContradiction |= lengthContradiction;
             }
 
             public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
@@ -956,7 +1136,7 @@ namespace PurelySharp.Symbolic.Smt
                     : new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
                 var added = false;
 
-                if (TryAddIntegerIntervalFact(effectiveFormula, _integerIntervals, out var integerContradiction))
+                if (TryAddIntegerIntervalFact(effectiveFormula, out var integerContradiction))
                 {
                     added = true;
                     hasContradiction |= integerContradiction;
@@ -1046,6 +1226,7 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
+                term = FindCanonical(term);
                 if (op == SmtBinaryOperator.NotEqual)
                 {
                     if (_exactStrings.TryGetValue(term, out var exactValue) &&
@@ -1094,6 +1275,7 @@ namespace PurelySharp.Symbolic.Smt
 
             private bool TryGetKnownString(SmtFormula formula, out string value)
             {
+                formula = FindCanonical(formula);
                 if (_exactStrings.TryGetValue(formula, out var exactValue))
                 {
                     value = exactValue;
@@ -1122,6 +1304,7 @@ namespace PurelySharp.Symbolic.Smt
 
             private bool TryGetKnownInteger(SmtFormula formula, out long value)
             {
+                formula = FindCanonical(formula);
                 if (_integerIntervals.TryGetValue(formula, out var interval) &&
                     interval.ExactValue.HasValue)
                 {
@@ -1192,6 +1375,26 @@ namespace PurelySharp.Symbolic.Smt
 
                 value = 0;
                 return false;
+            }
+
+            private bool TryAddIntegerIntervalFact(
+                SmtFormula formula,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!TryGetIntegerComparison(formula, out var term, out var op, out var constant))
+                {
+                    return false;
+                }
+
+                term = FindCanonical(term);
+                var interval = _integerIntervals.TryGetValue(term, out var existing)
+                    ? existing
+                    : IntegerInterval.Unbounded;
+                interval = interval.Apply(op, constant);
+                hasContradiction = interval.IsContradictory;
+                _integerIntervals[term] = interval;
+                return true;
             }
 
             private static bool TryGetStringComparison(

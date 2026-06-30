@@ -7915,6 +7915,14 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_CollectionCountNegativeContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("System.Collections.Generic.IReadOnlyCollection<int> values", "values.Count < 0"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_SourceNullOrEmptyPredicateNestedInNegation_IsAlwaysFalse()
         {
             Assert.That(
@@ -9531,6 +9539,68 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_CollectionCountNegativeGuard_EvaluatesUnknownGetterReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(IReadOnlyCollection<int> values)
+    {
+        if (values.Count < 0)
+        {
+            Console.WriteLine(values.Count);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceCollectionCountNegativeGuard_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public sealed class SourceCollection : IReadOnlyCollection<int>
+{
+    public int Count => -1;
+
+    public IEnumerator<int> GetEnumerator()
+    {
+        yield break;
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(SourceCollection values)
+    {
+        if (values.Count < 0)
+        {
+            Console.WriteLine(values.Count);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
         public async Task Ps0002_SourceNullOrEmptyPredicateTrueBranchContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -9962,6 +10032,33 @@ public class TestClass
         if (value.Length < 0)
         {
             Console.WriteLine(value.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_CustomCountNegativeGuard_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class HasCount
+{
+    public int Count => -1;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HasCount value)
+    {
+        if (value.Count < 0)
+        {
+            Console.WriteLine(value.Count);
         }
     }
 }");

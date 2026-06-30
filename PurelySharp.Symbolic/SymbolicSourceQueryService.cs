@@ -207,6 +207,44 @@ namespace PurelySharp.Symbolic
                 includeCurrentStatementCompletionFacts);
         }
 
+        public SymbolicSpanQueryResult QueryFileLineSpan(
+            string filePath,
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return QuerySourceLineSpan(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                startLine,
+                startColumn,
+                endLine,
+                endColumn,
+                references,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions,
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
+        }
+
         public SymbolicFileQueryResult QueryFileAllLines(
             string filePath,
             IEnumerable<MetadataReference>? references = null,
@@ -516,6 +554,55 @@ namespace PurelySharp.Symbolic
                 compilation,
                 spanStart,
                 spanEnd,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions,
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
+        }
+
+        public SymbolicSpanQueryResult QuerySourceLineSpan(
+            string sourceText,
+            string filePath,
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return QuerySyntaxTreeLineSpan(
+                syntaxTree,
+                compilation,
+                startLine,
+                startColumn,
+                endLine,
+                endColumn,
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
@@ -949,6 +1036,38 @@ namespace PurelySharp.Symbolic
                 endLineColumn.Column,
                 results,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        public SymbolicSpanQueryResult QuerySyntaxTreeLineSpan(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            var spanStart = GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
+            var spanEnd = GetPosition(syntaxTree, endLine, endColumn, cancellationToken);
+            return QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions,
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicFileQueryResult QuerySyntaxTreeAllLines(
