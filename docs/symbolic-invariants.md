@@ -89,6 +89,8 @@ The same CLI can query runtime hazards instead of invariant program points. Runt
 
 By default, `--runtime-hazards` returns only hazards with `Status = Proven`. Add `--include-unproven-hazards` when a tool wants to inspect `Unknown`, `Unreachable`, or `Unsupported` candidates.
 
+Known remaining runtime-hazard gaps: failed `as` conversions do not yet become reusable negative type facts, negative type-test branches do not fully prove invalid-cast hazards, dynamic binder modeling is limited to null receivers, array covariance stores can be missed through aliases or merged array identities, and richer throw-expression flow remains limited to currently proven `throw null` cases.
+
 Query proven hazards on one line:
 
 ```powershell

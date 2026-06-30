@@ -37,6 +37,80 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ClassifiesThrowNullAsNullReferenceException()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        Exception? error = null;
+        throw error;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "throw error;", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ClassifiesLiteralThrowNullAsNullReferenceException()
+        {
+            const string source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw null;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "throw null;", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ClassifiesPathProvenThrowMaybeNullAsNullReferenceException()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(Exception? error)
+    {
+        if (error is null)
+        {
+            throw error;
+        }
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "throw error;", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesGuardedDivideByZero()
         {
             const string source = @"

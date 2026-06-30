@@ -333,6 +333,13 @@ keeps only the product-facing summary.
 - [ ] IDE/compiler integration for inline invariant and runtime-hazard surfacing.
 - [ ] Performance and profiling work that preserves analysis quality while reducing test/build cost.
 
+Known remaining SMT runtime-hazard gaps are intentionally narrow: failed `as`
+conversions do not yet become reusable negative type facts, negative type-test
+branches are still conservative for proving invalid-cast hazards, dynamic binder
+hazards beyond null receivers are not modeled, array covariance stores through
+aliases can stay unknown, and richer throw-expression flow remains limited to
+the currently proven `throw null` cases.
+
 ## Verification
 
 Use the repo wrapper for .NET commands so long-running tests run under the

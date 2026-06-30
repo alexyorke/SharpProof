@@ -401,6 +401,28 @@ function Add-RuntimeHazardSmtTestClasses
         'DiagnosticEvidenceTests')
 }
 
+function Add-ExceptionReachabilityRuntimeHazardTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-TestClasses $Set @(
+        'AuthoringRuntimeHazardDiagnosticTests',
+        'DiagnosticEvidenceTests',
+        'ExceptionFlowPathFactStressTests',
+        'ExceptionFlowPropagationRegressionTests',
+        'ExceptionHandlingTests',
+        'ExceptionReachabilitySmtTests',
+        'RecursiveExceptionFlowTests',
+        'SemanticOracleSmtTests',
+        'SymbolicRuntimeHazardQueryTests',
+        'SymbolicSourceQueryLineTests',
+        'ThrowExpressionTests')
+}
+
 function Add-AnalyzerSmtTestClasses
 {
     param(
@@ -616,6 +638,16 @@ function Add-PathMappedTests
         '^PurelySharp\.Analyzer/Configuration/(AnalyzerConfiguration|ConfigKeys)\.cs$' {
             Add-TestClasses $Set @('DiagnosticEvidenceTests', 'SemanticOracleSmtTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard configuration change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/ExceptionFlowQuery\.cs$' {
+            Add-ExceptionReachabilityRuntimeHazardTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow query reachability and runtime-hazard change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer\.ExceptionSites\.cs$' {
+            Add-ExceptionReachabilityRuntimeHazardTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception site reachability and runtime-hazard analyzer change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer(\.(ExceptionSites|PathFacts|PropertyFlow|ResourceCallSites|SpecialCases))?\.cs$' {
@@ -835,7 +867,14 @@ try
         if ($path -match '^PurelySharp\.Test/.*\.cs$')
         {
             $className = Get-TestClassFromFile $path
-            if ([string]::IsNullOrWhiteSpace($className))
+            if ($path -match '(Throw|Hazard)')
+            {
+                $before = @($testClasses | Sort-Object)
+                Add-TestClass $testClasses $className
+                Add-ExceptionReachabilityRuntimeHazardTestClasses $testClasses
+                Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'test-name-map' 'Throw/hazard-named test change maps to exception reachability and runtime-hazard fixtures' $before $testClasses
+            }
+            elseif ([string]::IsNullOrWhiteSpace($className))
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is a test helper without a single owning fixture"
             }

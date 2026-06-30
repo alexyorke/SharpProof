@@ -369,9 +369,25 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 smtAnalysis,
                 cancellationToken);
+            var triggerCondition = candidate.TriggerCondition;
+            var exceptionType = candidate.ExceptionType;
+            var category = candidate.Category;
+            if (TryRefineThrowNullCandidate(
+                    candidate,
+                    analysis,
+                    semanticModel,
+                    smtAnalysis,
+                    cancellationToken,
+                    out var throwNullTrigger))
+            {
+                triggerCondition = throwNullTrigger;
+                exceptionType = "System.NullReferenceException";
+                category = "definite_throw_null";
+            }
+
             var (status, reason) = ClassifyTrigger(
                 analysis,
-                candidate.TriggerCondition,
+                triggerCondition,
                 smtAnalysis);
             var lineColumn = GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
             var sourceSpan = GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
@@ -381,8 +397,8 @@ namespace PurelySharp.Symbolic
                 candidate.Kind,
                 status,
                 reason,
-                candidate.ExceptionType,
-                candidate.Category,
+                exceptionType,
+                category,
                 candidate.Site.Kind().ToString(),
                 candidate.Site.ToString(),
                 candidate.Site.SpanStart,
@@ -393,12 +409,49 @@ namespace PurelySharp.Symbolic
                 sourceSpan.StartColumn,
                 sourceSpan.EndLine,
                 sourceSpan.EndColumn,
-                candidate.TriggerCondition.ToString() ?? string.Empty,
+                triggerCondition.ToString() ?? string.Empty,
                 analysis.MergedInvariantText,
                 analysis.Facts,
                 analysis.Reachability,
                 analysis.ReachabilityReason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        private static bool TryRefineThrowNullCandidate(
+            RuntimeHazardCandidate candidate,
+            SymbolicProgramPointAnalysis analysis,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            trigger = null!;
+            if (candidate.Kind != SymbolicRuntimeHazardKind.DirectThrow ||
+                !TryGetThrowExpression(candidate.Site, out var thrownExpression) ||
+                !TryTranslateNullCondition(thrownExpression, semanticModel, cancellationToken, out var nullTrigger))
+            {
+                return false;
+            }
+
+            trigger = nullTrigger;
+            return nullTrigger is SmtBooleanConstant { Value: true } ||
+                smtAnalysis.PathConditionsImply(analysis.PathConditions, nullTrigger);
+        }
+
+        private static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)
+        {
+            switch (throwNode)
+            {
+                case ThrowStatementSyntax { Expression: { } statementExpression }:
+                    expression = statementExpression;
+                    return true;
+                case ThrowExpressionSyntax throwExpression:
+                    expression = throwExpression.Expression;
+                    return true;
+                default:
+                    expression = null!;
+                    return false;
+            }
         }
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(

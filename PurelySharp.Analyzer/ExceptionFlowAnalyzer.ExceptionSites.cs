@@ -337,6 +337,23 @@ namespace PurelySharp.Analyzer
             return typeInfo.Type ?? typeInfo.ConvertedType;
         }
 
+        internal static bool IsDefinitelyThrowNull(
+            SyntaxNode throwNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var expression = throwNode switch
+            {
+                ThrowStatementSyntax { Expression: { } statementExpression } => statementExpression,
+                ThrowExpressionSyntax throwExpression => throwExpression.Expression,
+                _ => null
+            };
+
+            return expression != null &&
+                IsDefinitelyNullExpression(expression, throwNode, semanticModel, cancellationToken, smtAnalysis);
+        }
+
         internal static bool IsShadowedByDefinitelyThrowingFinally(SyntaxNode site)
         {
             foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())

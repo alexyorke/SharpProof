@@ -56,6 +56,42 @@ public class TestClass
 
             yield return new TestCaseData(
                 @"
+using System;
+
+public class TestClass
+{
+    public void ThrowMaybeNull(Exception? error)
+    {
+        if (error is null)
+        {
+            throw error;
+        }
+    }
+}",
+                "throw error;",
+                "System.NullReferenceException",
+                "definite_throw_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportBranchProvenThrowNullWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public void ThrowNull()
+    {
+        Exception? error = null;
+        throw error;
+    }
+}",
+                "throw error;",
+                "System.NullReferenceException",
+                "definite_throw_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportThrowNullWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
 public class TestClass
 {
     public int DivideByZero(int value)
@@ -87,6 +123,26 @@ public class TestClass
 
         private static IEnumerable<TestCaseData> GuardedSafeOrUnknownRuntimeHazardCases()
         {
+            yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public void CaughtThrowNull()
+    {
+        try
+        {
+            Exception? error = null;
+            throw error;
+        }
+        catch (NullReferenceException)
+        {
+        }
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressCaughtThrowNull");
+
             yield return new TestCaseData(
                 @"
 public class TestClass
