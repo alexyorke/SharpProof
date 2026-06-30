@@ -187,6 +187,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_AtomicGroupRegexContradictsWrongPrefix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?>A*)A\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("B")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_AtomicGroupApproximateSatisfiableResult_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?>A*)A\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_NegatedApproximateRegexWithLength_ReturnsUnknown()
         {
             using var solver = new SmtSolver();

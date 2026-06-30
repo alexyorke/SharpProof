@@ -5496,12 +5496,21 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var targetSymbols = new List<ISymbol>();
+            var targetSymbols = new List<ISymbol?>();
             foreach (var variableDesignation in leftDesignation.Variables)
             {
-                if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation ||
-                    singleVariableDesignation.Identifier.ValueText == "_" ||
-                    semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
+                if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation)
+                {
+                    return true;
+                }
+
+                if (singleVariableDesignation.Identifier.ValueText == "_")
+                {
+                    targetSymbols.Add(null);
+                    continue;
+                }
+
+                if (semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
                 {
                     return true;
                 }
@@ -5509,7 +5518,8 @@ namespace PurelySharp.Symbolic
                 targetSymbols.Add(localSymbol.OriginalDefinition);
             }
 
-            if (ExpressionReferencesAnySymbol(assignment.Right, targetSymbols, semanticModel, cancellationToken))
+            var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
+            if (ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
             {
                 return true;
             }
@@ -5535,23 +5545,37 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var targetSymbols = new List<ISymbol>();
+            var targetSymbols = new List<ISymbol?>();
             foreach (var argument in leftTuple.Arguments)
             {
+                if (argument.Expression is IdentifierNameSyntax identifier &&
+                    identifier.Identifier.ValueText == "_")
+                {
+                    targetSymbols.Add(null);
+                    continue;
+                }
+
                 var targetSymbol = semanticModel.GetSymbolInfo(argument.Expression, cancellationToken).Symbol;
                 if (targetSymbol is ILocalSymbol or IParameterSymbol)
                 {
                     targetSymbols.Add(targetSymbol.OriginalDefinition);
+                    continue;
                 }
+
+                return true;
             }
 
             foreach (var targetSymbol in targetSymbols)
             {
-                RemoveFactsReferencingSymbol(facts, targetSymbol);
+                if (targetSymbol != null)
+                {
+                    RemoveFactsReferencingSymbol(facts, targetSymbol);
+                }
             }
 
-            if (targetSymbols.Count != leftTuple.Arguments.Count ||
-                ExpressionReferencesAnySymbol(assignment.Right, targetSymbols, semanticModel, cancellationToken))
+            var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
+            if (targetSymbols.All(static symbol => symbol == null) ||
+                ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
             {
                 return true;
             }
@@ -5566,7 +5590,7 @@ namespace PurelySharp.Symbolic
         }
 
         private static void AddTupleElementTargetFacts(
-            IReadOnlyList<ISymbol> targetSymbols,
+            IReadOnlyList<ISymbol?> targetSymbols,
             ExpressionSyntax rightExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -5582,8 +5606,13 @@ namespace PurelySharp.Symbolic
 
                 for (var index = 0; index < targetSymbols.Count; index++)
                 {
+                    if (targetSymbols[index] == null)
+                    {
+                        continue;
+                    }
+
                     AddAssignedValueFacts(
-                        targetSymbols[index],
+                        targetSymbols[index]!,
                         rightTuple.Arguments[index].Expression,
                         semanticModel,
                         cancellationToken,
@@ -5605,13 +5634,18 @@ namespace PurelySharp.Symbolic
 
             for (var index = 0; index < targetSymbols.Count; index++)
             {
+                if (targetSymbols[index] == null)
+                {
+                    continue;
+                }
+
                 if (TryGetCurrentFormulaValue(facts, valueFormulas[index], out var currentValue) &&
-                    TryCreateAssignedValueFact(targetSymbols[index], currentValue, out var currentValueFact))
+                    TryCreateAssignedValueFact(targetSymbols[index]!, currentValue, out var currentValueFact))
                 {
                     facts.Add(currentValueFact);
                 }
 
-                if (TryCreateAssignedValueFact(targetSymbols[index], valueFormulas[index], out var fact))
+                if (TryCreateAssignedValueFact(targetSymbols[index]!, valueFormulas[index], out var fact))
                 {
                     facts.Add(fact);
                 }

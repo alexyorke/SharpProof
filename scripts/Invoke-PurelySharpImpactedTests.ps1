@@ -194,6 +194,65 @@ function Add-TestClasses
     }
 }
 
+function Add-SearchLibSmtTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-TestClasses $Set @(
+        'SearchLibZ3SmokeTests',
+        'SearchLibPurityProofTests',
+        'SearchLibRoslynLoweringTests',
+        'SearchLibBackedPurityFlowTests',
+        'SmtAnalysisServiceTests',
+        'SemanticOracleSmtTests',
+        'ExpressionSmtTranslationTests',
+        'ExpressionAtomSmtTests',
+        'StringLengthSmtTests')
+}
+
+function Add-SymbolicSmtTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-SearchLibSmtTestClasses $Set
+    Add-TestClasses $Set @(
+        'ElementAccessSmtTests',
+        'ForeachSmtInvariantTests',
+        'LoopExitSmtInvariantTests',
+        'PathFactExpressionReachabilityTests',
+        'PathSensitiveSmtInvariantTests',
+        'PatternSmtInvariantTests',
+        'ReferenceReachabilitySmtTests',
+        'SymbolicProgramPointFactTests',
+        'SymbolicRuntimeHazardQueryTests',
+        'SymbolicSourceQueryLineTests')
+}
+
+function Add-AnalyzerSmtTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-SymbolicSmtTestClasses $Set
+    Add-TestClasses $Set @(
+        'ExceptionReachabilitySmtTests',
+        'ExceptionFlowPathFactStressTests',
+        'ExceptionFlowPropagationRegressionTests',
+        'ExceptionHandlingTests',
+        'RecursiveExceptionFlowTests')
+}
+
 function Get-TestClassFromFile
 {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -268,7 +327,13 @@ function Add-TestFilesReferencingTokens
         $matches = @(& rg -l -F $token PurelySharp.Test -g '*.cs' 2>$null)
         foreach ($match in $matches)
         {
-            $className = Get-TestClassFromFile (Convert-ToRepoPath $match)
+            $repoPath = Convert-ToRepoPath $match
+            if ($repoPath -eq 'PurelySharp.Test/ImpactedTestSelectionScriptTests.cs')
+            {
+                continue
+            }
+
+            $className = Get-TestClassFromFile $repoPath
             Add-TestClass -Set $Set -ClassName $className
         }
     }
@@ -288,26 +353,15 @@ function Add-PathMappedTests
     switch -Regex ($Path)
     {
         '^SearchLib/' {
-            Add-TestClasses $Set @(
-                'SearchLibZ3SmokeTests',
-                'SearchLibPurityProofTests',
-                'SearchLibRoslynLoweringTests',
-                'SearchLibBackedPurityFlowTests',
-                'SmtAnalysisServiceTests',
-                'SemanticOracleSmtTests')
+            Add-SearchLibSmtTestClasses $Set
             break
         }
         '^PurelySharp\.Symbolic/' {
-            Add-TestClasses $Set @(
-                'SymbolicSourceQueryLineTests',
-                'SymbolicProgramPointFactTests',
-                'SmtAnalysisServiceTests',
-                'SearchLibZ3SmokeTests',
-                'SemanticOracleSmtTests')
+            Add-SymbolicSmtTestClasses $Set
             break
         }
         '^Tools/PurelySharp\.SymbolicCli/' {
-            Add-TestClasses $Set @('SymbolicSourceQueryLineTests', 'AnalyzerPackagingTests')
+            Add-TestClasses $Set @('SymbolicSourceQueryLineTests', 'SymbolicRuntimeHazardQueryTests', 'AnalyzerPackagingTests')
             break
         }
         '^Tools/PurelySharp\.Fuzz/' {
@@ -342,26 +396,21 @@ function Add-PathMappedTests
             Add-TestClasses $Set @('AnalyzerPackagingTests', 'EffectSummaryToolTests', 'ExceptionSummaryCatalogValidationTests')
             break
         }
+        '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer\.(ExceptionSites|PathFacts)\.cs$' {
+            Add-AnalyzerSmtTestClasses $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/Engine/ExecutionVisibility\.cs$' {
+            Add-AnalyzerSmtTestClasses $Set
+            break
+        }
         '^PurelySharp\.Analyzer/.*(Exception|Throw|Catch|Finally)' {
-            Add-TestClasses $Set @(
-                'ExceptionReachabilitySmtTests',
-                'ExceptionFlowPathFactStressTests',
-                'ExceptionFlowPropagationRegressionTests',
-                'ExceptionHandlingTests',
-                'ExceptionSummaryCatalogValidationTests',
-                'RecursiveExceptionFlowTests',
-                'SemanticOracleSmtTests')
+            Add-AnalyzerSmtTestClasses $Set
+            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests')
             break
         }
         '^PurelySharp\.Analyzer/.*(Smt|SemanticOracle|PathFact|Regex|String|Invariant)' {
-            Add-TestClasses $Set @(
-                'SmtAnalysisServiceTests',
-                'SemanticOracleSmtTests',
-                'PathSensitiveSmtInvariantTests',
-                'ExpressionSmtTranslationTests',
-                'ExpressionAtomSmtTests',
-                'StringLengthSmtTests',
-                'SearchLibZ3SmokeTests')
+            Add-SymbolicSmtTestClasses $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(EffectSummary|GeneratedPurity|Catalog|Summary)' {
@@ -553,6 +602,7 @@ try
             continue
         }
 
+        $beforeMappedCount = $testClasses.Count
         Add-PathMappedTests $testClasses $path
 
         if ($path -match '^PurelySharp\.Analyzer/')
@@ -561,6 +611,10 @@ try
             if ($path -match '^PurelySharp\.Analyzer/Engine/(PurityAnalysisEngine|CompilationPurityService|Rules/RuleRegistry)\.cs$')
             {
                 $fullReasons.Add("$path is high-fanout analyzer core")
+            }
+            elseif ($path -match '\.cs$' -and $testClasses.Count -eq $beforeMappedCount)
+            {
+                $fullReasons.Add("$path has no impacted-test mapping")
             }
         }
         elseif ($path -match '^(PurelySharp\.Symbolic|SearchLib|Tools|PurelySharp\.CodeFixes|PurelySharp\.Attributes|PurelySharp\.Package|PurelySharp\.Vsix|Shared)/')

@@ -231,6 +231,73 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task NegatedCustomListPatternEarlyExit_FeedsLengthFact()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        if (bag is not [_])
+        {
+            return;
+        }
+
+        if (bag.Count != 1)
+        {
+            Console.WriteLine(bag.Count);
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task NegatedCustomListPatternWithElementConstraint_RemainsReachable()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Bag bag)
+    {
+        if (bag is not [1] && bag.Count == 1)
+        {
+            Console.WriteLine(bag.Count);
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task NestedSwitchStatementCustomListPatternElementContradiction_PrunesSection()
         {
             var test = @"

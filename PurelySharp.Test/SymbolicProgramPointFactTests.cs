@@ -270,6 +270,47 @@ public class TestClass
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
         }
 
+        [Test]
+        public void ProgramPointFacts_DeconstructionDeclarationDiscardPreservesVisibleTupleSlotFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (5, 0);
+        (int divisor, _) = pair;
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 5");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_TupleAssignmentDiscardPreservesVisibleTupleSlotFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (0, 7);
+        var divisor = 1;
+        (_, divisor) = pair;
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 7");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
         private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(

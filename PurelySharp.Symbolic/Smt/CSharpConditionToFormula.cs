@@ -5190,8 +5190,14 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (value.Kind != SmtValueKind.Reference ||
-                !IsSupportedBuiltInElementAccessReceiver(valueType))
+            if (value.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            var canTranslateElementConditions = IsSupportedBuiltInElementAccessReceiver(valueType);
+            if (!canTranslateElementConditions &&
+                !ListPatternHasOnlySelectionNeutralElements(listPattern))
             {
                 return false;
             }
@@ -5212,15 +5218,19 @@ namespace PurelySharp.Symbolic.Smt
                 value,
                 new SmtNullConstant());
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
-            AddListPatternElementConditions(
-                value,
-                valueType,
-                listPattern,
-                semanticModel,
-                cancellationToken,
-                ref formula,
-                getSymbolVersion,
-                inlineDepth);
+            if (canTranslateElementConditions)
+            {
+                AddListPatternElementConditions(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    cancellationToken,
+                    ref formula,
+                    getSymbolVersion,
+                    inlineDepth);
+            }
+
             return true;
         }
 
@@ -5264,31 +5274,14 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            var hasSlice = false;
-            var minimumLength = 0;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                    {
-                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
-                    }
-
-                    hasSlice = true;
-                    continue;
-                }
-
-                minimumLength++;
-            }
-
-            lengthFormulaCondition = hasSlice
+            GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
+            lengthFormulaCondition = exactLength
                 ? new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
+                    SmtBinaryOperator.Equal,
                     lengthFormula,
                     new SmtIntegerConstant(minimumLength))
                 : new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
+                    SmtBinaryOperator.GreaterThanOrEqual,
                     lengthFormula,
                     new SmtIntegerConstant(minimumLength));
             return true;
@@ -5495,16 +5488,26 @@ namespace PurelySharp.Symbolic.Smt
             return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
         }
 
-        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
+        private static void GetListPatternLengthShape(
+            ListPatternSyntax listPattern,
+            out int minimumLength,
+            out bool exactLength)
         {
-            var minimumLength = 0;
+            minimumLength = 0;
+            exactLength = true;
             foreach (var subpattern in listPattern.Patterns)
             {
                 if (subpattern is SlicePatternSyntax slicePattern)
                 {
                     if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
                     {
-                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
+                        GetListPatternLengthShape(nestedListPattern, out var nestedMinimumLength, out var nestedExactLength);
+                        minimumLength += nestedMinimumLength;
+                        exactLength &= nestedExactLength;
+                    }
+                    else
+                    {
+                        exactLength = false;
                     }
 
                     continue;
@@ -5512,7 +5515,56 @@ namespace PurelySharp.Symbolic.Smt
 
                 minimumLength++;
             }
+        }
 
+        private static bool ListPatternHasOnlySelectionNeutralElements(ListPatternSyntax listPattern)
+        {
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (IsSelectionNeutralSlicePattern(slicePattern.Pattern))
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
+                        !ListPatternHasOnlySelectionNeutralElements(nestedListPattern))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (!IsSelectionNeutralPattern(subpattern))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsSelectionNeutralSlicePattern(PatternSyntax? pattern)
+        {
+            return pattern == null ||
+                IsSelectionNeutralPattern(pattern);
+        }
+
+        private static bool IsSelectionNeutralPattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern is DiscardPatternSyntax or VarPatternSyntax;
+        }
+
+        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
+        {
+            GetListPatternLengthShape(listPattern, out var minimumLength, out _);
             return minimumLength;
         }
 

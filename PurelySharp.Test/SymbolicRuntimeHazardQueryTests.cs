@@ -190,6 +190,115 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return checked(value + 1);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return checked(value + 1);", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedIntegralOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return checked(value + 1);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return checked(value + 1);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return checked(value + 1);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesArrayCovarianceStoreMismatch()
+        {
+            const string source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        object[] values = new string[1];
+        values[0] = 42;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "values[0] = 42;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArrayTypeMismatch));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArrayTypeMismatchException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_array_type_mismatch"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesCompatibleArrayCovarianceStore()
+        {
+            const string source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        object[] values = new string[1];
+        values[0] = ""text"";
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "values[0] = \"text\";",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsSpan_FiltersToRequestedSpan()
         {
             const string source = @"

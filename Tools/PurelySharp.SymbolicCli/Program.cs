@@ -101,12 +101,15 @@ try
 
     if (options.CompactJson)
     {
-        var compactResult = result switch
+        object compactResult = result switch
         {
-            SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult spanResult => spanResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicFileQueryResult fileResult => (object)fileResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicLineQueryResult lineResult => (object)lineResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSpanQueryResult spanResult => (object)spanResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSourceQueryResult pointResult => (object)pointResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicRuntimeHazardQueryResult hazardResult => (object)CompactRuntimeHazardQueryResult.FromResult(
+                hazardResult,
+                options.CreateCompactHazardOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
         Console.WriteLine(JsonSerializer.Serialize(
@@ -577,14 +580,15 @@ Options:
   --smt-max-expression-nodes <n>
                       Maximum formula nodes before conservative fallback.
   --json              Emit JSON instead of text.
-  --compact-json      Emit compact bounded JSON with observed and conservative invariant summaries.
+  --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
   --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
   --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
+  --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
   --max-facts <n>     Maximum raw SMT facts included in --compact-json output. Default: 50.
   --max-conditions <n>
                       Maximum condition strings included in --compact-json output. Default: 50.
   --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
-  --summary-only      Shorthand for --compact-json with --max-lines 0 and --max-points 0.
+  --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
 """;
 
     public string? FilePath { get; private set; }
@@ -671,6 +675,8 @@ Options:
 
     public int CompactMaxProgramPoints { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProgramPoints;
 
+    public int CompactMaxHazards { get; private set; } = CompactRuntimeHazardQueryOptions.DefaultMaxHazards;
+
     public int CompactMaxFacts { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxFacts;
 
     public int CompactMaxConditions { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxConditions;
@@ -678,6 +684,8 @@ Options:
     public int CompactMaxProofs { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProofs;
 
     public bool HasCompactOutputLimit { get; private set; }
+
+    public bool HasCompactHazardOutputLimit { get; private set; }
 
     public bool CompactSummaryOnly { get; private set; }
 
@@ -818,6 +826,11 @@ Options:
                     options.CompactMaxProgramPoints = ReadNonNegativeInt(args, ref index, arg);
                     options.HasCompactOutputLimit = true;
                     break;
+                case "--max-hazards":
+                    options.CompactMaxHazards = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    options.HasCompactHazardOutputLimit = true;
+                    break;
                 case "--max-facts":
                     options.CompactMaxFacts = ReadNonNegativeInt(args, ref index, arg);
                     options.HasCompactOutputLimit = true;
@@ -875,6 +888,7 @@ Options:
             {
                 options.CompactMaxLines = SymbolicCompactQueryOptions.SummaryOnly.MaxLines;
                 options.CompactMaxProgramPoints = SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints;
+                options.CompactMaxHazards = 0;
             }
 
             if (options.Json && options.CompactJson)
@@ -884,12 +898,12 @@ Options:
 
             if (options.HasCompactOutputLimit && !options.CompactJson)
             {
-                throw new ArgumentException("--max-lines, --max-points, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
+                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
             }
 
-            if (options.RuntimeHazards && options.CompactJson)
+            if (options.HasCompactHazardOutputLimit && !options.RuntimeHazards)
             {
-                throw new ArgumentException("--runtime-hazards cannot be combined with --compact-json.");
+                throw new ArgumentException("--max-hazards requires --runtime-hazards.");
             }
 
             if (!options.RuntimeHazards && (options.IncludeUnprovenHazards || options.HazardKinds.Count != 0))
@@ -1050,6 +1064,13 @@ Options:
             CompactMaxProofs);
     }
 
+    public CompactRuntimeHazardQueryOptions CreateCompactHazardOptions()
+    {
+        return new CompactRuntimeHazardQueryOptions(
+            CompactMaxHazards,
+            CompactMaxConditions);
+    }
+
     public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()
     {
         return new SymbolicRuntimeHazardQueryOptions(
@@ -1184,4 +1205,349 @@ Options:
 
         throw new ArgumentException(optionName + " must be Statement, Expression, or Other.");
     }
+}
+
+internal sealed class CompactRuntimeHazardQueryOptions
+{
+    public const int DefaultMaxHazards = 250;
+
+    public CompactRuntimeHazardQueryOptions(
+        int maxHazards = DefaultMaxHazards,
+        int maxConditions = SymbolicCompactQueryOptions.DefaultMaxConditions)
+    {
+        if (maxHazards < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxHazards), "Compact runtime hazard output limits cannot be negative.");
+        }
+
+        if (maxConditions < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxConditions), "Compact runtime hazard output limits cannot be negative.");
+        }
+
+        MaxHazards = maxHazards;
+        MaxConditions = maxConditions;
+    }
+
+    public int MaxHazards { get; }
+
+    public int MaxConditions { get; }
+}
+
+internal sealed class CompactRuntimeHazardQueryResult
+{
+    private CompactRuntimeHazardQueryResult(
+        string filePath,
+        int lineCount,
+        int? line,
+        int? scopeStart,
+        int? scopeEnd,
+        int hazardCount,
+        IReadOnlyDictionary<string, int> statusCounts,
+        IReadOnlyDictionary<string, int> kindCounts,
+        IReadOnlyList<CompactRuntimeHazardResult> hazards,
+        CompactRuntimeHazardOutputTruncation truncation,
+        CompactRuntimeHazardSmtDiagnostics smtDiagnostics)
+    {
+        FilePath = filePath;
+        LineCount = lineCount;
+        Line = line;
+        ScopeStart = scopeStart;
+        ScopeEnd = scopeEnd;
+        HazardCount = hazardCount;
+        StatusCounts = statusCounts;
+        KindCounts = kindCounts;
+        Hazards = hazards;
+        Truncation = truncation;
+        SmtDiagnostics = smtDiagnostics;
+    }
+
+    public string Kind => "runtimeHazards";
+
+    public int SchemaVersion => 1;
+
+    public string FilePath { get; }
+
+    public int LineCount { get; }
+
+    public string ScopeKind => Line.HasValue
+        ? "line"
+        : ScopeStart.HasValue && ScopeEnd.HasValue
+            ? "span"
+            : "file";
+
+    public int? Line { get; }
+
+    public int? ScopeStart { get; }
+
+    public int? ScopeEnd { get; }
+
+    public int? ScopeLength => ScopeStart.HasValue && ScopeEnd.HasValue
+        ? ScopeEnd.Value - ScopeStart.Value
+        : null;
+
+    public int HazardCount { get; }
+
+    public IReadOnlyDictionary<string, int> StatusCounts { get; }
+
+    public IReadOnlyDictionary<string, int> KindCounts { get; }
+
+    public IReadOnlyList<CompactRuntimeHazardResult> Hazards { get; }
+
+    public CompactRuntimeHazardOutputTruncation Truncation { get; }
+
+    public CompactRuntimeHazardSmtDiagnostics SmtDiagnostics { get; }
+
+    public static CompactRuntimeHazardQueryResult FromResult(
+        SymbolicRuntimeHazardQueryResult result,
+        CompactRuntimeHazardQueryOptions options)
+    {
+        var hazards = result.Hazards
+            .Take(options.MaxHazards)
+            .Select(hazard => CompactRuntimeHazardResult.FromHazard(hazard, options))
+            .ToArray();
+
+        return new CompactRuntimeHazardQueryResult(
+            result.FilePath,
+            result.LineCount,
+            result.Line,
+            result.ScopeStart,
+            result.ScopeEnd,
+            result.HazardCount,
+            CountBy(result.Hazards, static hazard => hazard.Status.ToString()),
+            CountBy(result.Hazards, static hazard => hazard.Kind.ToString()),
+            hazards,
+            new CompactRuntimeHazardOutputTruncation(
+                result.Hazards.Count > hazards.Length,
+                hazards.Any(static hazard => hazard.Truncation.PathConditions)),
+            CompactRuntimeHazardSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics));
+    }
+
+    private static IReadOnlyDictionary<string, int> CountBy(
+        IEnumerable<SymbolicRuntimeHazard> hazards,
+        Func<SymbolicRuntimeHazard, string> keySelector)
+    {
+        return hazards
+            .GroupBy(keySelector, StringComparer.Ordinal)
+            .OrderBy(static group => group.Key, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+    }
+}
+
+internal sealed class CompactRuntimeHazardResult
+{
+    private CompactRuntimeHazardResult(
+        SymbolicRuntimeHazardKind kind,
+        SymbolicRuntimeHazardStatus status,
+        string statusReason,
+        string exceptionType,
+        string category,
+        string filePath,
+        int line,
+        int column,
+        int spanStart,
+        int spanEnd,
+        int nodeStartLine,
+        int nodeStartColumn,
+        int nodeEndLine,
+        int nodeEndColumn,
+        string nodeKind,
+        string operationText,
+        string triggerCondition,
+        string mergedInvariantText,
+        int pathConditionCount,
+        IReadOnlyList<string> pathConditions,
+        SymbolicReachability reachability,
+        string reachabilityReason,
+        CompactRuntimeHazardItemTruncation truncation)
+    {
+        Kind = kind;
+        Status = status;
+        StatusReason = statusReason;
+        ExceptionType = exceptionType;
+        Category = category;
+        FilePath = filePath;
+        Line = line;
+        Column = column;
+        SpanStart = spanStart;
+        SpanEnd = spanEnd;
+        SpanLength = spanEnd - spanStart;
+        NodeStartLine = nodeStartLine;
+        NodeStartColumn = nodeStartColumn;
+        NodeEndLine = nodeEndLine;
+        NodeEndColumn = nodeEndColumn;
+        NodeKind = nodeKind;
+        OperationText = operationText;
+        TriggerCondition = triggerCondition;
+        MergedInvariantText = mergedInvariantText;
+        PathConditionCount = pathConditionCount;
+        PathConditions = pathConditions;
+        Reachability = reachability;
+        ReachabilityReason = reachabilityReason;
+        Truncation = truncation;
+    }
+
+    public SymbolicRuntimeHazardKind Kind { get; }
+
+    public SymbolicRuntimeHazardStatus Status { get; }
+
+    public string StatusReason { get; }
+
+    public string ExceptionType { get; }
+
+    public string Category { get; }
+
+    public string FilePath { get; }
+
+    public int Line { get; }
+
+    public int Column { get; }
+
+    public int SpanStart { get; }
+
+    public int SpanEnd { get; }
+
+    public int SpanLength { get; }
+
+    public int NodeStartLine { get; }
+
+    public int NodeStartColumn { get; }
+
+    public int NodeEndLine { get; }
+
+    public int NodeEndColumn { get; }
+
+    public string NodeKind { get; }
+
+    public string OperationText { get; }
+
+    public string TriggerCondition { get; }
+
+    public string MergedInvariantText { get; }
+
+    public int PathConditionCount { get; }
+
+    public IReadOnlyList<string> PathConditions { get; }
+
+    public SymbolicReachability Reachability { get; }
+
+    public string ReachabilityReason { get; }
+
+    public CompactRuntimeHazardItemTruncation Truncation { get; }
+
+    public static CompactRuntimeHazardResult FromHazard(
+        SymbolicRuntimeHazard hazard,
+        CompactRuntimeHazardQueryOptions options)
+    {
+        var pathConditions = hazard.PathConditions
+            .Take(options.MaxConditions)
+            .ToArray();
+
+        return new CompactRuntimeHazardResult(
+            hazard.Kind,
+            hazard.Status,
+            hazard.StatusReason,
+            hazard.ExceptionType,
+            hazard.Category,
+            hazard.FilePath,
+            hazard.Line,
+            hazard.Column,
+            hazard.SpanStart,
+            hazard.SpanEnd,
+            hazard.NodeStartLine,
+            hazard.NodeStartColumn,
+            hazard.NodeEndLine,
+            hazard.NodeEndColumn,
+            hazard.NodeKind,
+            hazard.OperationText,
+            hazard.TriggerCondition,
+            hazard.MergedInvariantText,
+            hazard.PathConditionCount,
+            pathConditions,
+            hazard.Reachability,
+            hazard.ReachabilityReason,
+            new CompactRuntimeHazardItemTruncation(hazard.PathConditions.Count > pathConditions.Length));
+    }
+}
+
+internal sealed class CompactRuntimeHazardSmtDiagnostics
+{
+    private CompactRuntimeHazardSmtDiagnostics(
+        bool isConfigured,
+        string mode,
+        bool isEnabled,
+        int queryTimeoutMs,
+        int methodBudgetMs,
+        int maxPathConditions,
+        int maxExpressionNodes,
+        int executedQueryCount,
+        int cacheEntryCount)
+    {
+        IsConfigured = isConfigured;
+        Mode = mode;
+        IsEnabled = isEnabled;
+        QueryTimeoutMs = queryTimeoutMs;
+        MethodBudgetMs = methodBudgetMs;
+        MaxPathConditions = maxPathConditions;
+        MaxExpressionNodes = maxExpressionNodes;
+        ExecutedQueryCount = executedQueryCount;
+        CacheEntryCount = cacheEntryCount;
+    }
+
+    public bool IsConfigured { get; }
+
+    public string Mode { get; }
+
+    public bool IsEnabled { get; }
+
+    public int QueryTimeoutMs { get; }
+
+    public int MethodBudgetMs { get; }
+
+    public int MaxPathConditions { get; }
+
+    public int MaxExpressionNodes { get; }
+
+    public int ExecutedQueryCount { get; }
+
+    public int CacheEntryCount { get; }
+
+    public static CompactRuntimeHazardSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
+    {
+        return new CompactRuntimeHazardSmtDiagnostics(
+            diagnostics.IsConfigured,
+            diagnostics.Mode.ToString(),
+            diagnostics.IsEnabled,
+            diagnostics.QueryTimeoutMs,
+            diagnostics.MethodBudgetMs,
+            diagnostics.MaxPathConditions,
+            diagnostics.MaxExpressionNodes,
+            diagnostics.ExecutedQueryCount,
+            diagnostics.CacheEntryCount);
+    }
+}
+
+internal sealed class CompactRuntimeHazardOutputTruncation
+{
+    public CompactRuntimeHazardOutputTruncation(
+        bool hazards,
+        bool pathConditions)
+    {
+        Hazards = hazards;
+        PathConditions = pathConditions;
+    }
+
+    public bool Hazards { get; }
+
+    public bool PathConditions { get; }
+}
+
+internal sealed class CompactRuntimeHazardItemTruncation
+{
+    public CompactRuntimeHazardItemTruncation(bool pathConditions)
+    {
+        PathConditions = pathConditions;
+    }
+
+    public bool PathConditions { get; }
 }

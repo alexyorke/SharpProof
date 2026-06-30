@@ -1713,6 +1713,72 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_RuntimeHazards_CompactJsonEmitsBoundedMetadata()
+        {
+            var source = @"
+public class TestClass
+{
+    public void First()
+    {
+        throw new System.InvalidOperationException(""one"");
+    }
+
+    public void Second()
+    {
+        throw new System.ArgumentException(""two"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardCompact-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--hazard-kind",
+                    "DirectThrow",
+                    "--compact-json",
+                    "--max-hazards",
+                    "1");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+                Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
+                Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
+                Assert.That(root.GetProperty("statusCounts").GetProperty("Proven").GetInt32(), Is.EqualTo(2));
+                Assert.That(root.GetProperty("kindCounts").GetProperty("DirectThrow").GetInt32(), Is.EqualTo(2));
+                Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+
+                var hazard = root.GetProperty("hazards")[0];
+                Assert.That(hazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow.ToString()));
+                Assert.That(hazard.GetProperty("status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
+                Assert.That(hazard.GetProperty("statusReason").GetString(), Is.Not.Empty);
+                Assert.That(hazard.GetProperty("exceptionType").GetString(), Does.Contain("Exception"));
+                Assert.That(hazard.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "throw new System.InvalidOperationException")));
+                Assert.That(hazard.GetProperty("nodeKind").GetString(), Is.EqualTo("ThrowStatement"));
+                Assert.That(hazard.GetProperty("operationText").GetString(), Does.Contain("throw"));
+                Assert.That(hazard.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
+                Assert.That(hazard.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
+                Assert.That(hazard.GetProperty("pathConditions").GetArrayLength(), Is.LessThanOrEqualTo(hazard.GetProperty("pathConditionCount").GetInt32()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
         {
             var sourcePath = Path.Combine(
@@ -1760,6 +1826,17 @@ public class TestClass
                     "--line-expressions");
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
+
+                var maxHazardsWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--compact-json",
+                    "--max-hazards",
+                    "1");
+                Assert.That(maxHazardsWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+                Assert.That(maxHazardsWithoutRuntimeHazards.StandardError, Does.Contain("--max-hazards requires --runtime-hazards."));
             }
             finally
             {

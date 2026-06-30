@@ -70,6 +70,15 @@ namespace PurelySharp.Analyzer
                     yield return unaryExpression;
                 }
             }
+
+            foreach (var castExpression in GetRelevantDescendants<CastExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(castExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return castExpression;
+                }
+            }
         }
 
         internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
@@ -454,6 +463,27 @@ namespace PurelySharp.Analyzer
                 smtAnalysis);
         }
 
+        private static bool IsDefinitelyCheckedIntegralOverflow(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryGetCheckedIntegralConversionRange(castExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
+                !CSharpConditionToFormula.TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
+                operandFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            return IsDefinitelyFalseAtUse(
+                castExpression,
+                CreateIntegralInRangeFormula(operandFormula, minValue, maxValue),
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
         private static bool TryGetCheckedIntegralBinaryOperator(
             BinaryExpressionSyntax binaryExpression,
             SemanticModel semanticModel,
@@ -510,6 +540,34 @@ namespace PurelySharp.Analyzer
                 };
         }
 
+        private static bool TryGetCheckedIntegralConversionRange(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out long minValue,
+            out long maxValue)
+        {
+            minValue = default;
+            maxValue = default;
+
+            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+                !conversionOperation.IsChecked ||
+                conversionOperation.Conversion.IsUserDefined ||
+                conversionOperation.Type is not { } targetType ||
+                !TryGetBoundedIntegralRange(targetType, out minValue, out maxValue))
+            {
+                return false;
+            }
+
+            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
+            if (!TryGetBoundedIntegralRange(sourceType, out var sourceMinValue, out var sourceMaxValue))
+            {
+                return false;
+            }
+
+            return sourceMinValue < minValue || sourceMaxValue > maxValue;
+        }
+
         private static bool TryGetCheckedIntegralRange(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -531,6 +589,52 @@ namespace PurelySharp.Analyzer
                 case SpecialType.System_Int32:
                     minValue = int.MinValue;
                     maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
+        private static bool TryGetBoundedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Char:
+                    minValue = char.MinValue;
+                    maxValue = char.MaxValue;
+                    return true;
+                case SpecialType.System_SByte:
+                    minValue = sbyte.MinValue;
+                    maxValue = sbyte.MaxValue;
+                    return true;
+                case SpecialType.System_Byte:
+                    minValue = byte.MinValue;
+                    maxValue = byte.MaxValue;
+                    return true;
+                case SpecialType.System_Int16:
+                    minValue = short.MinValue;
+                    maxValue = short.MaxValue;
+                    return true;
+                case SpecialType.System_UInt16:
+                    minValue = ushort.MinValue;
+                    maxValue = ushort.MaxValue;
+                    return true;
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
                     return true;
                 case SpecialType.System_Int64:
                     minValue = long.MinValue;

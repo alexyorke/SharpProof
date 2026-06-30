@@ -42,6 +42,58 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_SelectsExpandedSymbolicSmtFixturesForConditionTranslator()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs");
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("filterTooLong").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("ExpressionSmtTranslationTests"));
+            Assert.That(fixtures, Does.Contain("ExpressionAtomSmtTests"));
+            Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
+            Assert.That(fixtures, Does.Contain("ElementAccessSmtTests"));
+            Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsAnalyzerSmtFixturesForExceptionPathFacts()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs");
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("filterTooLong").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("ExceptionFlowPathFactStressTests"));
+            Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
+            Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_FallsBackForUnmappedAnalyzerProductionFile()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Analyzer/Engine/Analysis/WorklistPuritySolver.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Is.Empty);
+            Assert.That(
+                GetStringArray(root, "fullSuiteFallbackReasons").Single(),
+                Does.Contain("has no impacted-test mapping"));
+            Assert.That(root.GetProperty("testFilter").GetString(), Is.Empty);
+        }
+
+        [Test]
         public async Task ListOnlyJson_IgnoresDocumentationOnlyChanges()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(

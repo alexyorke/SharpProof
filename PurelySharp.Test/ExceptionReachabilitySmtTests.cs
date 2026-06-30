@@ -590,6 +590,102 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_CheckedExplicitNumericConversionOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        if (value == 2147483648L)
+        {
+            return checked((int)value);
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_conversion"));
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedExplicitNumericConversionGuardedUnreachableOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        if (value == 2147483648L)
+        {
+            return 0;
+        }
+
+        if (value == 2147483648L)
+        {
+            return checked((int)value);
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UncheckedExplicitNumericConversionOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        if (value == 2147483648L)
+        {
+            return unchecked((int)value);
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedExplicitNumericConversionOverflowCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        try
+        {
+            if (value == 2147483648L)
+            {
+                return checked((int)value);
+            }
+
+            return value == 0L ? 0 : 1;
+        }
+        catch (System.OverflowException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CheckedIntAdditionGuardedUnreachableOverflow_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

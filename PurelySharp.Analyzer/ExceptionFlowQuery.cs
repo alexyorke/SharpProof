@@ -192,7 +192,7 @@ namespace PurelySharp.Analyzer
                         exceptionType,
                         "System.OverflowException",
                         "definite_checked_integral_overflow",
-                        "checked_operator"));
+                        checkedOverflowNode is CastExpressionSyntax ? "checked_conversion" : "checked_operator"));
             }
 
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))

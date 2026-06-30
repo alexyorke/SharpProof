@@ -694,6 +694,14 @@ namespace SearchLib.Smt
                     return true;
                 }
 
+                if (Peek('>'))
+                {
+                    _position++;
+                    // Atomic grouping can only remove matches by preventing backtracking.
+                    _isExact = false;
+                    return true;
+                }
+
                 return TryParseExplicitCaptureOptionGroupPrefix() ||
                     TryParseNamedCaptureGroupPrefix();
             }
