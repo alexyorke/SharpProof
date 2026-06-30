@@ -328,6 +328,75 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_InlineIgnoreCaseOptionGroupAffectsFollowingLiterals()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?i)ab\z", RegexOptions.CultureInvariant),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineIgnoreCaseDisableMakesFollowingLiteralCaseSensitive()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?i)ab(?-i)c\z", RegexOptions.CultureInvariant),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineIgnorePatternWhitespaceOptionSkipsRemainderTrivia()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var pattern = "\\A(?x)A B # ignored comment\n C\\z";
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, pattern),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("ABC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineSinglelineDisableMakesFollowingDotRejectsNewline()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?s).(?-s).\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n\n")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_EscapedRegexClassLiteralContradictsPrefix()
         {
             using var solver = new SmtSolver();

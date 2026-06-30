@@ -6955,6 +6955,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ReferenceCoalesceAssignmentNonNullFallbackContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string value, string fallback", "fallback != null && (value ??= fallback) == null"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableCoalesceAssignmentFallbackContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && (maybe ??= 7) != 7"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableBoolCoalesceAssignmentFallbackContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && (maybe ??= true) == false"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_NullableGetValueOrDefaultUnknownFallback_RemainsUnknown()
         {
             Assert.That(

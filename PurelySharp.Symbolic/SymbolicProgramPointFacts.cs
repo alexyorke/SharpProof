@@ -17,6 +17,7 @@ namespace PurelySharp.Symbolic
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;
         private const int MaxFiniteForeachElementFacts = 8;
+        private const int MaxScopedBlockCompletionStatements = 32;
         private const int MaxStructuralNullStateDepth = 4;
         private const string DoesNotReturnAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute";
         private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
@@ -1848,7 +1849,11 @@ namespace PurelySharp.Symbolic
 
             var factsBeforeStatement = facts.ToArray();
             RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
-            if (statement is IfStatementSyntax ifStatement)
+            if (statement is BlockSyntax block)
+            {
+                AddCompletedScopedBlockFacts(block, semanticModel, cancellationToken, facts);
+            }
+            else if (statement is IfStatementSyntax ifStatement)
             {
                 AddCompletedIfStatementFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             }
@@ -1870,6 +1875,37 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddCompletedScopedBlockFacts(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (StatementDefinitelyExits(block, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var blockFacts = new List<SmtFormula>(facts);
+            var processedStatementCount = 0;
+            foreach (var statement in block.Statements)
+            {
+                if (processedStatementCount >= MaxScopedBlockCompletionStatements)
+                {
+                    return;
+                }
+
+                processedStatementCount++;
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockFacts);
+                if (StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+                {
+                    break;
+                }
+            }
+
+            AddVisibleSingleBranchFacts(blockFacts, block, semanticModel, cancellationToken, facts);
         }
 
         private static void AddNormalCompletionFacts(

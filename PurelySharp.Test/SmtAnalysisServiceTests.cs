@@ -1054,6 +1054,48 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyPathFeasibility_SubtractionIntervalContradiction_BypassesSolver()
+        {
+            var x = new SmtVariable("subtract_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, new SmtIntegerConstant(1));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(5)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, xMinusOne, new SmtIntegerConstant(4)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_PositiveConstantMultiplyIntervalEntailment_BypassesSolver()
+        {
+            var x = new SmtVariable("multiply_interval_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var twiceX = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, x, new SmtIntegerConstant(2));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(3)),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, twiceX, new SmtIntegerConstant(6));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver()
         {
             var left = new SmtVariable("length_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);

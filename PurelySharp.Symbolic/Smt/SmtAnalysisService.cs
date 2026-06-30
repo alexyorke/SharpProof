@@ -728,6 +728,8 @@ namespace PurelySharp.Symbolic.Smt
 
         private sealed class SyntacticFactSet
         {
+            private const int MaxAffineExpansionDepth = 8;
+
             private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
             private readonly Dictionary<SmtFormula, string> _exactStrings = new();
             private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
@@ -1574,6 +1576,54 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 term = NormalizeAliases(term);
+                var added = AddIntegerIntervalFact(term, op, constant, out hasContradiction);
+                if (hasContradiction)
+                {
+                    return true;
+                }
+
+                if (!TryNormalizeAffineIntegerComparison(
+                    term,
+                    op,
+                    constant,
+                    out var normalizedTerm,
+                    out var normalizedOp,
+                    out var normalizedConstant,
+                    out var affineContradiction,
+                    out var affineTautology))
+                {
+                    return added;
+                }
+
+                if (affineContradiction)
+                {
+                    hasContradiction = true;
+                    return true;
+                }
+
+                if (affineTautology)
+                {
+                    return added;
+                }
+
+                if (normalizedTerm.Equals(term) &&
+                    normalizedOp == op &&
+                    normalizedConstant == constant)
+                {
+                    return added;
+                }
+
+                added |= AddIntegerIntervalFact(normalizedTerm, normalizedOp, normalizedConstant, out var normalizedContradiction);
+                hasContradiction |= normalizedContradiction;
+                return added;
+            }
+
+            private bool AddIntegerIntervalFact(
+                SmtFormula term,
+                SmtBinaryOperator op,
+                long constant,
+                out bool hasContradiction)
+            {
                 var interval = _integerIntervals.TryGetValue(term, out var existing)
                     ? existing
                     : IntegerInterval.Unbounded;
@@ -1581,6 +1631,423 @@ namespace PurelySharp.Symbolic.Smt
                 hasContradiction = interval.IsContradictory;
                 _integerIntervals[term] = interval;
                 return true;
+            }
+
+            private bool TryNormalizeAffineIntegerComparison(
+                SmtFormula term,
+                SmtBinaryOperator op,
+                long constant,
+                out SmtFormula normalizedTerm,
+                out SmtBinaryOperator normalizedOp,
+                out long normalizedConstant,
+                out bool hasContradiction,
+                out bool isTautology)
+            {
+                normalizedTerm = term;
+                normalizedOp = op;
+                normalizedConstant = constant;
+                hasContradiction = false;
+                isTautology = false;
+
+                if (!TryGetAffineIntegerTerm(term, depth: 0, out var affine))
+                {
+                    return false;
+                }
+
+                if (affine.BaseTerm == null ||
+                    affine.Scale == 0)
+                {
+                    return TryEvaluateConstantComparison(
+                        affine.Offset,
+                        op,
+                        constant,
+                        out hasContradiction,
+                        out isTautology);
+                }
+
+                var scale = affine.Scale;
+                if (scale < 0)
+                {
+                    if (!TryNegate(scale, out scale))
+                    {
+                        return false;
+                    }
+
+                    op = ReverseComparison(op);
+                }
+
+                if (scale <= 0 ||
+                    !TrySubtract(constant, affine.Offset, out var adjustedConstant))
+                {
+                    return false;
+                }
+
+                if (!TryInvertPositiveScaleComparison(
+                    op,
+                    adjustedConstant,
+                    scale,
+                    out normalizedOp,
+                    out normalizedConstant,
+                    out hasContradiction,
+                    out isTautology))
+                {
+                    return false;
+                }
+
+                normalizedTerm = NormalizeAliases(affine.BaseTerm);
+                return true;
+            }
+
+            private static bool TryEvaluateConstantComparison(
+                long left,
+                SmtBinaryOperator op,
+                long right,
+                out bool hasContradiction,
+                out bool isTautology)
+            {
+                var value = op switch
+                {
+                    SmtBinaryOperator.Equal => left == right,
+                    SmtBinaryOperator.NotEqual => left != right,
+                    SmtBinaryOperator.LessThan => left < right,
+                    SmtBinaryOperator.LessThanOrEqual => left <= right,
+                    SmtBinaryOperator.GreaterThan => left > right,
+                    SmtBinaryOperator.GreaterThanOrEqual => left >= right,
+                    _ => false,
+                };
+
+                if (op is not (SmtBinaryOperator.Equal or
+                    SmtBinaryOperator.NotEqual or
+                    SmtBinaryOperator.LessThan or
+                    SmtBinaryOperator.LessThanOrEqual or
+                    SmtBinaryOperator.GreaterThan or
+                    SmtBinaryOperator.GreaterThanOrEqual))
+                {
+                    hasContradiction = false;
+                    isTautology = false;
+                    return false;
+                }
+
+                hasContradiction = !value;
+                isTautology = value;
+                return true;
+            }
+
+            private static bool TryInvertPositiveScaleComparison(
+                SmtBinaryOperator op,
+                long adjustedConstant,
+                long positiveScale,
+                out SmtBinaryOperator normalizedOp,
+                out long normalizedConstant,
+                out bool hasContradiction,
+                out bool isTautology)
+            {
+                normalizedOp = op;
+                normalizedConstant = adjustedConstant;
+                hasContradiction = false;
+                isTautology = false;
+
+                switch (op)
+                {
+                    case SmtBinaryOperator.Equal:
+                        if (adjustedConstant % positiveScale != 0)
+                        {
+                            hasContradiction = true;
+                            return true;
+                        }
+
+                        normalizedConstant = adjustedConstant / positiveScale;
+                        return true;
+                    case SmtBinaryOperator.NotEqual:
+                        if (adjustedConstant % positiveScale != 0)
+                        {
+                            isTautology = true;
+                            return true;
+                        }
+
+                        normalizedConstant = adjustedConstant / positiveScale;
+                        return true;
+                    case SmtBinaryOperator.GreaterThan:
+                        normalizedConstant = FloorDiv(adjustedConstant, positiveScale);
+                        return true;
+                    case SmtBinaryOperator.GreaterThanOrEqual:
+                        normalizedConstant = CeilingDiv(adjustedConstant, positiveScale);
+                        return true;
+                    case SmtBinaryOperator.LessThan:
+                        normalizedConstant = CeilingDiv(adjustedConstant, positiveScale);
+                        return true;
+                    case SmtBinaryOperator.LessThanOrEqual:
+                        normalizedConstant = FloorDiv(adjustedConstant, positiveScale);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
+            private bool TryGetAffineIntegerTerm(
+                SmtFormula formula,
+                int depth,
+                out AffineIntegerTerm affine)
+            {
+                formula = NormalizeAliases(formula);
+                if (depth > MaxAffineExpansionDepth)
+                {
+                    return TryCreateUnitAffineTerm(formula, out affine);
+                }
+
+                switch (formula)
+                {
+                    case SmtIntegerConstant constant:
+                        affine = AffineIntegerTerm.Constant(constant.Value);
+                        return true;
+                    case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unary
+                        when TryGetAffineIntegerTerm(unary.Operand, depth + 1, out var operand) &&
+                             TryNegate(operand, out affine):
+                        return true;
+                    case SmtIntegerBinaryTerm binary:
+                        return TryGetAffineIntegerBinaryTerm(binary, depth, out affine) ||
+                            TryCreateUnitAffineTerm(formula, out affine);
+                    default:
+                        return TryCreateUnitAffineTerm(formula, out affine);
+                }
+            }
+
+            private bool TryGetAffineIntegerBinaryTerm(
+                SmtIntegerBinaryTerm binary,
+                int depth,
+                out AffineIntegerTerm affine)
+            {
+                affine = default;
+                if (binary.Operator == SmtIntegerBinaryOperator.Multiply)
+                {
+                    if (TryGetKnownInteger(binary.Left, out var leftConstant) &&
+                        TryGetAffineIntegerTerm(binary.Right, depth + 1, out var rightAffine))
+                    {
+                        return TryScale(rightAffine, leftConstant, out affine);
+                    }
+
+                    if (TryGetKnownInteger(binary.Right, out var rightConstant) &&
+                        TryGetAffineIntegerTerm(binary.Left, depth + 1, out var leftAffine))
+                    {
+                        return TryScale(leftAffine, rightConstant, out affine);
+                    }
+
+                    return false;
+                }
+
+                if (binary.Operator is not (SmtIntegerBinaryOperator.Add or SmtIntegerBinaryOperator.Subtract) ||
+                    !TryGetAffineIntegerTerm(binary.Left, depth + 1, out var left) ||
+                    !TryGetAffineIntegerTerm(binary.Right, depth + 1, out var right))
+                {
+                    return false;
+                }
+
+                return binary.Operator == SmtIntegerBinaryOperator.Add
+                    ? TryAdd(left, right, out affine)
+                    : TrySubtract(left, right, out affine);
+            }
+
+            private static bool TryCreateUnitAffineTerm(SmtFormula formula, out AffineIntegerTerm affine)
+            {
+                if (formula.Kind != SmtValueKind.Int)
+                {
+                    affine = default;
+                    return false;
+                }
+
+                affine = AffineIntegerTerm.Term(formula);
+                return true;
+            }
+
+            private static bool TryAdd(
+                AffineIntegerTerm left,
+                AffineIntegerTerm right,
+                out AffineIntegerTerm result)
+            {
+                return TryCombine(left, right, subtractRight: false, out result);
+            }
+
+            private static bool TrySubtract(
+                AffineIntegerTerm left,
+                AffineIntegerTerm right,
+                out AffineIntegerTerm result)
+            {
+                return TryCombine(left, right, subtractRight: true, out result);
+            }
+
+            private static bool TryCombine(
+                AffineIntegerTerm left,
+                AffineIntegerTerm right,
+                bool subtractRight,
+                out AffineIntegerTerm result)
+            {
+                result = default;
+                var rightScale = right.Scale;
+                var rightOffset = right.Offset;
+                if (subtractRight &&
+                    (!TryNegate(rightScale, out rightScale) ||
+                     !TryNegate(rightOffset, out rightOffset)))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    checked
+                    {
+                        if (left.BaseTerm == null &&
+                            right.BaseTerm == null)
+                        {
+                            result = AffineIntegerTerm.Constant(left.Offset + rightOffset);
+                            return true;
+                        }
+
+                        if (left.BaseTerm == null)
+                        {
+                            var offset = left.Offset + rightOffset;
+                            result = rightScale == 0
+                                ? AffineIntegerTerm.Constant(offset)
+                                : new AffineIntegerTerm(right.BaseTerm, rightScale, offset);
+                            return true;
+                        }
+
+                        if (right.BaseTerm == null)
+                        {
+                            var offset = left.Offset + rightOffset;
+                            result = left.Scale == 0
+                                ? AffineIntegerTerm.Constant(offset)
+                                : new AffineIntegerTerm(left.BaseTerm, left.Scale, offset);
+                            return true;
+                        }
+
+                        if (!left.BaseTerm.Equals(right.BaseTerm))
+                        {
+                            return false;
+                        }
+
+                        var scale = left.Scale + rightScale;
+                        var combinedOffset = left.Offset + rightOffset;
+                        result = scale == 0
+                            ? AffineIntegerTerm.Constant(combinedOffset)
+                            : new AffineIntegerTerm(left.BaseTerm, scale, combinedOffset);
+                        return true;
+                    }
+                }
+                catch (OverflowException)
+                {
+                    return false;
+                }
+            }
+
+            private static bool TryScale(
+                AffineIntegerTerm value,
+                long scale,
+                out AffineIntegerTerm result)
+            {
+                result = default;
+                try
+                {
+                    checked
+                    {
+                        var scaledScale = value.Scale * scale;
+                        var scaledOffset = value.Offset * scale;
+                        result = value.BaseTerm == null || scaledScale == 0
+                            ? AffineIntegerTerm.Constant(scaledOffset)
+                            : new AffineIntegerTerm(value.BaseTerm, scaledScale, scaledOffset);
+                        return true;
+                    }
+                }
+                catch (OverflowException)
+                {
+                    return false;
+                }
+            }
+
+            private static bool TryNegate(AffineIntegerTerm value, out AffineIntegerTerm result)
+            {
+                result = default;
+                if (!TryNegate(value.Scale, out var scale) ||
+                    !TryNegate(value.Offset, out var offset))
+                {
+                    return false;
+                }
+
+                result = value.BaseTerm == null || scale == 0
+                    ? AffineIntegerTerm.Constant(offset)
+                    : new AffineIntegerTerm(value.BaseTerm, scale, offset);
+                return true;
+            }
+
+            private static bool TrySubtract(long left, long right, out long result)
+            {
+                try
+                {
+                    checked
+                    {
+                        result = left - right;
+                    }
+
+                    return true;
+                }
+                catch (OverflowException)
+                {
+                    result = default;
+                    return false;
+                }
+            }
+
+            private static bool TryNegate(long value, out long result)
+            {
+                if (value == long.MinValue)
+                {
+                    result = default;
+                    return false;
+                }
+
+                result = -value;
+                return true;
+            }
+
+            private static long FloorDiv(long dividend, long positiveDivisor)
+            {
+                var quotient = dividend / positiveDivisor;
+                var remainder = dividend % positiveDivisor;
+                return remainder != 0 && dividend < 0
+                    ? quotient - 1
+                    : quotient;
+            }
+
+            private static long CeilingDiv(long dividend, long positiveDivisor)
+            {
+                var quotient = dividend / positiveDivisor;
+                var remainder = dividend % positiveDivisor;
+                return remainder != 0 && dividend > 0
+                    ? quotient + 1
+                    : quotient;
+            }
+
+            private readonly struct AffineIntegerTerm
+            {
+                public AffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
+                {
+                    BaseTerm = scale == 0 ? null : baseTerm;
+                    Scale = BaseTerm == null ? 0 : scale;
+                    Offset = offset;
+                }
+
+                public SmtFormula? BaseTerm { get; }
+                public long Scale { get; }
+                public long Offset { get; }
+
+                public static AffineIntegerTerm Constant(long value)
+                {
+                    return new AffineIntegerTerm(null, 0, value);
+                }
+
+                public static AffineIntegerTerm Term(SmtFormula term)
+                {
+                    return new AffineIntegerTerm(term, 1, 0);
+                }
             }
 
             private static bool TryGetStringComparison(

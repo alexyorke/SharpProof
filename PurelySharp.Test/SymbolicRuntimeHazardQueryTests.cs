@@ -2034,6 +2034,111 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedNegativeStackAllocLength()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        if (length < 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "Span<int> span = stackalloc int[length];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeStackAllocLength));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedStackAllocLengthIsPruned()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        if (length >= 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "Span<int> span = stackalloc int[length];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeStackAllocLength));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownNegativeStackAllocLengthCandidate()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        Span<int> span = stackalloc int[length];
+        return span.Length;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "Span<int> span = stackalloc int[length];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "Span<int> span = stackalloc int[length];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NegativeStackAllocLength));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazards_ArrayCreationNormalCompletionPrunesNegativeLengthBranch()
         {
             const string source = @"

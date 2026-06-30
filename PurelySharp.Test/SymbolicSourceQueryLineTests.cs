@@ -1399,8 +1399,10 @@ public class TestClass
                 spanStart,
                 spanEnd,
                 smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0" });
-            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(maxConditions: 1));
+                impliedConditions: new[] { "copy > 0", "copy <= 0" });
+            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+                maxConditions: 1,
+                maxProofs: 1));
 
             Assert.That(invariantResult.Kind, Is.EqualTo("invariantQuery"));
             Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
@@ -1420,6 +1422,14 @@ public class TestClass
             Assert.That(invariantResult.InvariantQuery.MaybeFactsTruncated, Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
             Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
             Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
+            Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
+            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
+            Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(invariantResult.ConditionProofs[0].Condition, Is.Not.Empty);
+            Assert.That(invariantResult.ConditionProofs[0].Status, Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None));
+            Assert.That(invariantResult.ConditionProofs[0].Reasons, Is.Not.Empty);
+            Assert.That(invariantResult.ConditionProofsTruncated, Is.True);
+            Assert.That(invariantResult.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
             Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
         }
 
@@ -1939,8 +1949,12 @@ public class TestClass
                     "--check-reachability",
                     "--implies",
                     "copy > 0",
+                    "--implies",
+                    "copy <= 0",
                     "--invariant-json",
                     "--max-conditions",
+                    "1",
+                    "--max-proofs",
                     "1");
 
                 Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
@@ -1967,6 +1981,15 @@ public class TestClass
                 Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
                 Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
 
+                Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("conditionProofsTruncated").GetBoolean(), Is.True);
+                var proof = root.GetProperty("conditionProofs")[0];
+                Assert.That(proof.GetProperty("condition").GetString(), Is.Not.Empty);
+                Assert.That(proof.GetProperty("status").GetString(), Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None.ToString()));
+                Assert.That(proof.GetProperty("summary").GetString(), Is.Not.Empty);
+                Assert.That(proof.GetProperty("reasons").GetArrayLength(), Is.GreaterThan(0));
+
                 var analysisSummary = root.GetProperty("analysisSummary");
                 Assert.That(
                     analysisSummary.GetProperty("programPointCount").GetInt32(),
@@ -1974,6 +1997,7 @@ public class TestClass
                 Assert.That(
                     analysisSummary.GetProperty("invariantStatus").GetString(),
                     Is.EqualTo(invariantQuery.GetProperty("status").GetString()));
+                Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(root.GetProperty("conditionProofCount").GetInt32()));
                 Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
             }
             finally

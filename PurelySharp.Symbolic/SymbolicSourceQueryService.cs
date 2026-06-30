@@ -3219,6 +3219,8 @@ namespace PurelySharp.Symbolic
             SymbolicCompactAnalysisSummary analysisSummary,
             SymbolicReachabilitySummary reachability,
             SymbolicProgramPointSummary programPointSummary,
+            IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+            bool conditionProofsTruncated,
             SymbolicCompactSmtDiagnostics smtDiagnostics,
             int? lineCount,
             int linesWithProgramPoints,
@@ -3233,6 +3235,8 @@ namespace PurelySharp.Symbolic
             Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
             ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
             ProofOutcomes = ProgramPointSummary.ProofOutcomes;
+            ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+            ConditionProofsTruncated = conditionProofsTruncated;
             SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
             LineCount = lineCount;
             LinesWithProgramPoints = linesWithProgramPoints;
@@ -3260,6 +3264,12 @@ namespace PurelySharp.Symbolic
         public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
         public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+
+        public int ConditionProofCount => ConditionProofs.Count;
+
+        public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+        public bool ConditionProofsTruncated { get; }
 
         public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
 
@@ -3308,6 +3318,8 @@ namespace PurelySharp.Symbolic
                 result.AnalysisSummary,
                 result.Reachability,
                 result.ProgramPointSummary,
+                result.ConditionProofs,
+                result.Truncation.Proofs,
                 result.SmtDiagnostics,
                 result.LineCount,
                 result.LinesWithProgramPoints,

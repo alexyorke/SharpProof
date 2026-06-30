@@ -293,6 +293,58 @@ public class TestClass
         }
 
         [Test]
+        public async Task ScopedBlockNestedReturnGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        {
+            if (value <= 0)
+            {
+                return 0;
+            }
+        }
+
+        return value <= 0 ? Impure() : value;
+    }
+
+    [Impure]
+    private static int Impure() => 1;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ScopedBlockAssignment_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private static int s_state;
+
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        {
+            value = 1;
+        }
+
+        return value == 0 ? s_state : value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public void IfElseMerge_NonNullGuardAndNullAssignmentProvesContradictoryPathFalse()
         {
             var source = @"

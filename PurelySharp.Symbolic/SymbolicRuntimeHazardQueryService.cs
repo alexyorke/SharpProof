@@ -653,6 +653,17 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
+                    if (TryCreateNegativeStackAllocLengthCandidate(
+                            stackAllocCreation,
+                            semanticModel,
+                            cancellationToken,
+                            out var negativeStackAllocLengthCandidate))
+                    {
+                        yield return negativeStackAllocLengthCandidate;
+                    }
+
+                    break;
                 case ForEachStatementSyntax forEachStatement:
                     if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel, cancellationToken, out var foreachNullCandidate))
                     {
@@ -1531,6 +1542,40 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.OverflowException",
                 "definite_negative_array_length");
+            return true;
+        }
+
+        private static bool TryCreateNegativeStackAllocLengthCandidate(
+            StackAllocArrayCreationExpressionSyntax stackAllocCreation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            var trigger = default(SmtFormula);
+            foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
+            {
+                if (!TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var negativeLength))
+                {
+                    continue;
+                }
+
+                trigger = trigger == null
+                    ? negativeLength
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength);
+            }
+
+            if (trigger == null)
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                stackAllocCreation,
+                SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+                trigger,
+                "System.OverflowException",
+                "definite_negative_stackalloc_length");
             return true;
         }
 
@@ -3136,6 +3181,25 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(StackAllocArrayCreationExpressionSyntax stackAllocCreation)
+        {
+            if (stackAllocCreation.Type is not ArrayTypeSyntax arrayType)
+            {
+                yield break;
+            }
+
+            foreach (var rankSpecifier in arrayType.RankSpecifiers)
+            {
+                foreach (var size in rankSpecifier.Sizes)
+                {
+                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    {
+                        yield return size;
+                    }
+                }
+            }
+        }
+
         private static ITypeSymbol? GetThrownExceptionType(
             SyntaxNode throwNode,
             SemanticModel semanticModel,
@@ -3533,6 +3597,7 @@ namespace PurelySharp.Symbolic
         InvalidCast,
         DynamicNullBinding,
         NegativeArrayLength,
+        NegativeStackAllocLength,
         ArgumentNull,
     }
 

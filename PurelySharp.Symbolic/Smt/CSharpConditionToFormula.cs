@@ -10446,6 +10446,18 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is AssignmentExpressionSyntax coalesceAssignmentExpression &&
+                TryTranslateCoalesceAssignmentValue(
+                    coalesceAssignmentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is SwitchExpressionSyntax switchExpression &&
                 TryTranslateSwitchExpressionValue(switchExpression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
             {
@@ -11655,6 +11667,115 @@ namespace PurelySharp.Symbolic.Smt
                 nonZeroDivisors,
                 pathFacts) &&
                 formula is { Kind: SmtValueKind.Int };
+        }
+
+        private static bool TryTranslateCoalesceAssignmentValue(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) ||
+                ContainsNestedAssignment(assignment.Right))
+            {
+                return false;
+            }
+
+            if (TryTranslateNullableCoalesceAssignmentValue(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            return TryTranslateReferenceCoalesceAssignmentValue(
+                assignment,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateNullableCoalesceAssignmentValue(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateNullableValueParts(
+                    assignment.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var nullableValueFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                nullableValueFormula == null ||
+                !TryTranslateValue(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var fallbackFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                fallbackFormula == null ||
+                nullableValueFormula.Kind != fallbackFormula.Kind)
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                hasValueFormula,
+                nullableValueFormula,
+                fallbackFormula,
+                fallbackFormula.Kind);
+            return true;
+        }
+
+        private static bool TryTranslateReferenceCoalesceAssignmentValue(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!IsLocalOrParameterExpression(assignment.Left, semanticModel, cancellationToken) ||
+                !TryTranslateValue(assignment.Left, semanticModel, cancellationToken, out var targetFormula, getSymbolVersion, inlineDepth) ||
+                targetFormula is not { Kind: SmtValueKind.Reference } ||
+                !TryTranslateValue(assignment.Right, semanticModel, cancellationToken, out var fallbackFormula, getSymbolVersion, inlineDepth) ||
+                fallbackFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, targetFormula, new SmtNullConstant()),
+                targetFormula,
+                fallbackFormula,
+                SmtValueKind.Reference);
+            return true;
+        }
+
+        private static bool IsLocalOrParameterExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            return semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition is ILocalSymbol or IParameterSymbol;
         }
 
         private static bool IsSafeIntegerDivisor(SmtFormula divisor, ISet<string>? nonZeroDivisors)

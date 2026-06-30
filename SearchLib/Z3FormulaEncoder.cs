@@ -772,6 +772,13 @@ namespace SearchLib.Smt
                 switch (current)
                 {
                     case '(':
+                        if (TryParseInlineOptionGroup(out var inlineOptions))
+                        {
+                            ApplyOptions(inlineOptions);
+                            regex = CreateLiteralRegex(string.Empty);
+                            return true;
+                        }
+
                         var outerOptions = CaptureOptions();
                         if (!TryParseGroupPrefix(out var groupOptions))
                         {
@@ -821,6 +828,26 @@ namespace SearchLib.Smt
                 _ignoreCase = options.IgnoreCase;
             }
 
+            private bool TryParseInlineOptionGroup(out RegexOptionScope groupOptions)
+            {
+                groupOptions = CaptureOptions();
+                var savedPosition = _position;
+                if (!Peek('?'))
+                {
+                    return false;
+                }
+
+                _position++;
+                if (TryParseRegexOptionsUntil(')', out groupOptions))
+                {
+                    return true;
+                }
+
+                _position = savedPosition;
+                groupOptions = CaptureOptions();
+                return false;
+            }
+
             private bool TryParseGroupPrefix(out RegexOptionScope groupOptions)
             {
                 groupOptions = CaptureOptions();
@@ -855,21 +882,32 @@ namespace SearchLib.Smt
 
             private bool TryParseOptionGroupPrefix(out RegexOptionScope groupOptions)
             {
-                groupOptions = CaptureOptions();
                 var savedPosition = _position;
+                if (TryParseRegexOptionsUntil(':', out groupOptions))
+                {
+                    return true;
+                }
+
+                _position = savedPosition;
+                groupOptions = CaptureOptions();
+                return false;
+            }
+
+            private bool TryParseRegexOptionsUntil(char terminator, out RegexOptionScope groupOptions)
+            {
+                groupOptions = CaptureOptions();
                 var nextIgnorePatternWhitespace = groupOptions.IgnorePatternWhitespace;
                 var nextSingleline = groupOptions.Singleline;
                 var nextIgnoreCase = groupOptions.IgnoreCase;
                 var sawOption = false;
                 var sawDisableSeparator = false;
-                while (_position < _pattern.Length && !Peek(':'))
+                while (_position < _pattern.Length && !Peek(terminator))
                 {
                     var current = _pattern[_position];
                     if (current == '-')
                     {
                         if (sawDisableSeparator)
                         {
-                            _position = savedPosition;
                             return false;
                         }
 
@@ -909,13 +947,11 @@ namespace SearchLib.Smt
                         continue;
                     }
 
-                    _position = savedPosition;
                     return false;
                 }
 
-                if (!sawOption || !Peek(':'))
+                if (!sawOption || !Peek(terminator))
                 {
-                    _position = savedPosition;
                     return false;
                 }
 
