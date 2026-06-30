@@ -83,6 +83,38 @@ Use `--summary-only` to emit compact JSON with file or line aggregate metadata b
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --summary-only
 ```
 
+## Runtime Hazard Queries
+
+The same CLI can query runtime hazards instead of invariant program points. Runtime hazard queries support `--line`, `--span-start`/`--span-end`, or `--all-lines`; they do not use `--position`, invariant proof flags, or invariant program-point filters.
+
+By default, `--runtime-hazards` returns only hazards with `Status = Proven`. Add `--include-unproven-hazards` when a tool wants to inspect `Unknown`, `Unreachable`, or `Unsupported` candidates.
+
+Query proven hazards on one line:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards
+```
+
+Query all proven null-dereference hazards with compact JSON output:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
+```
+
+Inspect unknown candidates as a bounded machine-readable summary:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
+```
+
+Fail the process when the final filtered hazard output is non-empty:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind DivideByZero --fail-on-hazard
+```
+
+Hazard filters include `--hazard-kind`, `--hazard-status`, `--hazard-exception-type`, and `--hazard-category`. `--compact-json` hazard output includes `kind = runtimeHazards`, `hazardCount`, status/kind/exception/category counts, `analysisSummary`, bounded hazard entries, truncation flags, and SMT diagnostics.
+
 All-lines `--json` is a single full `SymbolicFileQueryResult` object with string enum values. `--compact-json` emits lower-camel-case JSON with `schemaVersion`, `kind`, file/line/program-point counts, string enum values, `observedInvariant`, `conservativeInvariant`, direct `mergedInvariantText`, method names and program-point kinds on program points, invariant `targets`, conservative unknown counts, reachability counts, proof summaries, proof outcomes, compact `analysisSummary`, `smtDiagnostics`, bounded nested line/program-point arrays, conservative-unknown diagnostics, and `truncation` flags. `--max-lines`, `--max-points`, `--max-facts`, `--max-conditions`, and `--max-proofs` apply only to `--compact-json`; totals remain untruncated so callers can detect omitted details.
 
 Text output includes total line count, lines with program points, total program points, program-point kind on points, program-point summary, conservative merged invariant text, invariant condition details, conservative unknown counts, observed distinct fact count, observed invariant metadata, and aggregate reachability or implication counts when requested. File-level observed facts and summaries are an overview, not a single invariant that holds at every program point; use each point result with `MergeKind=Conjunction` for actual path invariants.

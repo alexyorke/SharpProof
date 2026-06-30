@@ -385,6 +385,22 @@ function Add-SymbolicSmtTestClasses
         'SymbolicSourceQueryLineTests')
 }
 
+function Add-RuntimeHazardSmtTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-TestClasses $Set @(
+        'SmtAnalysisServiceTests',
+        'SemanticOracleSmtTests',
+        'SymbolicRuntimeHazardQueryTests',
+        'SymbolicSourceQueryLineTests',
+        'DiagnosticEvidenceTests')
+}
+
 function Add-AnalyzerSmtTestClasses
 {
     param(
@@ -532,8 +548,7 @@ function Add-PathMappedTests
             break
         }
         '^PurelySharp\.Symbolic/SymbolicRuntimeHazardQueryService\.cs$' {
-            Add-SymbolicSmtTestClasses $Set
-            Add-TestClasses $Set @('DiagnosticEvidenceTests')
+            Add-RuntimeHazardSmtTestClasses $Set
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic runtime-hazard query change' $before $Set
             break
         }
@@ -624,6 +639,11 @@ function Add-PathMappedTests
             Add-SymbolicSmtTestClasses $Set
             Add-TestClasses $Set @('DiagnosticEvidenceTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT path-fact analyzer rule change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/.*Hazard.*\.cs$' {
+            Add-RuntimeHazardSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard SMT change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(Exception|Throw|Catch|Finally)' {

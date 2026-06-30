@@ -249,14 +249,18 @@ The same CLI can query runtime hazards instead of invariant program points:
 ```powershell
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards --json
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
 ```
 
 `SymbolicRuntimeHazardQueryService` is the library surface behind that CLI. It
 returns only proven hazards by default, and can include unknown, unreachable, or
 unsupported candidates for tooling that wants to display conservative
-possibilities. This is source-analysis infrastructure rather than a compiler
-modification: it can be pointed at user code or compiler source, but IDE/compiler
-inline surfacing is separate integration work.
+possibilities. See [docs/symbolic-invariants.md](docs/symbolic-invariants.md)
+for hazard scopes, filters, and compact output notes.
+
+This is source-analysis infrastructure rather than a compiler modification: it
+can be pointed at user code or compiler source, but IDE/compiler inline surfacing
+is separate integration work.
 
 ## Effect Summaries
 

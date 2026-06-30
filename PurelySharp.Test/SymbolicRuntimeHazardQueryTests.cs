@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
@@ -87,6 +88,65 @@ public class TestClass
             var hazard = AssertSingleHazard(candidateResult);
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QueryNodeRuntimeHazards_DefaultExcludesNestedCallableHazards()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        string? text = null;
+        int Local() => text.Length;
+        int divisor = 0;
+        return value / divisor;
+    }
+}";
+
+            var (method, semanticModel) = CreateMethodContext(source, "TestMethod");
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                method,
+                semanticModel,
+                smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+            Assert.That(hazard.OperationText, Is.EqualTo("value / divisor"));
+            Assert.That(result.ScopeStart, Is.EqualTo(method.SpanStart));
+            Assert.That(result.ScopeEnd, Is.EqualTo(method.Span.End));
+        }
+
+        [Test]
+        public void QueryNodeRuntimeHazards_CanIncludeNestedCallableHazards()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        string? text = null;
+        int Local() => text.Length;
+        int divisor = 0;
+        return value / divisor;
+    }
+}";
+
+            var (method, semanticModel) = CreateMethodContext(source, "TestMethod");
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                method,
+                semanticModel,
+                smtAnalysis,
+                includeNestedCallables: true);
+
+            Assert.That(result.Hazards.Select(hazard => hazard.Kind), Is.EquivalentTo(new[]
+            {
+                SymbolicRuntimeHazardKind.NullDereference,
+                SymbolicRuntimeHazardKind.DivideByZero,
+            }));
         }
 
         [Test]
@@ -1131,6 +1191,26 @@ public class TestClass
         {
             Assert.That(result.Hazards, Has.Count.EqualTo(1));
             return result.Hazards.Single();
+        }
+
+        private static (MethodDeclarationSyntax Method, SemanticModel SemanticModel) CreateMethodContext(
+            string source,
+            string methodName)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                path: "NodeHazards.cs");
+            var compilation = CSharpCompilation.Create(
+                "NodeHazards",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var method = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MethodDeclarationSyntax>()
+                .Single(candidate => candidate.Identifier.ValueText == methodName);
+            return (method, compilation.GetSemanticModel(syntaxTree));
         }
 
         private static int FindLine(string source, string text)

@@ -629,6 +629,18 @@ Options:
                       Maximum condition strings included in --compact-json output. Default: 50.
   --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
   --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
+
+Runtime hazard notes:
+  --runtime-hazards accepts --line, --span-start/--span-end, or --all-lines.
+  Runtime hazard output includes only Proven hazards by default.
+  Add --include-unproven-hazards to inspect Unknown, Unreachable, or Unsupported candidates.
+  Use --hazard-kind, --hazard-status, --hazard-exception-type, or --hazard-category to narrow hazards.
+
+Examples:
+  PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
+  PurelySharp.SymbolicCli --file Example.cs --line 42 --runtime-hazards
+  PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
+  PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
 """;
 
     public string? FilePath { get; private set; }

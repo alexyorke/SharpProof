@@ -226,6 +226,41 @@ namespace PurelySharp.Symbolic
                 options);
         }
 
+        public SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazards(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken = default,
+            SymbolicRuntimeHazardQueryOptions? options = null,
+            bool includeNestedCallables = false)
+        {
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            return QueryRuntimeHazardsCore(
+                node.SyntaxTree,
+                semanticModel,
+                node,
+                scope: node.Span,
+                requestedLine: null,
+                smtAnalysis,
+                cancellationToken,
+                options,
+                includeNestedCallables);
+        }
+
         private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
             SyntaxTree syntaxTree,
             Compilation compilation,
@@ -253,7 +288,51 @@ namespace PurelySharp.Symbolic
             options ??= SymbolicRuntimeHazardQueryOptions.Default;
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
-            var hazards = EnumerateCandidates(root, semanticModel, cancellationToken)
+            return QueryRuntimeHazardsCore(
+                syntaxTree,
+                semanticModel,
+                root,
+                scope,
+                requestedLine,
+                smtAnalysis,
+                cancellationToken,
+                options,
+                includeNestedCallables: true);
+        }
+
+        private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsCore(
+            SyntaxTree syntaxTree,
+            SemanticModel semanticModel,
+            SyntaxNode root,
+            TextSpan? scope,
+            int? requestedLine,
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
+            SymbolicRuntimeHazardQueryOptions? options,
+            bool includeNestedCallables)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            options ??= SymbolicRuntimeHazardQueryOptions.Default;
+            var hazards = EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
                 .Where(candidate => scope == null || candidate.Site.Span.IntersectsWith(scope.Value))
                 .Where(candidate => options.Includes(candidate.Kind))
                 .Select(candidate => ClassifyCandidate(
@@ -372,10 +451,16 @@ namespace PurelySharp.Symbolic
         private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
             SyntaxNode root,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeNestedCallables)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var node in root.DescendantNodesAndSelf(descendIntoTrivia: false))
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoTrivia: false,
+                         descendIntoChildren: candidate =>
+                             includeNestedCallables ||
+                             ReferenceEquals(candidate, root) ||
+                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
