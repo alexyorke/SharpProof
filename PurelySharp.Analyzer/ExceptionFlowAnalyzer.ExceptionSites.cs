@@ -47,6 +47,31 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var binaryExpression in GetRelevantDescendants<BinaryExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return binaryExpression;
+                }
+            }
+
+            foreach (var unaryExpression in GetRelevantDescendants<PrefixUnaryExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(unaryExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return unaryExpression;
+                }
+            }
+        }
+
         internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -134,6 +159,22 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<AssignmentExpressionSyntax> GetDefiniteArrayTypeMismatchStoreNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var assignment in GetRelevantDescendants<AssignmentExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyArrayTypeMismatchStore(assignment, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(assignment, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return assignment;
+                }
+            }
+        }
+
         internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteIndexOutOfRangeNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -149,7 +190,7 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteArgumentOutOfRangeNodes(
+        internal static IEnumerable<SyntaxNode> GetDefiniteArgumentOutOfRangeNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
@@ -160,6 +201,14 @@ namespace PurelySharp.Analyzer
                 if (IsDefinitelyOutOfRangeBuiltInRangeAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return elementAccess;
+                }
+            }
+
+            foreach (var invocation in GetRelevantDescendants<InvocationExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return invocation;
                 }
             }
         }
@@ -359,6 +408,154 @@ namespace PurelySharp.Analyzer
             return IsDefinitelyFalseAtUse(memberAccess, hasValueFormula, semanticModel, cancellationToken, smtAnalysis);
         }
 
+        private static bool IsDefinitelyCheckedIntegralOverflow(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken, out var smtOperator, out var minValue, out var maxValue) ||
+                !CSharpConditionToFormula.TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftFormula, getSymbolVersion: null) ||
+                leftFormula is not { Kind: SmtValueKind.Int } ||
+                !CSharpConditionToFormula.TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightFormula, getSymbolVersion: null) ||
+                rightFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
+            return IsDefinitelyFalseAtUse(
+                binaryExpression,
+                CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
+        private static bool IsDefinitelyCheckedIntegralOverflow(
+            PrefixUnaryExpressionSyntax unaryExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
+                !CSharpConditionToFormula.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
+                operandFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
+            return IsDefinitelyFalseAtUse(
+                unaryExpression,
+                CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
+        private static bool TryGetCheckedIntegralBinaryOperator(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtIntegerBinaryOperator smtOperator,
+            out long minValue,
+            out long maxValue)
+        {
+            smtOperator = default;
+            minValue = default;
+            maxValue = default;
+
+            if (!TryGetCheckedIntegralRange(binaryExpression, semanticModel, cancellationToken, out minValue, out maxValue) ||
+                semanticModel.GetOperation(binaryExpression, cancellationToken) is not IBinaryOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                })
+            {
+                return false;
+            }
+
+            switch (binaryExpression.Kind())
+            {
+                case SyntaxKind.AddExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Add;
+                    return true;
+                case SyntaxKind.SubtractExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Subtract;
+                    return true;
+                case SyntaxKind.MultiplyExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Multiply;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryGetCheckedIntegralUnaryOperator(
+            PrefixUnaryExpressionSyntax unaryExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out long minValue,
+            out long maxValue)
+        {
+            minValue = default;
+            maxValue = default;
+            return unaryExpression.IsKind(SyntaxKind.UnaryMinusExpression) &&
+                TryGetCheckedIntegralRange(unaryExpression, semanticModel, cancellationToken, out minValue, out maxValue) &&
+                semanticModel.GetOperation(unaryExpression, cancellationToken) is IUnaryOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                };
+        }
+
+        private static bool TryGetCheckedIntegralRange(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out long minValue,
+            out long maxValue)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return TryGetCheckedIntegralRange(typeInfo.ConvertedType ?? typeInfo.Type, out minValue, out maxValue);
+        }
+
+        private static bool TryGetCheckedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
+        private static SmtFormula CreateIntegralInRangeFormula(SmtFormula resultFormula, long minValue, long maxValue)
+        {
+            var lowerBound = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                resultFormula,
+                new SmtIntegerConstant(minValue));
+            var upperBound = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                resultFormula,
+                new SmtIntegerConstant(maxValue));
+            return new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+        }
+
         private static bool IsDefinitelyUnboxNullCast(
             CastExpressionSyntax castExpression,
             SemanticModel semanticModel,
@@ -425,6 +622,92 @@ namespace PurelySharp.Analyzer
                 semanticModel.Compilation);
         }
 
+        private static bool IsDefinitelyArrayTypeMismatchStore(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapFactExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess ||
+                !IsObjectArrayElementStore(elementAccess, semanticModel, cancellationToken) ||
+                IsDefinitelyNullExpression(assignment.Right, assignment, semanticModel, cancellationToken, smtAnalysis) ||
+                !TryGetExactRuntimeType(
+                    elementAccess.Expression,
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out var exactRuntimeArrayType) ||
+                exactRuntimeArrayType is not IArrayTypeSymbol exactArrayType ||
+                exactArrayType.Rank != 1 ||
+                !IsReferenceType(exactArrayType.ElementType) ||
+                exactArrayType.ElementType.TypeKind == TypeKind.Dynamic ||
+                !IsDefinitelyInRangeElementStore(elementAccess, semanticModel, cancellationToken, smtAnalysis) ||
+                !TryGetExactRuntimeType(
+                    assignment.Right,
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out var exactAssignedType))
+            {
+                return false;
+            }
+
+            return !CanStoreExactRuntimeTypeInArrayElement(
+                exactAssignedType,
+                exactArrayType.ElementType,
+                semanticModel.Compilation);
+        }
+
+        private static bool IsObjectArrayElementStore(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            return GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
+            {
+                Rank: 1,
+                ElementType.SpecialType: SpecialType.System_Object
+            };
+        }
+
+        private static bool IsDefinitelyInRangeElementStore(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryTranslateBuiltInElementAccessInRangeForExceptionFlow(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFormula))
+            {
+                return false;
+            }
+
+            return IsDefinitelyTrueAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool CanStoreExactRuntimeTypeInArrayElement(
+            ITypeSymbol exactRuntimeType,
+            ITypeSymbol elementType,
+            Compilation compilation)
+        {
+            if (exactRuntimeType.TypeKind == TypeKind.Dynamic ||
+                elementType.TypeKind == TypeKind.Dynamic)
+            {
+                return true;
+            }
+
+            return CanCastExactRuntimeTypeToReferenceType(exactRuntimeType, elementType, compilation);
+        }
+
         private static bool IsUnboxingCastShape(
             CastExpressionSyntax castExpression,
             ITypeSymbol? targetType,
@@ -484,7 +767,7 @@ namespace PurelySharp.Analyzer
             }
 
             var expressionType = GetNaturalExpressionType(expression, semanticModel, cancellationToken);
-            if (IsNonNullableValueType(expressionType))
+            if (expressionType != null && IsNonNullableValueType(expressionType))
             {
                 exactType = expressionType;
                 return true;
@@ -863,6 +1146,24 @@ namespace PurelySharp.Analyzer
             return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
         }
 
+        private static bool IsDefinitelyOutOfRangeBuiltInSliceCall(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
+                    invocation,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFormula))
+            {
+                return false;
+            }
+
+            return IsDefinitelyFalseAtUse(invocation, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
         private static bool IsDefinitelyFalseAtUse(
             SyntaxNode useNode,
             SmtFormula formula,
@@ -880,6 +1181,23 @@ namespace PurelySharp.Analyzer
 
             return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
                 PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+        }
+
+        private static bool IsDefinitelyTrueAtUse(
+            SyntaxNode useNode,
+            SmtFormula formula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var pathConditions = CollectPathConditionsForUse(
+                useNode,
+                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
+                semanticModel,
+                cancellationToken);
+
+            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
+                PathConditionsImplyFact(pathConditions, formula, smtAnalysis);
         }
 
         private static bool IsBuiltInSequenceElementAccess(
@@ -909,6 +1227,171 @@ namespace PurelySharp.Analyzer
         {
             return typeSymbol is INamedTypeSymbol namedType &&
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        }
+
+        private static bool TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula inRangeFormula)
+        {
+            inRangeFormula = null!;
+            if (!TryGetBuiltInSliceCallParts(
+                    invocation,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverExpression,
+                    out var startExpression,
+                    out var lengthExpression) ||
+                !CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverLengthFormula) ||
+                receiverLengthFormula is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateIntExpression(startExpression, semanticModel, cancellationToken, out var startFormula))
+            {
+                return false;
+            }
+
+            var nonNegativeStart = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                startFormula,
+                new SmtIntegerConstant(0));
+
+            if (lengthExpression == null)
+            {
+                var startWithinLength = new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    startFormula,
+                    receiverLengthFormula);
+                inRangeFormula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNegativeStart, startWithinLength);
+                return true;
+            }
+
+            if (!TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out var sliceLengthFormula))
+            {
+                return false;
+            }
+
+            var nonNegativeLength = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                sliceLengthFormula,
+                new SmtIntegerConstant(0));
+            var end = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                startFormula,
+                sliceLengthFormula);
+            var endWithinLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                end,
+                receiverLengthFormula);
+            inRangeFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                nonNegativeStart,
+                new SmtBinaryFormula(SmtBinaryOperator.And, nonNegativeLength, endWithinLength));
+            return true;
+        }
+
+        private static bool TryGetBuiltInSliceCallParts(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ExpressionSyntax receiverExpression,
+            out ExpressionSyntax startExpression,
+            out ExpressionSyntax? lengthExpression)
+        {
+            receiverExpression = null!;
+            startExpression = null!;
+            lengthExpression = null;
+
+            if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol
+                {
+                    Name: "Slice",
+                    IsStatic: false,
+                    Parameters.Length: >= 1 and <= 2
+                } method ||
+                !IsBuiltInSpanType(method.ContainingType) ||
+                !method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) ||
+                invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                !TryMapInvocationArguments(invocation, method, out var arguments) ||
+                arguments[0] == null)
+            {
+                return false;
+            }
+
+            receiverExpression = memberAccess.Expression;
+            startExpression = arguments[0]!;
+            lengthExpression = arguments.Length == 2
+                ? arguments[1]
+                : null;
+            return lengthExpression != null || method.Parameters.Length == 1;
+        }
+
+        private static bool TryMapInvocationArguments(
+            InvocationExpressionSyntax invocation,
+            IMethodSymbol method,
+            out ExpressionSyntax?[] arguments)
+        {
+            arguments = new ExpressionSyntax?[method.Parameters.Length];
+            var nextOrdinal = 0;
+            foreach (var argument in invocation.ArgumentList.Arguments)
+            {
+                var targetOrdinal = -1;
+                if (argument.NameColon != null)
+                {
+                    var name = argument.NameColon.Name.Identifier.ValueText;
+                    for (var parameterIndex = 0; parameterIndex < method.Parameters.Length; parameterIndex++)
+                    {
+                        if (string.Equals(method.Parameters[parameterIndex].Name, name, StringComparison.Ordinal))
+                        {
+                            targetOrdinal = parameterIndex;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    while (nextOrdinal < arguments.Length && arguments[nextOrdinal] != null)
+                    {
+                        nextOrdinal++;
+                    }
+
+                    targetOrdinal = nextOrdinal++;
+                }
+
+                if (targetOrdinal < 0 || targetOrdinal >= arguments.Length || arguments[targetOrdinal] != null)
+                {
+                    arguments = Array.Empty<ExpressionSyntax?>();
+                    return false;
+                }
+
+                arguments[targetOrdinal] = argument.Expression;
+            }
+
+            return arguments.All(static argument => argument != null);
+        }
+
+        private static bool TryTranslateIntExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null) &&
+                translatedFormula is { Kind: SmtValueKind.Int })
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
         }
 
         private static bool IsBuiltInRangeAccessArgument(

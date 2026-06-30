@@ -647,15 +647,9 @@ namespace SearchLib.Smt
                 switch (current)
                 {
                     case '(':
-                        if (Peek('?'))
+                        if (!TryParseGroupPrefix())
                         {
-                            _position++;
-                            if (!Peek(':'))
-                            {
-                                return false;
-                            }
-
-                            _position++;
+                            return false;
                         }
 
                         if (!TryParseExpression(out regex) || !Peek(')'))
@@ -684,6 +678,116 @@ namespace SearchLib.Smt
                         regex = CreateLiteralRegex(current.ToString());
                         return true;
                 }
+            }
+
+            private bool TryParseGroupPrefix()
+            {
+                if (!Peek('?'))
+                {
+                    return true;
+                }
+
+                _position++;
+                if (Peek(':'))
+                {
+                    _position++;
+                    return true;
+                }
+
+                return TryParseExplicitCaptureOptionGroupPrefix() ||
+                    TryParseNamedCaptureGroupPrefix();
+            }
+
+            private bool TryParseExplicitCaptureOptionGroupPrefix()
+            {
+                var savedPosition = _position;
+                var sawOption = false;
+                var sawDisableSeparator = false;
+                while (_position < _pattern.Length && !Peek(':'))
+                {
+                    var current = _pattern[_position];
+                    if (current == '-')
+                    {
+                        if (sawDisableSeparator)
+                        {
+                            _position = savedPosition;
+                            return false;
+                        }
+
+                        sawDisableSeparator = true;
+                        _position++;
+                        continue;
+                    }
+
+                    if (current != 'n')
+                    {
+                        _position = savedPosition;
+                        return false;
+                    }
+
+                    sawOption = true;
+                    _position++;
+                }
+
+                if (!sawOption || !Peek(':'))
+                {
+                    _position = savedPosition;
+                    return false;
+                }
+
+                _position++;
+                return true;
+            }
+
+            private bool TryParseNamedCaptureGroupPrefix()
+            {
+                if (Peek('<'))
+                {
+                    if (_position + 1 >= _pattern.Length ||
+                        _pattern[_position + 1] is '=' or '!')
+                    {
+                        return false;
+                    }
+
+                    _position++;
+                    return TryReadCaptureName('>');
+                }
+
+                if (Peek('\''))
+                {
+                    _position++;
+                    return TryReadCaptureName('\'');
+                }
+
+                return false;
+            }
+
+            private bool TryReadCaptureName(char terminator)
+            {
+                var start = _position;
+                while (_position < _pattern.Length)
+                {
+                    var current = _pattern[_position];
+                    if (current == terminator)
+                    {
+                        if (_position == start)
+                        {
+                            return false;
+                        }
+
+                        _position++;
+                        return true;
+                    }
+
+                    if (!IsSupportedCaptureNameCharacter(current))
+                    {
+                        return false;
+                    }
+
+                    _position++;
+                }
+
+                return false;
             }
 
             private bool TryParseEscapedAtom(out ReExpr regex)
@@ -1416,6 +1520,11 @@ namespace SearchLib.Smt
             private static bool IsRegexMetaCharacter(char value)
             {
                 return value is '|' or '?' or '*' or '+' or ')' or '[' or ']' or '{' or '}';
+            }
+
+            private static bool IsSupportedCaptureNameCharacter(char value)
+            {
+                return char.IsLetterOrDigit(value) || value == '_';
             }
         }
     }

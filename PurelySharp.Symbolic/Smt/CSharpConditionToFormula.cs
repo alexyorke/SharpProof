@@ -5775,6 +5775,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateBuiltInSliceInvocationResultLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (TryCreateStringInvocationResultLengthFormula(
                     receiverExpression,
                     semanticModel,
@@ -5808,20 +5819,20 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsBuiltInSpanType(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
-                TryCreateBuiltInElementAccessReceiverFormula(
+            if (IsBuiltInSpanOrMemoryType(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
+                TryCreateBuiltInLengthReceiverFormula(
                     receiverExpression,
                     semanticModel,
                     cancellationToken,
-                    out var spanReceiverFormula,
+                    out var lengthReceiverFormula,
                     getSymbolVersion,
                     inlineDepth))
             {
                 var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-                if (TryCreateMemberFormula(spanReceiverFormula, "Length", intType, out var spanLength) &&
-                    spanLength is { Kind: SmtValueKind.Int })
+                if (TryCreateMemberFormula(lengthReceiverFormula, "Length", intType, out var receiverLength) &&
+                    receiverLength is { Kind: SmtValueKind.Int })
                 {
-                    lengthFormula = spanLength;
+                    lengthFormula = receiverLength;
                     return true;
                 }
             }
@@ -5848,6 +5859,90 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             lengthFormula = candidate;
+            return true;
+        }
+
+        private static bool TryCreateBuiltInSliceInvocationResultLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverExpression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                method.Name != "Slice" ||
+                !IsBuiltInSpanOrMemoryType(method.ContainingType) ||
+                !IsBuiltInSpanOrMemoryType(method.ReturnType) ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
+            {
+                return false;
+            }
+
+            if (method.Parameters.Length == 1)
+            {
+                if (invocationOperation.Arguments.Length != 1 ||
+                    !TryCreateBuiltInElementAccessLengthFormula(
+                        sourceExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var sourceLength,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 0,
+                        semanticModel,
+                        cancellationToken,
+                        out var start,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    return false;
+                }
+
+                lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, start);
+                return true;
+            }
+
+            if (method.Parameters.Length != 2 ||
+                invocationOperation.Arguments.Length != 2 ||
+                !TryCreateBuiltInElementAccessLengthFormula(
+                    sourceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out _,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryTranslateIntInvocationArgument(
+                    invocationOperation,
+                    parameterIndex: 0,
+                    semanticModel,
+                    cancellationToken,
+                    out _,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryTranslateIntInvocationArgument(
+                    invocationOperation,
+                    parameterIndex: 1,
+                    semanticModel,
+                    cancellationToken,
+                    out var resultLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            lengthFormula = resultLength;
             return true;
         }
 
@@ -6726,7 +6821,8 @@ namespace PurelySharp.Symbolic.Smt
 
         private static bool IsSupportedBuiltInLengthReceiver(ITypeSymbol? typeSymbol)
         {
-            return IsSupportedBuiltInElementAccessReceiver(typeSymbol);
+            return IsSupportedBuiltInElementAccessReceiver(typeSymbol) ||
+                IsBuiltInMemoryType(typeSymbol);
         }
 
         private static bool TryGetBuiltInElementAccessElementType(
@@ -6799,10 +6895,63 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryCreateBuiltInLengthReceiverFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula receiverFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (TryTranslateValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedReceiver,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                translatedReceiver is { Kind: SmtValueKind.Reference })
+            {
+                receiverFormula = translatedReceiver;
+                return true;
+            }
+
+            receiverExpression = UnwrapExpression(receiverExpression);
+            var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
+            if (!IsBuiltInSpanOrMemoryType(receiverType))
+            {
+                receiverFormula = null!;
+                return false;
+            }
+
+            var receiverSymbol = semanticModel.GetSymbolInfo(receiverExpression, cancellationToken).Symbol;
+            if (receiverSymbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                receiverFormula = null!;
+                return false;
+            }
+
+            receiverFormula = new SmtVariable(GetVariableName(receiverSymbol, getSymbolVersion), SmtValueKind.Reference);
+            return true;
+        }
+
         private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
         {
             return typeSymbol is INamedTypeSymbol namedType &&
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        }
+
+        private static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
+        }
+
+        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return IsBuiltInSpanType(typeSymbol) ||
+                IsBuiltInMemoryType(typeSymbol);
         }
 
         private static bool TryResolveBuiltInIndexAccessIndexShape(

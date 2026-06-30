@@ -6100,6 +6100,28 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ExplicitCaptureOptionRegexImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A(?n:[A-Z][0-9])\z"") && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NamedCaptureRegexContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A(?<prefix>AB)C\z"") && text != ""ABC""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_DollarRegexAnchorAllowsTrailingNewline()
         {
             Assert.That(
@@ -6207,6 +6229,17 @@ public class TestClass
                     "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"AB\"",
                     "using System.Text.RegularExpressions;"),
                 Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnsupportedInlineIgnoreCaseRegexConcreteMismatchUsesSelfVerification()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A(?i:ab)\z"") && text == ""CD""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
         }
 
         [Test]

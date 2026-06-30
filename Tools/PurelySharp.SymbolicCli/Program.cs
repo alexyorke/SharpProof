@@ -17,46 +17,75 @@ try
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
-    var queryService = new SymbolicSourceQueryService();
-    object result = options.AllLines
-            ? queryService.QueryFileAllLines(
-            options.FilePath,
-            options.CreateReferences(),
-            smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions,
-            includeExpressionProgramPoints: options.LineExpressions)
-        : options.LineInvariants
-        ? queryService.QueryFileLine(
-            options.FilePath,
-            options.Line,
-            options.CreateReferences(),
-            smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions,
-            includeExpressionProgramPoints: options.LineExpressions)
-        : options.IsSpanQuery
-        ? queryService.QueryFileSpan(
-            options.FilePath,
-            options.SpanStart!.Value,
-            options.SpanEnd!.Value,
-            options.CreateReferences(),
-            smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions,
-            includeExpressionProgramPoints: options.LineExpressions)
-        : options.Position.HasValue
-            ? queryService.QueryFileAtPosition(
-            options.FilePath,
-            options.Position.Value,
-            options.CreateReferences(),
-            smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions)
-            : queryService.QueryFile(
-            new SymbolicFileQuery(
+    object result;
+    if (options.RuntimeHazards)
+    {
+        var hazardService = new SymbolicRuntimeHazardQueryService();
+        var hazardOptions = options.CreateRuntimeHazardOptions();
+        result = options.AllLines
+            ? hazardService.QueryFileRuntimeHazards(
+                options.FilePath,
+                smtAnalysis!,
+                options.CreateReferences(),
+                options: hazardOptions)
+            : options.IsSpanQuery
+            ? hazardService.QueryFileRuntimeHazardsSpan(
+                options.FilePath,
+                options.SpanStart!.Value,
+                options.SpanEnd!.Value,
+                smtAnalysis!,
+                options.CreateReferences(),
+                options: hazardOptions)
+            : hazardService.QueryFileRuntimeHazardsLine(
                 options.FilePath,
                 options.Line,
-                options.Column,
+                smtAnalysis!,
                 options.CreateReferences(),
-                options.ImpliedConditions),
-            smtAnalysis: smtAnalysis);
+                options: hazardOptions);
+    }
+    else
+    {
+        var queryService = new SymbolicSourceQueryService();
+        result = options.AllLines
+            ? queryService.QueryFileAllLines(
+                options.FilePath,
+                options.CreateReferences(),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: options.ImpliedConditions,
+                includeExpressionProgramPoints: options.LineExpressions)
+            : options.LineInvariants
+            ? queryService.QueryFileLine(
+                options.FilePath,
+                options.Line,
+                options.CreateReferences(),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: options.ImpliedConditions,
+                includeExpressionProgramPoints: options.LineExpressions)
+            : options.IsSpanQuery
+            ? queryService.QueryFileSpan(
+                options.FilePath,
+                options.SpanStart!.Value,
+                options.SpanEnd!.Value,
+                options.CreateReferences(),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: options.ImpliedConditions,
+                includeExpressionProgramPoints: options.LineExpressions)
+            : options.Position.HasValue
+            ? queryService.QueryFileAtPosition(
+                options.FilePath,
+                options.Position.Value,
+                options.CreateReferences(),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: options.ImpliedConditions)
+            : queryService.QueryFile(
+                new SymbolicFileQuery(
+                    options.FilePath,
+                    options.Line,
+                    options.Column,
+                    options.CreateReferences(),
+                    options.ImpliedConditions),
+                smtAnalysis: smtAnalysis);
+    }
 
     if (options.HasResultFilter)
     {
@@ -92,9 +121,14 @@ try
             SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, CreateFullJsonOptions()),
             SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(spanResult, CreateFullJsonOptions()),
             SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, CreateFullJsonOptions()),
+            SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult, CreateFullJsonOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
         Console.WriteLine(json);
+    }
+    else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
+    {
+        PrintRuntimeHazardResult(hazardResult);
     }
     else if (result is SymbolicFileQueryResult fileResult)
     {
@@ -207,6 +241,42 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     }
 
     if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
+    {
+        PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+}
+
+static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
+{
+    Console.WriteLine($"{result.FilePath}");
+    if (result.Line.HasValue)
+    {
+        Console.WriteLine($"Line: {result.Line.Value}");
+    }
+    else if (result.ScopeStart.HasValue && result.ScopeEnd.HasValue)
+    {
+        Console.WriteLine($"Span: {result.ScopeStart.Value}-{result.ScopeEnd.Value}");
+    }
+    else
+    {
+        Console.WriteLine($"Total lines: {result.LineCount}");
+    }
+
+    Console.WriteLine($"Runtime hazards: {result.HazardCount}");
+    foreach (var hazard in result.Hazards)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"{hazard.FilePath}:{hazard.Line}:{hazard.Column} {hazard.Kind} {hazard.Status}");
+        Console.WriteLine($"Exception: {hazard.ExceptionType}");
+        Console.WriteLine($"Category: {hazard.Category}");
+        Console.WriteLine($"Reason: {hazard.StatusReason}");
+        Console.WriteLine($"Node: {hazard.NodeKind} {hazard.SpanStart}-{hazard.SpanEnd}");
+        Console.WriteLine($"Operation: {hazard.OperationText}");
+        Console.WriteLine($"Trigger: {hazard.TriggerCondition}");
+        Console.WriteLine($"Invariant: {hazard.MergedInvariantText}");
+    }
+
+    if (result.SmtDiagnostics.IsConfigured)
     {
         PrintSmtDiagnostics(result.SmtDiagnostics);
     }
@@ -454,7 +524,7 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n>) [--json|--compact-json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json]
 
 Options:
   --file <path>       C# source file to query.
@@ -493,6 +563,10 @@ Options:
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
+  --runtime-hazards   Query proven runtime hazards instead of invariant program points.
+  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, or ArgumentOutOfRange hazards. Can be repeated.
+  --include-unproven-hazards
+                      Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
   --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
   --smt-timeout-ms <n>
                       Per-query SMT timeout in milliseconds.
@@ -575,6 +649,12 @@ Options:
 
     public List<string> ImpliedConditions { get; } = new();
 
+    public bool RuntimeHazards { get; private set; }
+
+    public bool IncludeUnprovenHazards { get; private set; }
+
+    public List<SymbolicRuntimeHazardKind> HazardKinds { get; } = new();
+
     public bool ShowHelp { get; private set; }
 
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
@@ -601,7 +681,7 @@ Options:
 
     public bool CompactSummaryOnly { get; private set; }
 
-    public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
+    public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
@@ -760,6 +840,15 @@ Options:
                 case "--implies":
                     options.ImpliedConditions.Add(ReadString(args, ref index, arg));
                     break;
+                case "--runtime-hazards":
+                    options.RuntimeHazards = true;
+                    break;
+                case "--hazard-kind":
+                    options.HazardKinds.Add(ReadHazardKind(args, ref index, arg));
+                    break;
+                case "--include-unproven-hazards":
+                    options.IncludeUnprovenHazards = true;
+                    break;
                 case "--smt-mode":
                     options.SmtMode = ReadSmtMode(args, ref index, arg);
                     break;
@@ -796,6 +885,16 @@ Options:
             if (options.HasCompactOutputLimit && !options.CompactJson)
             {
                 throw new ArgumentException("--max-lines, --max-points, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
+            }
+
+            if (options.RuntimeHazards && options.CompactJson)
+            {
+                throw new ArgumentException("--runtime-hazards cannot be combined with --compact-json.");
+            }
+
+            if (!options.RuntimeHazards && (options.IncludeUnprovenHazards || options.HazardKinds.Count != 0))
+            {
+                throw new ArgumentException("--hazard-kind and --include-unproven-hazards require --runtime-hazards.");
             }
 
             if (options.FilePath == null)
@@ -854,6 +953,21 @@ Options:
             if (options.Position.HasValue && options.LineInvariants)
             {
                 throw new ArgumentException("--line-invariants cannot be combined with --position.");
+            }
+
+            if (options.RuntimeHazards && options.Position.HasValue)
+            {
+                throw new ArgumentException("--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
+            }
+
+            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.Column != 1))
+            {
+                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, or --column.");
+            }
+
+            if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability || options.HasResultFilter))
+            {
+                throw new ArgumentException("--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
             }
 
             if (options.LineInvariants && options.Column != 1)
@@ -936,6 +1050,13 @@ Options:
             CompactMaxProofs);
     }
 
+    public SymbolicRuntimeHazardQueryOptions CreateRuntimeHazardOptions()
+    {
+        return new SymbolicRuntimeHazardQueryOptions(
+            IncludeUnprovenHazards,
+            HazardKinds);
+    }
+
     public IEnumerable<MetadataReference>? CreateReferences()
     {
         if (ReferencePaths.Count == 0)
@@ -1008,6 +1129,17 @@ Options:
             default:
                 throw new ArgumentException(optionName + " must be off, bounded, or deep.");
         }
+    }
+
+    private static SymbolicRuntimeHazardKind ReadHazardKind(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName);
+        if (Enum.TryParse<SymbolicRuntimeHazardKind>(value, ignoreCase: true, out var kind))
+        {
+            return kind;
+        }
+
+        throw new ArgumentException(optionName + " must be DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, or ArgumentOutOfRange.");
     }
 
     private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)

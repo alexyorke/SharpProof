@@ -1,3 +1,23 @@
+<#
+.SYNOPSIS
+Recommends or runs a conservative PurelySharp test filter for changed files.
+
+.DESCRIPTION
+This helper maps changed repository files to likely impacted NUnit fixtures and
+passes the generated VSTest filter to Invoke-PurelySharpTests.ps1. It is a local
+iteration aid only; it intentionally falls back to the full suite for shared
+test infrastructure, build graph changes, high-fanout analyzer core files,
+unmapped files, or generated filters that are too large.
+
+.EXAMPLE
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -ListOnly
+
+.EXAMPLE
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -ListOnly -Json -ChangedFile PurelySharp.Test\SemanticOracleSmtTests.cs
+
+.EXAMPLE
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -Workers 20 -FailFast
+#>
 [CmdletBinding()]
 param(
     [Parameter()]
@@ -14,6 +34,9 @@ param(
 
     [Parameter()]
     [switch]$ListOnly,
+
+    [Parameter()]
+    [switch]$Json,
 
     [Parameter()]
     [ValidateSet('Debug', 'Release')]
@@ -46,6 +69,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($Json -and -not $ListOnly)
+{
+    throw '-Json is only supported with -ListOnly because normal mode streams test output.'
+}
 
 function Convert-ToRepoPath
 {
@@ -356,6 +384,83 @@ function Join-TestFilter
         ForEach-Object { "FullyQualifiedName~PurelySharp.Test.$_" }) -join '|'
 }
 
+function Format-TestWrapperCommand
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('RunFullSuite', 'RunPartial', 'RunPartialForced', 'Skip')]
+        [string]$SuggestedAction,
+
+        [string]$Filter,
+
+        [string]$Configuration,
+
+        [bool]$NoBuild,
+
+        [bool]$FailFast,
+
+        [int]$Workers,
+
+        [bool]$Profile,
+
+        [int]$Top,
+
+        [int]$MemoryLimitMb
+    )
+
+    if ($SuggestedAction -eq 'Skip')
+    {
+        return ''
+    }
+
+    $parts = New-Object System.Collections.Generic.List[string]
+    $parts.Add('.\scripts\Invoke-PurelySharpTests.ps1')
+    $parts.Add('-Configuration')
+    $parts.Add($Configuration)
+
+    if ($NoBuild)
+    {
+        $parts.Add('-NoBuild')
+    }
+
+    if ($FailFast)
+    {
+        $parts.Add('-FailFast')
+    }
+
+    if ($Workers -gt 0)
+    {
+        $parts.Add('-Workers')
+        $parts.Add([string]$Workers)
+    }
+
+    if ($Profile)
+    {
+        $parts.Add('-Profile')
+    }
+
+    if ($Top -ne 30)
+    {
+        $parts.Add('-Top')
+        $parts.Add([string]$Top)
+    }
+
+    if ($MemoryLimitMb -gt 0)
+    {
+        $parts.Add('-MemoryLimitMb')
+        $parts.Add([string]$MemoryLimitMb)
+    }
+
+    if ($SuggestedAction -ne 'RunFullSuite' -and -not [string]::IsNullOrWhiteSpace($Filter))
+    {
+        $escapedFilter = $Filter.Replace("'", "''")
+        $parts.Add('-Filter')
+        $parts.Add("'$escapedFilter'")
+    }
+
+    return ($parts -join ' ')
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $repoRoot
 try
@@ -363,7 +468,25 @@ try
     $changedFiles = @(Get-ChangedRepoFiles -RequestedBaseRef $BaseRef -IncludeUncommitted $IncludeUncommitted -ExplicitChangedFiles $ChangedFile)
     if ($changedFiles.Count -eq 0)
     {
-        Write-Host 'No changed files detected. No impacted tests to run.'
+        if ($Json)
+        {
+            [ordered]@{
+                changedFiles = @()
+                ignoredFiles = @()
+                selectedTestFixtures = @()
+                testFilter = ''
+                requiresFullSuite = $false
+                fullSuiteFallbackReasons = @()
+                suggestedAction = 'Skip'
+                suggestedCommand = ''
+                note = 'No changed files detected. No impacted tests to run.'
+            } | ConvertTo-Json -Depth 4
+        }
+        else
+        {
+            Write-Host 'No changed files detected. No impacted tests to run.'
+        }
+
         exit 0
     }
 
@@ -452,7 +575,54 @@ try
 
     $classNames = @($testClasses | Sort-Object)
     $filter = if ($classNames.Count -gt 0) { Join-TestFilter $classNames } else { '' }
-    $requiresFull = $fullReasons.Count -gt 0 -or $filter.Length -gt 7000
+    $filterTooLong = $filter.Length -gt 7000
+    $requiresFull = $fullReasons.Count -gt 0 -or $filterTooLong
+    $suggestedAction = if ($requiresFull -and -not $ForcePartial)
+    {
+        'RunFullSuite'
+    }
+    elseif ($requiresFull)
+    {
+        'RunPartialForced'
+    }
+    elseif ([string]::IsNullOrWhiteSpace($filter))
+    {
+        'Skip'
+    }
+    else
+    {
+        'RunPartial'
+    }
+
+    $suggestedCommand = Format-TestWrapperCommand `
+        -SuggestedAction $suggestedAction `
+        -Filter $filter `
+        -Configuration $Configuration `
+        -NoBuild ([bool]$NoBuild) `
+        -FailFast ([bool]$FailFast) `
+        -Workers $Workers `
+        -Profile ([bool]$Profile) `
+        -Top $Top `
+        -MemoryLimitMb $MemoryLimitMb
+
+    $recommendation = [ordered]@{
+        changedFiles = @($changedFiles)
+        ignoredFiles = @($ignoredFiles)
+        selectedTestFixtures = @($classNames)
+        testFilter = $filter
+        requiresFullSuite = $requiresFull
+        fullSuiteFallbackReasons = @($fullReasons)
+        filterTooLong = $filterTooLong
+        forcePartial = [bool]$ForcePartial
+        suggestedAction = $suggestedAction
+        suggestedCommand = $suggestedCommand
+    }
+
+    if ($Json)
+    {
+        $recommendation | ConvertTo-Json -Depth 4
+        exit 0
+    }
 
     Write-Host 'Changed files considered:'
     foreach ($path in $changedFiles)
@@ -494,6 +664,13 @@ try
     {
         Write-Host ''
         Write-Host "Full-suite fallback reason: generated filter is $($filter.Length) characters."
+    }
+
+    Write-Host ''
+    Write-Host "Suggested action: $suggestedAction"
+    if (-not [string]::IsNullOrWhiteSpace($suggestedCommand))
+    {
+        Write-Host "Suggested command: $suggestedCommand"
     }
 
     if ($ListOnly)

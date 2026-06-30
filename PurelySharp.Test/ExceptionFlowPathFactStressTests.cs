@@ -918,6 +918,114 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ReadOnlySpanSliceStartGreaterThanLength_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
+    {
+        return values.Slice(values.Length + 1);
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
+        }
+
+        [Test]
+        public async Task Ps0010_SpanSliceNegativeLength_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public Span<int> TestMethod(Span<int> values)
+    {
+        return values.Slice(0, -1);
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
+        }
+
+        [Test]
+        public async Task Ps0010_ReadOnlySpanSliceStartPlusLengthPastEnd_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length > values.Length)
+        {
+            return values.Slice(start, length);
+        }
+
+        return values.Slice(0, 0);
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:span_slice"));
+        }
+
+        [Test]
+        public async Task Ps0010_ReadOnlySpanSliceGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length);
+        }
+
+        return values.Slice(0, 0);
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ReadOnlySpanSliceCaught_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
+    {
+        try
+        {
+            return values.Slice(values.Length + 1);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return values.Slice(0, 0);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ArrayRangeGuardedStartAfterEnd_ReportsArgumentOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

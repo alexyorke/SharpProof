@@ -126,6 +126,126 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesSpanSliceStartResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.Span<int> span, int start)
+    {
+        if (start >= 0 && start <= span.Length)
+        {
+            return span.Slice(start).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return span.Slice(start).Length;",
+                "span.Slice(start).Length == span.Length - start");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesReadOnlySpanSliceRangeResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.ReadOnlySpan<int> span, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= span.Length)
+        {
+            return span.Slice(start, length).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return span.Slice(start, length).Length;",
+                "span.Slice(start, length).Length == length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesMemorySliceStartResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.Memory<int> memory, int start)
+    {
+        if (start >= 0 && start <= memory.Length)
+        {
+            return memory.Slice(start).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return memory.Slice(start).Length;",
+                "memory.Slice(start).Length == memory.Length - start");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesReadOnlyMemorySliceRangeResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.ReadOnlyMemory<int> memory, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= memory.Length)
+        {
+            return memory.Slice(start, length).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return memory.Slice(start, length).Length;",
+                "memory.Slice(start, length).Length == length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_UnsupportedSliceStartRemainsUnknown()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.Span<int> span)
+    {
+        if (span.Length > 0)
+        {
+            return span.Slice(GetStart()).Length;
+        }
+
+        return 0;
+    }
+
+    private int GetStart()
+    {
+        return 1;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return span.Slice(GetStart()).Length;",
+                "span.Slice(GetStart()).Length == span.Length - GetStart()");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesStringLiteralLengthConstant()
         {
             const string source = @"

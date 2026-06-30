@@ -167,6 +167,34 @@ namespace PurelySharp.Analyzer
                         "binary_operator"));
             }
 
+            foreach (var checkedOverflowNode in ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(checkedOverflowNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(checkedOverflowNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.OverflowException");
+                if (IsCaughtWithinMethod(checkedOverflowNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    checkedOverflowNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.OverflowException",
+                        "definite_checked_integral_overflow",
+                        "checked_operator"));
+            }
+
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
@@ -279,6 +307,34 @@ namespace PurelySharp.Analyzer
                         "cast"));
             }
 
+            foreach (var arrayTypeMismatchNode in ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(arrayTypeMismatchNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(arrayTypeMismatchNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArrayTypeMismatchException");
+                if (IsCaughtWithinMethod(arrayTypeMismatchNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    arrayTypeMismatchNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.ArrayTypeMismatchException",
+                        "definite_array_type_mismatch",
+                        "array_store"));
+            }
+
             foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
@@ -332,7 +388,7 @@ namespace PurelySharp.Analyzer
                         exceptionType,
                         "System.ArgumentOutOfRangeException",
                         "definite_range_out_of_range",
-                        "range_slice"));
+                        argumentOutOfRangeNode is InvocationExpressionSyntax ? "span_slice" : "range_slice"));
             }
         }
 
@@ -664,6 +720,8 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_invalid_cast", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_checked_integral_overflow", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_array_type_mismatch", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_index_out_of_range", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_range_out_of_range", StringComparison.Ordinal);
         }
