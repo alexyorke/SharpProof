@@ -52,7 +52,8 @@ try
                 options.CreateReferences(),
                 smtAnalysis: smtAnalysis,
                 impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions)
+                includeExpressionProgramPoints: options.LineExpressions,
+                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
             : options.LineInvariants
             ? queryService.QueryFileLine(
                 options.FilePath,
@@ -60,7 +61,8 @@ try
                 options.CreateReferences(),
                 smtAnalysis: smtAnalysis,
                 impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions)
+                includeExpressionProgramPoints: options.LineExpressions,
+                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
             : options.IsSpanQuery
             ? queryService.QueryFileSpan(
                 options.FilePath,
@@ -69,7 +71,8 @@ try
                 options.CreateReferences(),
                 smtAnalysis: smtAnalysis,
                 impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions)
+                includeExpressionProgramPoints: options.LineExpressions,
+                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
             : options.Position.HasValue
             ? queryService.QueryFileAtPosition(
                 options.FilePath,
@@ -567,6 +570,8 @@ Options:
   --span-end <n>      0-based exclusive source span end to query.
   --all-lines         Query every line that contains statement/expression program points.
   --line-expressions  Include expression program points in --line-invariants, --span-start/--span-end, or --all-lines.
+  --post-line-invariants
+                      Include facts established by completed declaration/assignment statements on queried lines.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
@@ -643,6 +648,8 @@ Options:
     public bool AllLines { get; private set; }
 
     public bool LineExpressions { get; private set; }
+
+    public bool PostLineInvariants { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
 
@@ -801,6 +808,9 @@ Options:
                 case "--line-expressions":
                 case "--include-expressions":
                     options.LineExpressions = true;
+                    break;
+                case "--post-line-invariants":
+                    options.PostLineInvariants = true;
                     break;
                 case "--reference":
                 case "-r":
@@ -1047,9 +1057,9 @@ Options:
                 throw new ArgumentException("--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
             }
 
-            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.Column != 1))
+            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1))
             {
-                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, or --column.");
+                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, or --column.");
             }
 
             if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability || options.HasResultFilter))
@@ -1065,6 +1075,11 @@ Options:
             if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)
             {
                 throw new ArgumentException("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
+            }
+
+            if (options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)
+            {
+                throw new ArgumentException("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
             }
 
             if (options.FilterLineStart.HasValue &&

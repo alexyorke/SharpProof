@@ -133,6 +133,57 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        value = 7;
+        return value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "PostLineInvariantQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "PostLineInvariantQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var service = new SymbolicSourceQueryService();
+            var assignmentLine = FindLine(source, "value = 7;");
+            var defaultResult = service.QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                assignmentLine,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value == 7" });
+            var defaultPoint = defaultResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
+
+            Assert.That(defaultPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+
+            var postLineResult = service.QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                assignmentLine,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value == 7" },
+                includeCurrentStatementCompletionFacts: true);
+            var postLinePoint = postLineResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
+
+            Assert.That(postLinePoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(
+                postLinePoint.Invariant.Conditions,
+                Has.Some.Matches<SymbolicInvariantCondition>(
+                    condition => condition.Target == "value" && condition.HasSmtFormula));
+        }
+
+        [Test]
         public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
         {
             const string source = @"
@@ -1262,6 +1313,66 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        value = 7;
+        return value;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliPostLineInvariant-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "value = 7;").ToString(),
+                    "--line-invariants",
+                    "--post-line-invariants",
+                    "--check-reachability",
+                    "--implies",
+                    "value == 7",
+                    "--compact-json",
+                    "--max-points",
+                    "1",
+                    "--max-facts",
+                    "10",
+                    "--max-conditions",
+                    "10",
+                    "--max-proofs",
+                    "1");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                var point = root.GetProperty("programPoints")[0];
+
+                Assert.That(
+                    point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(),
+                    Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+                Assert.That(
+                    point.GetProperty("conservativeInvariant")
+                        .GetProperty("targets")
+                        .EnumerateArray()
+                        .Select(static target => target.GetString()),
+                    Does.Contain("value"));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_SummaryOnly_EmitsAggregateCompactJsonWithoutNestedResults()
         {
             var source = @"
@@ -2185,6 +2296,15 @@ public class TestClass
                     "--line-expressions");
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
+
+                var postLineWithoutLineMode = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--post-line-invariants");
+                Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
+                Assert.That(postLineWithoutLineMode.StandardError, Does.Contain("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
                 var maxHazardsWithoutRuntimeHazards = await RunSymbolicCliAsync(
                     "--file",

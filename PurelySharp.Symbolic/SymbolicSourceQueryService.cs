@@ -114,7 +114,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -134,7 +135,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicSpanQueryResult QueryFileSpan(
@@ -145,7 +147,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -166,7 +169,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicFileQueryResult QueryFileAllLines(
@@ -175,7 +179,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -194,7 +199,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeFile(
@@ -358,7 +364,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (sourceText == null)
             {
@@ -388,7 +395,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicSpanQueryResult QuerySourceSpan(
@@ -400,7 +408,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (sourceText == null)
             {
@@ -431,7 +440,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicFileQueryResult QuerySourceAllLines(
@@ -441,7 +451,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (sourceText == null)
             {
@@ -470,7 +481,8 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
-                includeExpressionProgramPoints);
+                includeExpressionProgramPoints,
+                includeCurrentStatementCompletionFacts);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSource(
@@ -614,7 +626,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (syntaxTree == null)
             {
@@ -642,7 +655,8 @@ namespace PurelySharp.Symbolic
                         node.SpanStart,
                         node,
                         smtAnalysis,
-                        cancellationToken);
+                        cancellationToken,
+                        includeCurrentStatementCompletionFacts);
                     var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
                     var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
                     var conditionProofs = ProveConditions(
@@ -692,7 +706,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (syntaxTree == null)
             {
@@ -719,7 +734,8 @@ namespace PurelySharp.Symbolic
                         node.SpanStart,
                         node,
                         smtAnalysis,
-                        cancellationToken);
+                        cancellationToken,
+                        includeCurrentStatementCompletionFacts);
                     var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
                     var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
                     var conditionProofs = ProveConditions(
@@ -774,7 +790,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null,
-            bool includeExpressionProgramPoints = false)
+            bool includeExpressionProgramPoints = false,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             if (syntaxTree == null)
             {
@@ -797,7 +814,8 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     smtAnalysis,
                     impliedConditions,
-                    includeExpressionProgramPoints);
+                    includeExpressionProgramPoints,
+                    includeCurrentStatementCompletionFacts);
                 if (lineResult.ProgramPoints.Count != 0)
                 {
                     lineResults.Add(lineResult);
@@ -1094,11 +1112,17 @@ namespace PurelySharp.Symbolic
             int position,
             SyntaxNode node,
             SmtAnalysisService? smtAnalysis,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             var analysis = node is ForStatementSyntax forStatement
                 ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
-                : _invariantService.AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken);
+                : _invariantService.AnalyzeAt(
+                    node,
+                    semanticModel,
+                    smtAnalysis,
+                    cancellationToken,
+                    includeCurrentStatementCompletionFacts);
 
             return new ProgramPointQueryContext(semanticModel, position, node, analysis);
         }

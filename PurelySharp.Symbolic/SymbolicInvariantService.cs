@@ -15,9 +15,14 @@ namespace PurelySharp.Symbolic
         public SymbolicInvariantSnapshot GetInvariantsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool includeCurrentStatementCompletionFacts = false)
         {
-            var formulas = CollectInvariantsAt(site, semanticModel, cancellationToken);
+            var formulas = CollectInvariantsAt(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts);
 
             return new SymbolicInvariantSnapshot(site.SpanStart, formulas);
         }
@@ -26,9 +31,14 @@ namespace PurelySharp.Symbolic
             SyntaxNode site,
             SemanticModel semanticModel,
             SmtAnalysisService? smtAnalysis = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool includeCurrentStatementCompletionFacts = false)
         {
-            var formulas = CollectInvariantsAt(site, semanticModel, cancellationToken);
+            var formulas = CollectInvariantsAt(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts);
             return CreateAnalysis(site.SpanStart, formulas, smtAnalysis);
         }
 
@@ -137,12 +147,17 @@ namespace PurelySharp.Symbolic
         private static SmtFormula[] CollectInvariantsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             return SymbolicProgramPointFacts
                 .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
                 .Concat(SymbolicProgramPointFacts
-                    .CollectPriorAssignmentFacts(site, semanticModel, cancellationToken))
+                    .CollectPriorAssignmentFacts(
+                        site,
+                        semanticModel,
+                        cancellationToken,
+                        includeCurrentStatementCompletionFacts))
                 .ToArray();
         }
 

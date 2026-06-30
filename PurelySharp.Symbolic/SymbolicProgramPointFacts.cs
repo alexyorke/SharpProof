@@ -22,7 +22,8 @@ namespace PurelySharp.Symbolic
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts = false)
         {
             var facts = new List<SmtFormula>();
             foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
@@ -42,6 +43,13 @@ namespace PurelySharp.Symbolic
                 {
                     if (ReferenceEquals(statement, containingBlock.ContainingStatement))
                     {
+                        if (includeCurrentStatementCompletionFacts &&
+                            ReferenceEquals(site, statement) &&
+                            SupportsCurrentStatementCompletionFacts(statement))
+                        {
+                            AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
+                        }
+
                         break;
                     }
 
@@ -57,6 +65,12 @@ namespace PurelySharp.Symbolic
             }
 
             return facts;
+        }
+
+        private static bool SupportsCurrentStatementCompletionFacts(StatementSyntax statement)
+        {
+            return statement is LocalDeclarationStatementSyntax or
+                ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax };
         }
 
         private static void RemoveFactsInvalidatedByForLoopEntry(
