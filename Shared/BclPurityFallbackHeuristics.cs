@@ -19,6 +19,7 @@ internal static class BclPurityFallbackHeuristics
             string memberName,
             bool isFrameworkMetadataSymbol,
             bool isProperty,
+            bool isField,
             bool isConstructor,
             bool isStatic,
             bool returnsVoid,
@@ -26,13 +27,15 @@ internal static class BclPurityFallbackHeuristics
             bool hasRefOrOutParameter,
             bool hasValueLikeReturn,
             bool hasOnlyValueLikeOrReadOnlyViewParameters,
-            bool isSetterOnlyProperty)
+            bool isSetterOnlyProperty,
+            bool isReadOnlyField = false)
         {
             NamespaceName = namespaceName ?? string.Empty;
             TypeName = typeName ?? string.Empty;
             MemberName = memberName ?? string.Empty;
             IsFrameworkMetadataSymbol = isFrameworkMetadataSymbol;
             IsProperty = isProperty;
+            IsField = isField;
             IsConstructor = isConstructor;
             IsStatic = isStatic;
             ReturnsVoid = returnsVoid;
@@ -41,6 +44,7 @@ internal static class BclPurityFallbackHeuristics
             HasValueLikeReturn = hasValueLikeReturn;
             HasOnlyValueLikeOrReadOnlyViewParameters = hasOnlyValueLikeOrReadOnlyViewParameters;
             IsSetterOnlyProperty = isSetterOnlyProperty;
+            IsReadOnlyField = isReadOnlyField;
         }
 
         public string NamespaceName { get; }
@@ -48,6 +52,7 @@ internal static class BclPurityFallbackHeuristics
         public string MemberName { get; }
         public bool IsFrameworkMetadataSymbol { get; }
         public bool IsProperty { get; }
+        public bool IsField { get; }
         public bool IsConstructor { get; }
         public bool IsStatic { get; }
         public bool ReturnsVoid { get; }
@@ -56,6 +61,7 @@ internal static class BclPurityFallbackHeuristics
         public bool HasValueLikeReturn { get; }
         public bool HasOnlyValueLikeOrReadOnlyViewParameters { get; }
         public bool IsSetterOnlyProperty { get; }
+        public bool IsReadOnlyField { get; }
     }
 
     public readonly struct Classification
@@ -103,6 +109,12 @@ internal static class BclPurityFallbackHeuristics
         if (shape.IsProperty)
         {
             classification = ClassifyProperty(shape);
+            return true;
+        }
+
+        if (shape.IsField)
+        {
+            classification = ClassifyField(shape);
             return true;
         }
 
@@ -204,6 +216,23 @@ internal static class BclPurityFallbackHeuristics
         }
 
         return ProbablyPureBecause("metadata_getter_value_like_return");
+    }
+
+    private static Classification ClassifyField(Shape shape)
+    {
+        if (!shape.IsReadOnlyField)
+        {
+            return ProbablyImpureBecause("mutable_metadata_field");
+        }
+
+        if (!shape.HasValueLikeReturn)
+        {
+            return shape.IsStatic
+                ? UnknownBecause("readonly_reference_metadata_field")
+                : UnknownBecause("reference_returning_instance_metadata_field");
+        }
+
+        return ProbablyPureBecause("readonly_metadata_field_value_like");
     }
 
     private static bool IsAmbientNamespaceOrType(string namespaceName, string typeName)

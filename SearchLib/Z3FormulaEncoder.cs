@@ -1,4 +1,4 @@
-using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Z3;
 
 namespace SearchLib.Smt
@@ -9,6 +9,7 @@ namespace SearchLib.Smt
         private readonly Sort _referenceSort;
         private readonly Expr _nullReference;
         private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
+        private readonly Dictionary<string, RegexTranslationPrecision> _regexPrecisionCache = new(StringComparer.Ordinal);
 
         public Z3FormulaEncoder()
         {
@@ -39,6 +40,34 @@ namespace SearchLib.Smt
         public BoolExpr Negate(SmtFormula formula)
         {
             return _context.MkNot(EncodeCondition(formula));
+        }
+
+        public bool ContainsApproximateRegex(SmtFormula formula)
+        {
+            return formula switch
+            {
+                SmtRegexMatchFormula regexMatch => GetRegexTranslationPrecision(regexMatch.Pattern) == RegexTranslationPrecision.Approximate ||
+                    ContainsApproximateRegex(regexMatch.Value),
+                SmtUnaryFormula unaryFormula => ContainsApproximateRegex(unaryFormula.Operand),
+                SmtBinaryFormula binaryFormula => ContainsApproximateRegex(binaryFormula.Left) ||
+                    ContainsApproximateRegex(binaryFormula.Right),
+                SmtIntegerUnaryTerm integerUnaryTerm => ContainsApproximateRegex(integerUnaryTerm.Operand),
+                SmtIntegerBinaryTerm integerBinaryTerm => ContainsApproximateRegex(integerBinaryTerm.Left) ||
+                    ContainsApproximateRegex(integerBinaryTerm.Right),
+                SmtStringLengthTerm stringLengthTerm => ContainsApproximateRegex(stringLengthTerm.Value),
+                SmtStringConcatTerm stringConcatTerm => ContainsApproximateRegex(stringConcatTerm.Left) ||
+                    ContainsApproximateRegex(stringConcatTerm.Right),
+                SmtStringContainsFormula stringContainsFormula => ContainsApproximateRegex(stringContainsFormula.Value) ||
+                    ContainsApproximateRegex(stringContainsFormula.Search),
+                SmtStringStartsWithFormula stringStartsWithFormula => ContainsApproximateRegex(stringStartsWithFormula.Value) ||
+                    ContainsApproximateRegex(stringStartsWithFormula.Prefix),
+                SmtStringEndsWithFormula stringEndsWithFormula => ContainsApproximateRegex(stringEndsWithFormula.Value) ||
+                    ContainsApproximateRegex(stringEndsWithFormula.Suffix),
+                SmtConditionalFormula conditionalFormula => ContainsApproximateRegex(conditionalFormula.Condition) ||
+                    ContainsApproximateRegex(conditionalFormula.WhenTrue) ||
+                    ContainsApproximateRegex(conditionalFormula.WhenFalse),
+                _ => false,
+            };
         }
 
         public void Dispose()
@@ -327,7 +356,23 @@ namespace SearchLib.Smt
 
         private bool IsApproximateRegexPattern(string pattern)
         {
-            return Z3RegexTranslator.TryTranslate(_context, pattern, out _, out var isExact) && !isExact;
+            return GetRegexTranslationPrecision(pattern) == RegexTranslationPrecision.Approximate;
+        }
+
+        private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern)
+        {
+            if (_regexPrecisionCache.TryGetValue(pattern, out var cached))
+            {
+                return cached;
+            }
+
+            var precision = Z3RegexTranslator.TryTranslate(_context, pattern, out _, out var isExact)
+                ? isExact
+                    ? RegexTranslationPrecision.Exact
+                    : RegexTranslationPrecision.Approximate
+                : RegexTranslationPrecision.Unsupported;
+            _regexPrecisionCache.Add(pattern, precision);
+            return precision;
         }
 
         private static bool GetBooleanComparisonOperandPolarity(
@@ -373,10 +418,18 @@ namespace SearchLib.Smt
             return created;
         }
 
+        private enum RegexTranslationPrecision
+        {
+            Unsupported,
+            Exact,
+            Approximate,
+        }
+
         private sealed class Z3RegexTranslator
         {
             private const int MaxBoundedRepeat = 64;
             private const int MaxCharacterClassRangeCount = 512;
+            private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
             private readonly Context _context;
             private readonly string _pattern;
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
@@ -398,14 +451,21 @@ namespace SearchLib.Smt
                     return false;
                 }
 
+                if (!IsValidDotNetRegexPattern(pattern))
+                {
+                    return false;
+                }
+
                 var startAnchored = pattern.StartsWith("^", StringComparison.Ordinal);
                 var strictStartAnchored = pattern.StartsWith(@"\A", StringComparison.Ordinal);
-                var strictEndAnchored = pattern.EndsWith(@"\z", StringComparison.Ordinal);
+                var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
+                var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
                 var dollarEndAnchored = !strictEndAnchored &&
+                    !finalNewlineEndAnchored &&
                     pattern.EndsWith("$", StringComparison.Ordinal) &&
                     !IsEscaped(pattern, pattern.Length - 1);
                 var bodyStart = strictStartAnchored ? 2 : startAnchored ? 1 : 0;
-                var bodyEndTrim = strictEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
+                var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
                 var bodyLength = pattern.Length - bodyStart - bodyEndTrim;
                 if (bodyLength < 0)
                 {
@@ -426,7 +486,7 @@ namespace SearchLib.Smt
                     regex = context.MkConcat(new[] { translator.CreateAnyStringRegex(), regex });
                 }
 
-                if (dollarEndAnchored)
+                if (dollarEndAnchored || finalNewlineEndAnchored)
                 {
                     regex = context.MkConcat(new[] { regex, translator.CreateOptionalFinalNewlineRegex() });
                 }
@@ -660,6 +720,7 @@ namespace SearchLib.Smt
                 var literal = escaped switch
                 {
                     'a' => "\a",
+                    'e' => "\u001b",
                     'f' => "\f",
                     'n' => "\n",
                     'r' => "\r",
@@ -724,6 +785,12 @@ namespace SearchLib.Smt
                 }
 
                 var parts = new List<CharacterClassPart>();
+                if (Peek(']'))
+                {
+                    parts.Add(CreateClassCharacterPart(']'));
+                    _position++;
+                }
+
                 while (_position < _pattern.Length && !Peek(']'))
                 {
                     if (!TryReadClassPart(out var start))
@@ -834,12 +901,24 @@ namespace SearchLib.Smt
                 {
                     'a' => '\a',
                     'b' => '\b',
+                    'e' => '\u001b',
                     'f' => '\f',
                     'n' => '\n',
                     'r' => '\r',
                     't' => '\t',
                     'v' => '\v',
                     '\\' => '\\',
+                    '.' => '.',
+                    '$' => '$',
+                    '|' => '|',
+                    '?' => '?',
+                    '*' => '*',
+                    '+' => '+',
+                    '(' => '(',
+                    ')' => ')',
+                    '[' => '[',
+                    '{' => '{',
+                    '}' => '}',
                     '-' => '-',
                     ']' => ']',
                     '^' => '^',
@@ -896,7 +975,7 @@ namespace SearchLib.Smt
                 }
 
                 // .NET's shorthand classes are Unicode-aware by default. One-char over-approximation
-                // preserves soundness for reachability proofs while still exposing length facts to Z3.
+                // still exposes length facts; satisfiable results are downgraded by the solver.
                 regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false);
                 return true;
             }
@@ -1050,6 +1129,25 @@ namespace SearchLib.Smt
                 }
 
                 return slashCount % 2 == 1;
+            }
+
+            private static bool EndsWithUnescapedAnchor(string value, string anchor)
+            {
+                return value.EndsWith(anchor, StringComparison.Ordinal) &&
+                    !IsEscaped(value, value.Length - anchor.Length);
+            }
+
+            private static bool IsValidDotNetRegexPattern(string pattern)
+            {
+                try
+                {
+                    _ = new Regex(pattern, RegexOptions.None, RegexSyntaxValidationTimeout);
+                    return true;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
             }
 
             private static bool IsRegexMetaCharacter(char value)

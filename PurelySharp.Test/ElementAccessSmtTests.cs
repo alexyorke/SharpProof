@@ -220,6 +220,107 @@ public class TestClass
                 "result == values[^1]");
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesStringListPatternElementBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public char TestMethod(string text)
+    {
+        if (text is [var first, ..])
+        {
+            return first;
+        }
+
+        return '\0';
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return first;",
+                "first == text[0]");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesSpanListPatternElementBinding()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values)
+    {
+        if (values is [var first, ..])
+        {
+            return first;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return first;",
+                "first == values[0]");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesCountBackedListPatternLengthFact()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyList<int> values)
+    {
+        if (values is [_, ..])
+        {
+            return values.Count;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return values.Count;",
+                "values.Count >= 1");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ReassignedRangeRemainsUnknown()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        Range slice = 1..^1;
+        slice = 0..^0;
+        if (values != null && values.Length >= 2)
+        {
+            var result = values[slice].Length;
+            return result;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return result;",
+                "result == values.Length - 2");
+        }
+
         private static void AssertConditionProven(string source, string sourceLine, string condition)
         {
             var proof = ProveCondition(source, sourceLine, condition);

@@ -51,6 +51,11 @@ namespace PurelySharp.Analyzer.Engine
                 return TryClassifyProperty(propertySymbol, out classification);
             }
 
+            if (original is IFieldSymbol fieldSymbol)
+            {
+                return TryClassifyField(fieldSymbol, out classification);
+            }
+
             if (original is IMethodSymbol method)
             {
                 var shape = CreateMethodShape(method);
@@ -91,6 +96,7 @@ namespace PurelySharp.Analyzer.Engine
                 memberName: method.Name,
                 isFrameworkMetadataSymbol: IsFrameworkMetadataSymbol(method),
                 isProperty: false,
+                isField: false,
                 isConstructor: method.MethodKind == MethodKind.Constructor,
                 isStatic: method.IsStatic,
                 returnsVoid: method.ReturnsVoid,
@@ -111,6 +117,7 @@ namespace PurelySharp.Analyzer.Engine
                 memberName: property.Name,
                 isFrameworkMetadataSymbol: IsFrameworkMetadataSymbol(property),
                 isProperty: true,
+                isField: false,
                 isConstructor: false,
                 isStatic: property.GetMethod?.IsStatic == true || property.SetMethod?.IsStatic == true,
                 returnsVoid: false,
@@ -121,6 +128,32 @@ namespace PurelySharp.Analyzer.Engine
                 hasOnlyValueLikeOrReadOnlyViewParameters: property.Parameters.All(static parameter =>
                     IsValueLikeType(parameter.Type) || IsReadOnlyViewType(parameter.Type)),
                 isSetterOnlyProperty: property.SetMethod != null && property.GetMethod == null);
+        }
+
+        private static BclPurityFallbackHeuristics.Shape CreateFieldShape(IFieldSymbol field)
+        {
+            return new BclPurityFallbackHeuristics.Shape(
+                namespaceName: field.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+                typeName: field.ContainingType?.OriginalDefinition.ToDisplayString() ?? string.Empty,
+                memberName: field.Name,
+                isFrameworkMetadataSymbol: IsFrameworkMetadataSymbol(field),
+                isProperty: false,
+                isField: true,
+                isConstructor: false,
+                isStatic: field.IsStatic,
+                returnsVoid: false,
+                returnsByRef: false,
+                hasRefOrOutParameter: false,
+                hasValueLikeReturn: IsValueLikeType(field.Type),
+                hasOnlyValueLikeOrReadOnlyViewParameters: true,
+                isSetterOnlyProperty: false,
+                isReadOnlyField: field.IsReadOnly || field.IsConst);
+        }
+
+        private static bool TryClassifyField(IFieldSymbol field, out Classification classification)
+        {
+            var shape = CreateFieldShape(field);
+            return TryClassifyShape(shape, out classification);
         }
 
         private static bool IsValueLikeType(ITypeSymbol type)

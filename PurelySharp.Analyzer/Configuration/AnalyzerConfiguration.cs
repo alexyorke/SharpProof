@@ -17,6 +17,7 @@ namespace PurelySharp.Analyzer.Configuration
         public bool SuggestMissingEnforcePure { get; }
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
         public bool EmitExplanations { get; }
+        public bool ReportBclFallbackGuesses { get; }
         public bool ReportExceptions { get; }
         public bool CheckedExceptions { get; }
         public bool EnableEffectSummaryJson { get; }
@@ -32,6 +33,7 @@ namespace PurelySharp.Analyzer.Configuration
             bool suggestMissingEnforcePure,
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
+            bool reportBclFallbackGuesses,
             bool reportExceptions,
             bool checkedExceptions,
             bool enableEffectSummaryJson,
@@ -46,6 +48,7 @@ namespace PurelySharp.Analyzer.Configuration
             SuggestMissingEnforcePure = suggestMissingEnforcePure;
             MissingPuritySuggestions = missingPuritySuggestions;
             EmitExplanations = emitExplanations;
+            ReportBclFallbackGuesses = reportBclFallbackGuesses;
             ReportExceptions = reportExceptions;
             CheckedExceptions = checkedExceptions;
             EnableEffectSummaryJson = enableEffectSummaryJson;
@@ -69,6 +72,7 @@ namespace PurelySharp.Analyzer.Configuration
                 GetNonNegativeInt(options, ConfigKeys.SuggestMissingEnforcePureMinComplexity),
                 GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
             bool emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
+            bool reportBclFallbackGuesses = GetBool(options, ConfigKeys.ReportBclFallbackGuesses);
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
             bool checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
             bool enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
@@ -81,6 +85,7 @@ namespace PurelySharp.Analyzer.Configuration
                 suggestMissing,
                 missingPuritySuggestions,
                 emitExplanations,
+                reportBclFallbackGuesses,
                 reportExceptions,
                 checkedExceptions,
                 enableEffectSummaryJson,
@@ -120,6 +125,22 @@ namespace PurelySharp.Analyzer.Configuration
             {
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.EmitExplanations, fallback);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        public static bool GetReportBclFallbackGuesses(
+            AnalyzerOptions options,
+            SyntaxTree syntaxTree,
+            bool fallback)
+        {
+            try
+            {
+                var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
+                return GetBoolOrDefault(treeOptions, ConfigKeys.ReportBclFallbackGuesses, fallback);
             }
             catch
             {

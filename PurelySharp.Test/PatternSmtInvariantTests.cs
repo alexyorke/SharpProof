@@ -121,5 +121,33 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task SwitchStatementTypePatternWithoutBinding_FeedsNonNullFact()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        switch (value)
+        {
+            case string _:
+                if (value == null)
+                {
+                    Console.WriteLine(value);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

@@ -3275,14 +3275,19 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
-            if (!TryTranslateValue(isPatternExpression.Expression, semanticModel, cancellationToken, out var matchedValue, getSymbolVersion) ||
+            if (!TryTranslatePatternInputValue(
+                    isPatternExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var matchedValue,
+                    out var valueType,
+                    getSymbolVersion,
+                    inlineDepth: 0) ||
                 matchedValue == null)
             {
                 return;
             }
 
-            var valueType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
             AddPatternBindingFacts(
                 matchedValue,
                 valueType,
@@ -3473,6 +3478,12 @@ namespace PurelySharp.Symbolic.Smt
                         getSymbolVersion);
                     return;
                 case ListPatternSyntax listPattern:
+                    AddListPatternLengthFacts(
+                        matchedValue,
+                        matchedValueType,
+                        listPattern,
+                        semanticModel,
+                        formulas);
                     AddListPatternBindingFacts(
                         matchedValue,
                         matchedValueType,
@@ -3530,7 +3541,7 @@ namespace PurelySharp.Symbolic.Smt
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (!TryGetBuiltInListPatternElementType(matchedValueType, out var elementType) ||
+            if (!TryGetBuiltInElementAccessElementType(matchedValueType, semanticModel.Compilation, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind))
             {
                 return;
@@ -3767,15 +3778,57 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (!TryTranslateValue(expression.Expression, semanticModel, cancellationToken, out var value, getSymbolVersion, inlineDepth) ||
+            if (!TryTranslatePatternInputValue(
+                    expression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var value,
+                    out var valueType,
+                    getSymbolVersion,
+                    inlineDepth) ||
                 value == null)
             {
                 return false;
             }
 
-            var valueType = semanticModel.GetTypeInfo(expression.Expression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(expression.Expression, cancellationToken).Type;
             return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType, inlineDepth);
+        }
+
+        private static bool TryTranslatePatternInputValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? value,
+            out ITypeSymbol? valueType,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            expression = UnwrapExpression(expression);
+            var valueTypeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            valueType = valueTypeInfo.ConvertedType ?? valueTypeInfo.Type;
+
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out value, getSymbolVersion, inlineDepth) &&
+                value != null)
+            {
+                return true;
+            }
+
+            if (IsBuiltInSpanType(valueType) &&
+                TryCreateBuiltInElementAccessReceiverFormula(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var spanValue,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                spanValue is { Kind: SmtValueKind.Reference })
+            {
+                value = spanValue;
+                return true;
+            }
+
+            value = null;
+            return false;
         }
 
         private static bool TryTranslateNullablePatternExpression(
@@ -4465,22 +4518,75 @@ namespace PurelySharp.Symbolic.Smt
         {
             formula = null;
             if (value.Kind != SmtValueKind.Reference ||
-                !IsSupportedBuiltInListPatternReceiver(valueType))
+                !IsSupportedBuiltInElementAccessReceiver(valueType))
             {
                 return false;
             }
 
-            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            SmtFormula? lengthFormula;
-            if (valueType?.SpecialType == SpecialType.System_String)
+            if (!TryCreateListPatternLengthCondition(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    out var lengthFormulaCondition) ||
+                lengthFormulaCondition == null)
             {
-                if (!TryCreateStringLengthFormula(value, out lengthFormula))
-                {
-                    return false;
-                }
+                return false;
             }
-            else if (!TryCreateMemberFormula(value, "Length", intType, out lengthFormula) ||
-                     lengthFormula == null)
+
+            var nonNullFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                value,
+                new SmtNullConstant());
+            formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
+            AddListPatternElementConditions(
+                value,
+                valueType,
+                listPattern,
+                semanticModel,
+                cancellationToken,
+                ref formula,
+                getSymbolVersion,
+                inlineDepth);
+            return true;
+        }
+
+        private static void AddListPatternLengthFacts(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            ICollection<SmtFormula> formulas)
+        {
+            if (value.Kind != SmtValueKind.Reference ||
+                !TryCreateListPatternLengthCondition(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    out var lengthFormulaCondition) ||
+                lengthFormulaCondition == null)
+            {
+                return;
+            }
+
+            formulas.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                value,
+                new SmtNullConstant()));
+            formulas.Add(lengthFormulaCondition);
+        }
+
+        private static bool TryCreateListPatternLengthCondition(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            out SmtFormula? lengthFormulaCondition)
+        {
+            lengthFormulaCondition = null;
+            if (!TryCreateListPatternLengthFormula(value, valueType, semanticModel, out var lengthFormula) ||
+                lengthFormula == null)
             {
                 return false;
             }
@@ -4503,11 +4609,7 @@ namespace PurelySharp.Symbolic.Smt
                 minimumLength++;
             }
 
-            var nonNullFormula = new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                value,
-                new SmtNullConstant());
-            var lengthFormulaCondition = hasSlice
+            lengthFormulaCondition = hasSlice
                 ? new SmtBinaryFormula(
                     SmtBinaryOperator.GreaterThanOrEqual,
                     lengthFormula,
@@ -4516,18 +4618,94 @@ namespace PurelySharp.Symbolic.Smt
                     SmtBinaryOperator.Equal,
                     lengthFormula,
                     new SmtIntegerConstant(minimumLength));
-
-            formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
-            AddListPatternElementConditions(
-                value,
-                valueType,
-                listPattern,
-                semanticModel,
-                cancellationToken,
-                ref formula,
-                getSymbolVersion,
-                inlineDepth);
             return true;
+        }
+
+        private static bool TryCreateListPatternLengthFormula(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            SemanticModel semanticModel,
+            out SmtFormula? lengthFormula)
+        {
+            lengthFormula = null;
+            if (valueType?.SpecialType == SpecialType.System_String)
+            {
+                return TryCreateStringLengthFormula(value, out lengthFormula);
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (IsSupportedBuiltInElementAccessReceiver(valueType))
+            {
+                return TryCreateMemberFormula(value, "Length", intType, out lengthFormula) &&
+                    lengthFormula != null;
+            }
+
+            if (!TryGetListPatternLengthMemberName(valueType, out var memberName))
+            {
+                return false;
+            }
+
+            return TryCreateMemberFormula(value, memberName, intType, out lengthFormula) &&
+                lengthFormula != null;
+        }
+
+        private static bool TryGetListPatternLengthMemberName(ITypeSymbol? valueType, out string memberName)
+        {
+            if (HasInstanceInt32Member(valueType, "Length"))
+            {
+                memberName = "Length";
+                return true;
+            }
+
+            if (HasInstanceInt32Member(valueType, "Count"))
+            {
+                memberName = "Count";
+                return true;
+            }
+
+            memberName = string.Empty;
+            return false;
+        }
+
+        private static bool HasInstanceInt32Member(ITypeSymbol? valueType, string memberName)
+        {
+            if (valueType == null)
+            {
+                return false;
+            }
+
+            for (var current = valueType; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInstanceInt32Member(current, memberName))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in valueType.AllInterfaces)
+            {
+                if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInstanceInt32Member(ITypeSymbol type, string memberName)
+        {
+            foreach (var member in type.GetMembers(memberName))
+            {
+                switch (member)
+                {
+                    case IPropertySymbol { IsStatic: false, Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
+                    case IFieldSymbol { IsStatic: false, Type.SpecialType: SpecialType.System_Int32 }:
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TryCreateStringLengthFormula(SmtFormula receiver, out SmtFormula formula)
@@ -4561,7 +4739,7 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             if (formula == null ||
-                !TryGetBuiltInListPatternElementType(valueType, out var elementType) ||
+                !TryGetBuiltInElementAccessElementType(valueType, semanticModel.Compilation, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind))
             {
                 return;
@@ -4679,24 +4857,6 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             listPattern = null!;
-            return false;
-        }
-
-        private static bool IsSupportedBuiltInListPatternReceiver(ITypeSymbol? valueType)
-        {
-            return valueType is IArrayTypeSymbol { Rank: 1 } ||
-                valueType?.SpecialType == SpecialType.System_String;
-        }
-
-        private static bool TryGetBuiltInListPatternElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
-        {
-            if (valueType is IArrayTypeSymbol { Rank: 1 } arrayType)
-            {
-                elementType = arrayType.ElementType;
-                return true;
-            }
-
-            elementType = null!;
             return false;
         }
 

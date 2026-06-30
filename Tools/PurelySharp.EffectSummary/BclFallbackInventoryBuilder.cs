@@ -88,6 +88,7 @@ internal static class BclFallbackInventoryBuilder
             memberName: isProperty ? parsed.MemberName.Substring(4) : parsed.MemberName,
             isFrameworkMetadataSymbol: true,
             isProperty: isProperty,
+            isField: false,
             isConstructor: string.Equals(parsed.MemberName, ".ctor", StringComparison.Ordinal),
             isStatic: method.IsStatic,
             returnsVoid: returnsVoid,

@@ -148,6 +148,33 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyThrowDoesNotReachAfterLoop()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            if (index < 0)
+            {
+                throw new System.InvalidOperationException();
+            }
+
+            index++;
+        }
+
+        return index;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesSingleGuardedBreakExitCondition()
         {
             const string source = @"
@@ -170,6 +197,131 @@ public class TestClass
             var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesGuardedContinueBeforeBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready)
+    {
+        for (;;)
+        {
+            if (!ready)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesForLoopBodyLowerBoundWhenConditionLocalMutatesBeforeMarker()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int count)
+    {
+        var i = -1;
+        for (i = 0; i < count; i++)
+        {
+            count = -100;
+            return i;
+        }
+
+        return -1;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionlessForLoopBodyLowerBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var i = -1;
+        for (i = 0;; i++)
+        {
+            return i;
+        }
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesGuardedBreakForLoopExitLowerBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool done)
+    {
+        var i = -1;
+        for (i = 0;; i++)
+        {
+            if (done)
+            {
+                break;
+            }
+        }
+
+        return i;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotProveGuardedBreakForLoopExitLowerBoundWhenBodyMutatesIterator()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool done)
+    {
+        var i = 0;
+        for (i = 0;; i++)
+        {
+            i = -1;
+            if (done)
+            {
+                break;
+            }
+        }
+
+        return i;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         }
 
         [Test]

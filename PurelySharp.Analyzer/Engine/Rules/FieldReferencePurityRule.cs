@@ -130,6 +130,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 else
                 {
                     PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static non-readonly field '{fieldSymbol.Name}' - Impure");
+                    if (PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                        fieldSymbol,
+                        fieldReferenceOperation.Syntax,
+                        fieldReferenceOperation,
+                        nameof(FieldReferencePurityRule),
+                        out var staticFieldFallbackResult))
+                    {
+                        return staticFieldFallbackResult;
+                    }
+
                     return ImpureFieldRead(fieldReferenceOperation);
                 }
             }
@@ -158,6 +168,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     else
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance '{paramRef.Parameter.Name}' is mutable ref/out. Read is Impure.");
+                        if (PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                            fieldSymbol,
+                            fieldReferenceOperation.Syntax,
+                            fieldReferenceOperation,
+                            nameof(FieldReferencePurityRule),
+                            out var parameterFieldFallbackResult))
+                        {
+                            return parameterFieldFallbackResult;
+                        }
+
                         return ImpureFieldRead(fieldReferenceOperation);
                     }
                 }
@@ -240,6 +260,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
 
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance is complex ({instanceOperation.Kind})/non-readonly-local and field '{fieldSymbol.Name}' not known pure BCL. Assuming read is Impure.");
+                        if (PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                            fieldSymbol,
+                            fieldReferenceOperation.Syntax,
+                            fieldReferenceOperation,
+                            nameof(FieldReferencePurityRule),
+                            out var instanceFieldFallbackResult))
+                        {
+                            return instanceFieldFallbackResult;
+                        }
+
                         return ImpureFieldRead(fieldReferenceOperation);
                     }
                 }

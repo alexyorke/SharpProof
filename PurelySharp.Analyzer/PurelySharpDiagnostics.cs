@@ -50,7 +50,7 @@ namespace PurelySharp.Analyzer
         public const string BclFallbackGuessId = "PS0012";
         private static readonly LocalizableString BclFallbackGuessTitle = "BCL Purity Fallback Guess";
         private static readonly LocalizableString BclFallbackGuessMessageFormat = "BCL purity fallback for '{0}': {1} ({2})";
-        private static readonly LocalizableString BclFallbackGuessDescription = "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available.";
+        private static readonly LocalizableString BclFallbackGuessDescription = "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with purelysharp_emit_explanations or purelysharp_report_bcl_fallback_guesses.";
 
         public static readonly DiagnosticDescriptor BclFallbackGuessRule = new DiagnosticDescriptor(
             id: BclFallbackGuessId,

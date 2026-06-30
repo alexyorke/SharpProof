@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -490,6 +491,15 @@ namespace PurelySharp.Symbolic.Smt
                 patternFormula != null)
             {
                 conditions.Add(patternFormula);
+                AddStructuralPatternFacts(
+                    governingValue,
+                    governingType,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    conditions,
+                    getSymbolVersion,
+                    includeWholePatternTranslation: false);
             }
             else
             {
@@ -500,7 +510,8 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     conditions,
-                    getSymbolVersion);
+                    getSymbolVersion,
+                    includeWholePatternTranslation: false);
             }
 
             if (includePatternBindings)
@@ -546,9 +557,11 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             ICollection<SmtFormula> conditions,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            bool includeWholePatternTranslation = true)
         {
-            if (CSharpConditionToFormula.TryTranslatePattern(
+            if (includeWholePatternTranslation &&
+                CSharpConditionToFormula.TryTranslatePattern(
                     value,
                     pattern,
                     semanticModel,
@@ -575,6 +588,12 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
+            if (pattern is DeclarationPatternSyntax or TypePatternSyntax)
+            {
+                AddReferenceNonNullFact(value, conditions);
+                return;
+            }
+
             if (pattern is BinaryPatternSyntax binaryPattern &&
                 binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
             {
@@ -590,6 +609,19 @@ namespace PurelySharp.Symbolic.Smt
                     value,
                     valueType,
                     binaryPattern.Right,
+                    semanticModel,
+                    cancellationToken,
+                    conditions,
+                    getSymbolVersion);
+                return;
+            }
+
+            if (pattern is ListPatternSyntax listPattern)
+            {
+                AddListPatternStructuralFacts(
+                    value,
+                    valueType,
+                    listPattern,
                     semanticModel,
                     cancellationToken,
                     conditions,
@@ -623,48 +655,373 @@ namespace PurelySharp.Symbolic.Smt
             if (value.Kind == SmtValueKind.Reference &&
                 (valueType == null || valueType.IsReferenceType))
             {
-                conditions.Add(new SmtBinaryFormula(
-                    SmtBinaryOperator.NotEqual,
-                    value,
-                    new SmtNullConstant()));
+                AddReferenceNonNullFact(value, conditions);
             }
 
             var propertySubpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
-            if (propertySubpatterns == null)
+            if (propertySubpatterns != null)
+            {
+                foreach (var subpattern in propertySubpatterns.Value)
+                {
+                    if (!TryResolvePropertySubpatternValue(
+                            value,
+                            subpattern,
+                            semanticModel,
+                            cancellationToken,
+                            out var memberValue,
+                            out var memberType,
+                            out var pathCondition) ||
+                        memberValue == null ||
+                        memberType == null)
+                    {
+                        continue;
+                    }
+
+                    if (pathCondition != null)
+                    {
+                        conditions.Add(pathCondition);
+                    }
+
+                    AddStructuralPatternFacts(
+                        memberValue,
+                        memberType,
+                        subpattern.Pattern,
+                        semanticModel,
+                        cancellationToken,
+                        conditions,
+                        getSymbolVersion);
+                }
+            }
+
+            var positionalSubpatterns = recursivePattern.PositionalPatternClause?.Subpatterns;
+            if (positionalSubpatterns == null)
             {
                 return;
             }
 
-            foreach (var subpattern in propertySubpatterns.Value)
+            for (var position = 0; position < positionalSubpatterns.Value.Count; position++)
             {
-                if (!TryResolvePropertySubpatternValue(
+                if (!TryResolveTuplePositionalSubpatternValue(
                         value,
-                        subpattern,
-                        semanticModel,
-                        cancellationToken,
+                        valueType,
+                        position,
                         out var memberValue,
-                        out var memberType,
-                        out var pathCondition) ||
+                        out var memberType) ||
                     memberValue == null ||
                     memberType == null)
                 {
                     continue;
                 }
 
-                if (pathCondition != null)
-                {
-                    conditions.Add(pathCondition);
-                }
-
                 AddStructuralPatternFacts(
                     memberValue,
                     memberType,
-                    subpattern.Pattern,
+                    positionalSubpatterns.Value[position].Pattern,
                     semanticModel,
                     cancellationToken,
                     conditions,
                     getSymbolVersion);
             }
+        }
+
+        private static void AddListPatternStructuralFacts(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (value.Kind != SmtValueKind.Reference ||
+                !TryCreateListPatternLengthFormula(value, valueType, semanticModel, out var lengthFormula))
+            {
+                return;
+            }
+
+            AddReferenceNonNullFact(value, conditions);
+
+            var hasSlice = false;
+            var minimumLength = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
+                    }
+
+                    hasSlice = true;
+                    continue;
+                }
+
+                minimumLength++;
+            }
+
+            conditions.Add(hasSlice
+                ? new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength))
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength)));
+
+            if (!TryGetBuiltInListPatternElementType(valueType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return;
+            }
+
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
+            {
+                var subpattern = listPattern.Patterns[patternIndex];
+                if (subpattern is SlicePatternSyntax)
+                {
+                    continue;
+                }
+
+                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    continue;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, fromEnd, elementKind);
+                AddStructuralPatternFacts(
+                    elementValue,
+                    elementType,
+                    subpattern,
+                    semanticModel,
+                    cancellationToken,
+                    conditions,
+                    getSymbolVersion);
+            }
+        }
+
+        private static bool TryCreateListPatternLengthFormula(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            SemanticModel semanticModel,
+            out SmtFormula lengthFormula)
+        {
+            lengthFormula = null!;
+            if (!IsSupportedBuiltInListPatternReceiver(valueType))
+            {
+                return false;
+            }
+
+            if (valueType?.SpecialType == SpecialType.System_String)
+            {
+                return TryCreateStringLengthFormula(value, out lengthFormula);
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(value, "Length", intType, out var memberFormula) ||
+                memberFormula == null)
+            {
+                return false;
+            }
+
+            lengthFormula = memberFormula;
+            return true;
+        }
+
+        private static bool IsSupportedBuiltInListPatternReceiver(ITypeSymbol? valueType)
+        {
+            return valueType is IArrayTypeSymbol { Rank: 1 } ||
+                valueType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool TryGetBuiltInListPatternElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
+        {
+            if (valueType is IArrayTypeSymbol { Rank: 1 } arrayType)
+            {
+                elementType = arrayType.ElementType;
+                return true;
+            }
+
+            elementType = null!;
+            return false;
+        }
+
+        private static bool TryGetListPatternElementPosition(
+            ListPatternSyntax listPattern,
+            int patternIndex,
+            out int elementIndex,
+            out bool fromEnd)
+        {
+            elementIndex = 0;
+            fromEnd = false;
+
+            if (listPattern.Patterns[patternIndex] is SlicePatternSyntax)
+            {
+                return false;
+            }
+
+            var sliceIndex = -1;
+            for (var index = 0; index < listPattern.Patterns.Count; index++)
+            {
+                if (listPattern.Patterns[index] is SlicePatternSyntax)
+                {
+                    sliceIndex = index;
+                    break;
+                }
+            }
+
+            if (sliceIndex < 0 || patternIndex < sliceIndex)
+            {
+                elementIndex = patternIndex;
+                return true;
+            }
+
+            elementIndex = listPattern.Patterns.Count - patternIndex;
+            fromEnd = true;
+            return true;
+        }
+
+        private static SmtFormula CreateListPatternElementFormula(
+            SmtFormula receiver,
+            int elementIndex,
+            bool fromEnd,
+            SmtValueKind elementKind)
+        {
+            var indexText = fromEnd
+                ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
+                : elementIndex.ToString(CultureInfo.InvariantCulture);
+            return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
+        }
+
+        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
+        {
+            var minimumLength = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
+                    }
+
+                    continue;
+                }
+
+                minimumLength++;
+            }
+
+            return minimumLength;
+        }
+
+        private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            if (pattern is ListPatternSyntax candidate)
+            {
+                listPattern = candidate;
+                return true;
+            }
+
+            listPattern = null!;
+            return false;
+        }
+
+        private static bool TryResolveTuplePositionalSubpatternValue(
+            SmtFormula receiver,
+            ITypeSymbol? receiverType,
+            int position,
+            out SmtFormula? memberValue,
+            out ITypeSymbol? memberType)
+        {
+            memberValue = null;
+            memberType = null;
+            if (!TryGetTuplePositionalField(receiverType, position, out var fieldSymbol) ||
+                !TryGetTupleElementStorageName(fieldSymbol, out var storageName) ||
+                !TryGetValueKind(fieldSymbol.Type, out var kind))
+            {
+                return false;
+            }
+
+            memberType = fieldSymbol.Type;
+            memberValue = new SmtVariable(GetFormulaVariableName(receiver) + "." + storageName, kind);
+            return true;
+        }
+
+        private static bool TryGetTuplePositionalField(
+            ITypeSymbol? receiverType,
+            int position,
+            out IFieldSymbol fieldSymbol)
+        {
+            fieldSymbol = null!;
+            if (receiverType is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType)
+            {
+                if (position < 0 || position >= namedType.TupleElements.Length)
+                {
+                    return false;
+                }
+
+                fieldSymbol = namedType.TupleElements[position];
+                return true;
+            }
+
+            var storageName = "Item" + (position + 1).ToString(CultureInfo.InvariantCulture);
+            fieldSymbol = namedType
+                .GetMembers(storageName)
+                .OfType<IFieldSymbol>()
+                .FirstOrDefault(static field => !field.IsStatic)!;
+            return fieldSymbol != null;
+        }
+
+        private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)
+        {
+            var tupleField = fieldSymbol.CorrespondingTupleField ?? fieldSymbol;
+            if (IsTupleElementStorageName(tupleField.Name))
+            {
+                storageName = tupleField.Name;
+                return true;
+            }
+
+            storageName = string.Empty;
+            return false;
+        }
+
+        private static bool IsTupleElementStorageName(string name)
+        {
+            return name.Length > 4 &&
+                name.StartsWith("Item", StringComparison.Ordinal) &&
+                name.Skip(4).All(char.IsDigit);
+        }
+
+        private static void AddReferenceNonNullFact(
+            SmtFormula value,
+            ICollection<SmtFormula> conditions)
+        {
+            if (value.Kind != SmtValueKind.Reference)
+            {
+                return;
+            }
+
+            conditions.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                value,
+                new SmtNullConstant()));
+        }
+
+        private static string GetFormulaVariableName(SmtFormula formula)
+        {
+            return formula is SmtVariable variable
+                ? variable.Name
+                : formula.ToString() ?? string.Empty;
         }
 
         private static bool TryResolvePropertySubpatternValue(
@@ -787,25 +1144,56 @@ namespace PurelySharp.Symbolic.Smt
         {
             formula = null;
             var variableName = receiver + "." + memberName;
+            if (TryGetValueKind(type, out var kind))
+            {
+                formula = new SmtVariable(variableName, kind);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
+        {
             if (type.SpecialType == SpecialType.System_Boolean)
             {
-                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                kind = SmtValueKind.Bool;
                 return true;
             }
 
             if (IsIntegralOrEnumType(type))
             {
-                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                kind = SmtValueKind.Int;
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (type.IsReferenceType ||
+                IsSupportedTupleCarrierType(type))
             {
-                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                kind = SmtValueKind.Reference;
                 return true;
             }
 
+            kind = default;
             return false;
+        }
+
+        private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
+        {
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType && namedType.TupleElements.Length > 0)
+            {
+                return true;
+            }
+
+            return namedType
+                .GetMembers()
+                .OfType<IFieldSymbol>()
+                .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
         }
 
         private static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)

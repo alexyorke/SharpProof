@@ -51,6 +51,41 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NonNullStringCoalesceDivideByZeroFallback_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public string TestMethod()
+    {
+        var zero = 0;
+        return ""value"" ?? (10 / zero).ToString();
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UnknownStringCoalesceDivideByZeroFallback_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public string TestMethod(string text)
+    {
+        var zero = 0;
+        return text ?? (10 / zero).ToString();
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
         public async Task Ps0010_NonNullConditionalAccessCoalesceOutOfRangeFallback_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -65,6 +100,43 @@ public class TestClass
         }
 
         return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NonNullObjectConditionalAccessCoalesceOutOfRangeFallback_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public sealed class Box
+{
+    public int Value { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[1];
+        return new Box()?.Value ?? values[1];
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NonNullStringCoalesceRangeFallback_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public string TestMethod()
+    {
+        var values = new int[1];
+        return ""value"" ?? values[0..2].Length.ToString();
     }
 }");
 

@@ -69,6 +69,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void PurityProof_ApproximateRegexPathDoesNotProveImpurityReachable()
+        {
+            using var search = new PurityProofSearch();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = search.Classify(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\bA\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                new SmtBooleanConstant(true),
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result.Reason, Is.EqualTo("impurity_feasibility_unknown"));
+        }
+
+        [Test]
         public void PurityProof_NullReceiverCondition_IsProvablyImpure()
         {
             using var search = new PurityProofSearch();

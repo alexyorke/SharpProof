@@ -528,7 +528,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
-                GetContainingMethodName(query.Node));
+                GetContainingMethodName(query.Node),
+                GetProgramPointKind(query.Node));
         }
 
         public SymbolicLineQueryResult QuerySyntaxTreeLine(
@@ -596,7 +597,8 @@ namespace PurelySharp.Symbolic
                         nodeSourceSpan.StartColumn,
                         nodeSourceSpan.EndLine,
                         nodeSourceSpan.EndColumn,
-                        GetContainingMethodName(query.Node));
+                        GetContainingMethodName(query.Node),
+                        GetProgramPointKind(query.Node));
                 })
                 .ToArray();
 
@@ -703,7 +705,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
-                GetContainingMethodName(query.Node));
+                GetContainingMethodName(query.Node),
+                GetProgramPointKind(query.Node));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -738,7 +741,8 @@ namespace PurelySharp.Symbolic
                 query.Position,
                 query.Node.SpanStart,
                 query.Node.Kind().ToString(),
-                query.Analysis);
+                query.Analysis,
+                GetProgramPointKind(query.Node));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTreeAtPosition(
@@ -772,7 +776,8 @@ namespace PurelySharp.Symbolic
                 query.Position,
                 query.Node.SpanStart,
                 query.Node.Kind().ToString(),
-                query.Analysis);
+                query.Analysis,
+                GetProgramPointKind(query.Node));
         }
 
         public SymbolicConditionProofResult ProveConditionAtFile(
@@ -1295,6 +1300,16 @@ namespace PurelySharp.Symbolic
             return null;
         }
 
+        private static string GetProgramPointKind(SyntaxNode node)
+        {
+            return node switch
+            {
+                StatementSyntax => SymbolicProgramPointKinds.Statement,
+                ExpressionSyntax => SymbolicProgramPointKinds.Expression,
+                _ => SymbolicProgramPointKinds.Other,
+            };
+        }
+
         private readonly struct LineColumn
         {
             public LineColumn(int line, int column)
@@ -1610,6 +1625,7 @@ namespace PurelySharp.Symbolic
             int? position,
             string? nodeKind,
             string? methodName,
+            string? programPointKind,
             int? nodeSpanStart,
             int? nodeSpanEnd,
             int? nodeSpanLength,
@@ -1639,6 +1655,7 @@ namespace PurelySharp.Symbolic
             Position = position;
             NodeKind = nodeKind;
             MethodName = methodName;
+            ProgramPointKind = programPointKind;
             NodeSpanStart = nodeSpanStart;
             NodeSpanEnd = nodeSpanEnd;
             NodeSpanLength = nodeSpanLength;
@@ -1666,6 +1683,8 @@ namespace PurelySharp.Symbolic
 
         public string Kind { get; }
 
+        public int SchemaVersion => 1;
+
         public string FilePath { get; }
 
         public int? Line { get; }
@@ -1677,6 +1696,8 @@ namespace PurelySharp.Symbolic
         public string? NodeKind { get; }
 
         public string? MethodName { get; }
+
+        public string? ProgramPointKind { get; }
 
         public int? NodeSpanStart { get; }
 
@@ -1759,6 +1780,7 @@ namespace PurelySharp.Symbolic
                 result.Position,
                 result.NodeKind,
                 result.MethodName,
+                result.ProgramPointKind,
                 result.NodeSpanStart,
                 result.NodeSpanEnd,
                 result.NodeSpanLength,
@@ -1814,6 +1836,7 @@ namespace PurelySharp.Symbolic
                 "line",
                 result.FilePath,
                 result.Line,
+                null,
                 null,
                 null,
                 null,
@@ -1891,6 +1914,7 @@ namespace PurelySharp.Symbolic
             return new SymbolicCompactQueryResult(
                 "file",
                 result.FilePath,
+                null,
                 null,
                 null,
                 null,
@@ -2039,6 +2063,7 @@ namespace PurelySharp.Symbolic
             int nodeEndColumn,
             string nodeKind,
             string? methodName,
+            string programPointKind,
             int factCount,
             IReadOnlyList<string> facts,
             SymbolicCompactInvariantSummary observedInvariant,
@@ -2065,6 +2090,7 @@ namespace PurelySharp.Symbolic
             NodeEndColumn = nodeEndColumn;
             NodeKind = nodeKind ?? string.Empty;
             MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+            ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             FactCount = factCount;
             Facts = facts ?? throw new ArgumentNullException(nameof(facts));
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
@@ -2105,6 +2131,8 @@ namespace PurelySharp.Symbolic
         public string NodeKind { get; }
 
         public string? MethodName { get; }
+
+        public string ProgramPointKind { get; }
 
         public int FactCount { get; }
 
@@ -2171,6 +2199,7 @@ namespace PurelySharp.Symbolic
                 result.NodeEndColumn,
                 result.NodeKind,
                 result.MethodName,
+                result.ProgramPointKind,
                 result.Facts.Count,
                 facts,
                 observedInvariant,
@@ -2197,6 +2226,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<string> targets,
             int rawFactCount,
             IReadOnlyList<string> rawFacts,
+            int conservativeUnknownCount,
             SymbolicCompactMergedPathFacts? mergedPathFacts,
             bool conditionsTruncated,
             bool targetsTruncated,
@@ -2210,6 +2240,8 @@ namespace PurelySharp.Symbolic
             Targets = targets ?? throw new ArgumentNullException(nameof(targets));
             RawFactCount = rawFactCount;
             RawFacts = rawFacts ?? throw new ArgumentNullException(nameof(rawFacts));
+            ConservativeUnknownCount = conservativeUnknownCount;
+            HasConservativeUnknowns = conservativeUnknownCount != 0;
             MergedPathFacts = mergedPathFacts;
             ConditionsTruncated = conditionsTruncated;
             TargetsTruncated = targetsTruncated;
@@ -2231,6 +2263,10 @@ namespace PurelySharp.Symbolic
         public int RawFactCount { get; }
 
         public IReadOnlyList<string> RawFacts { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public bool HasConservativeUnknowns { get; }
 
         public SymbolicCompactMergedPathFacts? MergedPathFacts { get; }
 
@@ -2258,6 +2294,7 @@ namespace PurelySharp.Symbolic
                 SymbolicCompactProjection.Take(targets, options.MaxConditions),
                 rawFacts.Count,
                 SymbolicCompactProjection.Take(rawFacts, options.MaxFacts),
+                invariant.ConservativeUnknownCount,
                 null,
                 conditions.Length > options.MaxConditions,
                 targets.Length > options.MaxConditions,
@@ -2282,6 +2319,7 @@ namespace PurelySharp.Symbolic
                 SymbolicCompactProjection.Take(targets, options.MaxConditions),
                 0,
                 Array.Empty<string>(),
+                invariant.ConservativeUnknownCount,
                 mergedPathFacts == null
                     ? null
                     : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
@@ -2846,7 +2884,16 @@ namespace PurelySharp.Symbolic
             bool requirePathConditions = false,
             IEnumerable<string>? conditionTargets = null,
             IEnumerable<string>? conditionTexts = null,
-            IEnumerable<string>? conditionTextContains = null)
+            IEnumerable<string>? conditionTextContains = null,
+            IEnumerable<string>? methodNameContains = null,
+            IEnumerable<int>? lines = null,
+            int? lineStart = null,
+            int? lineEnd = null,
+            IEnumerable<string>? programPointKinds = null,
+            bool requireProofs = false,
+            IEnumerable<SymbolicTruthValue>? proofOutcomes = null,
+            IEnumerable<string>? proofConditions = null,
+            IEnumerable<string>? proofConditionContains = null)
         {
             NodeKinds = nodeKinds?
                 .Where(static kind => !string.IsNullOrWhiteSpace(kind))
@@ -2862,6 +2909,22 @@ namespace PurelySharp.Symbolic
             ConditionTargets = NormalizeStrings(conditionTargets, StringComparer.OrdinalIgnoreCase);
             ConditionTexts = NormalizeStrings(conditionTexts, StringComparer.Ordinal);
             ConditionTextContains = NormalizeStrings(conditionTextContains, StringComparer.OrdinalIgnoreCase);
+            MethodNameContains = NormalizeStrings(methodNameContains, StringComparer.OrdinalIgnoreCase);
+            Lines = NormalizePositiveIntegers(lines, nameof(lines));
+            LineStart = ValidatePositiveLine(lineStart, nameof(lineStart));
+            LineEnd = ValidatePositiveLine(lineEnd, nameof(lineEnd));
+            if (LineStart.HasValue && LineEnd.HasValue && LineStart.Value > LineEnd.Value)
+            {
+                throw new ArgumentException("LineStart cannot be greater than LineEnd.", nameof(lineStart));
+            }
+
+            ProgramPointKinds = NormalizeProgramPointKinds(programPointKinds);
+            RequireProofs = requireProofs;
+            ProofOutcomes = proofOutcomes?
+                .Distinct()
+                .ToArray() ?? Array.Empty<SymbolicTruthValue>();
+            ProofConditions = NormalizeStrings(proofConditions, StringComparer.Ordinal);
+            ProofConditionContains = NormalizeStrings(proofConditionContains, StringComparer.OrdinalIgnoreCase);
         }
 
         public IReadOnlyList<string> NodeKinds { get; }
@@ -2880,6 +2943,24 @@ namespace PurelySharp.Symbolic
 
         public IReadOnlyList<string> ConditionTextContains { get; }
 
+        public IReadOnlyList<string> MethodNameContains { get; }
+
+        public IReadOnlyList<int> Lines { get; }
+
+        public int? LineStart { get; }
+
+        public int? LineEnd { get; }
+
+        public IReadOnlyList<string> ProgramPointKinds { get; }
+
+        public bool RequireProofs { get; }
+
+        public IReadOnlyList<SymbolicTruthValue> ProofOutcomes { get; }
+
+        public IReadOnlyList<string> ProofConditions { get; }
+
+        public IReadOnlyList<string> ProofConditionContains { get; }
+
         public bool IsEmpty =>
             NodeKinds.Count == 0 &&
             !RequireFacts &&
@@ -2888,7 +2969,16 @@ namespace PurelySharp.Symbolic
             !RequirePathConditions &&
             ConditionTargets.Count == 0 &&
             ConditionTexts.Count == 0 &&
-            ConditionTextContains.Count == 0;
+            ConditionTextContains.Count == 0 &&
+            MethodNameContains.Count == 0 &&
+            Lines.Count == 0 &&
+            !LineStart.HasValue &&
+            !LineEnd.HasValue &&
+            ProgramPointKinds.Count == 0 &&
+            !RequireProofs &&
+            ProofOutcomes.Count == 0 &&
+            ProofConditions.Count == 0 &&
+            ProofConditionContains.Count == 0;
 
         public bool Matches(SymbolicSourceQueryResult result)
         {
@@ -2908,6 +2998,27 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            if (ProgramPointKinds.Count != 0 &&
+                !ProgramPointKinds.Any(kind => string.Equals(kind, result.ProgramPointKind, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            if (Lines.Count != 0 && !Lines.Contains(result.Line))
+            {
+                return false;
+            }
+
+            if (LineStart.HasValue && result.Line < LineStart.Value)
+            {
+                return false;
+            }
+
+            if (LineEnd.HasValue && result.Line > LineEnd.Value)
+            {
+                return false;
+            }
+
             if (Reachability.Count != 0 && !Reachability.Contains(result.Reachability))
             {
                 return false;
@@ -2916,6 +3027,14 @@ namespace PurelySharp.Symbolic
             if (MethodNames.Count != 0 &&
                 (string.IsNullOrWhiteSpace(result.MethodName) ||
                  !MethodNames.Any(methodName => string.Equals(methodName, result.MethodName, StringComparison.OrdinalIgnoreCase))))
+            {
+                return false;
+            }
+
+            var resultMethodName = result.MethodName;
+            if (MethodNameContains.Count != 0 &&
+                (string.IsNullOrWhiteSpace(resultMethodName) ||
+                 !MethodNameContains.Any(text => resultMethodName!.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)))
             {
                 return false;
             }
@@ -2946,6 +3065,31 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            if (RequireProofs && result.ConditionProofs.Count == 0)
+            {
+                return false;
+            }
+
+            if (ProofOutcomes.Count != 0 &&
+                !result.ConditionProofs.Any(proof => ProofOutcomes.Contains(proof.TruthValue)))
+            {
+                return false;
+            }
+
+            if (ProofConditions.Count != 0 &&
+                !result.ConditionProofs.Any(proof =>
+                    ProofConditions.Any(condition => string.Equals(condition, proof.Condition, StringComparison.Ordinal))))
+            {
+                return false;
+            }
+
+            if (ProofConditionContains.Count != 0 &&
+                !result.ConditionProofs.Any(proof =>
+                    ProofConditionContains.Any(text => proof.Condition.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -2958,6 +3102,66 @@ namespace PurelySharp.Symbolic
                 .Select(static value => value.Trim())
                 .Distinct(comparer)
                 .ToArray() ?? Array.Empty<string>();
+        }
+
+        private static IReadOnlyList<string> NormalizeProgramPointKinds(IEnumerable<string>? values)
+        {
+            return values?
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => NormalizeProgramPointKindFilter(value.Trim()))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? Array.Empty<string>();
+        }
+
+        private static string NormalizeProgramPointKindFilter(string value)
+        {
+            if (string.Equals(value, SymbolicProgramPointKinds.Statement, StringComparison.OrdinalIgnoreCase))
+            {
+                return SymbolicProgramPointKinds.Statement;
+            }
+
+            if (string.Equals(value, SymbolicProgramPointKinds.Expression, StringComparison.OrdinalIgnoreCase))
+            {
+                return SymbolicProgramPointKinds.Expression;
+            }
+
+            if (string.Equals(value, SymbolicProgramPointKinds.Other, StringComparison.OrdinalIgnoreCase))
+            {
+                return SymbolicProgramPointKinds.Other;
+            }
+
+            return value;
+        }
+
+        private static IReadOnlyList<int> NormalizePositiveIntegers(IEnumerable<int>? values, string paramName)
+        {
+            if (values == null)
+            {
+                return Array.Empty<int>();
+            }
+
+            var normalized = new SortedSet<int>();
+            foreach (var value in values)
+            {
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(paramName, "Line filters must be 1 or greater.");
+                }
+
+                normalized.Add(value);
+            }
+
+            return normalized.ToArray();
+        }
+
+        private static int? ValidatePositiveLine(int? value, string paramName)
+        {
+            if (value.HasValue && value.Value < 1)
+            {
+                throw new ArgumentOutOfRangeException(paramName, "Line filters must be 1 or greater.");
+            }
+
+            return value;
         }
     }
 
@@ -3153,16 +3357,20 @@ namespace PurelySharp.Symbolic
             int unknownCount,
             int provenTrueCount,
             int provenFalseCount,
-            int unreachableCount)
+            int unreachableCount,
+            int? totalCount = null)
         {
             Condition = condition ?? throw new ArgumentNullException(nameof(condition));
             UnknownCount = unknownCount;
             ProvenTrueCount = provenTrueCount;
             ProvenFalseCount = provenFalseCount;
             UnreachableCount = unreachableCount;
+            TotalCount = totalCount ?? unknownCount + provenTrueCount + provenFalseCount + unreachableCount;
         }
 
         public string Condition { get; }
+
+        public int TotalCount { get; }
 
         public int UnknownCount { get; }
 
@@ -3473,6 +3681,54 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    public static class SymbolicProgramPointKinds
+    {
+        public const string Statement = "Statement";
+        public const string Expression = "Expression";
+        public const string Other = "Other";
+
+        public static string Normalize(string? programPointKind, string? nodeKind = null)
+        {
+            if (string.Equals(programPointKind, Statement, StringComparison.OrdinalIgnoreCase))
+            {
+                return Statement;
+            }
+
+            if (string.Equals(programPointKind, Expression, StringComparison.OrdinalIgnoreCase))
+            {
+                return Expression;
+            }
+
+            if (string.Equals(programPointKind, Other, StringComparison.OrdinalIgnoreCase))
+            {
+                return Other;
+            }
+
+            return InferFromNodeKind(nodeKind);
+        }
+
+        private static string InferFromNodeKind(string? nodeKind)
+        {
+            if (string.IsNullOrWhiteSpace(nodeKind))
+            {
+                return Other;
+            }
+
+            var nonEmptyNodeKind = nodeKind!;
+            if (nonEmptyNodeKind.EndsWith(Statement, StringComparison.Ordinal))
+            {
+                return Statement;
+            }
+
+            if (nonEmptyNodeKind.EndsWith(Expression, StringComparison.Ordinal))
+            {
+                return Expression;
+            }
+
+            return Other;
+        }
+    }
+
     public sealed class SymbolicSourceQueryResult
     {
         public SymbolicSourceQueryResult(
@@ -3494,7 +3750,8 @@ namespace PurelySharp.Symbolic
             int? nodeStartColumn = null,
             int? nodeEndLine = null,
             int? nodeEndColumn = null,
-            string? methodName = null)
+            string? methodName = null,
+            string? programPointKind = null)
         {
             FilePath = filePath;
             Line = line;
@@ -3509,6 +3766,7 @@ namespace PurelySharp.Symbolic
             NodeEndColumn = nodeEndColumn ?? NodeStartColumn + NodeSpanLength;
             NodeKind = nodeKind;
             MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+            ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             Facts = facts ?? Array.Empty<string>();
             MergedInvariantText = mergedInvariantText ??
                 (pathConditions == null
@@ -3552,6 +3810,8 @@ namespace PurelySharp.Symbolic
         public string NodeKind { get; }
 
         public string? MethodName { get; }
+
+        public string ProgramPointKind { get; }
 
         public IReadOnlyList<string> Facts { get; }
 
@@ -3609,6 +3869,10 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicInvariantCondition> Conditions { get; }
 
         public int ConditionCount => Conditions.Count;
+
+        public int ConservativeUnknownCount => Conditions.Count(static condition => condition.IsConservativeUnknown);
+
+        public bool HasConservativeUnknowns => ConservativeUnknownCount != 0;
 
         public string MergedInvariantText { get; }
 
@@ -3796,7 +4060,8 @@ namespace PurelySharp.Symbolic
             int position,
             int nodeSpanStart,
             string nodeKind,
-            SymbolicProgramPointAnalysis analysis)
+            SymbolicProgramPointAnalysis analysis,
+            string? programPointKind = null)
         {
             FilePath = filePath;
             Line = line;
@@ -3804,6 +4069,7 @@ namespace PurelySharp.Symbolic
             Position = position;
             NodeSpanStart = nodeSpanStart;
             NodeKind = nodeKind;
+            ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             Analysis = analysis ?? throw new ArgumentNullException(nameof(analysis));
         }
 
@@ -3818,6 +4084,8 @@ namespace PurelySharp.Symbolic
         public int NodeSpanStart { get; }
 
         public string NodeKind { get; }
+
+        public string ProgramPointKind { get; }
 
         public SymbolicProgramPointAnalysis Analysis { get; }
 

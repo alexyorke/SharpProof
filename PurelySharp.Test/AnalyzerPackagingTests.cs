@@ -433,8 +433,17 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--all-lines"));
             Assert.That(source, Does.Contain("--line-expressions"));
             Assert.That(source, Does.Contain("--node-kind <kind>"));
+            Assert.That(source, Does.Contain("--program-point-kind <kind>"));
+            Assert.That(source, Does.Contain("--filter-line <n>"));
+            Assert.That(source, Does.Contain("--line-start <n>"));
+            Assert.That(source, Does.Contain("--line-end <n>"));
             Assert.That(source, Does.Contain("--with-facts"));
+            Assert.That(source, Does.Contain("--method-contains <text>"));
             Assert.That(source, Does.Contain("--reachability <r>"));
+            Assert.That(source, Does.Contain("--with-proofs"));
+            Assert.That(source, Does.Contain("--proof-outcome <v>"));
+            Assert.That(source, Does.Contain("--proof-condition <expr>"));
+            Assert.That(source, Does.Contain("--proof-condition-contains <text>"));
             Assert.That(source, Does.Contain("queryService.QueryFileAllLines"));
             Assert.That(source, Does.Contain("SymbolicFileQueryResult"));
             Assert.That(source, Does.Contain("QueryFileAtPosition"));
@@ -444,6 +453,8 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("Line merged invariant"));
             Assert.That(source, Does.Contain("Invariant merge"));
             Assert.That(source, Does.Contain("Path conditions"));
+            Assert.That(source, Does.Contain("Program point kind"));
+            Assert.That(source, Does.Contain("Conservative unknown conditions"));
             Assert.That(source, Does.Contain("Program point summary"));
             Assert.That(source, Does.Contain("Proof outcomes"));
             Assert.That(source, Does.Contain("MaxPerPoint"));

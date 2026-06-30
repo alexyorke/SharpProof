@@ -172,6 +172,83 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesSwitchStatementPositionalPatternPartialStructuralFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod((int, object) pair)
+    {
+        switch (pair)
+        {
+            case (> 0, string text):
+                return 10 / pair.Item1;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / pair.Item1;");
+            var proof = ProveAtMarker(source, marker, "pair.Item1 > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesSwitchExpressionListElementPartialStructuralFact()
+        {
+            const string source = @"
+public sealed class Entry
+{
+    public int Count { get; init; }
+
+    public object Tag { get; init; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Entry[] values)
+    {
+        return values switch
+        {
+            [ { Count: > 0, Tag: string text }, ..] => 10 / values[0].Count,
+            _ => 0
+        };
+    }
+}";
+
+            var marker = FindMarker(source, "10 / values[0].Count");
+            var proof = ProveAtMarker(source, marker, "values[0].Count > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_SwitchStatementDefaultExcludesTranslatedGuardedCase()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0 when value >= 0:
+                return 0;
+            default:
+                return 10 / value;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / value;");
+            var proof = ProveAtMarker(source, marker, "value != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_SwitchStatementFallbackUnknownGuardDoesNotExcludeCase()
         {
             const string source = @"

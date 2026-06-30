@@ -20,6 +20,7 @@ namespace PurelySharp.Analyzer
             Engine.CompilationPurityService purityService,
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
+            bool reportBclFallbackGuesses,
             DiagnosticBaseline baseline)
         {
 
@@ -140,6 +141,10 @@ namespace PurelySharp.Analyzer
                 context.Options,
                 context.Node.SyntaxTree,
                 emitExplanations);
+            var effectiveReportBclFallbackGuesses = AnalyzerConfiguration.GetReportBclFallbackGuesses(
+                context.Options,
+                context.Node.SyntaxTree,
+                reportBclFallbackGuesses);
 
             if (!isPure && hasPurityEnforcementAttribute)
             {
@@ -172,23 +177,25 @@ namespace PurelySharp.Analyzer
                             properties: properties,
                             messageArgs: new object[] { methodSymbol.Name, purityResult.Evidence.ToSummary() });
                         context.ReportDiagnostic(explanation);
-
-                        if (!string.IsNullOrEmpty(purityResult.Evidence.BclFallbackGuess))
-                        {
-                            var fallbackDiagnostic = Diagnostic.Create(
-                                PurelySharpDiagnostics.BclFallbackGuessRule,
-                                diagnosticLocation,
-                                additionalLocations: null,
-                                properties: properties,
-                                messageArgs: new object[]
-                                {
-                                    methodSymbol.Name,
-                                    purityResult.Evidence.BclFallbackGuess,
-                                    purityResult.Evidence.BclFallbackReason
-                                });
-                            context.ReportDiagnostic(fallbackDiagnostic);
-                        }
                     }
+
+                    if ((effectiveEmitExplanations || effectiveReportBclFallbackGuesses) &&
+                        !string.IsNullOrEmpty(purityResult.Evidence.BclFallbackGuess))
+                    {
+                        var fallbackDiagnostic = Diagnostic.Create(
+                            PurelySharpDiagnostics.BclFallbackGuessRule,
+                            diagnosticLocation,
+                            additionalLocations: null,
+                            properties: properties,
+                            messageArgs: new object[]
+                            {
+                                methodSymbol.Name,
+                                purityResult.Evidence.BclFallbackGuess,
+                                purityResult.Evidence.BclFallbackReason
+                            });
+                        context.ReportDiagnostic(fallbackDiagnostic);
+                    }
+
                     PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic PS0002 for {methodSymbol.Name} at {diagnosticLocation}.");
                 }
                 else

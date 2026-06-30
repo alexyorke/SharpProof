@@ -1578,6 +1578,16 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
+            if (TryGetSyntacticReferenceNullState(expression, semanticModel, cancellationToken, out var isDefinitelyNull))
+            {
+                if (isNull != isDefinitelyNull)
+                {
+                    pathConditions.Add(new SmtBooleanConstant(false));
+                }
+
+                return;
+            }
+
             if (!CSharpConditionToFormula.TryTranslateValue(
                     expression,
                     semanticModel,
@@ -1593,6 +1603,83 @@ namespace PurelySharp.Analyzer
                 isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
                 formula,
                 new SmtNullConstant()));
+        }
+
+        private static bool TryGetSyntacticReferenceNullState(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out bool isNull)
+        {
+            expression = UnwrapFactExpression(expression);
+            if (expression is CastExpressionSyntax castExpression)
+            {
+                if (!IsReferenceType(GetExpressionType(castExpression, semanticModel, cancellationToken)))
+                {
+                    isNull = false;
+                    return false;
+                }
+
+                return TryGetSyntacticReferenceNullState(castExpression.Expression, semanticModel, cancellationToken, out isNull);
+            }
+
+            if (expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+                IsDefaultReferenceExpression(expression, semanticModel, cancellationToken))
+            {
+                isNull = true;
+                return true;
+            }
+
+            var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue)
+            {
+                if (constantValue.Value == null && IsReferenceType(expressionType))
+                {
+                    isNull = true;
+                    return true;
+                }
+
+                if (constantValue.Value is string)
+                {
+                    isNull = false;
+                    return true;
+                }
+            }
+
+            if (IsSyntacticallyNonNullReferenceExpression(expression, expressionType))
+            {
+                isNull = false;
+                return true;
+            }
+
+            isNull = false;
+            return false;
+        }
+
+        private static bool IsSyntacticallyNonNullReferenceExpression(
+            ExpressionSyntax expression,
+            ITypeSymbol? expressionType)
+        {
+            if (!IsReferenceType(expressionType))
+            {
+                return false;
+            }
+
+            return expression switch
+            {
+                ThisExpressionSyntax => true,
+                BaseExpressionSyntax => true,
+                ObjectCreationExpressionSyntax => true,
+                ImplicitObjectCreationExpressionSyntax => true,
+                AnonymousObjectCreationExpressionSyntax => true,
+                ArrayCreationExpressionSyntax => true,
+                ImplicitArrayCreationExpressionSyntax => true,
+                InterpolatedStringExpressionSyntax => true,
+                TypeOfExpressionSyntax => true,
+                CollectionExpressionSyntax when expressionType is IArrayTypeSymbol => true,
+                _ => false
+            };
         }
 
         private static void TryAddCoalesceRightPathCondition(

@@ -124,7 +124,9 @@ public class TestClass
                 includeExpressionProgramPoints: true);
 
             Assert.That(expressionResult.ProgramPoints.Select(point => point.NodeKind), Does.Contain("ReturnStatement"));
+            Assert.That(expressionResult.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement").ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
             var addPoint = expressionResult.ProgramPoints.Single(point => point.NodeKind == "AddExpression");
+            Assert.That(addPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
             Assert.That(addPoint.MergedInvariantText, Is.EqualTo("value > 0"));
             Assert.That(addPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
             Assert.That(addPoint.NodeStartLine, Is.EqualTo(FindLine(source, "return value + 1;")));
@@ -513,6 +515,78 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryFilter_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int FirstValue(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+
+    public int SecondValue(int value)
+    {
+        if (value > 0)
+        {
+            return value + 2;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "RicherFilterQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "RicherFilterQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var firstReturnLine = FindLine(source, "return value + 1;");
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" },
+                includeExpressionProgramPoints: true);
+            var filtered = result.Filter(new SymbolicSourceQueryFilter(
+                methodNameContains: new[] { "First" },
+                lines: new[] { firstReturnLine },
+                lineStart: firstReturnLine,
+                lineEnd: firstReturnLine,
+                programPointKinds: new[] { SymbolicProgramPointKinds.Expression },
+                requireProofs: true,
+                proofOutcomes: new[] { SymbolicTruthValue.ProvenTrue },
+                proofConditions: new[] { "value > 0" },
+                proofConditionContains: new[] { "value" }));
+            var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+
+            Assert.That(points, Has.Length.EqualTo(1));
+            Assert.That(points[0].NodeKind, Is.EqualTo("AddExpression"));
+            Assert.That(points[0].ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(points[0].MethodName, Is.EqualTo("FirstValue"));
+            Assert.That(points[0].Line, Is.EqualTo(firstReturnLine));
+            Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
+
+            var compactPoint = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10))
+                .Lines
+                .SelectMany(static line => line.ProgramPoints)
+                .Single();
+            Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(compactPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
         {
             const string source = @"
@@ -553,10 +627,12 @@ public class TestClass
                 maxProofs: 0));
 
             Assert.That(compact.Kind, Is.EqualTo("point"));
+            Assert.That(compact.SchemaVersion, Is.EqualTo(1));
             Assert.That(compact.Line, Is.EqualTo(result.Line));
             Assert.That(compact.Column, Is.EqualTo(result.Column));
             Assert.That(compact.Position, Is.EqualTo(position));
             Assert.That(compact.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(compact.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
             Assert.That(compact.NodeSpanStart, Is.EqualTo(result.NodeSpanStart));
             Assert.That(compact.NodeSpanEnd, Is.EqualTo(result.NodeSpanEnd));
             Assert.That(compact.NodeSpanLength, Is.EqualTo(result.NodeSpanLength));
@@ -577,6 +653,8 @@ public class TestClass
             Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
             Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
             Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
+            Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.Invariant.ConservativeUnknownCount));
+            Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.False);
             Assert.That(compact.ConservativeInvariant.Conditions, Is.Empty);
 
             var json = JsonSerializer.Serialize(
@@ -591,8 +669,10 @@ public class TestClass
             var root = document.RootElement;
             Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
             Assert.That(kind.GetString(), Is.EqualTo("point"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
             Assert.That(root.TryGetProperty("Kind", out _), Is.False);
             Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
+            Assert.That(root.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
             Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
             Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
             Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
@@ -648,6 +728,8 @@ public class TestClass
             Assert.That(compact.ObservedInvariant.Text, Does.Contain("GreaterThan"));
             Assert.That(compact.ConservativeInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
             Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
+            Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.True);
             Assert.That(compact.ConservativeInvariant.Targets, Does.Contain("value"));
             Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
             Assert.That(compact.ConservativeInvariant.MergedPathFacts!.ConservativeUnknowns, Does.Contain("unknown(value)"));
@@ -674,6 +756,7 @@ public class TestClass
             Assert.That(compactPoint.NodeEndLine, Is.EqualTo(sourcePoint.NodeEndLine));
             Assert.That(compactPoint.NodeEndColumn, Is.EqualTo(sourcePoint.NodeEndColumn));
             Assert.That(compactPoint.MethodName, Is.EqualTo(sourcePoint.MethodName));
+            Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(sourcePoint.ProgramPointKind));
             Assert.That(compactPoint.MergedInvariantText, Is.EqualTo(sourcePoint.MergedInvariantText));
             Assert.That(compactPoint.Reachability, Is.EqualTo(sourcePoint.Reachability.ToString()));
             Assert.That(compactPoint.ReachabilityReason, Is.EqualTo(sourcePoint.ReachabilityReason));
@@ -782,6 +865,7 @@ public class TestClass
                 using var document = JsonDocument.Parse(result.StandardOutput);
                 var root = document.RootElement;
                 Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
                 Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
 
@@ -795,6 +879,7 @@ public class TestClass
                 Assert.That(point.GetProperty("nodeSpanLength").GetInt32(), Is.GreaterThan(0));
                 Assert.That(point.GetProperty("nodeStartLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
                 Assert.That(point.GetProperty("nodeEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
                 Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
                 Assert.That(point.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
                 Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
@@ -802,6 +887,7 @@ public class TestClass
                 Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conservativeUnknownCount").GetInt32(), Is.Zero);
                 Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
                 Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
                 Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
@@ -842,6 +928,8 @@ public class TestClass
                     FindLine(source, "return value + 1;").ToString(),
                     "--line-invariants",
                     "--line-expressions",
+                    "--program-point-kind",
+                    "Expression",
                     "--node-kind",
                     "AddExpression",
                     "--check-reachability",
@@ -859,8 +947,92 @@ public class TestClass
 
                 var point = root.GetProperty("programPoints")[0];
                 Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
                 Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
                 Assert.That(point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(), Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RicherFilters_NarrowExpressionProofResults()
+        {
+            var source = @"
+public class TestClass
+{
+    public int FirstValue(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+
+    public int SecondValue(int value)
+    {
+        if (value > 0)
+        {
+            return value + 2;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRicherFilters-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var firstReturnLine = FindLine(source, "return value + 1;");
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--all-lines",
+                    "--line-expressions",
+                    "--method-contains",
+                    "First",
+                    "--filter-line",
+                    firstReturnLine.ToString(),
+                    "--line-start",
+                    firstReturnLine.ToString(),
+                    "--line-end",
+                    firstReturnLine.ToString(),
+                    "--program-point-kind",
+                    "Expression",
+                    "--with-proofs",
+                    "--proof-outcome",
+                    "ProvenTrue",
+                    "--proof-condition",
+                    "value > 0",
+                    "--proof-condition-contains",
+                    "value",
+                    "--implies",
+                    "value > 0",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("conditionProofs")[0].GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+
+                var point = root
+                    .GetProperty("lines")[0]
+                    .GetProperty("programPoints")[0];
+                Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(firstReturnLine));
+                Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
+                Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("FirstValue"));
+                Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
             }
             finally
             {

@@ -211,6 +211,7 @@ static void PrintPointResult(
     }
 
     Console.WriteLine($"Node: {result.NodeKind}");
+    Console.WriteLine($"Program point kind: {result.ProgramPointKind}");
     if (!string.IsNullOrWhiteSpace(result.MethodName))
     {
         Console.WriteLine($"Method: {result.MethodName}");
@@ -219,6 +220,19 @@ static void PrintPointResult(
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
+    Console.WriteLine($"Conservative unknown conditions: {result.Invariant.ConservativeUnknownCount}");
+    if (result.Invariant.ConditionCount != 0)
+    {
+        Console.WriteLine("Invariant conditions:");
+        foreach (var condition in result.Invariant.Conditions)
+        {
+            var unknown = condition.IsConservativeUnknown ? " conservative-unknown" : string.Empty;
+            Console.WriteLine(
+                $"  [{condition.Index}] {condition.Text} " +
+                $"target={condition.Target} kind={condition.FormulaKind}{unknown}");
+        }
+    }
+
     if (options.CheckReachability)
     {
         Console.WriteLine($"Reachability: {result.Reachability}");
@@ -337,15 +351,28 @@ Options:
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
+  --program-point-kind <kind>
+                      Keep only Statement, Expression, or Other program points. Can be repeated.
+  --filter-line <n>   Keep only program points on this 1-based line in aggregate output. Can be repeated.
+  --line-start <n>    Keep only program points at or after this 1-based line.
+  --line-end <n>      Keep only program points at or before this 1-based line.
   --with-facts        Keep only program points that have at least one reported fact.
   --with-conditions   Keep only program points that have at least one path condition.
   --method <name>     Keep only program points inside a matching method/local function. Can be repeated.
+  --method-contains <text>
+                      Keep only program points inside a method/local function containing text. Can be repeated.
   --condition-target <target>
                       Keep only program points with a path condition for the target. Can be repeated.
   --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
   --condition-contains <text>
                       Keep only program points with a path condition containing text. Can be repeated.
   --reachability <r>  Keep only program points with reachability NotChecked, Unknown, Reachable, or Unreachable. Can be repeated.
+  --with-proofs       Keep only program points with at least one implication proof result.
+  --proof-outcome <v> Keep only program points with proof outcome Unknown, ProvenTrue, ProvenFalse, or Unreachable. Can be repeated.
+  --proof-condition <expr>
+                      Keep only program points with an exact implication condition. Can be repeated.
+  --proof-condition-contains <text>
+                      Keep only program points with an implication condition containing text. Can be repeated.
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
@@ -386,11 +413,21 @@ Options:
 
     public List<string> NodeKinds { get; } = new();
 
+    public List<string> ProgramPointKinds { get; } = new();
+
+    public List<int> FilterLines { get; } = new();
+
+    public int? FilterLineStart { get; private set; }
+
+    public int? FilterLineEnd { get; private set; }
+
     public bool WithFacts { get; private set; }
 
     public bool WithConditions { get; private set; }
 
     public List<string> MethodNames { get; } = new();
+
+    public List<string> MethodNameContains { get; } = new();
 
     public List<string> ConditionTargets { get; } = new();
 
@@ -399,6 +436,14 @@ Options:
     public List<string> ConditionContains { get; } = new();
 
     public List<SymbolicReachability> ReachabilityFilters { get; } = new();
+
+    public bool WithProofs { get; private set; }
+
+    public List<SymbolicTruthValue> ProofOutcomes { get; } = new();
+
+    public List<string> ProofConditions { get; } = new();
+
+    public List<string> ProofConditionContains { get; } = new();
 
     public bool Json { get; private set; }
 
@@ -436,13 +481,22 @@ Options:
 
     public bool HasResultFilter =>
         NodeKinds.Count != 0 ||
+        ProgramPointKinds.Count != 0 ||
+        FilterLines.Count != 0 ||
+        FilterLineStart.HasValue ||
+        FilterLineEnd.HasValue ||
         WithFacts ||
         WithConditions ||
         MethodNames.Count != 0 ||
+        MethodNameContains.Count != 0 ||
         ConditionTargets.Count != 0 ||
         Conditions.Count != 0 ||
         ConditionContains.Count != 0 ||
-        ReachabilityFilters.Count != 0;
+        ReachabilityFilters.Count != 0 ||
+        WithProofs ||
+        ProofOutcomes.Count != 0 ||
+        ProofConditions.Count != 0 ||
+        ProofConditionContains.Count != 0;
 
     public static SymbolicCliOptions Parse(string[] args)
     {
@@ -487,6 +541,19 @@ Options:
                 case "--node-kind":
                     options.NodeKinds.Add(ReadString(args, ref index, arg));
                     break;
+                case "--program-point-kind":
+                case "--point-kind":
+                    options.ProgramPointKinds.Add(ReadProgramPointKind(args, ref index, arg));
+                    break;
+                case "--filter-line":
+                    options.FilterLines.Add(ReadPositiveInt(args, ref index, arg));
+                    break;
+                case "--line-start":
+                    options.FilterLineStart = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--line-end":
+                    options.FilterLineEnd = ReadPositiveInt(args, ref index, arg);
+                    break;
                 case "--with-facts":
                     options.WithFacts = true;
                     break;
@@ -495,6 +562,9 @@ Options:
                     break;
                 case "--method":
                     options.MethodNames.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--method-contains":
+                    options.MethodNameContains.Add(ReadString(args, ref index, arg));
                     break;
                 case "--condition-target":
                 case "--target":
@@ -508,6 +578,18 @@ Options:
                     break;
                 case "--reachability":
                     options.ReachabilityFilters.Add(ReadReachability(args, ref index, arg));
+                    break;
+                case "--with-proofs":
+                    options.WithProofs = true;
+                    break;
+                case "--proof-outcome":
+                    options.ProofOutcomes.Add(ReadTruthValue(args, ref index, arg));
+                    break;
+                case "--proof-condition":
+                    options.ProofConditions.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--proof-condition-contains":
+                    options.ProofConditionContains.Add(ReadString(args, ref index, arg));
                     break;
                 case "--json":
                     options.Json = true;
@@ -610,6 +692,13 @@ Options:
                 throw new ArgumentException("--line-expressions requires --line-invariants or --all-lines.");
             }
 
+            if (options.FilterLineStart.HasValue &&
+                options.FilterLineEnd.HasValue &&
+                options.FilterLineStart.Value > options.FilterLineEnd.Value)
+            {
+                throw new ArgumentException("--line-start cannot be greater than --line-end.");
+            }
+
             if (!options.AllLines && !options.Position.HasValue && options.Line == 0)
             {
                 throw new ArgumentException("--line, --position, or --all-lines is required.");
@@ -635,14 +724,23 @@ Options:
     public SymbolicSourceQueryFilter CreateResultFilter()
     {
         return new SymbolicSourceQueryFilter(
-            NodeKinds,
-            WithFacts,
-            ReachabilityFilters,
-            MethodNames,
-            WithConditions,
-            ConditionTargets,
-            Conditions,
-            ConditionContains);
+            nodeKinds: NodeKinds,
+            requireFacts: WithFacts,
+            reachability: ReachabilityFilters,
+            methodNames: MethodNames,
+            requirePathConditions: WithConditions,
+            conditionTargets: ConditionTargets,
+            conditionTexts: Conditions,
+            conditionTextContains: ConditionContains,
+            methodNameContains: MethodNameContains,
+            lines: FilterLines,
+            lineStart: FilterLineStart,
+            lineEnd: FilterLineEnd,
+            programPointKinds: ProgramPointKinds,
+            requireProofs: WithProofs,
+            proofOutcomes: ProofOutcomes,
+            proofConditions: ProofConditions,
+            proofConditionContains: ProofConditionContains);
     }
 
     public SmtAnalysisOptions CreateSmtOptions()
@@ -747,5 +845,37 @@ Options:
         }
 
         throw new ArgumentException(optionName + " must be NotChecked, Unknown, Reachable, or Unreachable.");
+    }
+
+    private static SymbolicTruthValue ReadTruthValue(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName);
+        if (Enum.TryParse<SymbolicTruthValue>(value, ignoreCase: true, out var truthValue))
+        {
+            return truthValue;
+        }
+
+        throw new ArgumentException(optionName + " must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.");
+    }
+
+    private static string ReadProgramPointKind(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (string.Equals(value, SymbolicProgramPointKinds.Statement, StringComparison.OrdinalIgnoreCase))
+        {
+            return SymbolicProgramPointKinds.Statement;
+        }
+
+        if (string.Equals(value, SymbolicProgramPointKinds.Expression, StringComparison.OrdinalIgnoreCase))
+        {
+            return SymbolicProgramPointKinds.Expression;
+        }
+
+        if (string.Equals(value, SymbolicProgramPointKinds.Other, StringComparison.OrdinalIgnoreCase))
+        {
+            return SymbolicProgramPointKinds.Other;
+        }
+
+        throw new ArgumentException(optionName + " must be Statement, Expression, or Other.");
     }
 }

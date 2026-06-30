@@ -31,15 +31,22 @@ namespace SearchLib.Smt
 
         private Feasibility IsSatisfiableRaw(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
         {
+            if (timeout <= TimeSpan.Zero)
+            {
+                return Feasibility.Unknown;
+            }
+
             try
             {
+                var conditions = pathConditions as SmtFormula[] ?? pathConditions.ToArray();
+                var containsApproximateRegex = ContainsApproximateRegex(conditions);
                 using var solver = _encoder.CreateSolver(timeout);
-                foreach (var formula in pathConditions)
+                foreach (var formula in conditions)
                 {
                     solver.Assert(_encoder.EncodeCondition(formula));
                 }
 
-                return ToFeasibility(solver.Check());
+                return AdjustForApproximation(ToFeasibility(solver.Check()), containsApproximateRegex);
             }
             catch (Exception ex) when (IsConservativeSolverFailure(ex))
             {
@@ -69,6 +76,11 @@ namespace SearchLib.Smt
                     : Feasibility.Unknown, Feasibility.Unknown);
             }
 
+            if (timeout <= TimeSpan.Zero)
+            {
+                return (Feasibility.Unknown, Feasibility.Unknown);
+            }
+
             try
             {
                 using var solver = _encoder.CreateSolver(timeout);
@@ -83,6 +95,8 @@ namespace SearchLib.Smt
                     return (pathFeasibility, Feasibility.Unknown);
                 }
 
+                // A SAT path under regex approximation is only "may be feasible"; still check the
+                // combined query because UNSAT under the over-approximation remains a safe proof.
                 var combinedConditions = preparedPathConditions.Concat(new[] { impurityCondition }).ToArray();
                 var combinedPreparationStatus = PrepareConcreteFacts(combinedConditions, out var preparedCombinedConditions);
                 if (combinedPreparationStatus != ConcreteFactPreparationStatus.Ready)
@@ -101,7 +115,10 @@ namespace SearchLib.Smt
                 try
                 {
                     solver.Assert(_encoder.EncodeCondition(impurityCondition));
-                    return (pathFeasibility, ToFeasibility(solver.Check()));
+                    var combinedContainsApproximateRegex = ContainsApproximateRegex(combinedConditions);
+                    return (pathFeasibility, AdjustForApproximation(
+                        ToFeasibility(solver.Check()),
+                        combinedContainsApproximateRegex));
                 }
                 finally
                 {
@@ -127,6 +144,18 @@ namespace SearchLib.Smt
                 Status.UNSATISFIABLE => Feasibility.Unsatisfiable,
                 _ => Feasibility.Unknown,
             };
+        }
+
+        private bool ContainsApproximateRegex(IEnumerable<SmtFormula> formulas)
+        {
+            return formulas.Any(_encoder.ContainsApproximateRegex);
+        }
+
+        private static Feasibility AdjustForApproximation(Feasibility feasibility, bool containsApproximateRegex)
+        {
+            return feasibility == Feasibility.Satisfiable && containsApproximateRegex
+                ? Feasibility.Unknown
+                : feasibility;
         }
 
         private static bool IsConservativeSolverFailure(Exception ex)
