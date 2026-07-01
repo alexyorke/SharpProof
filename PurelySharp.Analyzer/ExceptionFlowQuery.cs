@@ -9,13 +9,14 @@ using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
+using ExceptionCategories = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
+using ExceptionSources = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionSources;
+using ExceptionTypes = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
 namespace PurelySharp.Analyzer
 {
     internal static class ExceptionFlowQuery
     {
-        private const string UnknownExceptionType = "unknown";
-
         private static readonly SymbolDisplayFormat ExceptionTypeDisplayFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -99,7 +100,7 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     smtAnalysis);
                 var exceptionType = isDefinitelyThrowNull
-                    ? semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException")
+                    ? semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException)
                     : ExceptionFlowAnalyzer.GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
                 if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
@@ -112,12 +113,12 @@ namespace PurelySharp.Analyzer
                     new ExceptionCandidate(
                         exceptionType,
                         isDefinitelyThrowNull
-                            ? "System.NullReferenceException"
-                            : exceptionType?.ToDisplayString(ExceptionTypeDisplayFormat) ?? UnknownExceptionType,
+                            ? ExceptionTypes.NullReferenceException
+                            : exceptionType?.ToDisplayString(ExceptionTypeDisplayFormat) ?? ExceptionTypes.Unknown,
                         isDefinitelyThrowNull
-                            ? "definite_throw_null"
-                            : IsRethrow(throwNode) ? "rethrow" : "direct_throw",
-                        "throw"));
+                            ? ExceptionCategories.DefiniteThrowNull
+                            : IsRethrow(throwNode) ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow,
+                        ExceptionSources.Throw));
             }
 
             foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
@@ -162,7 +163,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.DivideByZeroException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.DivideByZeroException);
                 if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -173,9 +174,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.DivideByZeroException",
-                        "definite_divide_by_zero",
-                        "binary_operator"));
+                        ExceptionTypes.DivideByZeroException,
+                        ExceptionCategories.DefiniteDivideByZero,
+                        ExceptionSources.BinaryOperator));
             }
 
             foreach (var checkedOverflowNode in ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -190,7 +191,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.OverflowException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
                 if (IsCaughtWithinMethod(checkedOverflowNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -201,9 +202,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.OverflowException",
-                        "definite_checked_integral_overflow",
-                        checkedOverflowNode is CastExpressionSyntax ? "checked_conversion" : "checked_operator"));
+                        ExceptionTypes.OverflowException,
+                        ExceptionCategories.DefiniteCheckedIntegralOverflow,
+                        checkedOverflowNode is CastExpressionSyntax ? ExceptionSources.CheckedConversion : ExceptionSources.CheckedOperator));
             }
 
             foreach (var negativeArrayLengthNode in ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -218,7 +219,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.OverflowException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
                 if (IsCaughtWithinMethod(negativeArrayLengthNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -229,9 +230,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.OverflowException",
-                        "definite_negative_array_length",
-                        "array_length"));
+                        ExceptionTypes.OverflowException,
+                        ExceptionCategories.DefiniteNegativeArrayLength,
+                        ExceptionSources.ArrayLength));
             }
 
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -246,7 +247,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException);
                 if (IsCaughtWithinMethod(nullDereferenceNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -257,9 +258,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.NullReferenceException",
-                        nullDereferenceNode is AwaitExpressionSyntax ? "definite_await_null" : "definite_null_dereference",
-                        nullDereferenceNode is AwaitExpressionSyntax ? "await_expression" : "null_receiver"));
+                        ExceptionTypes.NullReferenceException,
+                        nullDereferenceNode is AwaitExpressionSyntax ? ExceptionCategories.DefiniteAwaitNull : ExceptionCategories.DefiniteNullDereference,
+                        nullDereferenceNode is AwaitExpressionSyntax ? ExceptionSources.AwaitExpression : ExceptionSources.NullReceiver));
             }
 
             foreach (var lockNullNode in ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -274,7 +275,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArgumentNullException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentNullException);
                 if (IsCaughtWithinMethod(lockNullNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -285,9 +286,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.ArgumentNullException",
-                        "definite_lock_null",
-                        "lock_receiver"));
+                        ExceptionTypes.ArgumentNullException,
+                        ExceptionCategories.DefiniteLockNull,
+                        ExceptionSources.LockReceiver));
             }
 
             foreach (var dynamicNullBindingSite in ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -330,7 +331,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.InvalidOperationException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.InvalidOperationException);
                 if (IsCaughtWithinMethod(nullableValueAccessNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -341,9 +342,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.InvalidOperationException",
-                        "definite_nullable_value_without_value",
-                        "nullable_value"));
+                        ExceptionTypes.InvalidOperationException,
+                        ExceptionCategories.DefiniteNullableValueWithoutValue,
+                        ExceptionSources.NullableValue));
             }
 
             foreach (var unboxNullCastNode in ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -358,7 +359,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException);
                 if (IsCaughtWithinMethod(unboxNullCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -369,9 +370,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.NullReferenceException",
-                        "definite_unbox_null",
-                        "cast"));
+                        ExceptionTypes.NullReferenceException,
+                        ExceptionCategories.DefiniteUnboxNull,
+                        ExceptionSources.Cast));
             }
 
             foreach (var invalidCastNode in ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -386,7 +387,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.InvalidCastException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.InvalidCastException);
                 if (IsCaughtWithinMethod(invalidCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -397,9 +398,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.InvalidCastException",
-                        "definite_invalid_cast",
-                        "cast"));
+                        ExceptionTypes.InvalidCastException,
+                        ExceptionCategories.DefiniteInvalidCast,
+                        ExceptionSources.Cast));
             }
 
             foreach (var arrayTypeMismatchNode in ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -414,7 +415,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArrayTypeMismatchException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArrayTypeMismatchException);
                 if (IsCaughtWithinMethod(arrayTypeMismatchNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -425,9 +426,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.ArrayTypeMismatchException",
-                        "definite_array_type_mismatch",
-                        "array_store"));
+                        ExceptionTypes.ArrayTypeMismatchException,
+                        ExceptionCategories.DefiniteArrayTypeMismatch,
+                        ExceptionSources.ArrayStore));
             }
 
             foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -442,7 +443,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.IndexOutOfRangeException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.IndexOutOfRangeException);
                 if (IsCaughtWithinMethod(indexOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -453,9 +454,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.IndexOutOfRangeException",
-                        "definite_index_out_of_range",
-                        "array_index"));
+                        ExceptionTypes.IndexOutOfRangeException,
+                        ExceptionCategories.DefiniteIndexOutOfRange,
+                        ExceptionSources.ArrayIndex));
             }
 
             foreach (var argumentOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
@@ -470,7 +471,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArgumentOutOfRangeException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentOutOfRangeException);
                 if (IsCaughtWithinMethod(argumentOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -481,9 +482,9 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "System.ArgumentOutOfRangeException",
-                        "definite_range_out_of_range",
-                        argumentOutOfRangeNode is InvocationExpressionSyntax ? "span_slice" : "range_slice"));
+                        ExceptionTypes.ArgumentOutOfRangeException,
+                        ExceptionCategories.DefiniteRangeOutOfRange,
+                        argumentOutOfRangeNode is InvocationExpressionSyntax ? ExceptionSources.SpanSlice : ExceptionSources.RangeSlice));
             }
         }
 
@@ -531,11 +532,11 @@ namespace PurelySharp.Analyzer
                         return chainedSources.Select(source => new ExceptionCandidate(
                             TryResolveExceptionType(compilation, entry.ExceptionType),
                             entry.ExceptionType,
-                            "source_callee",
+                            ExceptionCategories.SourceCallee,
                             source,
                             CreateDerivedDiagnosticEdges(
                                 entry.ExceptionType,
-                                "source_callee",
+                                ExceptionCategories.SourceCallee,
                                 source,
                                 CreatePrefixedCalleeChain(invokedMethodDisplay, source))));
                     })
@@ -579,14 +580,14 @@ namespace PurelySharp.Analyzer
                             .Where(edge => string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
                             .Select(edge => new ExceptionEdgeDiagnosticEntry(
                                 summaryException.ExceptionType,
-                                "effect_summary",
+                                ExceptionCategories.EffectSummary,
                                 edge.SourcePath ?? source,
                                 edge.CalleeExactSymbolKey,
                                 edge.Depth ?? 0))
                             .ToImmutableArray();
                     var derivedEdges = CreateDerivedDiagnosticEdges(
                         summaryException.ExceptionType,
-                        "effect_summary",
+                        ExceptionCategories.EffectSummary,
                         source,
                         CreateSummaryCalleeChain(source, fallbackSource));
                     matchingEdges = MergeDiagnosticEdges(matchingEdges, derivedEdges);
@@ -594,7 +595,7 @@ namespace PurelySharp.Analyzer
                     yield return new ExceptionCandidate(
                         TryResolveExceptionType(compilation, summaryException.ExceptionType),
                         summaryException.ExceptionType,
-                        "effect_summary",
+                        ExceptionCategories.EffectSummary,
                         source,
                         matchingEdges);
                 }
@@ -806,28 +807,13 @@ namespace PurelySharp.Analyzer
 
         private static bool IsKnownExceptionCategory(string category)
         {
-            return string.Equals(category, "direct_throw", StringComparison.Ordinal) ||
-                string.Equals(category, "rethrow", StringComparison.Ordinal) ||
-                string.Equals(category, "source_callee", StringComparison.Ordinal) ||
-                string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_lock_null", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_throw_null", StringComparison.Ordinal) ||
-                SymbolicDynamicNullBindingFacts.IsDynamicNullBindingCategory(category) ||
-                string.Equals(category, "definite_negative_array_length", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_invalid_cast", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_checked_integral_overflow", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_array_type_mismatch", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_index_out_of_range", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_range_out_of_range", StringComparison.Ordinal);
+            return SymbolicRuntimeExceptionFacts.IsKnownEvidenceCategory(category) ||
+                SymbolicDynamicNullBindingFacts.IsDynamicNullBindingCategory(category);
         }
 
         private static ITypeSymbol? TryResolveExceptionType(Compilation compilation, string displayName)
         {
-            return displayName == UnknownExceptionType
+            return displayName == ExceptionTypes.Unknown
                 ? null
                 : compilation.GetTypeByMetadataName(displayName);
         }

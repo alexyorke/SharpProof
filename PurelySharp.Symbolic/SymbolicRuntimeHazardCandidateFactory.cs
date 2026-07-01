@@ -9,6 +9,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
+using ExceptionCategories = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
+using ExceptionTypes = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
 namespace PurelySharp.Symbolic
 {
@@ -231,7 +233,7 @@ namespace PurelySharp.Symbolic
                     if (TryCreateArgumentNullCandidate(
                             lockStatement,
                             lockStatement.Expression,
-                            "definite_lock_null",
+                            ExceptionCategories.DefiniteLockNull,
                             semanticModel,
                             cancellationToken,
                             out var lockNullCandidate))
@@ -329,8 +331,8 @@ namespace PurelySharp.Symbolic
                 isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
                 new SmtBooleanConstant(true),
                 exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty) ??
-                    (isRethrow ? "unknown" : "System.Exception"),
-                isRethrow ? "rethrow" : "direct_throw");
+                    (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),
+                isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow);
         }
 
         private static bool TryCreateDivideByZeroCandidate(
@@ -357,8 +359,8 @@ namespace PurelySharp.Symbolic
                 binaryExpression,
                 SymbolicRuntimeHazardKind.DivideByZero,
                 trigger,
-                "System.DivideByZeroException",
-                binaryExpression.IsKind(SyntaxKind.ModuloExpression) ? "definite_modulo_by_zero" : "definite_divide_by_zero");
+                ExceptionTypes.DivideByZeroException,
+                binaryExpression.IsKind(SyntaxKind.ModuloExpression) ? "definite_modulo_by_zero" : ExceptionCategories.DefiniteDivideByZero);
             return true;
         }
 
@@ -395,8 +397,8 @@ namespace PurelySharp.Symbolic
                 binaryExpression,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
-                "System.OverflowException",
-                "definite_checked_integral_overflow");
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteCheckedIntegralOverflow);
             return true;
         }
 
@@ -454,8 +456,8 @@ namespace PurelySharp.Symbolic
                 unaryExpression,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
-                "System.OverflowException",
-                "definite_checked_integral_overflow");
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteCheckedIntegralOverflow);
             return true;
         }
 
@@ -508,8 +510,8 @@ namespace PurelySharp.Symbolic
                 updateExpression,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
-                "System.OverflowException",
-                "definite_checked_integral_overflow");
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteCheckedIntegralOverflow);
             return true;
         }
 
@@ -546,8 +548,8 @@ namespace PurelySharp.Symbolic
                 assignment,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
-                "System.OverflowException",
-                "definite_checked_integral_overflow");
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteCheckedIntegralOverflow);
             return true;
         }
 
@@ -575,8 +577,8 @@ namespace PurelySharp.Symbolic
                 assignment,
                 SymbolicRuntimeHazardKind.DivideByZero,
                 trigger,
-                "System.DivideByZeroException",
-                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? "definite_modulo_by_zero" : "definite_divide_by_zero");
+                ExceptionTypes.DivideByZeroException,
+                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? "definite_modulo_by_zero" : ExceptionCategories.DefiniteDivideByZero);
             return true;
         }
 
@@ -612,7 +614,7 @@ namespace PurelySharp.Symbolic
                 assignment,
                 SymbolicRuntimeHazardKind.NullDereference,
                 trigger,
-                "System.NullReferenceException",
+                ExceptionTypes.NullReferenceException,
                 "definite_deconstruction_null");
             return true;
         }
@@ -652,8 +654,8 @@ namespace PurelySharp.Symbolic
                 assignment,
                 SymbolicRuntimeHazardKind.ArrayTypeMismatch,
                 Conjoin(mismatchTrigger, inRangeTrigger),
-                "System.ArrayTypeMismatchException",
-                "definite_array_type_mismatch");
+                ExceptionTypes.ArrayTypeMismatchException,
+                ExceptionCategories.DefiniteArrayTypeMismatch);
             return true;
         }
 
@@ -688,7 +690,7 @@ namespace PurelySharp.Symbolic
                 castExpression,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
-                "System.OverflowException",
+                ExceptionTypes.OverflowException,
                 "definite_checked_numeric_conversion_overflow");
             return true;
         }
@@ -715,8 +717,8 @@ namespace PurelySharp.Symbolic
                 castExpression,
                 SymbolicRuntimeHazardKind.UnboxNull,
                 trigger,
-                "System.NullReferenceException",
-                "definite_unbox_null");
+                ExceptionTypes.NullReferenceException,
+                ExceptionCategories.DefiniteUnboxNull);
             return true;
         }
 
@@ -744,8 +746,8 @@ namespace PurelySharp.Symbolic
                 castExpression,
                 SymbolicRuntimeHazardKind.NullableValueWithoutValue,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
-                "System.InvalidOperationException",
-                "definite_nullable_value_without_value");
+                ExceptionTypes.InvalidOperationException,
+                ExceptionCategories.DefiniteNullableValueWithoutValue);
             return true;
         }
 
@@ -835,8 +837,8 @@ namespace PurelySharp.Symbolic
                 castExpression,
                 SymbolicRuntimeHazardKind.InvalidCast,
                 trigger,
-                "System.InvalidCastException",
-                "definite_invalid_cast");
+                ExceptionTypes.InvalidCastException,
+                ExceptionCategories.DefiniteInvalidCast);
             return true;
         }
 
@@ -850,7 +852,7 @@ namespace PurelySharp.Symbolic
             return TryCreateNullDereferenceCandidate(
                 site,
                 receiver,
-                "definite_null_dereference",
+                ExceptionCategories.DefiniteNullDereference,
                 semanticModel,
                 cancellationToken,
                 out candidate);
@@ -865,7 +867,7 @@ namespace PurelySharp.Symbolic
             return TryCreateNullDereferenceCandidate(
                 awaitExpression,
                 awaitExpression.Expression,
-                "definite_await_null",
+                ExceptionCategories.DefiniteAwaitNull,
                 semanticModel,
                 cancellationToken,
                 out candidate);
@@ -892,7 +894,7 @@ namespace PurelySharp.Symbolic
                 site,
                 SymbolicRuntimeHazardKind.NullDereference,
                 trigger,
-                "System.NullReferenceException",
+                ExceptionTypes.NullReferenceException,
                 category);
             return true;
         }
@@ -918,7 +920,7 @@ namespace PurelySharp.Symbolic
                 site,
                 SymbolicRuntimeHazardKind.ArgumentNull,
                 trigger,
-                "System.ArgumentNullException",
+                ExceptionTypes.ArgumentNullException,
                 category);
             return true;
         }
@@ -995,8 +997,8 @@ namespace PurelySharp.Symbolic
                 memberAccess,
                 SymbolicRuntimeHazardKind.NullableValueWithoutValue,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
-                "System.InvalidOperationException",
-                "definite_nullable_value_without_value");
+                ExceptionTypes.InvalidOperationException,
+                ExceptionCategories.DefiniteNullableValueWithoutValue);
             return true;
         }
 
@@ -1088,7 +1090,7 @@ namespace PurelySharp.Symbolic
                 invocation,
                 SymbolicRuntimeHazardKind.ArgumentOutOfRange,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
-                "System.ArgumentOutOfRangeException",
+                ExceptionTypes.ArgumentOutOfRangeException,
                 category);
             return true;
         }
@@ -1153,7 +1155,7 @@ namespace PurelySharp.Symbolic
                 invocation,
                 SymbolicRuntimeHazardKind.IndexOutOfRange,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
-                "System.IndexOutOfRangeException",
+                ExceptionTypes.IndexOutOfRangeException,
                 "definite_array_get_value_index_out_of_range");
             return true;
         }
@@ -1214,8 +1216,8 @@ namespace PurelySharp.Symbolic
                 arrayCreation,
                 SymbolicRuntimeHazardKind.NegativeArrayLength,
                 trigger,
-                "System.OverflowException",
-                "definite_negative_array_length");
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteNegativeArrayLength);
             return true;
         }
 
@@ -1248,7 +1250,7 @@ namespace PurelySharp.Symbolic
                 stackAllocCreation,
                 SymbolicRuntimeHazardKind.NegativeStackAllocLength,
                 trigger,
-                "System.OverflowException",
+                ExceptionTypes.OverflowException,
                 "definite_negative_stackalloc_length");
             return true;
         }
@@ -1969,21 +1971,21 @@ namespace PurelySharp.Symbolic
                 if (isRange)
                 {
                     kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
-                    exceptionType = "System.ArgumentOutOfRangeException";
-                    category = "definite_range_out_of_range";
+                    exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
+                    category = ExceptionCategories.DefiniteRangeOutOfRange;
                     return true;
                 }
 
                 kind = SymbolicRuntimeHazardKind.IndexOutOfRange;
-                exceptionType = "System.IndexOutOfRangeException";
-                category = "definite_index_out_of_range";
+                exceptionType = ExceptionTypes.IndexOutOfRangeException;
+                category = ExceptionCategories.DefiniteIndexOutOfRange;
                 return true;
             }
 
             if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
             {
                 kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
-                exceptionType = "System.ArgumentOutOfRangeException";
+                exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
                 category = "definite_count_index_out_of_range";
                 return true;
             }

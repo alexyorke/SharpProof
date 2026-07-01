@@ -12,6 +12,8 @@ using Microsoft.CodeAnalysis.Text;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
+using ExceptionCategories = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
+using ExceptionTypes = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
 namespace PurelySharp.Symbolic
 {
@@ -399,8 +401,8 @@ namespace PurelySharp.Symbolic
                     out var throwNullTrigger))
             {
                 triggerCondition = throwNullTrigger;
-                exceptionType = "System.NullReferenceException";
-                category = "definite_throw_null";
+                exceptionType = ExceptionTypes.NullReferenceException;
+                category = ExceptionCategories.DefiniteThrowNull;
             }
 
             var (status, reason) = ClassifyTrigger(
