@@ -2462,22 +2462,12 @@ namespace PurelySharp.Symbolic
 
         private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol
-            {
-                Name: "Range",
-                ContainingNamespace: { } containingNamespace
-            } &&
-            containingNamespace.ToDisplayString() == "System";
+            return SymbolicTypeFacts.IsSystemRangeType(typeSymbol);
         }
 
         private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol
-            {
-                Name: "Index",
-                ContainingNamespace: { } containingNamespace
-            } &&
-            containingNamespace.ToDisplayString() == "System";
+            return SymbolicTypeFacts.IsSystemIndexType(typeSymbol);
         }
 
         private static bool IsNullableValueAccess(
@@ -2485,12 +2475,7 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            return memberAccess.Name.Identifier.ValueText == "Value" &&
-                semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is IPropertySymbol
-                {
-                    Name: "Value",
-                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-                };
+            return SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken);
         }
 
         private static bool IsNullableValueCastShape(
@@ -2532,26 +2517,7 @@ namespace PurelySharp.Symbolic
 
         private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
         {
-            if (typeSymbol == null)
-            {
-                return false;
-            }
-
-            switch (typeSymbol.SpecialType)
-            {
-                case SpecialType.System_Byte:
-                case SpecialType.System_SByte:
-                case SpecialType.System_Int16:
-                case SpecialType.System_UInt16:
-                case SpecialType.System_Int32:
-                case SpecialType.System_UInt32:
-                case SpecialType.System_Int64:
-                case SpecialType.System_UInt64:
-                case SpecialType.System_Decimal:
-                    return true;
-                default:
-                    return false;
-            }
+            return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
         }
 
         private static bool IsIntegralOrDecimalZero(object? value)

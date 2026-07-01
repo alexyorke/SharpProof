@@ -432,26 +432,7 @@ namespace PurelySharp.Analyzer
 
         private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
         {
-            if (typeSymbol == null)
-            {
-                return false;
-            }
-
-            switch (typeSymbol.SpecialType)
-            {
-                case SpecialType.System_Byte:
-                case SpecialType.System_SByte:
-                case SpecialType.System_Int16:
-                case SpecialType.System_UInt16:
-                case SpecialType.System_Int32:
-                case SpecialType.System_UInt32:
-                case SpecialType.System_Int64:
-                case SpecialType.System_UInt64:
-                case SpecialType.System_Decimal:
-                    return true;
-                default:
-                    return false;
-            }
+            return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
         }
 
         private static bool IsDefinitelyZeroExpression(
@@ -1962,22 +1943,12 @@ namespace PurelySharp.Analyzer
 
         private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol
-            {
-                Name: "Index",
-                ContainingNamespace: { } containingNamespace
-            } &&
-            containingNamespace.ToDisplayString() == "System";
+            return SymbolicTypeFacts.IsSystemIndexType(typeSymbol);
         }
 
         private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol
-            {
-                Name: "Range",
-                ContainingNamespace: { } containingNamespace
-            } &&
-            containingNamespace.ToDisplayString() == "System";
+            return SymbolicTypeFacts.IsSystemRangeType(typeSymbol);
         }
 
         private static bool IsNullableValueAccess(
@@ -1985,17 +1956,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            if (memberAccess.Name.Identifier.ValueText != "Value" ||
-                semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is not IPropertySymbol
-                {
-                    Name: "Value",
-                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-                })
-            {
-                return false;
-            }
-
-            return true;
+            return SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken);
         }
 
         private static bool IsNullableType(ITypeSymbol? typeSymbol)

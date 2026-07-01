@@ -43,6 +43,63 @@ namespace PurelySharp.Symbolic
                 typeInfo.ConvertedType?.TypeKind == TypeKind.Dynamic;
         }
 
+        public static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                Name: "Range",
+                ContainingNamespace: { } containingNamespace
+            } &&
+            containingNamespace.ToDisplayString() == "System";
+        }
+
+        public static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                Name: "Index",
+                ContainingNamespace: { } containingNamespace
+            } &&
+            containingNamespace.ToDisplayString() == "System";
+        }
+
+        public static bool IsNullableValueAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return memberAccess.Name.Identifier.ValueText == "Value" &&
+                semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is IPropertySymbol
+                {
+                    Name: "Value",
+                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+                };
+        }
+
+        public static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            switch (typeSymbol.SpecialType)
+            {
+                case SpecialType.System_Byte:
+                case SpecialType.System_SByte:
+                case SpecialType.System_Int16:
+                case SpecialType.System_UInt16:
+                case SpecialType.System_Int32:
+                case SpecialType.System_UInt32:
+                case SpecialType.System_Int64:
+                case SpecialType.System_UInt64:
+                case SpecialType.System_Decimal:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static bool IsKnownReferenceTypeParameter(
             ITypeParameterSymbol typeParameter,
             HashSet<ITypeParameterSymbol> visited)
