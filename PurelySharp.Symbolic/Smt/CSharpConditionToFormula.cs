@@ -374,6 +374,19 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateAsExpressionNullComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var asExpressionNullComparison,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    asExpressionNullComparison != null)
+                {
+                    formula = asExpressionNullComparison;
+                    return true;
+                }
+
                 if (TryTranslateNotNullIfNotNullNullComparison(
                         binaryExpression,
                         semanticModel,
@@ -488,6 +501,91 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateAsExpressionNullComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!binaryExpression.IsKind(SyntaxKind.EqualsExpression) &&
+                !binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))
+            {
+                return false;
+            }
+
+            if (!TryTranslateAsExpressionNullComparisonSide(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var resultNonNull,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                !TryTranslateAsExpressionNullComparisonSide(
+                    binaryExpression.Right,
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out resultNonNull,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            formula = binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)
+                ? resultNonNull
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, resultNonNull);
+            return true;
+        }
+
+        private static bool TryTranslateAsExpressionNullComparisonSide(
+            ExpressionSyntax candidateExpression,
+            ExpressionSyntax nullOperand,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            candidateExpression = UnwrapExpression(candidateExpression);
+            if (candidateExpression is not BinaryExpressionSyntax asExpression ||
+                !asExpression.IsKind(SyntaxKind.AsExpression) ||
+                asExpression.Right is not TypeSyntax targetTypeSyntax ||
+                !IsNullReferenceComparisonOperand(nullOperand, semanticModel, cancellationToken) ||
+                !TryTranslateValue(
+                    asExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                sourceFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var sourceNonNull = CreateNonNullFormula(sourceFormula);
+            if (IsIdentityPreservingReferenceConversion(asExpression.Left, targetTypeSyntax, semanticModel, cancellationToken))
+            {
+                formula = sourceNonNull;
+                return true;
+            }
+
+            var targetType = semanticModel.GetTypeInfo(targetTypeSyntax, cancellationToken).Type;
+            if (!TryCreateRuntimeTypeTestFormula(sourceFormula, targetType, out var runtimeTypeTest))
+            {
+                return false;
+            }
+
+            formula = Conjoin(sourceNonNull, runtimeTypeTest);
+            return true;
         }
 
         private static bool TryTranslateNullableValueComparison(

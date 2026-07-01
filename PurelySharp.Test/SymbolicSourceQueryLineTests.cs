@@ -1431,6 +1431,23 @@ public class TestClass
             Assert.That(invariantResult.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
             Assert.That(invariantResult.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
             Assert.That(invariantResult.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(invariantResult.QuerySummary.OutputMaxConditions, Is.EqualTo(1));
+            Assert.That(invariantResult.QuerySummary.OutputMaxProofs, Is.EqualTo(1));
+            Assert.That(invariantResult.QuerySummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(invariantResult.QuerySummary.TotalPathConditionCount, Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
+            Assert.That(invariantResult.QuerySummary.MaxPathConditionCount, Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
+            Assert.That(invariantResult.QuerySummary.ProofTotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+            Assert.That(invariantResult.QuerySummary.ProofUnknownCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.UnknownCount));
+            Assert.That(invariantResult.QuerySummary.TargetCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(invariantResult.QuerySummary.Targets, Does.Contain("copy"));
+            Assert.That(invariantResult.QuerySummary.Reasons, Has.Count.LessThanOrEqualTo(1));
+            Assert.That(invariantResult.QuerySummary.ReasonCount, Is.GreaterThanOrEqualTo(invariantResult.QuerySummary.Reasons.Count));
+            Assert.That(invariantResult.QuerySummary.HasUnresolvedAnalysis, Is.True);
+            Assert.That(invariantResult.QuerySummary.HasTruncatedOutput, Is.True);
+            Assert.That(invariantResult.QuerySummary.ConditionsTruncated, Is.True);
+            Assert.That(invariantResult.QuerySummary.ProofsTruncated, Is.True);
+            Assert.That(invariantResult.QuerySummary.SmtEnabled, Is.True);
+            Assert.That(invariantResult.QuerySummary.PathConditionBudgetExceeded, Is.False);
             Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("span"));
             Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
             Assert.That(invariantResult.Focus.SpanStart, Is.EqualTo(spanStart));
@@ -1978,6 +1995,8 @@ public class TestClass
                     "copy > 0",
                     "--implies",
                     "copy <= 0",
+                    "--condition-target",
+                    "copy",
                     "--invariant-json",
                     "--max-conditions",
                     "1",
@@ -2001,6 +2020,27 @@ public class TestClass
                 Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
                 Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
 
+                var querySummary = root.GetProperty("querySummary");
+                Assert.That(querySummary.GetProperty("outputMaxConditions").GetInt32(), Is.EqualTo(1));
+                Assert.That(querySummary.GetProperty("outputMaxProofs").GetInt32(), Is.EqualTo(1));
+                Assert.That(
+                    querySummary.GetProperty("programPointCount").GetInt32(),
+                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+                Assert.That(querySummary.GetProperty("totalPathConditionCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(querySummary.GetProperty("maxPathConditionCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(querySummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(querySummary.GetProperty("targetCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+                Assert.That(querySummary.GetProperty("targets").GetArrayLength(), Is.LessThanOrEqualTo(1));
+                Assert.That(querySummary.GetProperty("targets")[0].GetString(), Is.EqualTo("copy"));
+                Assert.That(querySummary.GetProperty("reasonCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
+                Assert.That(querySummary.GetProperty("reasons").GetArrayLength(), Is.LessThanOrEqualTo(1));
+                Assert.That(querySummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+                Assert.That(querySummary.GetProperty("hasTruncatedOutput").GetBoolean(), Is.True);
+                Assert.That(querySummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
+                Assert.That(querySummary.GetProperty("proofsTruncated").GetBoolean(), Is.True);
+                Assert.That(querySummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+                Assert.That(querySummary.GetProperty("pathConditionBudgetExceeded").GetBoolean(), Is.False);
+
                 var focus = root.GetProperty("focus");
                 Assert.That(focus.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
                 Assert.That(focus.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
@@ -2019,7 +2059,7 @@ public class TestClass
                 Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
                 Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
                 Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
 
                 Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));

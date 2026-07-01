@@ -3420,6 +3420,7 @@ namespace PurelySharp.Symbolic
             string scopeKind,
             string filePath,
             SymbolicCompactSourceQueryDescriptor queryDescriptor,
+            SymbolicInvariantQuerySummary querySummary,
             SymbolicInvariantQueryFocus focus,
             string mergedInvariantText,
             SymbolicCompactInvariantQueryView invariantQuery,
@@ -3436,6 +3437,7 @@ namespace PurelySharp.Symbolic
             ScopeKind = scopeKind ?? string.Empty;
             FilePath = filePath ?? string.Empty;
             QueryDescriptor = queryDescriptor ?? throw new ArgumentNullException(nameof(queryDescriptor));
+            QuerySummary = querySummary ?? throw new ArgumentNullException(nameof(querySummary));
             Focus = focus ?? throw new ArgumentNullException(nameof(focus));
             MergedInvariantText = mergedInvariantText ?? string.Empty;
             InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
@@ -3460,6 +3462,8 @@ namespace PurelySharp.Symbolic
         public string FilePath { get; }
 
         public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
+
+        public SymbolicInvariantQuerySummary QuerySummary { get; }
 
         public SymbolicInvariantQueryFocus Focus { get; }
 
@@ -3493,36 +3497,43 @@ namespace PurelySharp.Symbolic
             SymbolicSourceQueryResult result,
             SymbolicCompactQueryOptions? options = null)
         {
-            return FromCompactResult(SymbolicCompactQueryResult.FromPoint(result, NormalizeOptions(options)));
+            var normalizedOptions = NormalizeOptions(options);
+            return FromCompactResult(SymbolicCompactQueryResult.FromPoint(result, normalizedOptions), normalizedOptions);
         }
 
         public static SymbolicInvariantQueryResult FromLine(
             SymbolicLineQueryResult result,
             SymbolicCompactQueryOptions? options = null)
         {
-            return FromCompactResult(SymbolicCompactQueryResult.FromLine(result, NormalizeOptions(options)));
+            var normalizedOptions = NormalizeOptions(options);
+            return FromCompactResult(SymbolicCompactQueryResult.FromLine(result, normalizedOptions), normalizedOptions);
         }
 
         public static SymbolicInvariantQueryResult FromSpan(
             SymbolicSpanQueryResult result,
             SymbolicCompactQueryOptions? options = null)
         {
-            return FromCompactResult(SymbolicCompactQueryResult.FromSpan(result, NormalizeOptions(options)));
+            var normalizedOptions = NormalizeOptions(options);
+            return FromCompactResult(SymbolicCompactQueryResult.FromSpan(result, normalizedOptions), normalizedOptions);
         }
 
         public static SymbolicInvariantQueryResult FromFile(
             SymbolicFileQueryResult result,
             SymbolicCompactQueryOptions? options = null)
         {
-            return FromCompactResult(SymbolicCompactQueryResult.FromFile(result, NormalizeOptions(options)));
+            var normalizedOptions = NormalizeOptions(options);
+            return FromCompactResult(SymbolicCompactQueryResult.FromFile(result, normalizedOptions), normalizedOptions);
         }
 
-        private static SymbolicInvariantQueryResult FromCompactResult(SymbolicCompactQueryResult result)
+        private static SymbolicInvariantQueryResult FromCompactResult(
+            SymbolicCompactQueryResult result,
+            SymbolicCompactQueryOptions options)
         {
             return new SymbolicInvariantQueryResult(
                 result.Kind,
                 result.FilePath,
                 result.QueryDescriptor,
+                SymbolicInvariantQuerySummary.FromCompactResult(result, options),
                 SymbolicInvariantQueryFocus.FromCompactResult(result),
                 result.MergedInvariantText,
                 result.InvariantQuery,
@@ -3546,6 +3557,295 @@ namespace PurelySharp.Symbolic
                 maxFacts: normalizedOptions.MaxFacts,
                 maxConditions: normalizedOptions.MaxConditions,
                 maxProofs: normalizedOptions.MaxProofs);
+        }
+    }
+
+    public sealed class SymbolicInvariantQuerySummary
+    {
+        private const int MaxSummaryReasons = 16;
+        private const int MaxSummaryTargets = 32;
+
+        private SymbolicInvariantQuerySummary(
+            int outputMaxFacts,
+            int outputMaxConditions,
+            int outputMaxProofs,
+            bool hasTruncatedOutput,
+            bool factsTruncated,
+            bool conditionsTruncated,
+            bool proofsTruncated,
+            bool hasUnresolvedAnalysis,
+            int programPointCount,
+            int totalPathConditionCount,
+            int maxPathConditionCount,
+            int proofTotalCount,
+            int proofUnknownCount,
+            int conservativeUnknownCount,
+            int targetCount,
+            IReadOnlyList<string> targets,
+            bool targetsTruncated,
+            int reasonCount,
+            IReadOnlyList<string> reasons,
+            bool reasonsTruncated,
+            bool smtConfigured,
+            bool smtEnabled,
+            int smtExecutedQueryCount,
+            int smtCacheEntryCount,
+            int smtQueryTimeoutMs,
+            int smtMethodBudgetMs,
+            int smtMaxPathConditions,
+            int smtMaxExpressionNodes,
+            bool pathConditionBudgetExceeded)
+        {
+            OutputMaxFacts = outputMaxFacts;
+            OutputMaxConditions = outputMaxConditions;
+            OutputMaxProofs = outputMaxProofs;
+            HasTruncatedOutput = hasTruncatedOutput;
+            FactsTruncated = factsTruncated;
+            ConditionsTruncated = conditionsTruncated;
+            ProofsTruncated = proofsTruncated;
+            HasUnresolvedAnalysis = hasUnresolvedAnalysis;
+            ProgramPointCount = programPointCount;
+            TotalPathConditionCount = totalPathConditionCount;
+            MaxPathConditionCount = maxPathConditionCount;
+            ProofTotalCount = proofTotalCount;
+            ProofUnknownCount = proofUnknownCount;
+            ConservativeUnknownCount = conservativeUnknownCount;
+            TargetCount = targetCount;
+            Targets = targets ?? throw new ArgumentNullException(nameof(targets));
+            TargetsTruncated = targetsTruncated;
+            ReasonCount = reasonCount;
+            Reasons = reasons ?? throw new ArgumentNullException(nameof(reasons));
+            ReasonsTruncated = reasonsTruncated;
+            SmtConfigured = smtConfigured;
+            SmtEnabled = smtEnabled;
+            SmtExecutedQueryCount = smtExecutedQueryCount;
+            SmtCacheEntryCount = smtCacheEntryCount;
+            SmtQueryTimeoutMs = smtQueryTimeoutMs;
+            SmtMethodBudgetMs = smtMethodBudgetMs;
+            SmtMaxPathConditions = smtMaxPathConditions;
+            SmtMaxExpressionNodes = smtMaxExpressionNodes;
+            PathConditionBudgetExceeded = pathConditionBudgetExceeded;
+        }
+
+        public int OutputMaxFacts { get; }
+
+        public int OutputMaxConditions { get; }
+
+        public int OutputMaxProofs { get; }
+
+        public bool HasTruncatedOutput { get; }
+
+        public bool FactsTruncated { get; }
+
+        public bool ConditionsTruncated { get; }
+
+        public bool ProofsTruncated { get; }
+
+        public bool HasUnresolvedAnalysis { get; }
+
+        public int ProgramPointCount { get; }
+
+        public int TotalPathConditionCount { get; }
+
+        public int MaxPathConditionCount { get; }
+
+        public int ProofTotalCount { get; }
+
+        public int ProofUnknownCount { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public int TargetCount { get; }
+
+        public IReadOnlyList<string> Targets { get; }
+
+        public bool TargetsTruncated { get; }
+
+        public int ReasonCount { get; }
+
+        public IReadOnlyList<string> Reasons { get; }
+
+        public bool ReasonsTruncated { get; }
+
+        public bool SmtConfigured { get; }
+
+        public bool SmtEnabled { get; }
+
+        public int SmtExecutedQueryCount { get; }
+
+        public int SmtCacheEntryCount { get; }
+
+        public int SmtQueryTimeoutMs { get; }
+
+        public int SmtMethodBudgetMs { get; }
+
+        public int SmtMaxPathConditions { get; }
+
+        public int SmtMaxExpressionNodes { get; }
+
+        public bool PathConditionBudgetExceeded { get; }
+
+        internal static SymbolicInvariantQuerySummary FromCompactResult(
+            SymbolicCompactQueryResult result,
+            SymbolicCompactQueryOptions options)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            var targetLimit = Math.Min(options.MaxConditions, MaxSummaryTargets);
+            var reasonLimit = Math.Min(options.MaxConditions, MaxSummaryReasons);
+            var targets = GetTargets(result).ToArray();
+            var targetCount = Math.Max(
+                targets.Length,
+                Math.Max(result.ConservativeInvariant.TargetCount, result.ObservedInvariant.TargetCount));
+            var targetView = SymbolicCompactProjection.Take(targets, targetLimit);
+            var targetTruncated =
+                targetCount > targetView.Count ||
+                result.ConservativeInvariant.TargetsTruncated ||
+                result.ObservedInvariant.TargetsTruncated;
+
+            var reasons = GetReasons(result).ToArray();
+            var reasonView = SymbolicCompactProjection.Take(reasons, reasonLimit);
+            var truncation = result.Truncation;
+            var analysisSummary = result.AnalysisSummary;
+            var smtDiagnostics = result.SmtDiagnostics;
+            var hasTruncatedOutput =
+                truncation.Lines ||
+                truncation.ProgramPoints ||
+                truncation.Facts ||
+                truncation.Conditions ||
+                truncation.Proofs ||
+                result.InvariantQuery.IsTruncated;
+
+            return new SymbolicInvariantQuerySummary(
+                options.MaxFacts,
+                options.MaxConditions,
+                options.MaxProofs,
+                hasTruncatedOutput,
+                truncation.Facts,
+                truncation.Conditions || result.InvariantQuery.IsTruncated,
+                truncation.Proofs,
+                analysisSummary.HasUnresolvedAnalysis || result.InvariantQuery.HasUnresolvedAnalysis,
+                result.ProgramPointCount,
+                analysisSummary.TotalPathConditionCount,
+                analysisSummary.MaxPathConditionCount,
+                analysisSummary.ProofTotalCount,
+                analysisSummary.ProofUnknownCount,
+                analysisSummary.ConservativeUnknownCount,
+                targetCount,
+                targetView,
+                targetTruncated,
+                reasons.Length,
+                reasonView,
+                reasons.Length > reasonView.Count,
+                smtDiagnostics.IsConfigured,
+                smtDiagnostics.IsEnabled,
+                smtDiagnostics.ExecutedQueryCount,
+                smtDiagnostics.CacheEntryCount,
+                smtDiagnostics.QueryTimeoutMs,
+                smtDiagnostics.MethodBudgetMs,
+                smtDiagnostics.MaxPathConditions,
+                smtDiagnostics.MaxExpressionNodes,
+                smtDiagnostics.MaxPathConditions > 0 &&
+                    analysisSummary.MaxPathConditionCount > smtDiagnostics.MaxPathConditions);
+        }
+
+        private static IEnumerable<string> GetTargets(SymbolicCompactQueryResult result)
+        {
+            return result.ConservativeInvariant.Targets
+                .Concat(result.ObservedInvariant.Targets)
+                .Concat(result.ConditionProofs.Select(static proof => proof.Target))
+                .Where(static target => IsSummaryTarget(target))
+                .Where(static target => !string.IsNullOrWhiteSpace(target))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static target => target, StringComparer.Ordinal);
+        }
+
+        private static bool IsSummaryTarget(string? target)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                return false;
+            }
+
+            var trimmed = target!.Trim();
+            return SyntaxFacts.IsValidIdentifier(trimmed) ||
+                trimmed.EndsWith(".Length", StringComparison.Ordinal);
+        }
+
+        private static IEnumerable<string> GetReasons(SymbolicCompactQueryResult result)
+        {
+            var reasons = new List<string>();
+            AddReason(reasons, result.InvariantQuery.StatusReason);
+
+            foreach (var diagnostic in result.InvariantQuery.Diagnostics)
+            {
+                AddReason(reasons, diagnostic.Code + ": " + diagnostic.Message);
+            }
+
+            foreach (var diagnostic in result.InvariantQuery.UnknownDiagnostics)
+            {
+                AddReason(reasons, diagnostic.UnknownText + ": " + diagnostic.Reason);
+            }
+
+            if (result.AnalysisSummary.ReachabilityUnknownCount != 0)
+            {
+                AddReason(reasons, "reachability_unknown=" + result.AnalysisSummary.ReachabilityUnknownCount.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (result.AnalysisSummary.ReachabilityNotCheckedCount != 0)
+            {
+                AddReason(reasons, "reachability_not_checked=" + result.AnalysisSummary.ReachabilityNotCheckedCount.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (result.AnalysisSummary.ProofUnknownCount != 0)
+            {
+                AddReason(reasons, "proof_unknown=" + result.AnalysisSummary.ProofUnknownCount.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (!result.SmtDiagnostics.IsConfigured)
+            {
+                AddReason(reasons, "smt_not_configured");
+            }
+            else if (!result.SmtDiagnostics.IsEnabled)
+            {
+                AddReason(reasons, "smt_disabled");
+            }
+
+            if (result.Truncation.Facts)
+            {
+                AddReason(reasons, "fact_output_truncated");
+            }
+
+            if (result.Truncation.Conditions || result.InvariantQuery.IsTruncated)
+            {
+                AddReason(reasons, "condition_output_truncated");
+            }
+
+            if (result.Truncation.Proofs)
+            {
+                AddReason(reasons, "proof_output_truncated");
+            }
+
+            return reasons
+                .Where(static reason => !string.IsNullOrWhiteSpace(reason))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static reason => reason, StringComparer.Ordinal);
+        }
+
+        private static void AddReason(List<string> reasons, string? reason)
+        {
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                reasons.Add(reason!.Trim());
+            }
         }
     }
 

@@ -1864,6 +1864,126 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedDivisionOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MinValue)
+        {
+            return checked(value / -1);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return checked(value / -1);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedCheckedDivisionOverflowIsPruned()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value > int.MinValue && divisor == -1)
+        {
+            return checked(value / divisor);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return checked(value / divisor);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedDivisionOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        return checked(value / divisor);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return checked(value / divisor);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return checked(value / divisor);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_UIntDivisionDoesNotCreateImpossibleCheckedOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public uint TestMethod(uint value, uint divisor)
+    {
+        return checked(value / divisor);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return checked(value / divisor);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundAssignmentOverflow()
         {
             const string source = @"

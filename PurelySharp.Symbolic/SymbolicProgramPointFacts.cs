@@ -16,6 +16,8 @@ namespace PurelySharp.Symbolic
     {
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;
+        private const int MaxMergedTryFacts = 16;
+        private const int MaxTryCompletionBranches = 8;
         private const int MaxFiniteForeachElementFacts = 8;
         private const int MaxScopedBlockCompletionStatements = 32;
         private const int MaxStructuralNullStateDepth = 4;
@@ -1918,6 +1920,148 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
+            AddCompletedTryCatchFacts(tryStatement, semanticModel, cancellationToken, facts);
+            AddCompletedTryFinallyFacts(tryStatement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedTryCatchFacts(
+            TryStatementSyntax tryStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (tryStatement.Finally != null)
+            {
+                return;
+            }
+
+            var completedBranches = CollectCompletedTryBranches(tryStatement, facts, semanticModel, cancellationToken);
+            if (completedBranches.Count == 0)
+            {
+                return;
+            }
+
+            if (completedBranches.Count == 1)
+            {
+                var branch = completedBranches[0];
+                AddVisibleSingleBranchFacts(branch.Facts, branch.Statement, semanticModel, cancellationToken, facts);
+                return;
+            }
+
+            AddIdenticalCompletedBranchFacts(completedBranches, semanticModel, cancellationToken, facts);
+        }
+
+        private static List<CompletedBranchFacts> CollectCompletedTryBranches(
+            TryStatementSyntax tryStatement,
+            IEnumerable<SmtFormula> currentFacts,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var completedBranches = new List<CompletedBranchFacts>();
+            AddCompletedTryBlockBranch(
+                completedBranches,
+                tryStatement.Block,
+                currentFacts,
+                semanticModel,
+                cancellationToken);
+
+            foreach (var catchClause in tryStatement.Catches)
+            {
+                if (completedBranches.Count >= MaxTryCompletionBranches)
+                {
+                    return completedBranches;
+                }
+
+                AddCompletedCatchBranch(
+                    completedBranches,
+                    catchClause,
+                    currentFacts,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            return completedBranches;
+        }
+
+        private static void AddCompletedTryBlockBranch(
+            ICollection<CompletedBranchFacts> completedBranches,
+            BlockSyntax block,
+            IEnumerable<SmtFormula> currentFacts,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (StatementDefinitelyExits(block, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var branchFacts = CollectCompletedBlockFacts(currentFacts, block, semanticModel, cancellationToken);
+            completedBranches.Add(new CompletedBranchFacts(block, branchFacts));
+        }
+
+        private static void AddCompletedCatchBranch(
+            ICollection<CompletedBranchFacts> completedBranches,
+            CatchClauseSyntax catchClause,
+            IEnumerable<SmtFormula> currentFacts,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var branchFacts = new List<SmtFormula>(currentFacts);
+            AddCatchBodyEntryFacts(
+                branchFacts,
+                catchClause,
+                catchClause.Block.Span.End,
+                semanticModel,
+                cancellationToken);
+            AddCompletedBlockFacts(branchFacts, catchClause.Block, semanticModel, cancellationToken);
+            completedBranches.Add(new CompletedBranchFacts(catchClause.Block, branchFacts));
+        }
+
+        private static List<SmtFormula> CollectCompletedBlockFacts(
+            IEnumerable<SmtFormula> currentFacts,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var branchFacts = new List<SmtFormula>(currentFacts);
+            AddCompletedBlockFacts(branchFacts, block, semanticModel, cancellationToken);
+            return branchFacts;
+        }
+
+        private static void AddCompletedBlockFacts(
+            List<SmtFormula> facts,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var processedStatementCount = 0;
+            foreach (var statement in block.Statements)
+            {
+                if (processedStatementCount >= MaxScopedBlockCompletionStatements)
+                {
+                    return;
+                }
+
+                processedStatementCount++;
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
+                if (StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+                {
+                    return;
+                }
+            }
+        }
+
+        private static void AddCompletedTryFinallyFacts(
+            TryStatementSyntax tryStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
             if (tryStatement.Finally?.Block is not { } finallyBlock ||
                 StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
             {
@@ -1942,6 +2086,49 @@ namespace PurelySharp.Symbolic
             }
 
             AddVisibleSingleBranchFacts(finallyFacts, finallyBlock, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddIdenticalCompletedBranchFacts(
+            IReadOnlyList<CompletedBranchFacts> completedBranches,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            var visibleBranchFacts = completedBranches
+                .Select(branch => FilterVisibleBranchFacts(branch.Facts, branch.Statement, semanticModel, cancellationToken))
+                .ToArray();
+            if (visibleBranchFacts.Length == 0)
+            {
+                return;
+            }
+
+            var commonKeys = new HashSet<string>(visibleBranchFacts[0].Select(GetFormulaKey), StringComparer.Ordinal);
+            for (var branchIndex = 1; branchIndex < visibleBranchFacts.Length; branchIndex++)
+            {
+                commonKeys.IntersectWith(visibleBranchFacts[branchIndex].Select(GetFormulaKey));
+                if (commonKeys.Count == 0)
+                {
+                    return;
+                }
+            }
+
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var addedCount = 0;
+            foreach (var fact in visibleBranchFacts[0])
+            {
+                var key = GetFormulaKey(fact);
+                if (!commonKeys.Contains(key) || !existingKeys.Add(key))
+                {
+                    continue;
+                }
+
+                facts.Add(fact);
+                addedCount++;
+                if (addedCount >= MaxMergedTryFacts)
+                {
+                    return;
+                }
+            }
         }
 
         private static void AddNormalCompletionFacts(
@@ -2548,8 +2735,25 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            var hiddenSymbols = GetLocalsDeclaredInside(survivingBranch, semanticModel, cancellationToken);
             var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            foreach (var branchFact in FilterVisibleBranchFacts(branchFacts, survivingBranch, semanticModel, cancellationToken))
+            {
+                var key = GetFormulaKey(branchFact);
+                if (existingKeys.Add(key))
+                {
+                    facts.Add(branchFact);
+                }
+            }
+        }
+
+        private static List<SmtFormula> FilterVisibleBranchFacts(
+            IReadOnlyCollection<SmtFormula> branchFacts,
+            StatementSyntax survivingBranch,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var visibleFacts = new List<SmtFormula>(branchFacts.Count);
+            var hiddenSymbols = GetLocalsDeclaredInside(survivingBranch, semanticModel, cancellationToken);
             foreach (var branchFact in branchFacts)
             {
                 if (hiddenSymbols.Any(symbol => ReferencesSmtVariable(branchFact, GetSmtVariableName(symbol))))
@@ -2557,12 +2761,10 @@ namespace PurelySharp.Symbolic
                     continue;
                 }
 
-                var key = GetFormulaKey(branchFact);
-                if (existingKeys.Add(key))
-                {
-                    facts.Add(branchFact);
-                }
+                visibleFacts.Add(branchFact);
             }
+
+            return visibleFacts;
         }
 
         private static IReadOnlyList<ISymbol> GetLocalsDeclaredInside(
@@ -3361,6 +3563,19 @@ namespace PurelySharp.Symbolic
             public IReadOnlyList<SmtFormula> Facts { get; }
 
             public bool ConditionSymbolsMutated { get; }
+        }
+
+        private sealed class CompletedBranchFacts
+        {
+            public CompletedBranchFacts(StatementSyntax statement, IReadOnlyList<SmtFormula> facts)
+            {
+                Statement = statement;
+                Facts = facts;
+            }
+
+            public StatementSyntax Statement { get; }
+
+            public IReadOnlyList<SmtFormula> Facts { get; }
         }
 
         private static void AddCompletedLoopStatementFacts(

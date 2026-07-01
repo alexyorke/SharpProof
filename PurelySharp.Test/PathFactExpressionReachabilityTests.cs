@@ -450,6 +450,85 @@ public class TestClass
         }
 
         [Test]
+        public void TryCatchCommonAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            if (value < 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            value = 1;
+        }
+        catch (InvalidOperationException)
+        {
+            value = 1;
+        }
+
+        return value == 0 ? Impure() : value;
+    }
+
+    private static int Impure() => 1;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
+        public void TryCatchCatchPathWithoutCommonAssignment_DoesNotAssumeTryAssignment()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            if (value < 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            value = 1;
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return value < 0 ? Impure() : value;
+    }
+
+    private static int Impure() => 1;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
+        }
+
+        [Test]
         public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
         {
             var test = @"

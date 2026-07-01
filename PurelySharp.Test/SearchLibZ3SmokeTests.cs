@@ -508,6 +508,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_CharacterClassSubtractionRejectsExcludedLiteral()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[a-z-[aeiou]]\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("a")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_CharacterClassSubtractionAllowsRemainingLiteral()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[a-z-[aeiou]]\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("b")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
         public void SmtSolver_ControlCharacterEscapeAllowsExpectedCharacter()
         {
             using var solver = new SmtSolver();

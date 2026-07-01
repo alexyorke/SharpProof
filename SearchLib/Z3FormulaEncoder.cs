@@ -1275,11 +1275,26 @@ namespace SearchLib.Smt
             private bool TryParseCharClass(out ReExpr regex)
             {
                 regex = null!;
+                var classStart = _position - 1;
+                var savedIsExact = _isExact;
                 if (_ignoreCase)
                 {
                     return TryParseWholeCharacterClassWithDotNet(out regex);
                 }
 
+                if (TryParseSimpleCharClass(out regex))
+                {
+                    return true;
+                }
+
+                _position = classStart + 1;
+                _isExact = savedIsExact;
+                return TryParseWholeCharacterClassWithDotNet(out regex);
+            }
+
+            private bool TryParseSimpleCharClass(out ReExpr regex)
+            {
+                regex = null!;
                 var negate = false;
                 if (Peek('^'))
                 {
@@ -1360,13 +1375,34 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                if (!TryCreateCharacterRangesRegex(atomPattern, RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, out regex))
+                var options = CreateCurrentCharacterClassRegexOptions();
+                if (!TryCreateCharacterRangesRegex(atomPattern, options, out regex))
                 {
                     _isExact = false;
                     regex = CreateAnyCharRegex();
                 }
 
                 return true;
+            }
+
+            private RegexOptions CreateCurrentCharacterClassRegexOptions()
+            {
+                var options = RegexOptions.None;
+                if (_ignorePatternWhitespace)
+                {
+                    options |= RegexOptions.IgnorePatternWhitespace;
+                }
+
+                if (_ignoreCase)
+                {
+                    options |= RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+                }
+                else if (_canUseIgnoreCase)
+                {
+                    options |= RegexOptions.CultureInvariant;
+                }
+
+                return options;
             }
 
             private bool TryReadWholeCharacterClassPattern(out string atomPattern)

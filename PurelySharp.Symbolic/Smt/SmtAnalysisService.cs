@@ -1183,6 +1183,12 @@ namespace PurelySharp.Symbolic.Smt
                     hasContradiction |= stringContradiction;
                 }
 
+                if (TryAddReferenceNullFact(effectiveFormula, out var referenceContradiction))
+                {
+                    added = true;
+                    hasContradiction |= referenceContradiction;
+                }
+
                 return added;
             }
 

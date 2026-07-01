@@ -8019,6 +8019,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_AsExpressionNonNullImpliesSourceNonNull_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("object value", "(value as string) != null && value == null"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_AsExpressionNonNullImpliesRuntimeType_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("object value", "(value as string) != null && value is not string"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_AsExpressionNullContradictsRuntimeType_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("object value", "(value as string) == null && value is string"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_BooleanVariableContradiction_IsAlwaysFalse()
         {
             Assert.That(
