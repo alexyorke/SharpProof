@@ -13,7 +13,270 @@ using SearchLib.Smt;
 namespace PurelySharp.Symbolic
 {
     internal sealed partial class SymbolicRuntimeHazardQueryService
-    {        private static RuntimeHazardCandidate CreateThrowCandidate(
+    {
+        private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includeNestedCallables)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoTrivia: false,
+                         descendIntoChildren: candidate =>
+                             includeNestedCallables ||
+                             ReferenceEquals(candidate, root) ||
+                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken))
+                {
+                    var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
+                    if (seen.Add(key))
+                    {
+                        yield return candidate;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidatesForNode(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            switch (node)
+            {
+                case ThrowStatementSyntax throwStatement:
+                    yield return CreateThrowCandidate(throwStatement, semanticModel, cancellationToken);
+                    break;
+                case ThrowExpressionSyntax throwExpression:
+                    yield return CreateThrowCandidate(throwExpression, semanticModel, cancellationToken);
+                    break;
+                case BinaryExpressionSyntax binaryExpression:
+                    if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken, out var divideCandidate))
+                    {
+                        yield return divideCandidate;
+                    }
+
+                    if (TryCreateCheckedIntegralOverflowCandidate(binaryExpression, semanticModel, cancellationToken, out var binaryOverflowCandidate))
+                    {
+                        yield return binaryOverflowCandidate;
+                    }
+
+                    break;
+                case PrefixUnaryExpressionSyntax prefixUnaryExpression:
+                    if (TryCreateCheckedIntegralOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken, out var unaryOverflowCandidate))
+                    {
+                        yield return unaryOverflowCandidate;
+                    }
+
+                    break;
+                case PostfixUnaryExpressionSyntax postfixUnaryExpression:
+                    if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken, out var postfixOverflowCandidate))
+                    {
+                        yield return postfixOverflowCandidate;
+                    }
+
+                    break;
+                case CastExpressionSyntax castExpression:
+                    if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel, cancellationToken, out var conversionOverflowCandidate))
+                    {
+                        yield return conversionOverflowCandidate;
+                    }
+
+                    if (TryCreateNullableValueCastCandidate(castExpression, semanticModel, cancellationToken, out var nullableCastCandidate))
+                    {
+                        yield return nullableCastCandidate;
+                    }
+
+                    if (TryCreateUnboxNullCastCandidate(castExpression, semanticModel, cancellationToken, out var unboxNullCandidate))
+                    {
+                        yield return unboxNullCandidate;
+                    }
+
+                    if (TryCreateInvalidCastCandidate(castExpression, semanticModel, cancellationToken, out var invalidCastCandidate))
+                    {
+                        yield return invalidCastCandidate;
+                    }
+
+                    break;
+                case MemberAccessExpressionSyntax memberAccess:
+                    if (TryCreateNullableValueCandidate(memberAccess, semanticModel, cancellationToken, out var nullableCandidate))
+                    {
+                        yield return nullableCandidate;
+                    }
+
+                    if (memberAccess.Parent is not InvocationExpressionSyntax { Expression: var invocationExpression } ||
+                        !ReferenceEquals(invocationExpression, memberAccess))
+                    {
+                        if (TryCreateDynamicNullBindingCandidate(
+                                memberAccess,
+                                memberAccess.Expression,
+                                "definite_dynamic_member_null_binding",
+                                semanticModel,
+                                cancellationToken,
+                                out var memberDynamicCandidate))
+                        {
+                            yield return memberDynamicCandidate;
+                        }
+                    }
+
+                    if (TryCreateNullDereferenceCandidate(memberAccess, memberAccess.Expression, semanticModel, cancellationToken, out var memberNullCandidate))
+                    {
+                        yield return memberNullCandidate;
+                    }
+
+                    break;
+                case ElementAccessExpressionSyntax elementAccess:
+                    if (TryCreateDynamicNullBindingCandidate(
+                            elementAccess,
+                            elementAccess.Expression,
+                            "definite_dynamic_index_null_binding",
+                            semanticModel,
+                            cancellationToken,
+                            out var elementDynamicCandidate))
+                    {
+                        yield return elementDynamicCandidate;
+                    }
+
+                    if (TryCreateNullDereferenceCandidate(elementAccess, elementAccess.Expression, semanticModel, cancellationToken, out var elementNullCandidate))
+                    {
+                        yield return elementNullCandidate;
+                    }
+
+                    if (TryCreateIndexOrRangeCandidate(elementAccess, semanticModel, cancellationToken, out var indexCandidate))
+                    {
+                        yield return indexCandidate;
+                    }
+
+                    break;
+                case AssignmentExpressionSyntax assignment:
+                    if (TryCreateCompoundAssignmentDivideByZeroCandidate(assignment, semanticModel, cancellationToken, out var compoundDivideCandidate))
+                    {
+                        yield return compoundDivideCandidate;
+                    }
+
+                    if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken, out var deconstructionNullCandidate))
+                    {
+                        yield return deconstructionNullCandidate;
+                    }
+
+                    if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken, out var arrayTypeMismatchCandidate))
+                    {
+                        yield return arrayTypeMismatchCandidate;
+                    }
+
+                    if (TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(assignment, semanticModel, cancellationToken, out var compoundOverflowCandidate))
+                    {
+                        yield return compoundOverflowCandidate;
+                    }
+
+                    break;
+                case ArrayCreationExpressionSyntax arrayCreation:
+                    if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken, out var negativeLengthCandidate))
+                    {
+                        yield return negativeLengthCandidate;
+                    }
+
+                    break;
+                case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
+                    if (TryCreateNegativeStackAllocLengthCandidate(
+                            stackAllocCreation,
+                            semanticModel,
+                            cancellationToken,
+                            out var negativeStackAllocLengthCandidate))
+                    {
+                        yield return negativeStackAllocLengthCandidate;
+                    }
+
+                    break;
+                case SwitchExpressionSyntax switchExpression:
+                    if (TryCreateSwitchExpressionNoMatchCandidate(
+                            switchExpression,
+                            semanticModel,
+                            cancellationToken,
+                            out var switchNoMatchCandidate))
+                    {
+                        yield return switchNoMatchCandidate;
+                    }
+
+                    break;
+                case ForEachStatementSyntax forEachStatement:
+                    if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel, cancellationToken, out var foreachNullCandidate))
+                    {
+                        yield return foreachNullCandidate;
+                    }
+
+                    break;
+                case ForEachVariableStatementSyntax forEachVariableStatement:
+                    if (TryCreateNullDereferenceCandidate(forEachVariableStatement, forEachVariableStatement.Expression, semanticModel, cancellationToken, out var foreachVariableNullCandidate))
+                    {
+                        yield return foreachVariableNullCandidate;
+                    }
+
+                    break;
+                case LockStatementSyntax lockStatement:
+                    if (TryCreateArgumentNullCandidate(
+                            lockStatement,
+                            lockStatement.Expression,
+                            "definite_lock_null",
+                            semanticModel,
+                            cancellationToken,
+                            out var lockNullCandidate))
+                    {
+                        yield return lockNullCandidate;
+                    }
+
+                    break;
+                case InvocationExpressionSyntax invocation:
+                    if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
+                    {
+                        yield return invocationDynamicCandidate;
+                    }
+
+                    if (TryCreateArrayGetValueIndexOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var arrayGetValueCandidate))
+                    {
+                        yield return arrayGetValueCandidate;
+                    }
+
+                    if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var slicingCandidate))
+                    {
+                        yield return slicingCandidate;
+                    }
+
+                    if (invocation.Expression is not MemberAccessExpressionSyntax &&
+                        TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel, cancellationToken, out var invocationNullCandidate))
+                    {
+                        yield return invocationNullCandidate;
+                    }
+
+                    break;
+                case AwaitExpressionSyntax awaitExpression:
+                    if (TryCreateAwaitNullDereferenceCandidate(awaitExpression, semanticModel, cancellationToken, out var awaitNullCandidate))
+                    {
+                        yield return awaitNullCandidate;
+                    }
+
+                    break;
+                case WithExpressionSyntax withExpression:
+                    if (TryCreateNullDereferenceCandidate(
+                            withExpression,
+                            withExpression.Expression,
+                            "definite_with_null",
+                            semanticModel,
+                            cancellationToken,
+                            out var withNullCandidate))
+                    {
+                        yield return withNullCandidate;
+                    }
+
+                    break;
+            }
+        }
+
+        private static RuntimeHazardCandidate CreateThrowCandidate(
             SyntaxNode throwNode,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
