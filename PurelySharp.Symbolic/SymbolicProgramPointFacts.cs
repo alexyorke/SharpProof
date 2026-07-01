@@ -5945,36 +5945,29 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
-            if (valueType is not IArrayTypeSymbol { Rank: > 1 } arrayType ||
-                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
-                targetReference is not { Kind: SmtValueKind.Reference })
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetReference))
             {
                 return;
             }
 
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-            {
-                if (!SymbolicFactFactory.TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
-                    !CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
-                        valueExpression,
+            SymbolicFactFactory.AddReferenceBackedArrayDimensionLengthFacts(
+                targetReference,
+                valueExpression,
+                UnwrapExpression(valueExpression),
+                semanticModel,
+                cancellationToken,
+                (expression, dimension, model, token) =>
+                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                        expression,
                         dimension,
-                        semanticModel,
-                        cancellationToken,
+                        model,
+                        token,
                         out var valueDimensionLength,
                         getSymbolVersion: null,
-                        inlineDepth: 0))
-                {
-                    continue;
-                }
-
-                AddUniqueFact(
-                    facts,
-                    new SmtBinaryFormula(
-                        SmtBinaryOperator.Equal,
-                        targetDimensionLength,
-                        valueDimensionLength));
-            }
+                        inlineDepth: 0)
+                        ? valueDimensionLength
+                        : null,
+                fact => AddUniqueFact(facts, fact));
         }
 
         private static bool TryCreateReferenceBackedStringContentFact(
@@ -6036,33 +6029,31 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
+            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol targetArrayType)
             {
                 return;
             }
 
-            for (var dimension = 0; dimension < targetArrayType.Rank; dimension++)
-            {
-                if (!TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength) ||
-                    !CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
-                        valueExpression,
+            SymbolicFactFactory.AddArrayDimensionLengthAssignedValueFacts(
+                targetArrayType,
+                dimension => TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength)
+                    ? targetDimensionLength
+                    : null,
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                (expression, dimension, model, token) =>
+                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                        expression,
                         dimension,
-                        semanticModel,
-                        cancellationToken,
+                        model,
+                        token,
                         out var valueDimensionLength,
                         getSymbolVersion: null,
-                        inlineDepth: 0))
-                {
-                    continue;
-                }
-
-                AddUniqueFact(
-                    facts,
-                    new SmtBinaryFormula(
-                        SmtBinaryOperator.Equal,
-                        targetDimensionLength,
-                        valueDimensionLength));
-            }
+                        inlineDepth: 0)
+                        ? valueDimensionLength
+                        : null,
+                fact => AddUniqueFact(facts, fact));
         }
 
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)

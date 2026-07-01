@@ -67,6 +67,66 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        public static void AddReferenceBackedArrayDimensionLengthFacts(
+            SmtFormula targetReference,
+            ExpressionSyntax valueExpression,
+            ExpressionSyntax unwrappedValueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ExpressionSyntax, int, SemanticModel, CancellationToken, SmtFormula?> createValueDimensionLengthFormula,
+            Action<SmtFormula> addFact)
+        {
+            var valueType = semanticModel.GetTypeInfo(unwrappedValueExpression, cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: > 1 } arrayType ||
+                targetReference.Kind != SmtValueKind.Reference)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
+                    createValueDimensionLengthFormula(valueExpression, dimension, semanticModel, cancellationToken) is not { } valueDimensionLength)
+                {
+                    continue;
+                }
+
+                addFact(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    targetDimensionLength,
+                    valueDimensionLength));
+            }
+        }
+
+        public static void AddArrayDimensionLengthAssignedValueFacts(
+            IArrayTypeSymbol targetArrayType,
+            Func<int, SmtFormula?> createTargetDimensionLengthFormula,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ExpressionSyntax, int, SemanticModel, CancellationToken, SmtFormula?> createValueDimensionLengthFormula,
+            Action<SmtFormula> addFact)
+        {
+            if (targetArrayType.Rank <= 1)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < targetArrayType.Rank; dimension++)
+            {
+                if (createTargetDimensionLengthFormula(dimension) is not { } targetDimensionLength ||
+                    createValueDimensionLengthFormula(valueExpression, dimension, semanticModel, cancellationToken) is not { } valueDimensionLength)
+                {
+                    continue;
+                }
+
+                addFact(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    targetDimensionLength,
+                    valueDimensionLength));
+            }
+        }
+
         public static bool TryCreateCollectionExpressionLengthLowerBoundFact(
             SmtFormula targetLengthFormula,
             ExpressionSyntax unwrappedValueExpression,
