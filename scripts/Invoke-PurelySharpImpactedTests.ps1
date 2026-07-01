@@ -1044,6 +1044,22 @@ try
             continue
         }
 
+        if ($path -match '^scripts/Get-PurelySharpProductionMetrics\.ps1$')
+        {
+            $before = @($testClasses | Sort-Object)
+            Add-TestClasses $testClasses @('ArchitectureReductionTests')
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Production metrics script change' $before $testClasses
+            continue
+        }
+
+        if ($path -match '^scripts/(Get-PurelySharpTestImpactInventory\.ps1|test-impact-inventory\.json)$')
+        {
+            $before = @($testClasses | Sort-Object)
+            Add-TestClasses $testClasses @('ImpactedTestSelectionScriptTests')
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Impacted-test inventory change' $before $testClasses
+            continue
+        }
+
         if ($path -match '^\.github/workflows/')
         {
             $before = @($testClasses | Sort-Object)

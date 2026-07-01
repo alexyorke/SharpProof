@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Purity;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
@@ -424,6 +423,24 @@ namespace PurelySharp.Analyzer.Engine
             }
         }
 
+        private static void AddArrayLengthCountAliasFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (SymbolicReachabilityService.TryCreateArrayLengthCountAliasFact(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var aliasFact,
+                    getSymbolVersion))
+            {
+                pathConditions.Add(aliasFact);
+            }
+        }
+
         private static bool IsProgramPointUnreachableUsingSharedFacts(
             SyntaxNode syntaxNode,
             SemanticModel semanticModel,
@@ -777,13 +794,7 @@ namespace PurelySharp.Analyzer.Engine
             IReadOnlyCollection<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            var query = new PurityProofQuery(
-                pathConditions.ToArray(),
-                new PurityHazard(PurityHazardKind.BranchReachability, formula));
-
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            var proofResult = (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
-            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
         private static bool IsForInitialEntryConditionAlwaysFalseUsingSmt(
@@ -1066,13 +1077,7 @@ namespace PurelySharp.Analyzer.Engine
             IReadOnlyCollection<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            var query = new PurityProofQuery(
-                pathConditions.ToArray(),
-                new PurityHazard(PurityHazardKind.BranchReachability, formula));
-
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            var proofResult = (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
-            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
         private static List<SmtFormula> CollectPathConditionsAt(
@@ -1080,66 +1085,7 @@ namespace PurelySharp.Analyzer.Engine
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var pathConditions = SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
-                .ToList();
-            AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
-            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken));
-            return pathConditions;
-        }
-
-        private static void AddAncestorSwitchArrayLengthCountAliasFacts(
-            SyntaxNode site,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            ICollection<SmtFormula> pathConditions)
-        {
-            foreach (var ancestor in site.Ancestors())
-            {
-                if (ancestor is SwitchStatementSyntax switchStatement)
-                {
-                    AddArrayLengthCountAliasFact(
-                        switchStatement.Expression,
-                        semanticModel,
-                        cancellationToken,
-                        pathConditions,
-                        getSymbolVersion: null);
-                }
-                else if (ancestor is SwitchExpressionSyntax switchExpression)
-                {
-                    AddArrayLengthCountAliasFact(
-                        switchExpression.GoverningExpression,
-                        semanticModel,
-                        cancellationToken,
-                        pathConditions,
-                        getSymbolVersion: null);
-                }
-            }
-        }
-
-        private static void AddArrayLengthCountAliasFact(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            ICollection<SmtFormula> pathConditions,
-            Func<ISymbol, int>? getSymbolVersion)
-        {
-            if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is not IArrayTypeSymbol ||
-                !CSharpConditionToFormula.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var receiverFormula,
-                    getSymbolVersion) ||
-                receiverFormula is not SmtVariable { Kind: SmtValueKind.Reference } receiverVariable)
-            {
-                return;
-            }
-
-            pathConditions.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtVariable(receiverVariable.Name + ".Length", SmtValueKind.Int),
-                new SmtVariable(receiverVariable.Name + ".Count", SmtValueKind.Int)));
+            return SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
         }
 
         private static bool PathConditionsAreUnsatisfiable(
@@ -1151,10 +1097,7 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            return (smtAnalysis ?? fallbackSmtAnalysis!)
-                .ClassifyPathFeasibility(pathConditions)
-                .PathFeasibility == Feasibility.Unsatisfiable;
+            return SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis);
         }
 
         private enum KnownBooleanValue

@@ -1,0 +1,183 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Symbolic.Smt;
+using SearchLib.Purity;
+using SearchLib.Smt;
+
+namespace PurelySharp.Symbolic
+{
+    public static class SymbolicReachabilityService
+    {
+        public static bool IsSatisfiable(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility != Feasibility.Unsatisfiable;
+        }
+
+        public static bool IsUnsatisfiable(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility == Feasibility.Unsatisfiable;
+        }
+
+        public static bool PathConditionsImply(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula,
+            SmtAnalysisService? smtAnalysis)
+        {
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            return (smtAnalysis ?? fallbackSmtAnalysis!).PathConditionsImply(pathConditions, factFormula);
+        }
+
+        public static bool IsFormulaAlwaysFalse(
+            SmtFormula formula,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsFormulaAlwaysFalse(formula, Array.Empty<SmtFormula>(), smtAnalysis);
+        }
+
+        public static bool IsFormulaAlwaysFalse(
+            SmtFormula formula,
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return ClassifyBranchReachability(pathConditions, formula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
+        public static bool IsFormulaAlwaysTrue(
+            SmtFormula formula,
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), pathConditions, smtAnalysis);
+        }
+
+        public static bool IsNodeReachable(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsSatisfiable(CollectPathConditionsAt(node, semanticModel, cancellationToken), smtAnalysis);
+        }
+
+        public static bool IsNodeUnreachable(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return !IsNodeReachable(node, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        public static List<SmtFormula> CollectPathConditionsAt(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var pathConditions = SymbolicProgramPointFacts
+                .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
+                .ToList();
+            AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
+            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken));
+            return pathConditions;
+        }
+
+        public static PurityProofResult ClassifyBranchReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula branchCondition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            var query = new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(PurityHazardKind.BranchReachability, branchCondition));
+
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            return (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
+        }
+
+        public static PurityProofResult ClassifyPathFeasibility(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyPathFeasibility(pathConditions);
+        }
+
+        public static bool TryCreateArrayLengthCountAliasFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula aliasFact,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is IArrayTypeSymbol &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion) &&
+                receiverFormula is SmtVariable { Kind: SmtValueKind.Reference } receiverVariable)
+            {
+                aliasFact = new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtVariable(receiverVariable.Name + ".Length", SmtValueKind.Int),
+                    new SmtVariable(receiverVariable.Name + ".Count", SmtValueKind.Int));
+                return true;
+            }
+
+            aliasFact = new SmtBooleanConstant(true);
+            return false;
+        }
+
+        private static void AddAncestorSwitchArrayLengthCountAliasFacts(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var ancestor in site.Ancestors())
+            {
+                if (ancestor is SwitchStatementSyntax switchStatement)
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchStatement.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion: null);
+                }
+                else if (ancestor is SwitchExpressionSyntax switchExpression)
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchExpression.GoverningExpression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion: null);
+                }
+            }
+        }
+
+        private static void AddArrayLengthCountAliasFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (TryCreateArrayLengthCountAliasFact(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var aliasFact,
+                    getSymbolVersion))
+            {
+                pathConditions.Add(aliasFact);
+            }
+        }
+    }
+}

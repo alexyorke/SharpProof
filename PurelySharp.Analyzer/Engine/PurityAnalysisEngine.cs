@@ -13,7 +13,6 @@ using System.Globalization;
 using PurelySharp.Analyzer.Engine.Rules;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Purity;
 using SearchLib.Smt;
 using System.Threading;
 
@@ -2693,12 +2692,7 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService smtAnalysis)
         {
             var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
-            var query = new PurityProofQuery(
-                proofPathConditions,
-                new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-            var proofResult = smtAnalysis.Classify(query);
-            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+            return SymbolicReachabilityService.IsUnsatisfiable(proofPathConditions, smtAnalysis);
         }
 
         private static bool TryTranslateBranchValueToFormula(
@@ -2818,12 +2812,7 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            var query = new PurityProofQuery(
-                pathConditions,
-                new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
-
-            var proofResult = smtAnalysis.Classify(query);
-            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+            return SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsInUnmatchedConstantSwitchExpressionArm(

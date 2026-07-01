@@ -191,7 +191,7 @@ try
                 }
             }
         } |
-        Sort-Object name, path)
+        Sort-Object { $_['name'] }, { $_['path'] })
 
     $productionFiles = @(Get-ChildItem -Path $script:RepoRoot -Recurse -Filter '*.cs' |
         Where-Object {
@@ -282,11 +282,11 @@ try
         generatedBy = 'scripts/Get-PurelySharpTestImpactInventory.ps1'
         modules = @($script:Modules)
         maxInventoryFixtureDependencies = $maxInventoryFixtureDependencies
-        highFanoutFiles = @($highFanoutFiles | Sort-Object path)
+        highFanoutFiles = @($highFanoutFiles | Sort-Object { $_['path'] })
         projects = @($projects)
         testFixtures = @($testFixtures)
-        sourceFiles = @($sourceFiles | Sort-Object path)
-        fixtureDependencies = @($fixtureDependencies | Sort-Object path)
+        sourceFiles = @($sourceFiles | Sort-Object { $_['path'] })
+        fixtureDependencies = @($fixtureDependencies | Sort-Object { $_['path'] })
     }
 
     $json = $inventory | ConvertTo-Json -Depth 8

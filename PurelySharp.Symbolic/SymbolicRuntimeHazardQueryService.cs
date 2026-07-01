@@ -435,7 +435,7 @@ namespace PurelySharp.Symbolic
 
             trigger = nullTrigger;
             return nullTrigger is SmtBooleanConstant { Value: true } ||
-                smtAnalysis.PathConditionsImply(analysis.PathConditions, nullTrigger);
+                SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, nullTrigger, smtAnalysis);
         }
 
         private static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)

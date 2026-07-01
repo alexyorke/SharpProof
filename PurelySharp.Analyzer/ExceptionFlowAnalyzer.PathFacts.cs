@@ -2830,14 +2830,14 @@ namespace PurelySharp.Analyzer
             SmtFormula factFormula,
             SmtAnalysisService smtAnalysis)
         {
-            return smtAnalysis.PathConditionsImply(pathConditions, factFormula);
+            return SymbolicReachabilityService.PathConditionsImply(pathConditions, factFormula, smtAnalysis);
         }
 
         private static bool PathConditionsAreSatisfiable(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService smtAnalysis)
         {
-            return smtAnalysis.ClassifyPathFeasibility(pathConditions).PathFeasibility != Feasibility.Unsatisfiable;
+            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsSymbolAssignedBeforeUse(

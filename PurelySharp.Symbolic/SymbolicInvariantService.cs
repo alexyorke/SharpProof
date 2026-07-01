@@ -281,7 +281,7 @@ namespace PurelySharp.Symbolic
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var proof = smtAnalysis?.ClassifyPathFeasibility(formulas);
+            var proof = smtAnalysis == null ? null : SymbolicReachabilityService.ClassifyPathFeasibility(formulas, smtAnalysis);
             var reachability = proof?.PathFeasibility switch
             {
                 Feasibility.Satisfiable => SymbolicReachability.Reachable,

@@ -6,8 +6,8 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
@@ -958,7 +958,7 @@ namespace PurelySharp.Analyzer
 
             if (CSharpConditionToFormula.TryTranslate(filterExpression, semanticModel, cancellationToken, out var filterFormula) &&
                 filterFormula != null &&
-                smtAnalysis.PathConditionsImply(pathConditions, filterFormula))
+                SymbolicReachabilityService.PathConditionsImply(pathConditions, filterFormula, smtAnalysis))
             {
                 return true;
             }
@@ -977,7 +977,7 @@ namespace PurelySharp.Analyzer
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService smtAnalysis)
         {
-            return smtAnalysis.ClassifyPathFeasibility(pathConditions).PathFeasibility != Feasibility.Unsatisfiable;
+            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)

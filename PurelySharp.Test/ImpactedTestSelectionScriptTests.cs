@@ -179,6 +179,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_SelectsArchitectureGuardForProductionMetricsScript()
+        {
+            const string changedFile = "scripts/Get-PurelySharpProductionMetrics.ps1";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("ArchitectureReductionTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Production metrics script change"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsSelectorTestsForGeneratedImpactInventory()
+        {
+            const string changedFile = "scripts/test-impact-inventory.json";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("ImpactedTestSelectionScriptTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Impacted-test inventory change"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_SelectsRuntimeTypeTestFixturesForMethodInvocationRule()
         {
             const string changedFile = "PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs";
