@@ -720,7 +720,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     context);
             }
 
-            if (TryGetReceiverInitializerOperation(unwrappedReceiver, context, out var initializerOperation) &&
+            if (FieldOrPropertyInitializerOperationHelper.TryGetFieldOrPropertyInitializerOperation(
+                    unwrappedReceiver,
+                    context,
+                    out var initializerOperation) &&
                 PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) is IObjectCreationOperation initializerObjectCreation)
             {
                 return CheckDictionaryObjectCreationComparerPurity(
@@ -730,51 +733,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static bool TryGetReceiverInitializerOperation(
-            IOperation? receiverOperation,
-            PurityAnalysisContext context,
-            out IOperation initializerOperation)
-        {
-            ISymbol? receiverSymbol = receiverOperation switch
-            {
-                IFieldReferenceOperation fieldReference => fieldReference.Field,
-                IPropertyReferenceOperation propertyReference => propertyReference.Property,
-                _ => null
-            };
-
-            if (receiverSymbol == null)
-            {
-                initializerOperation = null!;
-                return false;
-            }
-
-            foreach (var syntaxReference in receiverSymbol.DeclaringSyntaxReferences)
-            {
-                SyntaxNode? initializerSyntax = syntaxReference.GetSyntax(context.CancellationToken) switch
-                {
-                    VariableDeclaratorSyntax variableDeclarator => variableDeclarator.Initializer?.Value,
-                    PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.Initializer?.Value,
-                    _ => null
-                };
-
-                if (initializerSyntax == null)
-                {
-                    continue;
-                }
-
-                var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(initializerSyntax.SyntaxTree);
-                var operation = semanticModel.GetOperation(initializerSyntax, context.CancellationToken);
-                if (operation != null)
-                {
-                    initializerOperation = operation;
-                    return true;
-                }
-            }
-
-            initializerOperation = null!;
-            return false;
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDictionaryObjectCreationComparerPurity(

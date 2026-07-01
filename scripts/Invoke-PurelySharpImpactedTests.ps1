@@ -851,6 +851,11 @@ function Add-PathMappedTests
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT path-fact analyzer rule change' $before $Set
             break
         }
+        '^PurelySharp\.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper\.cs$' {
+            Add-TestClasses $Set @('ObjectEqualsDispatchTests', 'ComparisonDispatchTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Field/property initializer receiver analysis change' $before $Set
+            break
+        }
         '^PurelySharp\.Analyzer/Engine/Rules/MethodInvocationPurityRule\.cs$' {
             Add-SymbolicSmtTestClasses $Set
             Add-RuntimeHazardSmtTestClasses $Set

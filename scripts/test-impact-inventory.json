@@ -1746,6 +1746,17 @@
                                                  ]
                         },
                         {
+                            "path":  "PurelySharp.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "FieldOrPropertyInitializerOperationHelper"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/FieldReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [

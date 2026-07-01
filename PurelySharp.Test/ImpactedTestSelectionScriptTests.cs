@@ -227,6 +227,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_SelectsComparerDispatchFixturesForFieldOrPropertyInitializerHelper()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
+            Assert.That(fixtures, Does.Contain("ObjectEqualsDispatchTests"));
+            Assert.That(fixtures, Does.Contain("ComparisonDispatchTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Field/property initializer receiver analysis change"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_DoesNotFallbackWhenMappedAnalyzerFilesShareFixtures()
         {
             const string exceptionSitesFile = "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs";
