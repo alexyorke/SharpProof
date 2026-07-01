@@ -879,6 +879,32 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicMemberNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null).Missing;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return ((dynamic)null).Missing;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesDynamicInvocationNullBinding()
         {
             const string source = @"
@@ -895,6 +921,32 @@ public class TestClass
             var result = QueryLine(
                 source,
                 "return value.Missing();",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicInvocationNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null).Missing();
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return ((dynamic)null).Missing();",
                 smtAnalysis,
                 new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
 
@@ -933,6 +985,32 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicDirectInvocationNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null)();
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return ((dynamic)null)();",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesDynamicIndexerNullBinding()
         {
             const string source = @"
@@ -949,6 +1027,32 @@ public class TestClass
             var result = QueryLine(
                 source,
                 "return value[0];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_index_null_binding"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesCastedDynamicIndexerNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null)[0];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return ((dynamic)null)[0];",
                 smtAnalysis,
                 new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
 
