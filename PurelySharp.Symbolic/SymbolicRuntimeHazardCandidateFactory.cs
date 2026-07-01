@@ -2871,25 +2871,12 @@ namespace PurelySharp.Symbolic
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)
         {
-            if (typeSymbol == null)
-            {
-                return false;
-            }
-
-            if (typeSymbol is ITypeParameterSymbol typeParameter)
-            {
-                return IsKnownReferenceTypeParameter(
-                    typeParameter,
-                    new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default));
-            }
-
-            return typeSymbol.IsReferenceType;
+            return SymbolicTypeFacts.IsReferenceType(typeSymbol);
         }
 
         private static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol?.TypeKind == TypeKind.Dynamic ||
-                IsReferenceType(typeSymbol);
+            return SymbolicTypeFacts.IsReferenceLikeType(typeSymbol);
         }
 
         private static bool IsDynamicExpression(
@@ -2897,10 +2884,11 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            expression = UnwrapExpression(expression);
-            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-            return typeInfo.Type?.TypeKind == TypeKind.Dynamic ||
-                typeInfo.ConvertedType?.TypeKind == TypeKind.Dynamic;
+            return SymbolicTypeFacts.IsDynamicExpression(
+                expression,
+                semanticModel,
+                cancellationToken,
+                UnwrapExpression);
         }
 
         private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
@@ -2923,26 +2911,6 @@ namespace PurelySharp.Symbolic
 
             underlyingType = null!;
             return false;
-        }
-
-        private static bool IsKnownReferenceTypeParameter(
-            ITypeParameterSymbol typeParameter,
-            HashSet<ITypeParameterSymbol> visited)
-        {
-            if (!visited.Add(typeParameter))
-            {
-                return false;
-            }
-
-            if (typeParameter.HasReferenceTypeConstraint)
-            {
-                return true;
-            }
-
-            return typeParameter.ConstraintTypes.Any(constraint =>
-                constraint.IsReferenceType ||
-                constraint is ITypeParameterSymbol nestedTypeParameter &&
-                IsKnownReferenceTypeParameter(nestedTypeParameter, visited));
         }
 
         private static ITypeSymbol? GetExpressionType(
