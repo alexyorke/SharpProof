@@ -2945,7 +2945,7 @@ namespace PurelySharp.Symbolic.Smt
                 coalesceRight != null)
             {
                 formula = new SmtConditionalFormula(
-                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceReference, new SmtNullConstant()),
+                    CreateNonNullFormula(coalesceReference),
                     coalesceLeft,
                     coalesceRight,
                     SmtValueKind.String);
@@ -3195,7 +3195,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             formula = new SmtConditionalFormula(
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiverFormula, new SmtNullConstant()),
+                CreateNonNullFormula(receiverFormula),
                 CreateStringValueFormulaForReference(whenNotNullReference),
                 CreateConditionalAccessNullBranchStringFormula(receiverFormula),
                 SmtValueKind.String);
@@ -3237,7 +3237,7 @@ namespace PurelySharp.Symbolic.Smt
                 referenceFormula is { Kind: SmtValueKind.Reference })
             {
                 formula = new SmtConditionalFormula(
-                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, referenceFormula, new SmtNullConstant()),
+                    CreateNonNullFormula(referenceFormula),
                     stringFormula,
                     new SmtStringConstant(string.Empty),
                     SmtValueKind.String);
@@ -3774,7 +3774,7 @@ namespace PurelySharp.Symbolic.Smt
             if (TryTranslateValue(expression, semanticModel, cancellationToken, out var referenceFormula, getSymbolVersion, inlineDepth) &&
                 referenceFormula is { Kind: SmtValueKind.Reference })
             {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, referenceFormula, new SmtNullConstant());
+                formula = CreateNonNullFormula(referenceFormula);
                 return true;
             }
 

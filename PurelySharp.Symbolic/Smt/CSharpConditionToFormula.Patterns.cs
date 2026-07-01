@@ -1164,8 +1164,8 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiver, new SmtNullConstant()));
-            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, whenNotNullReference, new SmtNullConstant()));
+            formulas.Add(CreateNonNullFormula(receiver));
+            formulas.Add(CreateNonNullFormula(whenNotNullReference));
             formulas.Add(new SmtBinaryFormula(
                 SmtBinaryOperator.Equal,
                 CreateStringValueFormulaForReference(whenNotNullReference),
@@ -1203,7 +1203,7 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, testedValue, new SmtNullConstant());
+            formula = CreateNonNullFormula(testedValue);
             return true;
         }
 
@@ -1328,7 +1328,7 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, sourceFormula, new SmtNullConstant());
+            formula = CreateNonNullFormula(sourceFormula);
             return true;
         }
 
@@ -1771,10 +1771,7 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
-            formulas.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                designationValue,
-                new SmtNullConstant()));
+            formulas.Add(CreateNonNullFormula(designationValue));
         }
 
         private static bool TryCreateDesignationStringFormula(
@@ -2383,7 +2380,7 @@ namespace PurelySharp.Symbolic.Smt
         {
             formula = null;
             SmtFormula? current = ShouldRequireRecursivePatternNonNull(value, valueType)
-                ? new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
+                ? CreateNonNullFormula(value)
                 : null;
 
             var positionalSubpatterns = recursivePattern.PositionalPatternClause?.Subpatterns;
@@ -2622,10 +2619,7 @@ namespace PurelySharp.Symbolic.Smt
                 if (index < memberNames.Length - 1 &&
                     memberType.IsReferenceType)
                 {
-                    var nonNull = new SmtBinaryFormula(
-                        SmtBinaryOperator.NotEqual,
-                        currentValue,
-                        new SmtNullConstant());
+                    var nonNull = CreateNonNullFormula(currentValue);
                     pathCondition = pathCondition == null
                         ? nonNull
                         : new SmtBinaryFormula(SmtBinaryOperator.And, pathCondition, nonNull);
@@ -2706,10 +2700,7 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            var nonNullFormula = new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                value,
-                new SmtNullConstant());
+            var nonNullFormula = CreateNonNullFormula(value);
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
             if (canTranslateElementConditions)
             {
@@ -2746,10 +2737,7 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
-            formulas.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                value,
-                new SmtNullConstant()));
+            formulas.Add(CreateNonNullFormula(value));
             formulas.Add(lengthFormulaCondition);
         }
 

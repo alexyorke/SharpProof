@@ -399,7 +399,7 @@ namespace PurelySharp.Symbolic.Smt
                 coalesceRight is { Kind: SmtValueKind.Reference })
             {
                 formula = new SmtConditionalFormula(
-                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
+                    CreateNonNullFormula(coalesceLeft),
                     coalesceLeft,
                     coalesceRight,
                     SmtValueKind.Reference);
@@ -1698,7 +1698,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             formula = new SmtConditionalFormula(
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, targetFormula, new SmtNullConstant()),
+                CreateNonNullFormula(targetFormula),
                 targetFormula,
                 fallbackFormula,
                 SmtValueKind.Reference);
@@ -1979,7 +1979,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             formula = new SmtConditionalFormula(
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiverFormula, new SmtNullConstant()),
+                CreateNonNullFormula(receiverFormula),
                 whenNotNullValue,
                 new SmtNullConstant(),
                 SmtValueKind.Reference);
@@ -2127,10 +2127,7 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth))
             {
-                hasValueFormula = new SmtBinaryFormula(
-                    SmtBinaryOperator.NotEqual,
-                    receiverFormula,
-                    new SmtNullConstant());
+                hasValueFormula = CreateNonNullFormula(receiverFormula);
                 return true;
             }
 
@@ -2496,7 +2493,7 @@ namespace PurelySharp.Symbolic.Smt
                 leftMember.Kind == rightMember.Kind)
             {
                 formula = new SmtConditionalFormula(
-                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, leftReceiver, new SmtNullConstant()),
+                    CreateNonNullFormula(leftReceiver),
                     leftMember,
                     rightMember,
                     leftMember.Kind);

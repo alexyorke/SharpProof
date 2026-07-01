@@ -278,7 +278,7 @@ namespace PurelySharp.Symbolic.Smt
                     inlineDepth))
             {
                 lengthFormula = new SmtConditionalFormula(
-                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
+                    CreateNonNullFormula(coalesceLeft),
                     coalesceLeftLength,
                     coalesceRightLength,
                     SmtValueKind.Int);
