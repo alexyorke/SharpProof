@@ -2646,21 +2646,17 @@ namespace PurelySharp.Analyzer
                 return;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var formula,
-                    getSymbolVersion: null) ||
-                formula is not { Kind: SmtValueKind.Reference })
+                    equalToNull: isNull,
+                    out var formula))
             {
                 return;
             }
 
-            pathConditions.Add(new SmtBinaryFormula(
-                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
-                formula,
-                new SmtNullConstant()));
+            pathConditions.Add(formula);
         }
 
         private static bool TryGetSyntacticReferenceNullState(

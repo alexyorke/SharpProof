@@ -408,18 +408,15 @@ namespace PurelySharp.Analyzer.Engine
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (SymbolicReachabilityService.TryCreateReferenceNullComparison(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var referenceFormula,
-                    getSymbolVersion) &&
-                referenceFormula is { Kind: SmtValueKind.Reference })
+                    equalToNull,
+                    out var formula,
+                    getSymbolVersion))
             {
-                pathConditions.Add(new SmtBinaryFormula(
-                    equalToNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
-                    referenceFormula,
-                    new SmtNullConstant()));
+                pathConditions.Add(formula);
             }
         }
 
@@ -699,7 +696,12 @@ namespace PurelySharp.Analyzer.Engine
                 return isNull;
             }
 
-            if (!TryCreateReferenceNullComparison(expression, semanticModel, cancellationToken, equalToNull: true, out var nullFormula))
+            if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    equalToNull: true,
+                    out var nullFormula))
             {
                 return false;
             }
@@ -722,7 +724,12 @@ namespace PurelySharp.Analyzer.Engine
                 return !isNull;
             }
 
-            if (!TryCreateReferenceNullComparison(expression, semanticModel, cancellationToken, equalToNull: false, out var nonNullFormula))
+            if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    equalToNull: false,
+                    out var nonNullFormula))
             {
                 return false;
             }
@@ -748,33 +755,6 @@ namespace PurelySharp.Analyzer.Engine
 
             isNull = false;
             return false;
-        }
-
-        private static bool TryCreateReferenceNullComparison(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            bool equalToNull,
-            out SmtFormula formula)
-        {
-            formula = null!;
-            if (!CSharpConditionToFormula.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var valueFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                valueFormula is not { Kind: SmtValueKind.Reference })
-            {
-                return false;
-            }
-
-            formula = new SmtBinaryFormula(
-                equalToNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
-                valueFormula,
-                new SmtNullConstant());
-            return true;
         }
 
         private static bool IsForInitialEntryConditionAlwaysFalseUsingSmt(

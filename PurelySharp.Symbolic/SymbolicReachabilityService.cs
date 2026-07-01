@@ -358,6 +358,33 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        public static bool TryCreateReferenceNullComparison(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool equalToNull,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            formula = null!;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion) ||
+                valueFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                equalToNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                valueFormula,
+                new SmtNullConstant());
+            return true;
+        }
+
         private static void AddAncestorSwitchArrayLengthCountAliasFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
