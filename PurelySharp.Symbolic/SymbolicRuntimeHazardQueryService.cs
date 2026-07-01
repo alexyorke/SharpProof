@@ -573,6 +573,11 @@ namespace PurelySharp.Symbolic
                         yield return conversionOverflowCandidate;
                     }
 
+                    if (TryCreateNullableValueCastCandidate(castExpression, semanticModel, cancellationToken, out var nullableCastCandidate))
+                    {
+                        yield return nullableCastCandidate;
+                    }
+
                     if (TryCreateUnboxNullCastCandidate(castExpression, semanticModel, cancellationToken, out var unboxNullCandidate))
                     {
                         yield return unboxNullCandidate;
@@ -1158,6 +1163,35 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.NullReferenceException",
                 "definite_unbox_null");
+            return true;
+        }
+
+        private static bool TryCreateNullableValueCastCandidate(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+                conversionOperation.Conversion.IsUserDefined ||
+                conversionOperation.Conversion.IsIdentity ||
+                !IsNullableValueCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken) ||
+                !CSharpConditionToFormula.TryTranslateNullableHasValue(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula))
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                castExpression,
+                SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
+                "System.InvalidOperationException",
+                "definite_nullable_value_without_value");
             return true;
         }
 
@@ -3196,6 +3230,16 @@ namespace PurelySharp.Symbolic
                 };
         }
 
+        private static bool IsNullableValueCastShape(
+            CastExpressionSyntax castExpression,
+            ITypeSymbol? targetType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return IsNonNullableValueType(targetType) &&
+                TryGetNullableUnderlyingType(GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken), out _);
+        }
+
         private static bool IsUnboxingCastShape(
             CastExpressionSyntax castExpression,
             ITypeSymbol? targetType,
@@ -3312,6 +3356,22 @@ namespace PurelySharp.Symbolic
         {
             return typeSymbol is { IsValueType: true, TypeKind: not TypeKind.TypeParameter } &&
                 typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
+        }
+
+        private static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
+        {
+            if (typeSymbol is INamedTypeSymbol
+                {
+                    OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+                    TypeArguments.Length: 1
+                } namedType)
+            {
+                underlyingType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            underlyingType = null!;
+            return false;
         }
 
         private static bool IsKnownReferenceTypeParameter(

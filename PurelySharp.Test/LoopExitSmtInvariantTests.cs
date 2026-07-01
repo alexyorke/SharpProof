@@ -290,6 +290,36 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesNestedGuardedContinueBeforeBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready, bool blocked)
+    {
+        for (;;)
+        {
+            if (ready)
+            {
+                if (blocked)
+                {
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "!ready || !blocked");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesMultipleGuardedContinuesBeforeBreakExitCondition()
         {
             const string source = @"

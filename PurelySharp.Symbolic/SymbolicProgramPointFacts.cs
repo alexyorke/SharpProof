@@ -4069,11 +4069,11 @@ namespace PurelySharp.Symbolic
             for (var index = targetIndex - 1; index >= 0; index--)
             {
                 if (block.Statements[index] is not IfStatementSyntax ifStatement ||
-                    !TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue) ||
-                    AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, targetStatement.SpanStart, semanticModel, cancellationToken) ||
-                    !TryCreateBranchConditionFormula(
-                        ifStatement.Condition,
-                        !continueBranchWhenTrue,
+                    !TryCreateGuardedContinueFallThroughCondition(
+                        ifStatement,
+                        loopStatement,
+                        loopBody,
+                        targetStatement,
                         semanticModel,
                         cancellationToken,
                         out var guardFallThroughCondition))
@@ -4092,6 +4092,123 @@ namespace PurelySharp.Symbolic
             }
 
             breakCondition = combinedCondition;
+            return true;
+        }
+
+        private static bool TryCreateGuardedContinueFallThroughCondition(
+            IfStatementSyntax ifStatement,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            StatementSyntax targetStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fallThroughCondition)
+        {
+            fallThroughCondition = null!;
+            if (TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue))
+            {
+                if (AnyConditionSymbolInvalidatedBeforeStatement(
+                        ifStatement.Condition,
+                        loopBody,
+                        targetStatement.SpanStart,
+                        semanticModel,
+                        cancellationToken) ||
+                    !TryCreateBranchConditionFormula(
+                        ifStatement.Condition,
+                        !continueBranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        out fallThroughCondition))
+                {
+                    fallThroughCondition = null!;
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (!TryCreateNestedGuardedContinueCondition(
+                    ifStatement,
+                    loopStatement,
+                    loopBody,
+                    targetStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out var continueCondition))
+            {
+                return false;
+            }
+
+            fallThroughCondition = new SmtUnaryFormula(SmtUnaryOperator.Not, continueCondition);
+            return true;
+        }
+
+        private static bool TryCreateNestedGuardedContinueCondition(
+            IfStatementSyntax ifStatement,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            StatementSyntax targetStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula continueCondition)
+        {
+            continueCondition = null!;
+            var continueStatements = ifStatement
+                .DescendantNodes(descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                .OfType<ContinueStatementSyntax>()
+                .Where(continueStatement => ContinueTargetsLoop(continueStatement, loopStatement))
+                .ToArray();
+            if (continueStatements.Length != 1)
+            {
+                return false;
+            }
+
+            var guards = new List<(IfStatementSyntax IfStatement, bool BranchWhenTrue)>();
+            StatementSyntax currentStatement = continueStatements[0];
+            while (TryGetOnlyParentIfBranch(currentStatement, out var parentIf, out var branchWhenTrue))
+            {
+                guards.Add((parentIf, branchWhenTrue));
+                currentStatement = parentIf;
+            }
+
+            if (guards.Count <= 1 ||
+                !ReferenceEquals(currentStatement, ifStatement))
+            {
+                return false;
+            }
+
+            SmtFormula? combinedCondition = null;
+            for (var index = guards.Count - 1; index >= 0; index--)
+            {
+                var guard = guards[index];
+                if (AnyConditionSymbolInvalidatedBeforeStatement(
+                        guard.IfStatement.Condition,
+                        loopBody,
+                        targetStatement.SpanStart,
+                        semanticModel,
+                        cancellationToken) ||
+                    !TryCreateBranchConditionFormula(
+                        guard.IfStatement.Condition,
+                        guard.BranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        out var guardCondition))
+                {
+                    continueCondition = null!;
+                    return false;
+                }
+
+                combinedCondition = combinedCondition == null
+                    ? guardCondition
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, combinedCondition, guardCondition);
+            }
+
+            if (combinedCondition == null)
+            {
+                return false;
+            }
+
+            continueCondition = combinedCondition;
             return true;
         }
 

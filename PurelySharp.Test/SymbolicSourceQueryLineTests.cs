@@ -1605,7 +1605,30 @@ public class TestClass
                 Is.All.EqualTo("copy"));
             Assert.That(invariantResult.QuerySummary.Targets, Is.EquivalentTo(new[] { "copy" }));
             Assert.That(invariantResult.QuerySummary.Targets, Does.Not.Contain("other"));
-            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(result.ConditionProofs.Count));
+            Assert.That(invariantResult.MergedInvariantText, Does.Contain("copy"));
+            Assert.That(invariantResult.MergedInvariantText, Does.Not.Contain("unknown(other)"));
+            Assert.That(invariantResult.InvariantQuery.Text, Does.Contain("copy"));
+            Assert.That(invariantResult.InvariantQuery.Text, Does.Not.Contain("unknown(other)"));
+            Assert.That(
+                invariantResult.InvariantQuery.MaybeFacts,
+                Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
+            Assert.That(
+                invariantResult.InvariantQuery.MaybeFacts,
+                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+            Assert.That(
+                invariantResult.InvariantQuery.UnknownFacts,
+                Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
+            Assert.That(
+                invariantResult.InvariantQuery.UnknownFacts,
+                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+            Assert.That(
+                invariantResult.InvariantQuery.UnknownDiagnostics.Select(static diagnostic => diagnostic.Target),
+                Is.All.EqualTo("copy"));
+            Assert.That(invariantResult.AnalysisSummary.MaybeFactCount, Is.EqualTo(invariantResult.InvariantQuery.MaybeFactCount));
+            Assert.That(invariantResult.AnalysisSummary.UnknownFactCount, Is.EqualTo(invariantResult.InvariantQuery.UnknownFactCount));
+            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
+            Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
         }
 
         [Test]
@@ -2141,6 +2164,8 @@ public class TestClass
                 using var document = JsonDocument.Parse(result.StandardOutput);
                 var root = document.RootElement;
                 Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
+                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Contain("copy"));
+                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Not.Contain("unknown(other)"));
 
                 var querySummary = root.GetProperty("querySummary");
                 Assert.That(
@@ -2167,6 +2192,24 @@ public class TestClass
                 Assert.That(
                     invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
                     Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
+                Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Contain("copy"));
+                Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
+                var maybeFacts = invariantQuery.GetProperty("maybeFacts")
+                    .EnumerateArray()
+                    .Select(static fact => fact.GetString() ?? string.Empty)
+                    .ToArray();
+                Assert.That(maybeFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
+                Assert.That(maybeFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
+                var unknownFacts = invariantQuery.GetProperty("unknownFacts")
+                    .EnumerateArray()
+                    .Select(static fact => fact.GetString() ?? string.Empty)
+                    .ToArray();
+                Assert.That(unknownFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
+                Assert.That(unknownFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
+                Assert.That(
+                    invariantQuery.GetProperty("unknownDiagnostics").EnumerateArray()
+                        .Select(static diagnostic => diagnostic.GetProperty("target").GetString()),
+                    Is.All.EqualTo("copy"));
 
                 var targetSummaries = invariantQuery.GetProperty("targetSummaries")
                     .EnumerateArray()
@@ -2180,6 +2223,11 @@ public class TestClass
                     .Select(static summary => summary.GetProperty("target").GetString())
                     .ToArray();
                 Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
+                Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(
+                    root.GetProperty("conditionProofs").EnumerateArray()
+                        .Select(static proof => proof.GetProperty("target").GetString()),
+                    Is.EquivalentTo(new[] { "copy" }));
             }
             finally
             {
@@ -2233,6 +2281,8 @@ public class TestClass
                 Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter matched: True"));
                 Assert.That(result.StandardOutput, Does.Contain("Span invariant query matched target filters: copy"));
                 Assert.That(result.StandardOutput, Does.Contain("Span invariant query unmatched target filters: missing"));
+                Assert.That(result.StandardOutput, Does.Contain("Span invariant query text:"));
+                Assert.That(result.StandardOutput, Does.Contain("unknown(copy)"));
             }
             finally
             {

@@ -1737,21 +1737,43 @@ namespace PurelySharp.Symbolic.Smt
                 if (formula.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
                     formula.Left.Kind != SmtValueKind.Bool ||
                     formula.Right.Kind != SmtValueKind.Bool ||
-                    !CanRelateBooleanTerm(formula.Left) ||
-                    !CanRelateBooleanTerm(formula.Right))
+                    !TryGetBooleanRelationTerm(formula.Left, out var left, out var leftNegated) ||
+                    !TryGetBooleanRelationTerm(formula.Right, out var right, out var rightNegated))
                 {
                     return false;
                 }
 
-                var left = NormalizeAliases(formula.Left);
-                var right = NormalizeAliases(formula.Right);
                 var differs = formula.Operator == SmtBinaryOperator.NotEqual;
                 if (!value)
                 {
                     differs = !differs;
                 }
 
+                differs ^= leftNegated ^ rightNegated;
                 return UnionBooleanEquivalences(left, right, differs, out hasContradiction);
+            }
+
+            private bool TryGetBooleanRelationTerm(
+                SmtFormula formula,
+                out SmtFormula term,
+                out bool isNegated)
+            {
+                term = NormalizeAliases(formula);
+                isNegated = false;
+                while (term is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+                {
+                    isNegated = !isNegated;
+                    term = NormalizeAliases(negated.Operand);
+                }
+
+                if (CanRelateBooleanTerm(term))
+                {
+                    return true;
+                }
+
+                term = null!;
+                isNegated = false;
+                return false;
             }
 
             private static bool CanRelateBooleanTerm(SmtFormula formula)
@@ -2121,16 +2143,20 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
-                var left = NormalizeAliases(binary.Left);
-                var right = NormalizeAliases(binary.Right);
-                var leftRoot = FindBooleanCanonical(left, out var leftNegated);
-                var rightRoot = FindBooleanCanonical(right, out var rightNegated);
+                if (!TryGetBooleanRelationTerm(binary.Left, out var left, out var leftNegated) ||
+                    !TryGetBooleanRelationTerm(binary.Right, out var right, out var rightNegated))
+                {
+                    return false;
+                }
+
+                var leftRoot = FindBooleanCanonical(left, out var leftRootNegated);
+                var rightRoot = FindBooleanCanonical(right, out var rightRootNegated);
                 if (!leftRoot.Equals(rightRoot))
                 {
                     return false;
                 }
 
-                var areEqual = leftNegated == rightNegated;
+                var areEqual = (leftNegated ^ leftRootNegated) == (rightNegated ^ rightRootNegated);
                 value = binary.Operator == SmtBinaryOperator.Equal
                     ? areEqual
                     : !areEqual;

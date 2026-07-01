@@ -429,6 +429,37 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NestedGuardedContinueBeforeBreakExit_DoesNotReportDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        var guard = true;
+        for (;;)
+        {
+            if (guard)
+            {
+                if (divisor == 0)
+                {
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_NestedGuardedBreakExit_DoesNotReportDivideByZero()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

@@ -524,6 +524,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_InlineRegexCommentBeforeQuantifierPreservesPreviousAtom()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AA(?# repeat previous atom)*\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AA")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_LeadingInlineRegexCommentBeforeStartAnchorKeepsAnchorStrict()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"(?# leading comment)\AAB\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("XAB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_EscapedRegexClassLiteralContradictsPrefix()
         {
             using var solver = new SmtSolver();

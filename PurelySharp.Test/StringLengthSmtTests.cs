@@ -540,6 +540,29 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringInterpolationLengthWithNameofConstant()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int WithNameof(string text)
+    {
+        if (text != null)
+        {
+            return $""{text}:{nameof(WithNameof)}"".Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return $\"{text}:{nameof(WithNameof)}\".Length;",
+                "$\"{text}:{nameof(WithNameof)}\".Length == text.Length + 1 + nameof(WithNameof).Length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
         {
             const string source = @"

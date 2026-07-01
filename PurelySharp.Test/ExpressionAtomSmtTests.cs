@@ -32,6 +32,33 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value.Value == 5)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value.HasValue");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value.Value == 5");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck()
         {
             const string source = @"
@@ -231,6 +258,37 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCheckedNarrowingCastAtomFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (checked((byte)value) == 5)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value >= 0");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value <= 255");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value == 5");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts()
         {
             const string source = @"
@@ -385,6 +443,37 @@ public class TestClass
                 source,
                 "return 1;",
                 "mode != Mode.None");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesTypeOfStableConstantFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        if (typeof(string) != typeof(object) && typeof(int) == typeof(int) && typeof(string) != null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "typeof(string) != typeof(object)");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "typeof(int) == typeof(int)");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "typeof(string) != null");
         }
 
         [Test]

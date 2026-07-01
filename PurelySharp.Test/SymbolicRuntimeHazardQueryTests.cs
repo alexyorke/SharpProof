@@ -1095,6 +1095,77 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesNullableExplicitCastWithoutValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (!value.HasValue)
+        {
+            return (int)value;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_nullable_value_without_value"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_GuardedNullableExplicitCastIsPruned()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value.HasValue)
+        {
+            return (int)value;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return (int)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_nullable_value_without_value"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
         {
             const string source = @"

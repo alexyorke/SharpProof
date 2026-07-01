@@ -234,7 +234,7 @@ static void PrintFileResult(
             $"NotChecked={result.Reachability.NotCheckedCount}");
     }
 
-    PrintConditionProofSummaries(result.ConditionProofs);
+    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
 
     foreach (var lineResult in result.Lines)
     {
@@ -259,7 +259,7 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
     PrintInvariantQuery("Line invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
-    PrintConditionProofSummaries(result.ConditionProofs);
+    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -284,7 +284,7 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Span invariant conditions: {result.MergedInvariant.ConditionCount}");
     PrintInvariantQuery("Span invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
-    PrintConditionProofSummaries(result.ConditionProofs);
+    PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -382,31 +382,6 @@ static void PrintInvariantQuery(
     SymbolicInvariantQueryView query,
     SymbolicCliOptions options)
 {
-    Console.WriteLine(
-        $"{label}: " +
-        $"Must={query.MustFactCount}, " +
-        $"Maybe={query.MaybeFactCount}, " +
-        $"Unknown={query.UnknownFactCount}, " +
-        $"CandidatePoints={query.CandidateProgramPointCount}, " +
-        $"UnreachablePoints={query.UnreachableProgramPointCount}");
-    Console.WriteLine(label + " status: " + query.Status);
-    Console.WriteLine(label + " status reason: " + query.StatusReason);
-    Console.WriteLine(label + " summary: " + query.Summary);
-    if (query.MustFacts.Count != 0)
-    {
-        Console.WriteLine(label + " must facts: " + string.Join("; ", query.MustFacts));
-    }
-
-    if (query.MaybeFacts.Count != 0)
-    {
-        Console.WriteLine(label + " maybe facts: " + string.Join("; ", query.MaybeFacts));
-    }
-
-    if (query.UnknownFacts.Count != 0)
-    {
-        Console.WriteLine(label + " unknowns: " + string.Join("; ", query.UnknownFacts));
-    }
-
     var targetSummaries = FilterInvariantTargets(
         query.TargetSummaries,
         options,
@@ -415,6 +390,51 @@ static void PrintInvariantQuery(
         query.TargetPathSummaries,
         options,
         static target => target.Target);
+    var mustFacts = SelectInvariantFacts(
+        query.MustFacts,
+        targetSummaries,
+        options,
+        static target => target.MustFacts);
+    var maybeFacts = SelectInvariantFacts(
+        query.MaybeFacts,
+        targetSummaries,
+        options,
+        static target => target.MaybeFacts);
+    var unknownFacts = SelectInvariantFacts(
+        query.UnknownFacts,
+        targetSummaries,
+        options,
+        static target => target.UnknownFacts);
+    var queryText = options.HasInvariantTargetFilter
+        ? SymbolicInvariantService.FormatMergedInvariantFacts(mustFacts.Concat(unknownFacts).ToArray())
+        : query.Text;
+
+    Console.WriteLine(
+        $"{label}: " +
+        $"Must={mustFacts.Count}, " +
+        $"Maybe={maybeFacts.Count}, " +
+        $"Unknown={unknownFacts.Count}, " +
+        $"CandidatePoints={query.CandidateProgramPointCount}, " +
+        $"UnreachablePoints={query.UnreachableProgramPointCount}");
+    Console.WriteLine(label + " text: " + queryText);
+    Console.WriteLine(label + " status: " + query.Status);
+    Console.WriteLine(label + " status reason: " + query.StatusReason);
+    Console.WriteLine(label + " summary: " + query.Summary);
+    if (mustFacts.Count != 0)
+    {
+        Console.WriteLine(label + " must facts: " + string.Join("; ", mustFacts));
+    }
+
+    if (maybeFacts.Count != 0)
+    {
+        Console.WriteLine(label + " maybe facts: " + string.Join("; ", maybeFacts));
+    }
+
+    if (unknownFacts.Count != 0)
+    {
+        Console.WriteLine(label + " unknowns: " + string.Join("; ", unknownFacts));
+    }
+
     if (options.HasInvariantTargetFilter)
     {
         var matchedTargetFilters = GetMatchedInvariantTargetFilters(options, targetSummaries, targetPathSummaries);
@@ -461,6 +481,24 @@ static IReadOnlyList<TTarget> FilterInvariantTargets<TTarget>(
         .Where(target => options.InvariantTargets.Contains(
             NormalizeInvariantTarget(targetSelector(target)),
             StringComparer.Ordinal))
+        .ToArray();
+}
+
+static IReadOnlyList<string> SelectInvariantFacts(
+    IReadOnlyList<string> facts,
+    IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
+    SymbolicCliOptions options,
+    Func<SymbolicInvariantTargetSummary, IReadOnlyList<string>> factSelector)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return facts;
+    }
+
+    return targetSummaries
+        .SelectMany(factSelector)
+        .Where(static fact => !string.IsNullOrWhiteSpace(fact))
+        .Distinct(StringComparer.Ordinal)
         .ToArray();
 }
 
@@ -638,7 +676,7 @@ static void PrintPointResult(
         Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
     }
 
-    foreach (var proof in result.ConditionProofs)
+    foreach (var proof in FilterConditionProofResults(result.ConditionProofs, options))
     {
         Console.WriteLine(
             $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
@@ -743,6 +781,38 @@ static void PrintConditionProofSummaries(
         Console.WriteLine($"  Proof summary: {proof.Summary}");
         PrintProofReasonSummary(proof.Reasons, indent: "  ");
     }
+}
+
+static IReadOnlyList<SymbolicConditionProofSummary> FilterConditionProofSummaries(
+    IReadOnlyList<SymbolicConditionProofSummary> proofs,
+    SymbolicCliOptions options)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return proofs;
+    }
+
+    return proofs
+        .Where(proof => options.InvariantTargets.Contains(
+            NormalizeInvariantTarget(proof.Target),
+            StringComparer.Ordinal))
+        .ToArray();
+}
+
+static IReadOnlyList<SymbolicConditionProofResult> FilterConditionProofResults(
+    IReadOnlyList<SymbolicConditionProofResult> proofs,
+    SymbolicCliOptions options)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return proofs;
+    }
+
+    return proofs
+        .Where(proof => options.InvariantTargets.Contains(
+            NormalizeInvariantTarget(proof.Target),
+            StringComparer.Ordinal))
+        .ToArray();
 }
 
 static string FormatProofTarget(string? target)

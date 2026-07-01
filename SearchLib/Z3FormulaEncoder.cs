@@ -2248,13 +2248,18 @@ namespace SearchLib.Smt
 
             private void SkipIgnoredPatternTrivia()
             {
-                if (!_ignorePatternWhitespace)
-                {
-                    return;
-                }
-
                 while (_position < _pattern.Length)
                 {
+                    if (TrySkipInlineComment())
+                    {
+                        continue;
+                    }
+
+                    if (!_ignorePatternWhitespace)
+                    {
+                        return;
+                    }
+
                     var current = _pattern[_position];
                     if (char.IsWhiteSpace(current))
                     {
@@ -2281,13 +2286,18 @@ namespace SearchLib.Smt
 
             private static void SkipIgnoredPatternTrivia(string pattern, ref int position, bool ignorePatternWhitespace)
             {
-                if (!ignorePatternWhitespace)
-                {
-                    return;
-                }
-
                 while (position < pattern.Length)
                 {
+                    if (TrySkipInlineComment(pattern, ref position))
+                    {
+                        continue;
+                    }
+
+                    if (!ignorePatternWhitespace)
+                    {
+                        return;
+                    }
+
                     var current = pattern[position];
                     if (char.IsWhiteSpace(current))
                     {
@@ -2310,6 +2320,56 @@ namespace SearchLib.Smt
 
                     return;
                 }
+            }
+
+            private bool TrySkipInlineComment()
+            {
+                if (_position + 2 >= _pattern.Length ||
+                    _pattern[_position] != '(' ||
+                    _pattern[_position + 1] != '?' ||
+                    _pattern[_position + 2] != '#')
+                {
+                    return false;
+                }
+
+                var end = _position + 3;
+                while (end < _pattern.Length && _pattern[end] != ')')
+                {
+                    end++;
+                }
+
+                if (end >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                _position = end + 1;
+                return true;
+            }
+
+            private static bool TrySkipInlineComment(string pattern, ref int position)
+            {
+                if (position + 2 >= pattern.Length ||
+                    pattern[position] != '(' ||
+                    pattern[position + 1] != '?' ||
+                    pattern[position + 2] != '#')
+                {
+                    return false;
+                }
+
+                var end = position + 3;
+                while (end < pattern.Length && pattern[end] != ')')
+                {
+                    end++;
+                }
+
+                if (end >= pattern.Length)
+                {
+                    return false;
+                }
+
+                position = end + 1;
+                return true;
             }
 
             private ReExpr CreateAnyStringRegex()
