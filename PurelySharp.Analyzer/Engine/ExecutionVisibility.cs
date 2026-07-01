@@ -136,7 +136,11 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     if (forStatement.Condition != null &&
                         forStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
-                        IsForInitialEntryConditionAlwaysFalseUsingSmt(forStatement, semanticModel, cancellationToken, smtAnalysis))
+                        SymbolicReachabilityService.IsForInitialEntryConditionAlwaysFalse(
+                            forStatement,
+                            semanticModel,
+                            cancellationToken,
+                            smtAnalysis))
                     {
                         return true;
                     }
@@ -735,38 +739,6 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
-        private static bool IsForInitialEntryConditionAlwaysFalseUsingSmt(
-            ForStatementSyntax forStatement,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis)
-        {
-            if (forStatement.Condition == null)
-            {
-                return false;
-            }
-
-            var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
-            if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
-                formula == null)
-            {
-                return EvaluateKnownBoolean(
-                    forStatement.Condition,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    pathConditions) == KnownBooleanValue.False;
-            }
-
-            foreach (var initializerFact in SymbolicReachabilityService.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
-            {
-                pathConditions.Add(initializerFact);
-            }
-
-            CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
-            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
-        }
-
         private static bool IsConditionAlwaysFalseAt(
             ExpressionSyntax expression,
             SyntaxNode site,
@@ -774,12 +746,12 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            return EvaluateKnownBoolean(
+            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
                 expression,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == false;
         }
 
         private static bool IsConditionAlwaysTrueAt(
@@ -789,12 +761,12 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            return EvaluateKnownBoolean(
+            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
                 expression,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == true;
         }
 
         public static bool IsConditionAlwaysTrue(
@@ -811,7 +783,11 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis = null)
         {
-            return EvaluateKnownBoolean(expression, semanticModel, cancellationToken, smtAnalysis) == KnownBooleanValue.True;
+            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis) == true;
         }
 
         public static bool IsConditionAlwaysFalse(
@@ -828,7 +804,11 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis = null)
         {
-            return EvaluateKnownBoolean(expression, semanticModel, cancellationToken, smtAnalysis) == KnownBooleanValue.False;
+            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis) == false;
         }
 
         private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation)
@@ -847,115 +827,6 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return false;
-        }
-
-        private static KnownBooleanValue EvaluateKnownBoolean(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis,
-            IReadOnlyCollection<SmtFormula>? pathConditions = null)
-        {
-            expression = UnwrapExpression(expression);
-            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-            if (constantValue.HasValue && constantValue.Value is bool booleanValue)
-            {
-                return booleanValue ? KnownBooleanValue.True : KnownBooleanValue.False;
-            }
-
-            if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
-                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
-            {
-                return Negate(EvaluateKnownBoolean(prefixUnary.Operand, semanticModel, cancellationToken, smtAnalysis, pathConditions));
-            }
-
-            if (expression is BinaryExpressionSyntax binaryExpression)
-            {
-                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
-                {
-                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                    if (left == KnownBooleanValue.False || right == KnownBooleanValue.False)
-                    {
-                        return KnownBooleanValue.False;
-                    }
-
-                    if (left == KnownBooleanValue.True && right == KnownBooleanValue.True)
-                    {
-                        return KnownBooleanValue.True;
-                    }
-
-                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                }
-
-                if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
-                {
-                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                    if (left == KnownBooleanValue.True || right == KnownBooleanValue.True)
-                    {
-                        return KnownBooleanValue.True;
-                    }
-
-                    if (left == KnownBooleanValue.False && right == KnownBooleanValue.False)
-                    {
-                        return KnownBooleanValue.False;
-                    }
-
-                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-                }
-
-                return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-            }
-
-            if (expression is IsPatternExpressionSyntax isPatternExpression)
-            {
-                return EvaluateWithSmtFallback(isPatternExpression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-            }
-
-            return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-        }
-
-        private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-        {
-            return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        }
-
-        private static KnownBooleanValue Negate(KnownBooleanValue value)
-        {
-            return value switch
-            {
-                KnownBooleanValue.True => KnownBooleanValue.False,
-                KnownBooleanValue.False => KnownBooleanValue.True,
-                _ => KnownBooleanValue.Unknown
-            };
-        }
-
-        private static KnownBooleanValue EvaluateWithSmtFallback(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis,
-            IReadOnlyCollection<SmtFormula>? pathConditions = null)
-        {
-            return SymbolicReachabilityService.EvaluateConditionTruth(
-                expression,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                pathConditions) switch
-            {
-                true => KnownBooleanValue.True,
-                false => KnownBooleanValue.False,
-                _ => KnownBooleanValue.Unknown
-            };
-        }
-
-        private enum KnownBooleanValue
-        {
-            Unknown,
-            False,
-            True
         }
 
         private static bool IsIntegralType(ITypeSymbol typeSymbol)

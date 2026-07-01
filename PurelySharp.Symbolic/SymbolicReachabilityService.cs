@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -243,6 +244,73 @@ namespace PurelySharp.Symbolic
             return null;
         }
 
+        public static bool? EvaluateKnownConditionTruth(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis,
+            IReadOnlyCollection<SmtFormula>? pathConditions = null)
+        {
+            expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue && constantValue.Value is bool booleanValue)
+            {
+                return booleanValue;
+            }
+
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                return EvaluateKnownConditionTruth(
+                    prefixUnary.Operand,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    pathConditions) is { } operandTruth
+                    ? !operandTruth
+                    : null;
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression)
+            {
+                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
+                {
+                    var left = EvaluateKnownConditionTruth(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    var right = EvaluateKnownConditionTruth(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    if (left == false || right == false)
+                    {
+                        return false;
+                    }
+
+                    if (left == true && right == true)
+                    {
+                        return true;
+                    }
+                }
+                else if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+                {
+                    var left = EvaluateKnownConditionTruth(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    var right = EvaluateKnownConditionTruth(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    if (left == true || right == true)
+                    {
+                        return true;
+                    }
+
+                    if (left == false && right == false)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return EvaluateConditionTruth(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                pathConditions);
+        }
+
         public static bool IsNodeReachable(
             SyntaxNode node,
             SemanticModel semanticModel,
@@ -326,6 +394,38 @@ namespace PurelySharp.Symbolic
                 .Concat(CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
                 .Concat(CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
                 .ToArray();
+        }
+
+        public static bool IsForInitialEntryConditionAlwaysFalse(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (forStatement.Condition == null)
+            {
+                return false;
+            }
+
+            var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
+            if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                return EvaluateKnownConditionTruth(
+                    forStatement.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    pathConditions) == false;
+            }
+
+            foreach (var initializerFact in CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
+            {
+                pathConditions.Add(initializerFact);
+            }
+
+            CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
+            return IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
         public static IEnumerable<SmtFormula> CollectForInitializerFacts(

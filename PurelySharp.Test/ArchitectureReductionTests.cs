@@ -54,6 +54,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_UsesSymbolicReachabilityForConditionProofs()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "ExecutionVisibility.cs"));
+
+            Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.IsForInitialEntryConditionAlwaysFalse"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.EvaluateKnownConditionTruth"));
+        }
+
+        [Test]
         public void SymbolicPublicSurface_HidesImplementationTranslators()
         {
             Assert.That(typeof(CSharpConditionToFormula).IsPublic, Is.False);

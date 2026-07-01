@@ -1430,10 +1430,9 @@
                             "path":  "PurelySharp.Analyzer/Engine/ExecutionVisibility.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "ExecutionVisibility",
-                                                  "KnownBooleanValue"
+                                                  "ExecutionVisibility"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "ExecutionVisibility"
                                                  ]
@@ -3248,6 +3247,7 @@
                                     "path":  "PurelySharp.Analyzer/Engine/ExecutionVisibility.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "ReferenceReachabilitySmtTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "StringLengthSmtTests"
@@ -3255,7 +3255,7 @@
                                     "tokens":  [
                                                    "ExecutionVisibility"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
