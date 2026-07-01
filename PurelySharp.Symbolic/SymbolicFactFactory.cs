@@ -258,6 +258,69 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        public static bool TryCreateSymbolVariableFormula(
+            string variableName,
+            ITypeSymbol? type,
+            Func<ITypeSymbol, bool> isIntegralType,
+            Func<ITypeSymbol, bool> isReferenceLikeType,
+            out SmtFormula formula)
+        {
+            if (type == null)
+            {
+                formula = null!;
+                return false;
+            }
+
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (isIntegralType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                return true;
+            }
+
+            if (isReferenceLikeType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        public static bool TryGetValueKind(
+            ITypeSymbol type,
+            Func<ITypeSymbol, bool> isIntegralType,
+            Func<ITypeSymbol, bool> isReferenceLikeType,
+            out SmtValueKind kind)
+        {
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                kind = SmtValueKind.Bool;
+                return true;
+            }
+
+            if (isIntegralType(type))
+            {
+                kind = SmtValueKind.Int;
+                return true;
+            }
+
+            if (isReferenceLikeType(type))
+            {
+                kind = SmtValueKind.Reference;
+                return true;
+            }
+
+            kind = default;
+            return false;
+        }
+
         public static string GetReferenceFormulaName(SmtFormula receiverFormula)
         {
             return receiverFormula is SmtVariable variable

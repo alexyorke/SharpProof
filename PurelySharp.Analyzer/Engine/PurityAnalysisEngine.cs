@@ -4334,35 +4334,12 @@ namespace PurelySharp.Analyzer.Engine
             PurityAnalysisState currentState,
             out SmtFormula formula)
         {
-            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-
-            if (type == null)
-            {
-                formula = null!;
-                return false;
-            }
-
-            var variableName = GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion);
-            if (type.SpecialType == SpecialType.System_Boolean)
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Bool);
-                return true;
-            }
-
-            if (IsSmtIntegralType(type))
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Int);
-                return true;
-            }
-
-            if (type.IsReferenceType)
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Reference);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateSymbolVariableFormula(
+                GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
+                SymbolicFactFactory.GetTrackedSymbolType(symbol),
+                IsSmtIntegralType,
+                static type => type.IsReferenceType,
+                out formula);
         }
 
         private static bool TryCreateStringContentFormula(

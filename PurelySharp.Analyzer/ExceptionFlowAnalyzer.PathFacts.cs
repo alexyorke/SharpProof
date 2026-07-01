@@ -1778,59 +1778,21 @@ namespace PurelySharp.Analyzer
 
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
         {
-            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-
-            if (type == null)
-            {
-                formula = null!;
-                return false;
-            }
-
-            var variableName = GetSmtVariableName(symbol);
-            if (type.SpecialType == SpecialType.System_Boolean)
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Bool);
-                return true;
-            }
-
-            if (IsSearchLibIntegralType(type))
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Int);
-                return true;
-            }
-
-            if (IsReferenceType(type))
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Reference);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateSymbolVariableFormula(
+                GetSmtVariableName(symbol),
+                SymbolicFactFactory.GetTrackedSymbolType(symbol),
+                IsSearchLibIntegralType,
+                IsReferenceType,
+                out formula);
         }
 
         private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
         {
-            if (type.SpecialType == SpecialType.System_Boolean)
-            {
-                kind = SmtValueKind.Bool;
-                return true;
-            }
-
-            if (IsSearchLibIntegralType(type))
-            {
-                kind = SmtValueKind.Int;
-                return true;
-            }
-
-            if (IsReferenceType(type))
-            {
-                kind = SmtValueKind.Reference;
-                return true;
-            }
-
-            kind = default;
-            return false;
+            return SymbolicFactFactory.TryGetValueKind(
+                type,
+                IsSearchLibIntegralType,
+                IsReferenceType,
+                out kind);
         }
 
         private static bool TryCreateStringContentFormula(ISymbol symbol, out SmtFormula formula)
