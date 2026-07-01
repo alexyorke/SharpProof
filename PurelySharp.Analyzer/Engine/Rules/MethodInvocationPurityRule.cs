@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -2528,7 +2529,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
                 methodSymbol.Name == "Parse" &&
                 methodSymbol.Parameters.Length == 1 &&
-                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type);
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type);
         }
 
         private static bool IsBooleanTryParseMethod(IMethodSymbol methodSymbol)
@@ -2536,7 +2537,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
                 methodSymbol.Name == "TryParse" &&
                 methodSymbol.Parameters.Length == 2 &&
-                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type) &&
                 methodSymbol.Parameters[1].RefKind == RefKind.Out &&
                 methodSymbol.Parameters[1].Type.SpecialType == SpecialType.System_Boolean;
         }
@@ -2548,7 +2549,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 !methodSymbol.IsGenericMethod ||
                 methodSymbol.TypeParameters.Length != 1 ||
                 methodSymbol.Parameters.Length is not (2 or 3) ||
-                !IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type))
+                !SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type))
             {
                 return false;
             }
@@ -2602,7 +2603,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 methodSymbol.Name != "Parse" ||
                 methodSymbol.Parameters.Length is not (2 or 3) ||
                 methodSymbol.Parameters[0].Type.ToDisplayString() != "System.Type" ||
-                !IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[1].Type))
+                !SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[1].Type))
             {
                 return false;
             }
@@ -2623,7 +2624,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return methodSymbol.ContainingType?.ToDisplayString() == "System.Net.IPAddress" &&
                 methodSymbol.Name == "Parse" &&
                 methodSymbol.Parameters.Length == 1 &&
-                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type);
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(methodSymbol.Parameters[0].Type);
         }
 
         private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol)
@@ -2637,20 +2638,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return -1;
-        }
-
-        private static bool IsReadOnlySpanOfChar(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
-                namedType.TypeArguments.Length == 1 &&
-                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
-        }
-
-        private static bool IsStringOrReadOnlySpanOfChar(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol.SpecialType == SpecialType.System_String ||
-                IsReadOnlySpanOfChar(typeSymbol);
         }
 
         private static bool IsDeterministicStringComparison(IOperation? operation)

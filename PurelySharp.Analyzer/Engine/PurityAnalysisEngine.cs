@@ -4761,7 +4761,7 @@ namespace PurelySharp.Analyzer.Engine
                 targetMethod.Parameters.Length == 4 &&
                 invocationOperation.Arguments.Length == 4 &&
                 (targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String ||
-                 IsReadOnlySpanOfChar(targetMethod.Parameters[0].Type)) &&
+                 SymbolicTypeFacts.IsReadOnlySpanOfCharType(targetMethod.Parameters[0].Type)) &&
                 IsSingleTimeSpanConstantFormat(invocationOperation.Arguments[1].Value) &&
                 IsTimeSpanStylesNone(invocationOperation.Arguments[3].Value))
             {
@@ -4807,14 +4807,14 @@ namespace PurelySharp.Analyzer.Engine
 
             if (targetMethod.Parameters.Length == 2 &&
                 invocationOperation.Arguments.Length == 2 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
             }
 
             if (targetMethod.Parameters.Length == 3 &&
                 invocationOperation.Arguments.Length == 3 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 targetMethod.Parameters[1].Type.ToDisplayString() == "System.Globalization.NumberStyles")
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
@@ -4835,7 +4835,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "Parse" &&
                 targetMethod.Parameters.Length == 1 &&
                 invocationOperation.Arguments.Length == 1 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return true;
             }
@@ -4843,7 +4843,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "TryParse" &&
                 targetMethod.Parameters.Length == 2 &&
                 invocationOperation.Arguments.Length == 2 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return true;
             }
@@ -4913,7 +4913,7 @@ namespace PurelySharp.Analyzer.Engine
 
             if (targetMethod.Name == "Parse" &&
                 invocationOperation.Arguments.Length >= 1 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return invocationOperation.Arguments.Length == 1 ||
                     HasFormatProviderParameter(targetMethod);
@@ -4921,14 +4921,14 @@ namespace PurelySharp.Analyzer.Engine
 
             if (targetMethod.Name == "TryParse" &&
                 invocationOperation.Arguments.Length >= 2 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return invocationOperation.Arguments.Length == 2 ||
                     HasFormatProviderParameter(targetMethod);
             }
 
             if ((targetMethod.Name == "ParseExact" || targetMethod.Name == "TryParseExact") &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsFormatSpecifierType(targetMethod.Parameters[1].Type))
             {
                 return HasFormatProviderParameter(targetMethod) ||
@@ -5006,7 +5006,7 @@ namespace PurelySharp.Analyzer.Engine
         private static bool IsFormatSpecifierType(ITypeSymbol typeSymbol)
         {
             return typeSymbol.SpecialType == SpecialType.System_String ||
-                IsReadOnlySpanOfChar(typeSymbol) ||
+                SymbolicTypeFacts.IsReadOnlySpanOfCharType(typeSymbol) ||
                 typeSymbol is IArrayTypeSymbol arrayType &&
                 arrayType.ElementType.SpecialType == SpecialType.System_String;
         }
@@ -5038,7 +5038,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "Parse" &&
                 targetMethod.Parameters.Length == 2 &&
                 invocationOperation.Arguments.Length == 2 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
             }
@@ -5046,7 +5046,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "Parse" &&
                 targetMethod.Parameters.Length == 3 &&
                 invocationOperation.Arguments.Length == 3 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[2].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
@@ -5055,7 +5055,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Parameters.Length == 3 &&
                 invocationOperation.Arguments.Length == 3 &&
                 targetMethod.Name == "ParseExact" &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsSingleTimeOnlyInvariantFormat(invocationOperation.Arguments[1].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
@@ -5064,7 +5064,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Parameters.Length == 4 &&
                 invocationOperation.Arguments.Length == 4 &&
                 targetMethod.Name == "ParseExact" &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsSingleTimeOnlyInvariantFormat(invocationOperation.Arguments[1].Value) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[3].Value))
             {
@@ -5087,7 +5087,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "Parse" &&
                 targetMethod.Parameters.Length == 2 &&
                 invocationOperation.Arguments.Length == 2 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
             }
@@ -5095,7 +5095,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Name == "Parse" &&
                 targetMethod.Parameters.Length == 3 &&
                 invocationOperation.Arguments.Length == 3 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[2].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
@@ -5104,7 +5104,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Parameters.Length == 3 &&
                 invocationOperation.Arguments.Length == 3 &&
                 targetMethod.Name == "ParseExact" &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsSingleDateOnlyInvariantFormat(invocationOperation.Arguments[1].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
@@ -5113,7 +5113,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod.Parameters.Length == 4 &&
                 invocationOperation.Arguments.Length == 4 &&
                 targetMethod.Name == "ParseExact" &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsSingleDateOnlyInvariantFormat(invocationOperation.Arguments[1].Value) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[3].Value))
             {
@@ -5143,7 +5143,7 @@ namespace PurelySharp.Analyzer.Engine
 
             if (targetMethod.Parameters.Length == 4 &&
                 invocationOperation.Arguments.Length == 4 &&
-                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
                 IsSingleDateTimeOffsetRoundtripFormat(invocationOperation.Arguments[1].Value) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[3].Value))
             {
@@ -5196,20 +5196,6 @@ namespace PurelySharp.Analyzer.Engine
         private static bool IsTimeSpanStylesNone(IOperation? operation) => IsZeroStyle(operation);
 
         private static bool IsDateTimeStylesNone(IOperation? operation) => IsZeroStyle(operation);
-
-        private static bool IsReadOnlySpanOfChar(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
-                namedType.TypeArguments.Length == 1 &&
-                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
-        }
-
-        private static bool IsStringOrReadOnlySpanOfChar(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol.SpecialType == SpecialType.System_String ||
-                IsReadOnlySpanOfChar(typeSymbol);
-        }
 
         private static bool IsCultureInfoInvariantCulture(IOperation? operation)
         {

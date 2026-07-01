@@ -91,6 +91,29 @@ namespace PurelySharp.Symbolic
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
         }
 
+        public static bool IsCharArrayType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is IArrayTypeSymbol
+            {
+                Rank: 1,
+                ElementType.SpecialType: SpecialType.System_Char
+            };
+        }
+
+        public static bool IsReadOnlySpanOfCharType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                namedType.TypeArguments.Length == 1 &&
+                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
+        }
+
+        public static bool IsStringOrReadOnlySpanOfCharType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol?.SpecialType == SpecialType.System_String ||
+                IsReadOnlySpanOfCharType(typeSymbol);
+        }
+
         public static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
         {
             return typeSymbol is INamedTypeSymbol namedType &&

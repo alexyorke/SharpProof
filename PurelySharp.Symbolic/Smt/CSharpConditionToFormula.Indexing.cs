@@ -622,7 +622,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (constructor.Parameters.Length == 1 &&
-                IsCharArrayType(constructor.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
                 TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var charArrayExpression) &&
                 TryCreateBuiltInElementAccessLengthFormula(
                     charArrayExpression,
@@ -637,7 +637,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (constructor.Parameters.Length == 3 &&
-                IsCharArrayType(constructor.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
                 constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
                 constructor.Parameters[2].Type.SpecialType == SpecialType.System_Int32 &&
                 TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 2, out var lengthExpression) &&
@@ -655,7 +655,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (constructor.Parameters.Length == 1 &&
-                IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
+                SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
                 TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var spanExpression) &&
                 TryCreateBuiltInElementAccessLengthFormula(
                     spanExpression,
@@ -670,23 +670,6 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
-        }
-
-        private static bool IsCharArrayType(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol is IArrayTypeSymbol
-            {
-                Rank: 1,
-                ElementType.SpecialType: SpecialType.System_Char
-            };
-        }
-
-        private static bool IsReadOnlySpanOfCharType(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
-                namedType.TypeArguments.Length == 1 &&
-                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
         }
 
         private static bool TryCreateStringInvocationResultLengthFormula(
