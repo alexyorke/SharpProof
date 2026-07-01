@@ -489,8 +489,12 @@ namespace PurelySharp.Symbolic
             int position,
             CancellationToken cancellationToken)
         {
-            var lineSpan = syntaxTree.GetLineSpan(new TextSpan(position, 0), cancellationToken);
-            return (lineSpan.StartLinePosition.Line + 1, lineSpan.StartLinePosition.Character + 1);
+            var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+                syntaxTree,
+                position,
+                cancellationToken,
+                validatePosition: true);
+            return (lineColumn.Line, lineColumn.Column);
         }
 
         private static (int StartLine, int StartColumn, int EndLine, int EndColumn) GetNodeSourceSpan(
@@ -498,12 +502,12 @@ namespace PurelySharp.Symbolic
             TextSpan span,
             CancellationToken cancellationToken)
         {
-            var lineSpan = syntaxTree.GetLineSpan(span, cancellationToken);
+            var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, span, cancellationToken);
             return (
-                lineSpan.StartLinePosition.Line + 1,
-                lineSpan.StartLinePosition.Character + 1,
-                lineSpan.EndLinePosition.Line + 1,
-                lineSpan.EndLinePosition.Character + 1);
+                nodeSourceSpan.StartLine,
+                nodeSourceSpan.StartColumn,
+                nodeSourceSpan.EndLine,
+                nodeSourceSpan.EndColumn);
         }
 
         private static string? GetContainingMethodName(SyntaxNode node)
