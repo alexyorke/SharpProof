@@ -1593,17 +1593,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/BranchPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "BranchPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/CoalesceOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1648,17 +1637,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ConstantPatternPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ConstantPatternPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/ConstructorInitializerPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1681,14 +1659,14 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DeclarationPatternPurityRule.cs",
+                            "path":  "PurelySharp.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "DeclarationPatternPurityRule"
+                                                  "DeclarativePureOperationRule"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "DeclarativePureOperationRule"
                                                  ]
                         },
                         {
@@ -1703,32 +1681,10 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DefaultValuePurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "DefaultValuePurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/DelegateCreationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DelegateCreationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DiscardPatternPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "DiscardPatternPurityRule"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -1813,17 +1769,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/InstanceReferencePurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "InstanceReferencePurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/InterpolatedStringPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1879,17 +1824,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/LiteralPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "LiteralPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/LocalFunctionOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1898,17 +1832,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "LocalFunctionOperationPurityRule"
-                                                 ]
-                        },
-                        {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/LocalReferencePurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "LocalReferencePurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -1945,17 +1868,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/NameOfPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "NameOfPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/NegatedPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -1975,17 +1887,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "ObjectCreationPurityRule"
-                                                 ]
-                        },
-                        {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ParameterReferencePurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ParameterReferencePurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -2015,6 +1916,17 @@
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PropertySubpatternPurityRule"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Analyzer/Engine/Rules/PureOperationRuleDescriptor.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PureOperationRuleDescriptor"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -2086,17 +1998,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "RuleRegistry"
-                                                 ]
-                        },
-                        {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/SizeOfPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "SizeOfPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
                                                  ]
                         },
                         {
@@ -2177,17 +2078,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/TypeOfPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "TypeOfPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/TypePatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2214,17 +2104,6 @@
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "UsingStatementPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/Utf8StringLiteralPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "Utf8StringLiteralPurityRule"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -2535,7 +2414,7 @@
                                                   "SourceBooleanFormulaCacheEntry",
                                                   "SourceBooleanFormulaCacheKey"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpConditionToFormula"
                                                  ]
@@ -2546,7 +2425,7 @@
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpConditionToFormula"
                                                  ]
@@ -2557,7 +2436,7 @@
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpConditionToFormula"
                                                  ]
@@ -2568,7 +2447,7 @@
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpConditionToFormula"
                                                  ]
@@ -2579,7 +2458,7 @@
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "CSharpConditionToFormula"
                                                  ]
@@ -2591,7 +2470,7 @@
                                                   "SmtAnalysisMode",
                                                   "SmtAnalysisOptions"
                                               ],
-                            "referencingFixtureCount":  15,
+                            "referencingFixtureCount":  16,
                             "referencedTokens":  [
                                                      "SmtAnalysisMode",
                                                      "SmtAnalysisOptions"
@@ -2603,7 +2482,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  15,
+                            "referencingFixtureCount":  16,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -2635,6 +2514,28 @@
                                                  ]
                         },
                         {
+                            "path":  "PurelySharp.Symbolic/SymbolicDynamicNullBindingFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicDynamicNullBindingFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicFactFactory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicFactFactory"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "PurelySharp.Symbolic/SymbolicInvariantService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -2654,6 +2555,17 @@
                                                  ]
                         },
                         {
+                            "path":  "PurelySharp.Symbolic/SymbolicMutationFactFactory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicMutationFactFactory"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -2665,6 +2577,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicProgramPointFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicProgramPointMetadata.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicProgramPointMetadata"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -2682,7 +2605,7 @@
                                                   "SymbolicSourceInput",
                                                   "SymbolicSourceInputKind"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SymbolicQueryOptions",
                                                      "SymbolicQueryRequest",
@@ -2704,9 +2627,27 @@
                                                  ]
                         },
                         {
+                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeExceptionFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "ExceptionCategories",
+                                                  "ExceptionSources",
+                                                  "ExceptionTypes",
+                                                  "SymbolicRuntimeExceptionFacts"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "ExceptionCategories",
+                                                     "ExceptionSources",
+                                                     "ExceptionTypes",
+                                                     "SymbolicRuntimeExceptionFacts"
+                                                 ]
+                        },
+                        {
                             "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
+                                                  "RuntimeHazardCandidate",
                                                   "SymbolicRuntimeHazardQueryService"
                                               ],
                             "referencingFixtureCount":  2,
@@ -2718,9 +2659,6 @@
                             "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "LineColumn",
-                                                  "NodeSourceSpan",
-                                                  "RuntimeHazardCandidate",
                                                   "SymbolicRuntimeHazard",
                                                   "SymbolicRuntimeHazardKind",
                                                   "SymbolicRuntimeHazardQueryOptions",
@@ -2739,11 +2677,44 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeTypeFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRuntimeTypeFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicSourceCompilation.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicSourceCompilation"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicSourceLocation.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "LineColumn",
                                                   "NodeSourceSpan",
+                                                  "SymbolicSourceLocation"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
                                                   "ProgramPointQueryContext",
                                                   "ProofReasonKey",
                                                   "ProofReasonKeyComparer",
@@ -2815,6 +2786,28 @@
                                                      "SymbolicSourceQueryResult",
                                                      "SymbolicSourceQueryService",
                                                      "SymbolicTruthValue"
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicTypeFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicTypeFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "PurelySharp.Symbolic/SymbolicValueFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicValueFacts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -3332,6 +3325,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "PurelySharp.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "RoslynConstructCoverageTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "DeclarativePureOperationRule"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "PurelySharp.Analyzer/Engine/Rules/EventAssignmentPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -3580,67 +3584,73 @@
                                     "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicInvariantServiceTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpConditionToFormula"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicInvariantServiceTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpConditionToFormula"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicInvariantServiceTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpConditionToFormula"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicInvariantServiceTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpConditionToFormula"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicInvariantServiceTests"
                                                              ],
                                     "tokens":  [
                                                    "CSharpConditionToFormula"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisOptions.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "ElementAccessSmtTests",
                                                                  "ExpressionAtomSmtTests",
                                                                  "ExpressionSmtTranslationTests",
@@ -3660,13 +3670,14 @@
                                                    "SmtAnalysisMode",
                                                    "SmtAnalysisOptions"
                                                ],
-                                    "fixtureCount":  15
+                                    "fixtureCount":  16
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "ElementAccessSmtTests",
                                                                  "ExpressionAtomSmtTests",
                                                                  "ExpressionSmtTranslationTests",
@@ -3685,7 +3696,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  15
+                                    "fixtureCount":  16
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/SymbolicInvariantService.cs",
@@ -3720,6 +3731,7 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
@@ -3730,7 +3742,7 @@
                                                    "SymbolicRuntimeHazardRequest",
                                                    "SymbolicSourceInput"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
@@ -3742,6 +3754,21 @@
                                                    "SymbolicReachabilityService"
                                                ],
                                     "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "PurelySharp.Symbolic/SymbolicRuntimeExceptionFacts.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "CorpusReportTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionCategories",
+                                                   "ExceptionSources",
+                                                   "ExceptionTypes",
+                                                   "SymbolicRuntimeExceptionFacts"
+                                               ],
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",

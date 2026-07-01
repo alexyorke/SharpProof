@@ -22,8 +22,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new DeconstructionAssignmentPurityRule(),
 				new AssignmentPurityRule(),
 				new ExpressionStatementPurityRule(),
-				new ParameterReferencePurityRule(),
-				new LocalReferencePurityRule(),
+				CreateAlwaysPureRule(OperationKind.ParameterReference, "ParamRefRule", "Parameter reference"),
+				CreateAlwaysPureRule(OperationKind.LocalReference, "LocalRefRule", "LocalReference"),
 				new FieldReferencePurityRule(),
 				CreateAlwaysPureRule(OperationKind.InstanceReference, "InstRefRule", "InstanceReference"),
 				
@@ -54,8 +54,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new TuplePurityRule(),
 				CreateAlwaysPureRule(OperationKind.TypeOf, "TypeOfRule", "TypeOf operation"),
 				CreateAlwaysPureRule(OperationKind.NameOf, "NameOfRule", "NameOf operation"),
-				new Utf8StringLiteralPurityRule(),
-				new SizeOfPurityRule(),
+				CreateAlwaysPureRule(OperationKind.Utf8String, "Utf8StringLiteralPurityRule", "Utf8String operation"),
+				CreateAlwaysPureRule(OperationKind.SizeOf, "SizeOfRule", "SizeOf operation"),
 				
 				// Patterns
 				new BinaryPatternPurityRule(),

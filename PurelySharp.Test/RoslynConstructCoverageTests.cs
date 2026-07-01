@@ -76,11 +76,15 @@ namespace PurelySharp.Test
         {
             var expectedDeclarativeKinds = new[]
             {
+                OperationKind.ParameterReference,
+                OperationKind.LocalReference,
                 OperationKind.InstanceReference,
                 OperationKind.DefaultValue,
                 OperationKind.Literal,
                 OperationKind.TypeOf,
                 OperationKind.NameOf,
+                OperationKind.Utf8String,
+                OperationKind.SizeOf,
                 OperationKind.ConstantPattern,
                 OperationKind.DeclarationPattern,
                 OperationKind.DiscardPattern,
