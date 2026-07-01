@@ -1658,25 +1658,7 @@ namespace PurelySharp.Symbolic
             out long minValue,
             out long maxValue)
         {
-            switch (typeSymbol?.SpecialType)
-            {
-                case SpecialType.System_Int32:
-                    minValue = int.MinValue;
-                    maxValue = int.MaxValue;
-                    return true;
-                case SpecialType.System_UInt32:
-                    minValue = uint.MinValue;
-                    maxValue = uint.MaxValue;
-                    return true;
-                case SpecialType.System_Int64:
-                    minValue = long.MinValue;
-                    maxValue = long.MaxValue;
-                    return true;
-                default:
-                    minValue = default;
-                    maxValue = default;
-                    return false;
-            }
+            return SymbolicTypeFacts.TryGetCheckedIntegralRange(typeSymbol, out minValue, out maxValue);
         }
 
         private static bool TryGetBoundedIntegralRange(
@@ -1684,45 +1666,7 @@ namespace PurelySharp.Symbolic
             out long minValue,
             out long maxValue)
         {
-            switch (typeSymbol?.SpecialType)
-            {
-                case SpecialType.System_Char:
-                    minValue = char.MinValue;
-                    maxValue = char.MaxValue;
-                    return true;
-                case SpecialType.System_SByte:
-                    minValue = sbyte.MinValue;
-                    maxValue = sbyte.MaxValue;
-                    return true;
-                case SpecialType.System_Byte:
-                    minValue = byte.MinValue;
-                    maxValue = byte.MaxValue;
-                    return true;
-                case SpecialType.System_Int16:
-                    minValue = short.MinValue;
-                    maxValue = short.MaxValue;
-                    return true;
-                case SpecialType.System_UInt16:
-                    minValue = ushort.MinValue;
-                    maxValue = ushort.MaxValue;
-                    return true;
-                case SpecialType.System_Int32:
-                    minValue = int.MinValue;
-                    maxValue = int.MaxValue;
-                    return true;
-                case SpecialType.System_UInt32:
-                    minValue = uint.MinValue;
-                    maxValue = uint.MaxValue;
-                    return true;
-                case SpecialType.System_Int64:
-                    minValue = long.MinValue;
-                    maxValue = long.MaxValue;
-                    return true;
-                default:
-                    minValue = default;
-                    maxValue = default;
-                    return false;
-            }
+            return SymbolicTypeFacts.TryGetBoundedIntegralRange(typeSymbol, out minValue, out maxValue);
         }
 
         private static bool TryGetCheckedNumericConversionRange(
@@ -1730,45 +1674,7 @@ namespace PurelySharp.Symbolic
             out long minValue,
             out long maxValue)
         {
-            switch (typeSymbol?.SpecialType)
-            {
-                case SpecialType.System_Char:
-                    minValue = char.MinValue;
-                    maxValue = char.MaxValue;
-                    return true;
-                case SpecialType.System_SByte:
-                    minValue = sbyte.MinValue;
-                    maxValue = sbyte.MaxValue;
-                    return true;
-                case SpecialType.System_Byte:
-                    minValue = byte.MinValue;
-                    maxValue = byte.MaxValue;
-                    return true;
-                case SpecialType.System_Int16:
-                    minValue = short.MinValue;
-                    maxValue = short.MaxValue;
-                    return true;
-                case SpecialType.System_UInt16:
-                    minValue = ushort.MinValue;
-                    maxValue = ushort.MaxValue;
-                    return true;
-                case SpecialType.System_Int32:
-                    minValue = int.MinValue;
-                    maxValue = int.MaxValue;
-                    return true;
-                case SpecialType.System_UInt32:
-                    minValue = uint.MinValue;
-                    maxValue = uint.MaxValue;
-                    return true;
-                case SpecialType.System_Int64:
-                    minValue = long.MinValue;
-                    maxValue = long.MaxValue;
-                    return true;
-                default:
-                    minValue = default;
-                    maxValue = default;
-                    return false;
-            }
+            return SymbolicTypeFacts.TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
         }
 
         private static SmtFormula CreateIntegralOutOfRangeFormula(SmtFormula resultFormula, long minValue, long maxValue)

@@ -122,6 +122,86 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        public static bool TryGetCheckedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
+        public static bool TryGetBoundedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            return TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
+        }
+
+        public static bool TryGetCheckedNumericConversionRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Char:
+                    minValue = char.MinValue;
+                    maxValue = char.MaxValue;
+                    return true;
+                case SpecialType.System_SByte:
+                    minValue = sbyte.MinValue;
+                    maxValue = sbyte.MaxValue;
+                    return true;
+                case SpecialType.System_Byte:
+                    minValue = byte.MinValue;
+                    maxValue = byte.MaxValue;
+                    return true;
+                case SpecialType.System_Int16:
+                    minValue = short.MinValue;
+                    maxValue = short.MaxValue;
+                    return true;
+                case SpecialType.System_UInt16:
+                    minValue = ushort.MinValue;
+                    maxValue = ushort.MaxValue;
+                    return true;
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
         private static bool IsKnownReferenceTypeParameter(
             ITypeParameterSymbol typeParameter,
             HashSet<ITypeParameterSymbol> visited)
