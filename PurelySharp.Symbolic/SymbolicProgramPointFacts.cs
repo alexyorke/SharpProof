@@ -3828,6 +3828,7 @@ namespace PurelySharp.Symbolic
                 var breakStatement = loopBreaks[0];
                 return TryCreateDirectGuardedBreakCondition(
                     breakStatement,
+                    loopStatement,
                     loopBody,
                     semanticModel,
                     cancellationToken,
@@ -3846,6 +3847,7 @@ namespace PurelySharp.Symbolic
             {
                 if (!TryCreateDirectGuardedBreakCondition(
                         breakStatement,
+                        loopStatement,
                         loopBody,
                         semanticModel,
                         cancellationToken,
@@ -3864,6 +3866,7 @@ namespace PurelySharp.Symbolic
 
         private static bool TryCreateDirectGuardedBreakCondition(
             BreakStatementSyntax breakStatement,
+            StatementSyntax loopStatement,
             StatementSyntax loopBody,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -3884,6 +3887,17 @@ namespace PurelySharp.Symbolic
             {
                 breakCondition = null!;
                 return false;
+            }
+
+            if (TryCreateGuardedContinueFallThroughBeforeStatement(
+                loopStatement,
+                loopBody,
+                ifStatement,
+                semanticModel,
+                cancellationToken,
+                out var fallThroughCondition))
+            {
+                breakCondition = new SmtBinaryFormula(SmtBinaryOperator.And, fallThroughCondition, breakCondition);
             }
 
             return true;
@@ -3918,12 +3932,50 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            return TryCreateGuardedContinueFallThroughBeforeStatement(
+                loopStatement,
+                loopBody,
+                block.Statements[breakIndex],
+                semanticModel,
+                cancellationToken,
+                out breakCondition);
+        }
+
+        private static bool TryCreateGuardedContinueFallThroughBeforeStatement(
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            StatementSyntax targetStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula breakCondition)
+        {
+            breakCondition = null!;
+            if (loopBody is not BlockSyntax block)
+            {
+                return false;
+            }
+
+            var targetIndex = -1;
+            for (var index = 0; index < block.Statements.Count; index++)
+            {
+                if (ReferenceEquals(block.Statements[index], targetStatement))
+                {
+                    targetIndex = index;
+                    break;
+                }
+            }
+
+            if (targetIndex <= 0)
+            {
+                return false;
+            }
+
             SmtFormula? combinedCondition = null;
-            for (var index = breakIndex - 1; index >= 0; index--)
+            for (var index = targetIndex - 1; index >= 0; index--)
             {
                 if (block.Statements[index] is not IfStatementSyntax ifStatement ||
                     !TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue) ||
-                    AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, ifStatement.SpanStart, semanticModel, cancellationToken) ||
+                    AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, targetStatement.SpanStart, semanticModel, cancellationToken) ||
                     !TryCreateBranchConditionFormula(
                         ifStatement.Condition,
                         !continueBranchWhenTrue,

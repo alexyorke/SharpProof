@@ -2567,6 +2567,8 @@ namespace PurelySharp.Symbolic
             UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
             Status = ResolveStatus();
             StatusReason = ResolveStatusReason();
+            ReasonCode = ResolveReasonCode();
+            Summary = CreateSummary();
         }
 
         public string Target { get; }
@@ -2590,6 +2592,10 @@ namespace PurelySharp.Symbolic
         public SymbolicInvariantQueryStatus Status { get; }
 
         public string StatusReason { get; }
+
+        public string ReasonCode { get; }
+
+        public string Summary { get; }
 
         internal static IReadOnlyList<SymbolicInvariantTargetSummary> FromPoint(SymbolicSourceQueryResult result)
         {
@@ -2660,6 +2666,36 @@ namespace PurelySharp.Symbolic
             }
 
             return "target_exact";
+        }
+
+        private string ResolveReasonCode()
+        {
+            if (HasUnknowns)
+            {
+                return "PS-SYM-TARGET-CONSERVATIVE-UNKNOWN";
+            }
+
+            if (HasMaybeFacts)
+            {
+                return "PS-SYM-TARGET-PATH-SPECIFIC";
+            }
+
+            return "PS-SYM-TARGET-EXACT";
+        }
+
+        private string CreateSummary()
+        {
+            if (HasUnknowns)
+            {
+                return "Facts for this target differ across selected paths; the merged invariant keeps a conservative unknown for the target.";
+            }
+
+            if (HasMaybeFacts)
+            {
+                return "Some facts for this target apply only to a subset of selected paths.";
+            }
+
+            return "All selected reachable program points agree on the facts for this target.";
         }
 
         private static void AddCondition(
@@ -4887,6 +4923,8 @@ namespace PurelySharp.Symbolic
             string target,
             string status,
             string statusReason,
+            string reasonCode,
+            string summary,
             int mustFactCount,
             IReadOnlyList<string> mustFacts,
             int maybeFactCount,
@@ -4900,6 +4938,8 @@ namespace PurelySharp.Symbolic
             Target = target ?? string.Empty;
             Status = status ?? string.Empty;
             StatusReason = statusReason ?? string.Empty;
+            ReasonCode = reasonCode ?? string.Empty;
+            Summary = summary ?? string.Empty;
             MustFactCount = mustFactCount;
             MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
             MaybeFactCount = maybeFactCount;
@@ -4916,6 +4956,10 @@ namespace PurelySharp.Symbolic
         public string Status { get; }
 
         public string StatusReason { get; }
+
+        public string ReasonCode { get; }
+
+        public string Summary { get; }
 
         public int MustFactCount { get; }
 
@@ -4945,6 +4989,8 @@ namespace PurelySharp.Symbolic
                 summary.Target,
                 summary.Status.ToString(),
                 summary.StatusReason,
+                summary.ReasonCode,
+                summary.Summary,
                 summary.MustFactCount,
                 SymbolicCompactProjection.Take(summary.MustFacts, options.MaxConditions),
                 summary.MaybeFactCount,

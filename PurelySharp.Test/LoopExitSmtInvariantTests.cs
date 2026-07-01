@@ -322,6 +322,72 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesGuardedContinuesBeforeGuardedBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready, bool blocked, bool done)
+    {
+        for (;;)
+        {
+            if (!ready)
+            {
+                continue;
+            }
+
+            if (blocked)
+            {
+                continue;
+            }
+
+            if (done)
+            {
+                break;
+            }
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked && done");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotProveGuardedContinueBeforeGuardedBreakWhenGuardMutates()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready, bool done)
+    {
+        for (;;)
+        {
+            if (!ready)
+            {
+                continue;
+            }
+
+            ready = false;
+            if (done)
+            {
+                break;
+            }
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_DoesNotProveGuardedContinueConditionWhenInterveningStatementMutatesGuard()
         {
             const string source = @"

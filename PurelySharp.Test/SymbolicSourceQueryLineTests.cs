@@ -501,6 +501,8 @@ public class TestClass
             Assert.That(targetSummary.Target, Is.EqualTo("value"));
             Assert.That(targetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
             Assert.That(targetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+            Assert.That(targetSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+            Assert.That(targetSummary.Summary, Does.Contain("conservative unknown"));
             Assert.That(targetSummary.MustFacts, Is.Empty);
             Assert.That(targetSummary.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
             Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
@@ -540,6 +542,9 @@ public class TestClass
             Assert.That(positiveTargetSummary.MaybeFacts, Is.Empty);
             Assert.That(positiveTargetSummary.UnknownFacts, Is.Empty);
             Assert.That(positiveTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
+            Assert.That(positiveTargetSummary.StatusReason, Is.EqualTo("target_exact"));
+            Assert.That(positiveTargetSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-EXACT"));
+            Assert.That(positiveTargetSummary.Summary, Does.Contain("agree"));
         }
 
         [Test]
@@ -1483,6 +1488,9 @@ public class TestClass
             var compactTargetSummary = invariantResult.InvariantQuery.TargetSummaries.Single();
             Assert.That(compactTargetSummary.Target, Is.EqualTo("copy"));
             Assert.That(compactTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+            Assert.That(compactTargetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+            Assert.That(compactTargetSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+            Assert.That(compactTargetSummary.Summary, Does.Contain("conservative unknown"));
             Assert.That(compactTargetSummary.MaybeFactCount, Is.GreaterThanOrEqualTo(2));
             Assert.That(compactTargetSummary.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
             Assert.That(compactTargetSummary.MaybeFactsTruncated, Is.True);
@@ -2090,6 +2098,8 @@ public class TestClass
                 Assert.That(targetSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
                 Assert.That(targetSummary.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
                 Assert.That(targetSummary.GetProperty("statusReason").GetString(), Is.EqualTo("target_has_conservative_unknowns"));
+                Assert.That(targetSummary.GetProperty("reasonCode").GetString(), Is.EqualTo("PS-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+                Assert.That(targetSummary.GetProperty("summary").GetString(), Does.Contain("conservative unknown"));
                 Assert.That(targetSummary.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
                 Assert.That(targetSummary.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
                 Assert.That(targetSummary.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
@@ -2378,6 +2388,8 @@ public class TestClass
 
                 Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
                 Assert.That(result.StandardOutput, Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target: value status=Exact reason=target_exact code=PS-SYM-TARGET-EXACT"));
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target summary: All selected reachable program points agree on the facts for this target."));
                 Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' target=value kind=SmtBinary summary: Status=AlwaysTrue"));
                 Assert.That(result.StandardOutput, Does.Contain("Proof summary: The condition is proven true at every reachable candidate program point."));
             }

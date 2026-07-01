@@ -168,6 +168,43 @@ public class TestClass
                 "(left ?? right).HasValue && (left ?? right).Value");
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalPropertyPatternArmFacts()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Count { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box left, Box right, bool flag)
+    {
+        if ((flag ? left : right) is { Count: > 0 })
+        {
+            if (flag)
+            {
+                return left.Count;
+            }
+
+            return right.Count;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return left.Count;",
+                "left != null && left.Count > 0");
+            AssertConditionProven(
+                source,
+                "return right.Count;",
+                "right != null && right.Count > 0");
+        }
+
         private static void AssertConditionProven(string source, string sourceLine, string condition)
         {
             var proof = ProveCondition(source, sourceLine, condition);

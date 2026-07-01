@@ -736,6 +736,7 @@ namespace PurelySharp.Symbolic.Smt
             private readonly Dictionary<SmtFormula, bool> _referenceNullStates = new();
             private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
             private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
+            private readonly Dictionary<SmtFormula, BooleanEquivalenceParent> _booleanEquivalences = new();
 
             public static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
             {
@@ -990,6 +991,22 @@ namespace PurelySharp.Symbolic.Smt
             public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
             {
                 formula = NormalizeAliases(formula);
+                var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
+                if (!canonical.Equals(formula))
+                {
+                    if (_exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
+                    {
+                        value = canonicalExactValue ^ isNegatedFromCanonical;
+                        return true;
+                    }
+
+                    if (TryEvaluateBoolean(canonical, out var canonicalValue))
+                    {
+                        value = canonicalValue ^ isNegatedFromCanonical;
+                        return true;
+                    }
+                }
+
                 if (_exactBooleans.TryGetValue(formula, out var exactValue))
                 {
                     value = exactValue;
@@ -1136,12 +1153,23 @@ namespace PurelySharp.Symbolic.Smt
                         binary.Left.Kind == SmtValueKind.Bool &&
                         binary.Right.Kind == SmtValueKind.Bool)
                     {
+                        var addedEquivalence = TryAddBooleanEquivalenceFact(
+                            binary,
+                            value,
+                            out var equivalenceContradiction);
+                        if (equivalenceContradiction)
+                        {
+                            hasContradiction = true;
+                            return true;
+                        }
+
                         if (TryEvaluateBoolean(binary.Left, out var left))
                         {
                             var expectedRight = binary.Operator == SmtBinaryOperator.Equal == value
                                 ? left
                                 : !left;
-                            return TryAddBooleanFact(binary.Right, expectedRight, out hasContradiction);
+                            var addedRight = TryAddBooleanFact(binary.Right, expectedRight, out hasContradiction);
+                            return addedEquivalence || addedRight;
                         }
 
                         if (TryEvaluateBoolean(binary.Right, out var right))
@@ -1149,7 +1177,8 @@ namespace PurelySharp.Symbolic.Smt
                             var expectedLeft = binary.Operator == SmtBinaryOperator.Equal == value
                                 ? right
                                 : !right;
-                            return TryAddBooleanFact(binary.Left, expectedLeft, out hasContradiction);
+                            var addedLeft = TryAddBooleanFact(binary.Left, expectedLeft, out hasContradiction);
+                            return addedEquivalence || addedLeft;
                         }
                     }
                 }
@@ -1198,14 +1227,138 @@ namespace PurelySharp.Symbolic.Smt
                 out bool hasContradiction)
             {
                 hasContradiction = false;
-                if (_exactBooleans.TryGetValue(formula, out var existing) &&
-                    existing != value)
+                formula = NormalizeAliases(formula);
+                var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
+                var canonicalValue = value ^ isNegatedFromCanonical;
+                if (_exactBooleans.TryGetValue(canonical, out var existing) &&
+                    existing != canonicalValue)
                 {
                     hasContradiction = true;
                 }
 
-                _exactBooleans[formula] = value;
+                _exactBooleans[canonical] = canonicalValue;
                 return true;
+            }
+
+            private bool TryAddBooleanEquivalenceFact(
+                SmtBinaryFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (formula.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
+                    formula.Left.Kind != SmtValueKind.Bool ||
+                    formula.Right.Kind != SmtValueKind.Bool ||
+                    !CanRelateBooleanTerm(formula.Left) ||
+                    !CanRelateBooleanTerm(formula.Right))
+                {
+                    return false;
+                }
+
+                var left = NormalizeAliases(formula.Left);
+                var right = NormalizeAliases(formula.Right);
+                var differs = formula.Operator == SmtBinaryOperator.NotEqual;
+                if (!value)
+                {
+                    differs = !differs;
+                }
+
+                return UnionBooleanEquivalences(left, right, differs, out hasContradiction);
+            }
+
+            private static bool CanRelateBooleanTerm(SmtFormula formula)
+            {
+                if (formula.Kind != SmtValueKind.Bool)
+                {
+                    return false;
+                }
+
+                return formula switch
+                {
+                    SmtVariable => true,
+                    SmtStringContainsFormula => true,
+                    SmtStringStartsWithFormula => true,
+                    SmtStringEndsWithFormula => true,
+                    SmtRegexMatchFormula => true,
+                    SmtRuntimeTypeTestFormula => true,
+                    SmtBinaryFormula binary => binary.Operator is (
+                            SmtBinaryOperator.Equal or
+                            SmtBinaryOperator.NotEqual or
+                            SmtBinaryOperator.LessThan or
+                            SmtBinaryOperator.LessThanOrEqual or
+                            SmtBinaryOperator.GreaterThan or
+                            SmtBinaryOperator.GreaterThanOrEqual) &&
+                        binary.Left.Kind != SmtValueKind.Bool &&
+                        binary.Right.Kind != SmtValueKind.Bool,
+                    _ => false,
+                };
+            }
+
+            private bool UnionBooleanEquivalences(
+                SmtFormula left,
+                SmtFormula right,
+                bool differs,
+                out bool hasContradiction)
+            {
+                var leftRoot = FindBooleanCanonical(left, out var leftNegated);
+                var rightRoot = FindBooleanCanonical(right, out var rightNegated);
+                var rootDiffers = differs ^ leftNegated ^ rightNegated;
+                hasContradiction = false;
+
+                if (leftRoot.Equals(rightRoot))
+                {
+                    hasContradiction = rootDiffers;
+                    return hasContradiction;
+                }
+
+                var leftText = leftRoot.ToString();
+                var rightText = rightRoot.ToString();
+                var canonical = string.CompareOrdinal(leftText, rightText) <= 0 ? leftRoot : rightRoot;
+                var alias = canonical.Equals(leftRoot) ? rightRoot : leftRoot;
+                _booleanEquivalences[alias] = new BooleanEquivalenceParent(canonical, rootDiffers);
+                MergeBooleanFacts(canonical, alias, rootDiffers, out hasContradiction);
+                return true;
+            }
+
+            private SmtFormula FindBooleanCanonical(SmtFormula formula, out bool isNegatedFromCanonical)
+            {
+                if (!_booleanEquivalences.TryGetValue(formula, out var parent))
+                {
+                    isNegatedFromCanonical = false;
+                    return formula;
+                }
+
+                var canonical = FindBooleanCanonical(parent.Parent, out var parentNegated);
+                isNegatedFromCanonical = parent.IsNegatedFromParent ^ parentNegated;
+                if (!canonical.Equals(parent.Parent))
+                {
+                    _booleanEquivalences[formula] = new BooleanEquivalenceParent(canonical, isNegatedFromCanonical);
+                }
+
+                return canonical;
+            }
+
+            private void MergeBooleanFacts(
+                SmtFormula canonical,
+                SmtFormula alias,
+                bool aliasDiffersFromCanonical,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!_exactBooleans.TryGetValue(alias, out var aliasValue))
+                {
+                    return;
+                }
+
+                var canonicalValue = aliasValue ^ aliasDiffersFromCanonical;
+                if (_exactBooleans.TryGetValue(canonical, out var existing) &&
+                    existing != canonicalValue)
+                {
+                    hasContradiction = true;
+                }
+
+                _exactBooleans[canonical] = canonicalValue;
+                _exactBooleans.Remove(alias);
             }
 
             private bool TryEvaluateComparison(SmtBinaryFormula binary, out bool value)
@@ -1255,6 +1408,11 @@ namespace PurelySharp.Symbolic.Smt
                     return binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
                 }
 
+                if (TryEvaluateBooleanEquivalenceComparison(binary, out value))
+                {
+                    return true;
+                }
+
                 if (TryEvaluateReferenceComparison(binary, out value))
                 {
                     return true;
@@ -1262,6 +1420,32 @@ namespace PurelySharp.Symbolic.Smt
 
                 value = false;
                 return false;
+            }
+
+            private bool TryEvaluateBooleanEquivalenceComparison(SmtBinaryFormula binary, out bool value)
+            {
+                value = false;
+                if (binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) ||
+                    binary.Left.Kind != SmtValueKind.Bool ||
+                    binary.Right.Kind != SmtValueKind.Bool)
+                {
+                    return false;
+                }
+
+                var left = NormalizeAliases(binary.Left);
+                var right = NormalizeAliases(binary.Right);
+                var leftRoot = FindBooleanCanonical(left, out var leftNegated);
+                var rightRoot = FindBooleanCanonical(right, out var rightNegated);
+                if (!leftRoot.Equals(rightRoot))
+                {
+                    return false;
+                }
+
+                var areEqual = leftNegated == rightNegated;
+                value = binary.Operator == SmtBinaryOperator.Equal
+                    ? areEqual
+                    : !areEqual;
+                return true;
             }
 
             private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction)
@@ -2213,6 +2397,18 @@ namespace PurelySharp.Symbolic.Smt
                 return remainder != 0 && dividend > 0
                     ? quotient + 1
                     : quotient;
+            }
+
+            private readonly struct BooleanEquivalenceParent
+            {
+                public BooleanEquivalenceParent(SmtFormula parent, bool isNegatedFromParent)
+                {
+                    Parent = parent;
+                    IsNegatedFromParent = isNegatedFromParent;
+                }
+
+                public SmtFormula Parent { get; }
+                public bool IsNegatedFromParent { get; }
             }
 
             private readonly struct AffineIntegerTerm

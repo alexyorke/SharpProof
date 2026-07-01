@@ -15,6 +15,7 @@ namespace PurelySharp.Symbolic.Smt
     public static class CSharpConditionToFormula
     {
         private const int MaxSourcePredicateInlineDepth = 4;
+        private const int MaxConditionalPatternDistributionDepth = 4;
         private const string ImplicitThisVariableName = "this";
         private const string NotNullIfNotNullAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
         private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
@@ -6758,6 +6759,19 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryDistributePatternOverConditionalValue(
+                    value,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    valueType,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&
@@ -6868,6 +6882,56 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryDistributePatternOverConditionalValue(
+            SmtFormula value,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            ITypeSymbol? valueType,
+            int inlineDepth)
+        {
+            formula = null;
+            if (inlineDepth >= MaxConditionalPatternDistributionDepth ||
+                value is not SmtConditionalFormula conditionalValue ||
+                conditionalValue.Condition.Kind != SmtValueKind.Bool ||
+                conditionalValue.WhenTrue.Kind != conditionalValue.ResultKind ||
+                conditionalValue.WhenFalse.Kind != conditionalValue.ResultKind ||
+                !TryTranslatePattern(
+                    conditionalValue.WhenTrue,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenTruePattern,
+                    getSymbolVersion,
+                    valueType,
+                    inlineDepth + 1) ||
+                whenTruePattern is not { Kind: SmtValueKind.Bool } ||
+                !TryTranslatePattern(
+                    conditionalValue.WhenFalse,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenFalsePattern,
+                    getSymbolVersion,
+                    valueType,
+                    inlineDepth + 1) ||
+                whenFalsePattern is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            formula = whenTruePattern.Equals(whenFalsePattern)
+                ? whenTruePattern
+                : new SmtConditionalFormula(
+                    conditionalValue.Condition,
+                    whenTruePattern,
+                    whenFalsePattern,
+                    SmtValueKind.Bool);
+            return true;
         }
 
         private static bool TryTranslateReferenceTypePattern(

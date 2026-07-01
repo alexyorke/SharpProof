@@ -961,6 +961,75 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_TransitiveBooleanEquivalenceEntailment_BypassesSolver()
+        {
+            var left = new SmtVariable("bool_equiv_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var middle = new SmtVariable("bool_equiv_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var right = new SmtVariable("bool_equiv_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, middle),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, middle, right),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_TransitiveBooleanNegationEntailment_BypassesSolver()
+        {
+            var left = new SmtVariable("bool_neg_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var middle = new SmtVariable("bool_neg_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var right = new SmtVariable("bool_neg_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, middle),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, middle, right),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_BooleanEquivalenceParityContradiction_BypassesSolver()
+        {
+            var left = new SmtVariable("bool_parity_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var middle = new SmtVariable("bool_parity_middle_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var right = new SmtVariable("bool_parity_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, middle),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, middle, right),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_IntegerAliasIntervalContradiction_BypassesSolver()
         {
             var x = new SmtVariable("alias_int_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);

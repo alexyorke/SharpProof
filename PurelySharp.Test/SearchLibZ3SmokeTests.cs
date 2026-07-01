@@ -635,6 +635,90 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_PositiveLookaheadRegexContradictsImpossibleSuffix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?=AB)A.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_PositiveLookaheadRegexAcceptsMatchingSuffix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?=AB)A.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegativeLookaheadRegexRejectsExcludedSuffix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?!AB)A.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegativeLookaheadRegexAcceptsDifferentSuffix()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?!AB)A.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_LookaheadWithoutConsumingSuffix_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AA(?=B)"),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_AtomicGroupRegexContradictsWrongPrefix()
         {
             using var solver = new SmtSolver();

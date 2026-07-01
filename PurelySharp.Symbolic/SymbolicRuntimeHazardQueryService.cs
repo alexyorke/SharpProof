@@ -737,6 +737,19 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case WithExpressionSyntax withExpression:
+                    if (TryCreateNullDereferenceCandidate(
+                            withExpression,
+                            withExpression.Expression,
+                            "definite_with_null",
+                            semanticModel,
+                            cancellationToken,
+                            out var withNullCandidate))
+                    {
+                        yield return withNullCandidate;
+                    }
+
+                    break;
             }
         }
 

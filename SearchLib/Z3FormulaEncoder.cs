@@ -795,7 +795,13 @@ namespace SearchLib.Smt
 
             private bool TryParseConcat(out ReExpr regex)
             {
+                return TryParseConcat(out regex, out _);
+            }
+
+            private bool TryParseConcat(out ReExpr regex, out bool consumedAny)
+            {
                 var parts = new List<ReExpr>();
+                consumedAny = false;
                 while (true)
                 {
                     SkipIgnoredPatternTrivia();
@@ -806,6 +812,20 @@ namespace SearchLib.Smt
                         break;
                     }
 
+                    if (TryParseLookaheadAssertion(out var lookahead))
+                    {
+                        if (!TryParseConcat(out var suffix, out var suffixConsumed) || !suffixConsumed)
+                        {
+                            regex = null!;
+                            return false;
+                        }
+
+                        parts.Add(ConstrainSuffixWithLookahead(lookahead, suffix));
+                        consumedAny = true;
+                        regex = parts.Count == 1 ? parts[0] : _context.MkConcat(parts.ToArray());
+                        return true;
+                    }
+
                     if (!TryParseRepeat(out var part))
                     {
                         regex = null!;
@@ -813,6 +833,7 @@ namespace SearchLib.Smt
                     }
 
                     parts.Add(part);
+                    consumedAny = true;
                 }
 
                 regex = parts.Count switch
@@ -822,6 +843,70 @@ namespace SearchLib.Smt
                     _ => _context.MkConcat(parts.ToArray())
                 };
                 return true;
+            }
+
+            private bool TryParseLookaheadAssertion(out RegexLookaheadAssertion assertion)
+            {
+                assertion = default;
+                SkipIgnoredPatternTrivia();
+                var savedPosition = _position;
+                var savedOptions = CaptureOptions();
+                var savedIsExact = _isExact;
+                if (_position + 2 >= _pattern.Length ||
+                    _pattern[_position] != '(' ||
+                    _pattern[_position + 1] != '?' ||
+                    _pattern[_position + 2] is not ('=' or '!'))
+                {
+                    return false;
+                }
+
+                var positive = _pattern[_position + 2] == '=';
+                _position += 3;
+                if (!TryParseExpression(out var lookaheadRegex) || !Peek(')'))
+                {
+                    _position = savedPosition;
+                    ApplyOptions(savedOptions);
+                    _isExact = savedIsExact;
+                    return false;
+                }
+
+                _position++;
+                var lookaheadIsExact = _isExact;
+                ApplyOptions(savedOptions);
+                _isExact = savedIsExact;
+                if (!positive && !lookaheadIsExact)
+                {
+                    _position = savedPosition;
+                    return false;
+                }
+
+                assertion = new RegexLookaheadAssertion(lookaheadRegex, positive, lookaheadIsExact);
+                return true;
+            }
+
+            private ReExpr ConstrainSuffixWithLookahead(RegexLookaheadAssertion assertion, ReExpr suffix)
+            {
+                _isExact &= assertion.IsExact;
+                var lookaheadLanguage = CreateConcat(assertion.Regex, CreateAnyStringRegex());
+                return assertion.IsPositive
+                    ? _context.MkIntersect(new[] { suffix, lookaheadLanguage })
+                    : _context.MkDiff(suffix, lookaheadLanguage);
+            }
+
+            private readonly struct RegexLookaheadAssertion
+            {
+                public RegexLookaheadAssertion(ReExpr regex, bool isPositive, bool isExact)
+                {
+                    Regex = regex;
+                    IsPositive = isPositive;
+                    IsExact = isExact;
+                }
+
+                public ReExpr Regex { get; }
+
+                public bool IsPositive { get; }
+
+                public bool IsExact { get; }
             }
 
             private bool TryParseRepeat(out ReExpr regex)

@@ -399,6 +399,36 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_GuardedContinueBeforeGuardedBreakExit_DoesNotReportDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool stop, int divisor)
+    {
+        for (;;)
+        {
+            if (divisor == 0)
+            {
+                continue;
+            }
+
+            if (stop)
+            {
+                break;
+            }
+        }
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesOneSidedReassignedLocalFactAfterJoin()
         {
             const string source = @"

@@ -314,6 +314,75 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesWithExpressionNullReceiverDereference()
+        {
+            const string source = @"
+public record Person(string Name);
+
+public class TestClass
+{
+    public Person TestMethod(Person? person)
+    {
+        if (person is null)
+        {
+            return person with { Name = ""fallback"" };
+        }
+
+        return person;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return person with { Name = \"fallback\" };",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_with_null"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.WithExpression.ToString()));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_PrunesWithExpressionNullReceiverAfterNonNullGuard()
+        {
+            const string source = @"
+public record Person(string Name);
+
+public class TestClass
+{
+    public Person TestMethod(Person? person)
+    {
+        if (person is not null)
+        {
+            return person with { Name = ""safe"" };
+        }
+
+        return new Person(""fallback"");
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return person with { Name = \"safe\" };",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_with_null"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesForeachNullSourceDereference()
         {
             const string source = @"

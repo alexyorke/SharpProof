@@ -435,7 +435,9 @@ static void PrintInvariantTargetSummaries(
         Console.WriteLine(
             label + " target: " +
             $"{target.Target} status={target.Status} " +
+            $"reason={target.StatusReason} code={target.ReasonCode} " +
             $"must={target.MustFactCount} maybe={target.MaybeFactCount} unknown={target.UnknownFactCount}");
+        Console.WriteLine(label + " target summary: " + target.Summary);
     }
 
     if (targetSummaries.Count > maxTextTargets)

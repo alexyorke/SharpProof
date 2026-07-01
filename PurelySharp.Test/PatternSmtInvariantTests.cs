@@ -495,6 +495,42 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ConditionalReceiverPropertyPattern_FeedsSelectedArmFacts()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    [Pure]
+    public int Count { get; init; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Box left, Box right, bool flag)
+    {
+        if ((flag ? left : right) is { Count: > 0 })
+        {
+            if (flag && left.Count <= 0)
+            {
+                Console.WriteLine(left.Count);
+            }
+
+            if (!flag && right.Count <= 0)
+            {
+                Console.WriteLine(right.Count);
+            }
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task SwitchStatementExtendedPropertyPattern_FeedsIntermediateNonNullFact()
         {
             var test = @"
