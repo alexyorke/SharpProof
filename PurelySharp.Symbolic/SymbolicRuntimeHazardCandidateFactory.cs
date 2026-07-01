@@ -308,7 +308,11 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var exceptionType = GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
+            var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
+                throwNode,
+                semanticModel,
+                cancellationToken,
+                stopAtUntypedCatch: false);
             var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
             return new RuntimeHazardCandidate(
                 throwNode,
@@ -2661,46 +2665,6 @@ namespace PurelySharp.Symbolic
                     }
                 }
             }
-        }
-
-        private static ITypeSymbol? GetThrownExceptionType(
-            SyntaxNode throwNode,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            ExpressionSyntax? exceptionExpression = throwNode switch
-            {
-                ThrowStatementSyntax statement => statement.Expression,
-                ThrowExpressionSyntax expression => expression.Expression,
-                _ => null
-            };
-
-            if (exceptionExpression == null)
-            {
-                return GetRethrownExceptionType(throwNode, semanticModel, cancellationToken);
-            }
-
-            var typeInfo = semanticModel.GetTypeInfo(exceptionExpression, cancellationToken);
-            return typeInfo.Type ?? typeInfo.ConvertedType;
-        }
-
-        private static ITypeSymbol? GetRethrownExceptionType(
-            SyntaxNode throwNode,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            foreach (var catchClause in throwNode.Ancestors().OfType<CatchClauseSyntax>())
-            {
-                if (!catchClause.Block.Span.Contains(throwNode.SpanStart) ||
-                    catchClause.Declaration == null)
-                {
-                    continue;
-                }
-
-                return semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
-            }
-
-            return null;
         }
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)

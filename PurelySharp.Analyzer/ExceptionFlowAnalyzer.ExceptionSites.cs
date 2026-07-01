@@ -344,22 +344,16 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            ExpressionSyntax? exceptionExpression = throwNode switch
+            if (throwNode is not ThrowStatementSyntax and not ThrowExpressionSyntax)
             {
-                ThrowStatementSyntax statement => statement.Expression,
-                ThrowExpressionSyntax expression => expression.Expression,
-                _ => null
-            };
-
-            if (exceptionExpression == null)
-            {
-                return throwNode is ThrowStatementSyntax statement
-                    ? GetRethrownExceptionType(statement, semanticModel, cancellationToken)
-                    : null;
+                return null;
             }
 
-            var typeInfo = semanticModel.GetTypeInfo(exceptionExpression, cancellationToken);
-            return typeInfo.Type ?? typeInfo.ConvertedType;
+            return SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
+                throwNode,
+                semanticModel,
+                cancellationToken,
+                stopAtUntypedCatch: true);
         }
 
         internal static bool IsDefinitelyThrowNull(
@@ -2056,27 +2050,5 @@ namespace PurelySharp.Analyzer
             public string Source { get; }
         }
 
-        private static ITypeSymbol? GetRethrownExceptionType(
-            ThrowStatementSyntax throwStatement,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            foreach (var catchClause in throwStatement.Ancestors().OfType<CatchClauseSyntax>())
-            {
-                if (!catchClause.Block.Span.Contains(throwStatement.SpanStart))
-                {
-                    continue;
-                }
-
-                if (catchClause.Declaration == null)
-                {
-                    return null;
-                }
-
-                return semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
-            }
-
-            return null;
-        }
     }
 }
