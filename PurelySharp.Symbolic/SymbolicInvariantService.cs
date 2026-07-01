@@ -47,12 +47,10 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken = default)
         {
-            var formulas = SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(forStatement, semanticModel, cancellationToken)
-                .Concat(SymbolicProgramPointFacts
-                    .CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
-                .Concat(SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
-                .ToArray();
+            var formulas = SymbolicReachabilityService.CollectForInitialEntryPathConditions(
+                forStatement,
+                semanticModel,
+                cancellationToken);
 
             return new SymbolicInvariantSnapshot(forStatement.SpanStart, formulas);
         }
@@ -63,12 +61,10 @@ namespace PurelySharp.Symbolic
             SmtAnalysisService? smtAnalysis = null,
             CancellationToken cancellationToken = default)
         {
-            var formulas = SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(forStatement, semanticModel, cancellationToken)
-                .Concat(SymbolicProgramPointFacts
-                    .CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
-                .Concat(SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
-                .ToArray();
+            var formulas = SymbolicReachabilityService.CollectForInitialEntryPathConditions(
+                forStatement,
+                semanticModel,
+                cancellationToken);
 
             return CreateAnalysis(forStatement.SpanStart, formulas, smtAnalysis);
         }
@@ -255,14 +251,12 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            return SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
-                .Concat(SymbolicProgramPointFacts
-                    .CollectPriorAssignmentFacts(
-                        site,
-                        semanticModel,
-                        cancellationToken,
-                        includeCurrentStatementCompletionFacts))
+            return SymbolicReachabilityService
+                .CollectPathConditionsAt(
+                    site,
+                    semanticModel,
+                    cancellationToken,
+                    includeCurrentStatementCompletionFacts)
                 .ToArray();
         }
 

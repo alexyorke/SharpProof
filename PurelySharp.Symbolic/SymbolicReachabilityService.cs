@@ -77,12 +77,42 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            return CollectPathConditionsAt(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts: false);
+        }
+
+        public static List<SmtFormula> CollectPathConditionsAt(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts)
+        {
             var pathConditions = SymbolicProgramPointFacts
                 .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
                 .ToList();
             AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
-            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken));
+            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts));
             return pathConditions;
+        }
+
+        public static SmtFormula[] CollectForInitialEntryPathConditions(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return SymbolicProgramPointFacts
+                .CollectAncestorReachabilityConditions(forStatement, semanticModel, cancellationToken)
+                .Concat(SymbolicProgramPointFacts
+                    .CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
+                .Concat(SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
+                .ToArray();
         }
 
         public static PurityProofResult ClassifyBranchReachability(
