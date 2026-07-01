@@ -382,10 +382,7 @@ namespace PurelySharp.Symbolic
 
         private static bool IsNullableType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol
-            {
-                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-            };
+            return SymbolicTypeFacts.IsNullableType(typeSymbol);
         }
 
         private static ExpressionSyntax UnwrapRuntimeTypeExpression(ExpressionSyntax expression)

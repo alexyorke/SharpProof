@@ -1530,16 +1530,7 @@ namespace PurelySharp.Analyzer
 
         private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
         {
-            if (type is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
-                namedType.TypeArguments.Length == 1)
-            {
-                underlyingType = namedType.TypeArguments[0];
-                return true;
-            }
-
-            underlyingType = null!;
-            return false;
+            return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
         }
 
         private static bool TryCreateReferenceBackedLengthFact(
@@ -2208,7 +2199,7 @@ namespace PurelySharp.Analyzer
             }
 
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-            return constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value) ||
+            return constantValue.HasValue && SymbolicValueFacts.IsIntegralOrDecimalZero(constantValue.Value) ||
                 IsDefaultIntegralExpression(expression, semanticModel, cancellationToken);
         }
 

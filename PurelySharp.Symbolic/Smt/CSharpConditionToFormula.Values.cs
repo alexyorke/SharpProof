@@ -2975,16 +2975,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
         {
-            if (type is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
-                namedType.TypeArguments.Length == 1)
-            {
-                underlyingType = namedType.TypeArguments[0];
-                return true;
-            }
-
-            underlyingType = null!;
-            return false;
+            return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
         }
 
         private static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)

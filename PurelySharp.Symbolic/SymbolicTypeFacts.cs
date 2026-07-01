@@ -31,6 +31,28 @@ namespace PurelySharp.Symbolic
                 IsReferenceType(typeSymbol);
         }
 
+        public static bool IsNullableType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+            };
+        }
+
+        public static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
+        {
+            if (typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+                namedType.TypeArguments.Length == 1)
+            {
+                underlyingType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            underlyingType = null!;
+            return false;
+        }
+
         public static bool IsDynamicExpression(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
