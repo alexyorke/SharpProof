@@ -427,6 +427,59 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringCharArrayCreationResultLengths()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int WholeArray(char[] chars)
+    {
+        if (chars != null)
+        {
+            return new string(chars).Length;
+        }
+
+        return 0;
+    }
+
+    public int ArrayRange(char[] chars, int start, int length)
+    {
+        if (chars != null && start >= 0 && length >= 0 && start + length <= chars.Length)
+        {
+            return new string(chars, start, length).Length;
+        }
+
+        return 0;
+    }
+
+    public int SpanRange(char[] chars, int start, int length)
+    {
+        if (chars != null && start >= 0 && length >= 0 && start + length <= chars.Length)
+        {
+            return new string(chars.AsSpan(start, length)).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return new string(chars).Length;",
+                "new string(chars).Length == chars.Length");
+            AssertConditionProven(
+                source,
+                "return new string(chars, start, length).Length;",
+                "new string(chars, start, length).Length == length");
+            AssertConditionProven(
+                source,
+                "return new string(chars.AsSpan(start, length)).Length;",
+                "new string(chars.AsSpan(start, length)).Length == length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesStringConcatResultLengths()
         {
             const string source = @"

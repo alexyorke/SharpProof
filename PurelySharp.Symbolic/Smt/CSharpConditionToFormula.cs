@@ -8219,26 +8219,95 @@ namespace PurelySharp.Symbolic.Smt
 
             var constructor = objectCreationOperation.Constructor;
             if (constructor == null ||
-                constructor.ContainingType.SpecialType != SpecialType.System_String ||
-                constructor.Parameters.Length != 2 ||
-                constructor.Parameters[0].Type.SpecialType != SpecialType.System_Char ||
-                constructor.Parameters[1].Type.SpecialType != SpecialType.System_Int32 ||
-                objectCreationOperation.Arguments.Length != 2 ||
-                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var countExpression) ||
-                !TryTranslateValue(
+                constructor.ContainingType.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            if (constructor.Parameters.Length == 2 &&
+                constructor.Parameters[0].Type.SpecialType == SpecialType.System_Char &&
+                constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
+                objectCreationOperation.Arguments.Length == 2 &&
+                TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var countExpression) &&
+                TryTranslateValue(
                     countExpression,
                     semanticModel,
                     cancellationToken,
                     out var countFormula,
                     getSymbolVersion,
-                    inlineDepth) ||
-                countFormula is not { Kind: SmtValueKind.Int })
+                    inlineDepth) &&
+                countFormula is { Kind: SmtValueKind.Int })
             {
-                return false;
+                lengthFormula = countFormula;
+                return true;
             }
 
-            lengthFormula = countFormula;
-            return true;
+            if (constructor.Parameters.Length == 1 &&
+                IsCharArrayType(constructor.Parameters[0].Type) &&
+                TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var charArrayExpression) &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    charArrayExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var charArrayLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                lengthFormula = charArrayLength;
+                return true;
+            }
+
+            if (constructor.Parameters.Length == 3 &&
+                IsCharArrayType(constructor.Parameters[0].Type) &&
+                constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
+                constructor.Parameters[2].Type.SpecialType == SpecialType.System_Int32 &&
+                TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 2, out var lengthExpression) &&
+                TryTranslateValue(
+                    lengthExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedLength,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                translatedLength is { Kind: SmtValueKind.Int })
+            {
+                lengthFormula = translatedLength;
+                return true;
+            }
+
+            if (constructor.Parameters.Length == 1 &&
+                IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
+                TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var spanExpression) &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    spanExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var spanLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                lengthFormula = spanLength;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsCharArrayType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol is IArrayTypeSymbol
+            {
+                Rank: 1,
+                ElementType.SpecialType: SpecialType.System_Char
+            };
+        }
+
+        private static bool IsReadOnlySpanOfCharType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                namedType.TypeArguments.Length == 1 &&
+                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
         }
 
         private static bool TryCreateStringInvocationResultLengthFormula(

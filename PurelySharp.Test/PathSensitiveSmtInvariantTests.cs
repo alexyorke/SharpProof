@@ -577,6 +577,76 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesExhaustiveBooleanSwitchAssignmentRelationAfterJoin()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool choose)
+    {
+        var divisor = 0;
+        switch (choose)
+        {
+            case true:
+                divisor = 1;
+                break;
+            case false:
+                divisor = 2;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var query = AnalyzeAtPosition(source, marker.Position);
+            var proof = ProveAtMarker(
+                source,
+                marker,
+                "(choose && divisor == 1) || (!choose && divisor == 2)");
+
+            Assert.That(query.MergedInvariantText, Does.Contain("choose"));
+            Assert.That(query.MergedInvariantText, Does.Contain("divisor"));
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotTreatEnumSwitchWithoutDefaultAsExhaustive()
+        {
+            const string source = @"
+public enum Choice
+{
+    First,
+    Second
+}
+
+public class TestClass
+{
+    public int TestMethod(Choice choose)
+    {
+        var divisor = 0;
+        switch (choose)
+        {
+            case Choice.First:
+                divisor = 1;
+                break;
+            case Choice.Second:
+                divisor = 2;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
         public async Task Ps0002_BranchDiscriminatorValueJoinPrunesImpossibleImpureCall()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
@@ -612,6 +682,34 @@ public class TestClass
                     diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
                     symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
                 Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ExhaustiveBooleanSwitchValueJoinPrunesDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool choose)
+    {
+        var divisor = 0;
+        switch (choose)
+        {
+            case true:
+                divisor = 1;
+                break;
+            case false:
+                divisor = 2;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)

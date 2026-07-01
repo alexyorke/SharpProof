@@ -2818,14 +2818,16 @@ namespace PurelySharp.Symbolic
             category = string.Empty;
 
             var method = invocationOperation.TargetMethod;
-            if (TryGetMemoryExtensionsAsSpanSlicingShape(
+            if (TryGetMemoryExtensionsViewSlicingShape(
                     invocationOperation,
                     method,
                     out sourceExpression,
                     out startExpression,
                     out countExpression))
             {
-                category = "definite_memory_extensions_as_span_out_of_range";
+                category = method.Name == "AsMemory"
+                    ? "definite_memory_extensions_as_memory_out_of_range"
+                    : "definite_memory_extensions_as_span_out_of_range";
                 return true;
             }
 
@@ -2871,7 +2873,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        private static bool TryGetMemoryExtensionsAsSpanSlicingShape(
+        private static bool TryGetMemoryExtensionsViewSlicingShape(
             IInvocationOperation invocationOperation,
             IMethodSymbol method,
             out ExpressionSyntax sourceExpression,
@@ -2882,12 +2884,12 @@ namespace PurelySharp.Symbolic
             startExpression = null!;
             countExpression = null;
 
-            if (!IsMemoryExtensionsAsSpanInvocation(method))
+            if (!IsMemoryExtensionsViewInvocation(method))
             {
                 return false;
             }
 
-            if (!TryGetMemoryExtensionsAsSpanSourceExpression(invocationOperation, out sourceExpression))
+            if (!TryGetMemoryExtensionsViewSourceExpression(invocationOperation, out sourceExpression))
             {
                 return false;
             }
@@ -2907,12 +2909,12 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static bool TryGetMemoryExtensionsAsSpanSourceExpression(
+        private static bool TryGetMemoryExtensionsViewSourceExpression(
             IInvocationOperation invocationOperation,
             out ExpressionSyntax sourceExpression)
         {
             if (invocationOperation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
-                IsMemoryExtensionsAsSpanSourceType(invocationOperation.Instance.Type))
+                IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type))
             {
                 sourceExpression = instanceExpression;
                 return true;
@@ -2921,9 +2923,9 @@ namespace PurelySharp.Symbolic
             foreach (var argument in invocationOperation.Arguments)
             {
                 if ((argument.Parameter?.Ordinal == 0 ||
-                     IsMemoryExtensionsAsSpanSourceType(argument.Value.Type)) &&
+                     IsMemoryExtensionsViewSourceType(argument.Value.Type)) &&
                     argument.Value.Syntax is ExpressionSyntax argumentExpression &&
-                    IsMemoryExtensionsAsSpanSourceType(argument.Value.Type))
+                    IsMemoryExtensionsViewSourceType(argument.Value.Type))
                 {
                     sourceExpression = argumentExpression;
                     return true;
@@ -3003,16 +3005,16 @@ namespace PurelySharp.Symbolic
                 IsBuiltInSpanOrMemoryType(method.ReturnType);
         }
 
-        private static bool IsMemoryExtensionsAsSpanInvocation(IMethodSymbol method)
+        private static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method)
         {
-            return method.Name == "AsSpan" &&
+            return method.Name is "AsSpan" or "AsMemory" &&
                 method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
-                IsBuiltInSpanType(method.ReturnType) &&
+                IsBuiltInSpanOrMemoryType(method.ReturnType) &&
                 method.Parameters.Count(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) is 1 or 2 &&
-                method.Parameters.Any(static parameter => IsMemoryExtensionsAsSpanSourceType(parameter.Type));
+                method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
         }
 
-        private static bool IsMemoryExtensionsAsSpanSourceType(ITypeSymbol? typeSymbol)
+        private static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol)
         {
             return typeSymbol?.SpecialType == SpecialType.System_String ||
                 typeSymbol is IArrayTypeSymbol;

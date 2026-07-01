@@ -5092,6 +5092,10 @@ namespace PurelySharp.Symbolic
             int targetFilterCount,
             bool hasTargetFilter,
             bool targetFilterMatched,
+            int matchedTargetFilterCount,
+            IReadOnlyList<string> matchedTargetFilters,
+            int unmatchedTargetFilterCount,
+            IReadOnlyList<string> unmatchedTargetFilters,
             int unfilteredTargetSummaryCount,
             int unfilteredTargetPathSummaryCount,
             int diagnosticCount,
@@ -5111,6 +5115,8 @@ namespace PurelySharp.Symbolic
             bool unknownDiagnosticsTruncated,
             bool targetSummariesTruncated,
             bool targetPathSummariesTruncated,
+            bool matchedTargetFiltersTruncated,
+            bool unmatchedTargetFiltersTruncated,
             bool diagnosticsTruncated)
         {
             Text = text ?? string.Empty;
@@ -5130,6 +5136,10 @@ namespace PurelySharp.Symbolic
             TargetFilterCount = targetFilterCount;
             HasTargetFilter = hasTargetFilter;
             TargetFilterMatched = targetFilterMatched;
+            MatchedTargetFilterCount = matchedTargetFilterCount;
+            MatchedTargetFilters = matchedTargetFilters ?? throw new ArgumentNullException(nameof(matchedTargetFilters));
+            UnmatchedTargetFilterCount = unmatchedTargetFilterCount;
+            UnmatchedTargetFilters = unmatchedTargetFilters ?? throw new ArgumentNullException(nameof(unmatchedTargetFilters));
             UnfilteredTargetSummaryCount = unfilteredTargetSummaryCount;
             UnfilteredTargetPathSummaryCount = unfilteredTargetPathSummaryCount;
             DiagnosticCount = diagnosticCount;
@@ -5149,6 +5159,8 @@ namespace PurelySharp.Symbolic
             UnknownDiagnosticsTruncated = unknownDiagnosticsTruncated;
             TargetSummariesTruncated = targetSummariesTruncated;
             TargetPathSummariesTruncated = targetPathSummariesTruncated;
+            MatchedTargetFiltersTruncated = matchedTargetFiltersTruncated;
+            UnmatchedTargetFiltersTruncated = unmatchedTargetFiltersTruncated;
             DiagnosticsTruncated = diagnosticsTruncated;
         }
 
@@ -5185,6 +5197,14 @@ namespace PurelySharp.Symbolic
         public bool HasTargetFilter { get; }
 
         public bool TargetFilterMatched { get; }
+
+        public int MatchedTargetFilterCount { get; }
+
+        public IReadOnlyList<string> MatchedTargetFilters { get; }
+
+        public int UnmatchedTargetFilterCount { get; }
+
+        public IReadOnlyList<string> UnmatchedTargetFilters { get; }
 
         public int UnfilteredTargetSummaryCount { get; }
 
@@ -5224,6 +5244,10 @@ namespace PurelySharp.Symbolic
 
         public bool TargetPathSummariesTruncated { get; }
 
+        public bool MatchedTargetFiltersTruncated { get; }
+
+        public bool UnmatchedTargetFiltersTruncated { get; }
+
         public bool DiagnosticsTruncated { get; }
 
         public bool IsTruncated =>
@@ -5233,6 +5257,8 @@ namespace PurelySharp.Symbolic
             UnknownDiagnosticsTruncated ||
             TargetSummariesTruncated ||
             TargetPathSummariesTruncated ||
+            MatchedTargetFiltersTruncated ||
+            UnmatchedTargetFiltersTruncated ||
             DiagnosticsTruncated ||
             Diagnostics.Any(static diagnostic => diagnostic.EvidenceTruncated) ||
             UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
@@ -5272,9 +5298,11 @@ namespace PurelySharp.Symbolic
                 .Take(query.Diagnostics, options.MaxConditions)
                 .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
                 .ToArray();
-            var targetFilterMatched = !options.HasInvariantTargetFilter ||
-                filteredTargetSummaries.Count != 0 ||
-                filteredTargetPathSummaries.Count != 0;
+            var matchedTargetFilters = GetMatchedTargetFilters(query, options);
+            var unmatchedTargetFilters = GetUnmatchedTargetFilters(options, matchedTargetFilters);
+            var visibleMatchedTargetFilters = SymbolicCompactProjection.Take(matchedTargetFilters, options.MaxConditions);
+            var visibleUnmatchedTargetFilters = SymbolicCompactProjection.Take(unmatchedTargetFilters, options.MaxConditions);
+            var targetFilterMatched = !options.HasInvariantTargetFilter || matchedTargetFilters.Count != 0;
             return new SymbolicCompactInvariantQueryView(
                 query.Text,
                 query.MergeKind.ToString(),
@@ -5293,6 +5321,10 @@ namespace PurelySharp.Symbolic
                 options.InvariantTargets.Count,
                 options.HasInvariantTargetFilter,
                 targetFilterMatched,
+                matchedTargetFilters.Count,
+                visibleMatchedTargetFilters,
+                unmatchedTargetFilters.Count,
+                visibleUnmatchedTargetFilters,
                 query.TargetSummaryCount,
                 query.TargetPathSummaryCount,
                 query.DiagnosticCount,
@@ -5312,7 +5344,49 @@ namespace PurelySharp.Symbolic
                 query.UnknownDiagnostics.Count > options.MaxConditions,
                 filteredTargetSummaries.Count > targetSummaries.Length,
                 filteredTargetPathSummaries.Count > targetPathSummaries.Length,
+                matchedTargetFilters.Count > visibleMatchedTargetFilters.Count,
+                unmatchedTargetFilters.Count > visibleUnmatchedTargetFilters.Count,
                 query.Diagnostics.Count > options.MaxConditions);
+        }
+
+        private static IReadOnlyList<string> GetMatchedTargetFilters(
+            SymbolicInvariantQueryView query,
+            SymbolicCompactQueryOptions options)
+        {
+            if (!options.HasInvariantTargetFilter)
+            {
+                return Array.Empty<string>();
+            }
+
+            var availableTargets = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var summary in query.TargetSummaries)
+            {
+                availableTargets.Add(NormalizeTarget(summary.Target));
+            }
+
+            foreach (var summary in query.TargetPathSummaries)
+            {
+                availableTargets.Add(NormalizeTarget(summary.Target));
+            }
+
+            return options.InvariantTargets
+                .Where(availableTargets.Contains)
+                .ToArray();
+        }
+
+        private static IReadOnlyList<string> GetUnmatchedTargetFilters(
+            SymbolicCompactQueryOptions options,
+            IReadOnlyList<string> matchedTargetFilters)
+        {
+            if (!options.HasInvariantTargetFilter)
+            {
+                return Array.Empty<string>();
+            }
+
+            var matched = new HashSet<string>(matchedTargetFilters, StringComparer.Ordinal);
+            return options.InvariantTargets
+                .Where(target => !matched.Contains(target))
+                .ToArray();
         }
 
         private static IReadOnlyList<TSummary> ApplyTargetFilter<TSummary>(

@@ -659,7 +659,7 @@ namespace SearchLib.Smt
 
                 if (index + 1 < pattern.Length &&
                     pattern[index] == '\\' &&
-                    pattern[index + 1] == 'A')
+                    pattern[index + 1] is 'A' or 'G')
                 {
                     anchorStart = index;
                     anchorLength = 2;

@@ -417,10 +417,14 @@ static void PrintInvariantQuery(
         static target => target.Target);
     if (options.HasInvariantTargetFilter)
     {
+        var matchedTargetFilters = GetMatchedInvariantTargetFilters(options, targetSummaries, targetPathSummaries);
+        var unmatchedTargetFilters = GetUnmatchedInvariantTargetFilters(options, matchedTargetFilters);
         Console.WriteLine(label + " target filter: " + string.Join(", ", options.InvariantTargets));
         Console.WriteLine(
             label + " target filter matched: " +
-            (targetSummaries.Count != 0 || targetPathSummaries.Count != 0));
+            (matchedTargetFilters.Count != 0));
+        PrintInvariantTargetFilterList(label, "matched target filters", matchedTargetFilters);
+        PrintInvariantTargetFilterList(label, "unmatched target filters", unmatchedTargetFilters);
     }
 
     PrintInvariantTargetSummaries(label, targetSummaries);
@@ -458,6 +462,65 @@ static IReadOnlyList<TTarget> FilterInvariantTargets<TTarget>(
             NormalizeInvariantTarget(targetSelector(target)),
             StringComparer.Ordinal))
         .ToArray();
+}
+
+static IReadOnlyList<string> GetMatchedInvariantTargetFilters(
+    SymbolicCliOptions options,
+    IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
+    IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return Array.Empty<string>();
+    }
+
+    var availableTargets = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var summary in targetSummaries)
+    {
+        availableTargets.Add(NormalizeInvariantTarget(summary.Target));
+    }
+
+    foreach (var summary in targetPathSummaries)
+    {
+        availableTargets.Add(NormalizeInvariantTarget(summary.Target));
+    }
+
+    return options.InvariantTargets
+        .Where(availableTargets.Contains)
+        .ToArray();
+}
+
+static IReadOnlyList<string> GetUnmatchedInvariantTargetFilters(
+    SymbolicCliOptions options,
+    IReadOnlyList<string> matchedTargetFilters)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return Array.Empty<string>();
+    }
+
+    var matched = new HashSet<string>(matchedTargetFilters, StringComparer.Ordinal);
+    return options.InvariantTargets
+        .Where(target => !matched.Contains(target))
+        .ToArray();
+}
+
+static void PrintInvariantTargetFilterList(
+    string label,
+    string name,
+    IReadOnlyList<string> values)
+{
+    const int maxTextTargetFilters = 16;
+    if (values.Count == 0)
+    {
+        return;
+    }
+
+    var visibleValues = values.Take(maxTextTargetFilters).ToArray();
+    var suffix = values.Count > visibleValues.Length
+        ? " ... " + (values.Count - visibleValues.Length).ToString(System.Globalization.CultureInfo.InvariantCulture) + " omitted"
+        : string.Empty;
+    Console.WriteLine(label + " " + name + ": " + string.Join(", ", visibleValues) + suffix);
 }
 
 static string NormalizeInvariantTarget(string? target)

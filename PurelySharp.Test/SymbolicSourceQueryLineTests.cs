@@ -2134,10 +2134,8 @@ public class TestClass
                     "--invariant-json",
                     "--invariant-target",
                     "copy",
-                    "--max-conditions",
-                    "10",
-                    "--max-proofs",
-                    "10");
+                    "--invariant-target",
+                    "missing");
 
                 Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
                 using var document = JsonDocument.Parse(result.StandardOutput);
@@ -2151,9 +2149,21 @@ public class TestClass
 
                 var invariantQuery = root.GetProperty("invariantQuery");
                 Assert.That(invariantQuery.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(invariantQuery.GetProperty("targetFilters")[0].GetString(), Is.EqualTo("copy"));
+                Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(2));
+                Assert.That(
+                    invariantQuery.GetProperty("targetFilters").EnumerateArray().Select(static target => target.GetString()),
+                    Is.EquivalentTo(new[] { "copy", "missing" }));
                 Assert.That(invariantQuery.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
+                Assert.That(invariantQuery.GetProperty("matchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(
+                    invariantQuery.GetProperty("matchedTargetFilters").EnumerateArray().Select(static target => target.GetString()),
+                    Is.EquivalentTo(new[] { "copy" }));
+                Assert.That(invariantQuery.GetProperty("matchedTargetFiltersTruncated").GetBoolean(), Is.False);
+                Assert.That(invariantQuery.GetProperty("unmatchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(
+                    invariantQuery.GetProperty("unmatchedTargetFilters").EnumerateArray().Select(static target => target.GetString()),
+                    Is.EquivalentTo(new[] { "missing" }));
+                Assert.That(invariantQuery.GetProperty("unmatchedTargetFiltersTruncated").GetBoolean(), Is.False);
                 Assert.That(
                     invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
                     Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
@@ -2170,6 +2180,59 @@ public class TestClass
                     .Select(static summary => summary.GetProperty("target").GetString())
                     .ToArray();
                 Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_InvariantTargetFilter_TextReportsMatchedAndUnmatchedTargets()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvariantTargetFilterText-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var spanStart = FindPosition(source, "if (copy > 0)");
+                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--span-start",
+                    spanStart.ToString(),
+                    "--span-end",
+                    spanEnd.ToString(),
+                    "--check-reachability",
+                    "--implies",
+                    "copy > 0",
+                    "--invariant-target",
+                    "copy",
+                    "--invariant-target",
+                    "missing");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter: copy, missing"));
+                Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter matched: True"));
+                Assert.That(result.StandardOutput, Does.Contain("Span invariant query matched target filters: copy"));
+                Assert.That(result.StandardOutput, Does.Contain("Span invariant query unmatched target filters: missing"));
             }
             finally
             {

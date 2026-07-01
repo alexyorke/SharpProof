@@ -3162,7 +3162,7 @@ namespace PurelySharp.Symbolic
         {
             AddCompletedSwitchExitExclusionFacts(switchStatement, semanticModel, cancellationToken, facts);
 
-            if (!switchStatement.Sections.Any(static section => section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)))
+            if (!SwitchStatementHasDefaultOrExhaustiveBooleanLabels(switchStatement, semanticModel, cancellationToken))
             {
                 return;
             }
@@ -3222,6 +3222,49 @@ namespace PurelySharp.Symbolic
             {
                 AddConditionalSwitchBranchFacts(branches, facts.ToArray(), facts);
             }
+        }
+
+        private static bool SwitchStatementHasDefaultOrExhaustiveBooleanLabels(
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (switchStatement.Sections.Any(static section => section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)))
+            {
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(switchStatement.Expression, cancellationToken);
+            var switchType = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (switchType?.SpecialType != SpecialType.System_Boolean)
+            {
+                return false;
+            }
+
+            var hasTrue = false;
+            var hasFalse = false;
+            foreach (var section in switchStatement.Sections)
+            {
+                foreach (var label in section.Labels)
+                {
+                    if (label is not CaseSwitchLabelSyntax caseLabel ||
+                        semanticModel.GetConstantValue(caseLabel.Value, cancellationToken) is not { HasValue: true, Value: bool value })
+                    {
+                        continue;
+                    }
+
+                    if (value)
+                    {
+                        hasTrue = true;
+                    }
+                    else
+                    {
+                        hasFalse = true;
+                    }
+                }
+            }
+
+            return hasTrue && hasFalse;
         }
 
         private static void AddCompletedSwitchExitExclusionFacts(
