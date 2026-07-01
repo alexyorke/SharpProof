@@ -85,6 +85,24 @@ namespace PurelySharp.Symbolic
             containingNamespace.ToDisplayString() == "System";
         }
 
+        public static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        }
+
+        public static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
+        }
+
+        public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return IsBuiltInSpanType(typeSymbol) ||
+                IsBuiltInMemoryType(typeSymbol);
+        }
+
         public static bool IsNullableValueAccess(
             MemberAccessExpressionSyntax memberAccess,
             SemanticModel semanticModel,

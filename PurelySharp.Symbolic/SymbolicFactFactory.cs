@@ -223,12 +223,7 @@ namespace PurelySharp.Symbolic
 
         public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() is
-                    "System.Span<T>" or
-                    "System.ReadOnlySpan<T>" or
-                    "System.Memory<T>" or
-                    "System.ReadOnlyMemory<T>";
+            return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
         }
 
         public static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)

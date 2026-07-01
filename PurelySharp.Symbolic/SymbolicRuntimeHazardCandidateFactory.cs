@@ -2330,20 +2330,17 @@ namespace PurelySharp.Symbolic
 
         private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+            return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
         }
 
         private static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
+            return SymbolicTypeFacts.IsBuiltInMemoryType(typeSymbol);
         }
 
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
         {
-            return IsBuiltInSpanType(typeSymbol) ||
-                IsBuiltInMemoryType(typeSymbol);
+            return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
         }
 
         private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
