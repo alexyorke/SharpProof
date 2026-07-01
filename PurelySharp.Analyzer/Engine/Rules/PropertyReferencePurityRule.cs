@@ -689,7 +689,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         var argumentOperation = context.SemanticModel.GetOperation(argument.Expression, context.CancellationToken);
                         var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
-                        if (value?.Type == null || !IsComparerOrDerivedInterface(value.Type))
+                        if (value?.Type == null || !ComparerDispatchHelper.IsComparerOrDerivedInterface(value.Type))
                         {
                             continue;
                         }
@@ -793,8 +793,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
                 if (value?.Type == null ||
                     argument.Parameter?.Type is not INamedTypeSymbol parameterType ||
-                    !IsComparerOrDerivedInterface(parameterType) &&
-                    !IsComparerOrDerivedInterface(value.Type))
+                    !ComparerDispatchHelper.IsComparerOrDerivedInterface(parameterType) &&
+                    !ComparerDispatchHelper.IsComparerOrDerivedInterface(value.Type))
                 {
                     continue;
                 }
@@ -821,7 +821,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisContext context)
         {
             var foundImplementation = false;
-            foreach (var comparerMethod in EnumerateComparerImplementations(value.Type!))
+            foreach (var comparerMethod in ComparerDispatchHelper.EnumerateComparerImplementations(value.Type!))
             {
                 foundImplementation = true;
                 var comparerPurity = PurityAnalysisEngine.GetCalleePurity(comparerMethod.OriginalDefinition, context);
@@ -831,7 +831,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            if (!foundImplementation && IsUnresolvedComparerDispatch(value.Type!))
+            if (!foundImplementation && ComparerDispatchHelper.IsUnresolvedComparerDispatch(value.Type!))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
@@ -843,77 +843,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)
-        {
-            if (comparerType is not INamedTypeSymbol namedComparerType)
-            {
-                yield break;
-            }
-
-            var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-            foreach (var interfaceType in namedComparerType.AllInterfaces)
-            {
-                if (!IsComparerInterface(interfaceType))
-                {
-                    continue;
-                }
-
-                foreach (var interfaceMethod in interfaceType.GetMembers().OfType<IMethodSymbol>())
-                {
-                    var implementation = namedComparerType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
-                    if (implementation == null || implementation.DeclaringSyntaxReferences.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    if (seen.Add(implementation.OriginalDefinition))
-                    {
-                        yield return implementation;
-                    }
-                }
-            }
-        }
-
-        private static bool IsComparerInterface(INamedTypeSymbol typeSymbol)
-        {
-            var displayString = typeSymbol.OriginalDefinition.ToDisplayString();
-            return displayString == "System.Collections.Generic.IEqualityComparer<T>" ||
-                displayString == "System.Collections.Generic.IComparer<T>";
-        }
-
-        private static bool IsUnresolvedComparerDispatch(ITypeSymbol comparerType)
-        {
-            if (comparerType is ITypeParameterSymbol typeParameter)
-            {
-                return typeParameter.ConstraintTypes
-                    .OfType<INamedTypeSymbol>()
-                    .Any(IsComparerOrDerivedInterface);
-            }
-
-            if (comparerType is not INamedTypeSymbol namedComparerType)
-            {
-                return false;
-            }
-
-            if (IsComparerInterface(namedComparerType))
-            {
-                return true;
-            }
-
-            if (namedComparerType.TypeKind != TypeKind.Interface && !namedComparerType.IsAbstract)
-            {
-                return false;
-            }
-
-            return IsComparerOrDerivedInterface(namedComparerType);
-        }
-
-        private static bool IsComparerOrDerivedInterface(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                (IsComparerInterface(namedType) || namedType.AllInterfaces.Any(IsComparerInterface));
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckSortedDictionaryKeyDispatchPurity(

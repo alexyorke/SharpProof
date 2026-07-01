@@ -1615,6 +1615,17 @@
                                                  ]
                         },
                         {
+                            "path":  "PurelySharp.Analyzer/Engine/Rules/ComparerDispatchHelper.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ComparerDispatchHelper"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/ConditionalAccessPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
