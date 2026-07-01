@@ -48,7 +48,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken)
         {
             var branchConditions = pathConditions.ToList();
-            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+            return TryAddBranchConditionFacts(
                     condition,
                     branchWhenTrue,
                     semanticModel,
@@ -56,6 +56,57 @@ namespace PurelySharp.Symbolic
                     branchConditions)
                 ? branchConditions
                 : null;
+        }
+
+        internal static bool TryAddBranchConditionFacts(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            bool collectDomainFactsBeforeBranchAssumptions = false,
+            bool addTranslatedFormulaFallback = false,
+            bool addTranslatedFormulaAlways = false)
+        {
+            var originalCount = pathConditions.Count;
+
+            if (collectDomainFactsBeforeBranchAssumptions)
+            {
+                CSharpConditionToFormula.TryCollectDomainFacts(
+                    condition,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions,
+                    getSymbolVersion);
+            }
+
+            var countBeforeBranchAssumptions = pathConditions.Count;
+            CSharpConditionToFormula.TryCollectBranchAssumptions(
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                pathConditions,
+                getSymbolVersion);
+
+            var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
+            if ((addTranslatedFormulaAlways ||
+                 addTranslatedFormulaFallback && !addedBranchFacts) &&
+                CSharpConditionToFormula.TryTranslate(
+                    condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion) &&
+                formula != null)
+            {
+                pathConditions.Add(branchWhenTrue
+                    ? formula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+            }
+
+            return pathConditions.Count != originalCount;
         }
 
         public static bool IsBranchReachable(

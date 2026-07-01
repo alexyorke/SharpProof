@@ -367,37 +367,15 @@ namespace PurelySharp.Analyzer.Engine
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            CSharpConditionToFormula.TryCollectDomainFacts(
-                expression,
-                semanticModel,
-                cancellationToken,
-                pathConditions,
-                getSymbolVersion);
-
-            var originalCount = pathConditions.Count;
-            CSharpConditionToFormula.TryCollectBranchAssumptions(
+            SymbolicReachabilityService.TryAddBranchConditionFacts(
                 expression,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
                 pathConditions,
-                getSymbolVersion);
-
-            if (pathConditions.Count != originalCount)
-            {
-                return;
-            }
-
-            if (CSharpConditionToFormula.TryTranslate(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var formula,
-                    getSymbolVersion) &&
-                formula != null)
-            {
-                pathConditions.Add(branchWhenTrue ? formula : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
-            }
+                getSymbolVersion,
+                collectDomainFactsBeforeBranchAssumptions: true,
+                addTranslatedFormulaFallback: true);
         }
 
         private static void AddReferenceNullStateFact(

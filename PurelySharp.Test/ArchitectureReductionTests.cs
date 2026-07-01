@@ -29,7 +29,8 @@ namespace PurelySharp.Test
                 .Where(static file =>
                     file.Source.Contains("new PurityProofQuery", StringComparison.Ordinal) ||
                     file.Source.Contains("PurityHazardKind.BranchReachability", StringComparison.Ordinal) ||
-                    file.Source.Contains(".ClassifyPathFeasibility(", StringComparison.Ordinal))
+                    file.Source.Contains(".ClassifyPathFeasibility(", StringComparison.Ordinal) ||
+                    file.Source.Contains("CSharpConditionToFormula.TryCollectBranchAssumptions", StringComparison.Ordinal))
                 .Select(static file => file.Path)
                 .ToArray();
 

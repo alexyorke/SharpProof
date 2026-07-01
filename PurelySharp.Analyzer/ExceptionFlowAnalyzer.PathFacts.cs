@@ -1237,7 +1237,7 @@ namespace PurelySharp.Analyzer
                 (ifStatement.Else?.Statement == null ||
                  !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
             {
-                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                SymbolicReachabilityService.TryAddBranchConditionFacts(
                     ifStatement.Condition,
                     branchWhenTrue: false,
                     semanticModel,
@@ -1249,7 +1249,7 @@ namespace PurelySharp.Analyzer
                 StatementDefinitelyExits(elseStatement) &&
                 !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
             {
-                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                SymbolicReachabilityService.TryAddBranchConditionFacts(
                     ifStatement.Condition,
                     branchWhenTrue: true,
                     semanticModel,
@@ -1403,7 +1403,7 @@ namespace PurelySharp.Analyzer
                 (!ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken) ||
                  effectiveValueIsTarget))
             {
-                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                SymbolicReachabilityService.TryAddBranchConditionFacts(
                     guardExpression,
                     guardBranchWhenTrue,
                     semanticModel,
@@ -2349,7 +2349,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
-            CSharpConditionToFormula.TryCollectBranchAssumptions(
+            SymbolicReachabilityService.TryAddBranchConditionFacts(
                 condition,
                 branchWhenTrue,
                 semanticModel,

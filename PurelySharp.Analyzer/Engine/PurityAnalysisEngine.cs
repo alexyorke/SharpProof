@@ -2473,7 +2473,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var nextPathConditionsBuilder = currentState.PathConditions.ToBuilder();
-            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectBranchAssumptions(
+            var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
                 expressionSyntax,
                 takeConditionalSuccessor,
                 semanticModel,
@@ -2665,34 +2665,15 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService smtAnalysis)
         {
             var pathConditionsBuilder = currentState.PathConditions.ToBuilder();
-            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectDomainFacts(
-                expressionSyntax,
-                semanticModel,
-                CancellationToken.None,
-                pathConditionsBuilder,
-                currentState.GetSmtSymbolVersion);
-
-            addedBranchAssumptions |= CSharpConditionToFormula.TryCollectBranchAssumptions(
+            var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,
                 CancellationToken.None,
                 pathConditionsBuilder,
-                currentState.GetSmtSymbolVersion);
-
-            if (CSharpConditionToFormula.TryTranslate(
-                    expressionSyntax,
-                    semanticModel,
-                    CancellationToken.None,
-                    out var formula,
-                    currentState.GetSmtSymbolVersion) &&
-                formula != null)
-            {
-                pathConditionsBuilder.Add(branchWhenTrue
-                    ? formula
-                    : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
-                addedBranchAssumptions = true;
-            }
+                currentState.GetSmtSymbolVersion,
+                collectDomainFactsBeforeBranchAssumptions: true,
+                addTranslatedFormulaAlways: true);
 
             return addedBranchAssumptions &&
                 ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), smtAnalysis);
