@@ -1778,22 +1778,12 @@ namespace PurelySharp.Analyzer
 
         private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
         {
-            return symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
         }
 
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
         {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
 
             if (type == null)
             {
@@ -2213,9 +2203,13 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            expression = UnwrapFactExpression(expression);
-            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-            return symbol is ILocalSymbol or IParameterSymbol ? symbol.OriginalDefinition : null;
+            return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                UnwrapFactExpression(expression),
+                semanticModel,
+                cancellationToken,
+                out var symbol)
+                    ? symbol
+                    : null;
         }
 
         private static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)

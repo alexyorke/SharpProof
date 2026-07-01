@@ -231,6 +231,33 @@ namespace PurelySharp.Symbolic
                     "System.ReadOnlyMemory<T>";
         }
 
+        public static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
+        {
+            return symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+        }
+
+        public static bool TryGetDirectLocalOrParameterSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol symbol)
+        {
+            var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
+            if (candidate is ILocalSymbol or IParameterSymbol)
+            {
+                symbol = candidate;
+                return true;
+            }
+
+            symbol = null!;
+            return false;
+        }
+
         public static string GetReferenceFormulaName(SmtFormula receiverFormula)
         {
             return receiverFormula is SmtVariable variable

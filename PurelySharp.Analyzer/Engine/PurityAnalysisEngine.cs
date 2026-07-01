@@ -4331,12 +4331,7 @@ namespace PurelySharp.Analyzer.Engine
 
         private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
         {
-            return symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
         }
 
         private static bool TryCreateSymbolSmtValue(
@@ -4344,12 +4339,7 @@ namespace PurelySharp.Analyzer.Engine
             PurityAnalysisState currentState,
             out SmtFormula formula)
         {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
 
             if (type == null)
             {
@@ -4385,12 +4375,7 @@ namespace PurelySharp.Analyzer.Engine
             PurityAnalysisState currentState,
             out SmtFormula formula)
         {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
 
             return SymbolicFactFactory.TryCreateStringContentFormula(
                 GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),

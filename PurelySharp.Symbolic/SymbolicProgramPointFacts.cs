@@ -6081,15 +6081,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out ISymbol symbol)
         {
-            var candidate = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol?.OriginalDefinition;
-            if (candidate is ILocalSymbol or IParameterSymbol)
-            {
-                symbol = candidate;
-                return true;
-            }
-
-            symbol = null!;
-            return false;
+            return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                UnwrapExpression(expression),
+                semanticModel,
+                cancellationToken,
+                out symbol);
         }
 
         private static void AddTupleElementSourceSymbolSnapshotFacts(
@@ -8416,12 +8412,7 @@ namespace PurelySharp.Symbolic
 
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
         {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
 
             if (type == null)
             {
@@ -8454,12 +8445,7 @@ namespace PurelySharp.Symbolic
 
         private static ITypeSymbol? GetSymbolType(ISymbol symbol)
         {
-            return symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
+            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
         }
 
         private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
