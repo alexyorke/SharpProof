@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic.Smt;
@@ -92,17 +93,43 @@ namespace PurelySharp.Symbolic
                 includeCurrentStatementCompletionFacts: false);
         }
 
+        public static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(
+                site,
+                semanticModel,
+                cancellationToken);
+        }
+
+        public static List<SmtFormula> CollectPriorAssignmentFacts(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            return SymbolicProgramPointFacts.CollectPriorAssignmentFacts(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts);
+        }
+
         public static List<SmtFormula> CollectPathConditionsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             bool includeCurrentStatementCompletionFacts)
         {
-            var pathConditions = SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
+            var pathConditions = CollectAncestorReachabilityConditions(
+                    site,
+                    semanticModel,
+                    cancellationToken)
                 .ToList();
             AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
-            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(
+            pathConditions.AddRange(CollectPriorAssignmentFacts(
                 site,
                 semanticModel,
                 cancellationToken,
@@ -115,12 +142,43 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            return SymbolicProgramPointFacts
-                .CollectAncestorReachabilityConditions(forStatement, semanticModel, cancellationToken)
-                .Concat(SymbolicProgramPointFacts
-                    .CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
-                .Concat(SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
+            return CollectAncestorReachabilityConditions(forStatement, semanticModel, cancellationToken)
+                .Concat(CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken))
+                .Concat(CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
                 .ToArray();
+        }
+
+        public static IEnumerable<SmtFormula> CollectForInitializerFacts(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return SymbolicProgramPointFacts.CollectForInitializerFacts(
+                forStatement,
+                semanticModel,
+                cancellationToken);
+        }
+
+        public static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(
+                loopStatement,
+                semanticModel,
+                cancellationToken);
+        }
+
+        public static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return SymbolicProgramPointFacts.CollectCompletedLoopExitInvariantFacts(
+                statement,
+                semanticModel,
+                cancellationToken);
         }
 
         public static PurityProofResult ClassifyBranchReachability(

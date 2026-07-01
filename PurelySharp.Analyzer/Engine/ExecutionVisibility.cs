@@ -820,7 +820,7 @@ namespace PurelySharp.Analyzer.Engine
                     pathConditions) == KnownBooleanValue.False;
             }
 
-            foreach (var initializerFact in SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
+            foreach (var initializerFact in SymbolicReachabilityService.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
             {
                 pathConditions.Add(initializerFact);
             }

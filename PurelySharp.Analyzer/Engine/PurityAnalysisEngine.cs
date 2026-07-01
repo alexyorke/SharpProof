@@ -2806,7 +2806,10 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
-            var pathConditions = SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(syntaxNode, semanticModel, CancellationToken.None);
+            var pathConditions = SymbolicReachabilityService.CollectAncestorReachabilityConditions(
+                syntaxNode,
+                semanticModel,
+                CancellationToken.None);
             if (pathConditions.Length == 0)
             {
                 return false;

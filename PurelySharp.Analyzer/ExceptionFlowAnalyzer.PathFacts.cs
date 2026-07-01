@@ -206,7 +206,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
-            foreach (var condition in SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(useNode, semanticModel, cancellationToken))
+            foreach (var condition in SymbolicReachabilityService.CollectAncestorReachabilityConditions(useNode, semanticModel, cancellationToken))
             {
                 pathConditions.Add(condition);
             }
@@ -291,7 +291,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 TryAddPathCondition(whileStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
-                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(whileStatement, semanticModel, cancellationToken))
+                foreach (var loopFact in SymbolicReachabilityService.CollectLoopBodyInvariantFacts(whileStatement, semanticModel, cancellationToken))
                 {
                     pathConditions.Add(loopFact);
                 }
@@ -305,7 +305,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(doStatement, semanticModel, cancellationToken))
+                foreach (var loopFact in SymbolicReachabilityService.CollectLoopBodyInvariantFacts(doStatement, semanticModel, cancellationToken))
                 {
                     pathConditions.Add(loopFact);
                 }
@@ -322,7 +322,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 TryAddPathCondition(forStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
-                foreach (var loopFact in SymbolicProgramPointFacts.CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken))
+                foreach (var loopFact in SymbolicReachabilityService.CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken))
                 {
                     pathConditions.Add(loopFact);
                 }
@@ -467,7 +467,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
-            foreach (var fact in SymbolicProgramPointFacts.CollectPriorAssignmentFacts(useNode, semanticModel, cancellationToken))
+            foreach (var fact in SymbolicReachabilityService.CollectPriorAssignmentFacts(useNode, semanticModel, cancellationToken))
             {
                 pathConditions.Add(fact);
             }
@@ -1059,7 +1059,7 @@ namespace PurelySharp.Analyzer
             }
             else
             {
-                foreach (var loopFact in SymbolicProgramPointFacts.CollectCompletedLoopExitInvariantFacts(statement, semanticModel, cancellationToken))
+                foreach (var loopFact in SymbolicReachabilityService.CollectCompletedLoopExitInvariantFacts(statement, semanticModel, cancellationToken))
                 {
                     facts.Add(loopFact);
                 }
