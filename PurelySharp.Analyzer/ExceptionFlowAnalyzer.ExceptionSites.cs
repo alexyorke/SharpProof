@@ -1562,11 +1562,7 @@ namespace PurelySharp.Analyzer
         {
             var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
-            var pathConditions = CollectPathConditionsForUse(
-                useNode,
-                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
-                semanticModel,
-                cancellationToken);
+            var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
             return SymbolicReachabilityService.PathConditionsAllowAndImply(
                 pathConditions,
@@ -1581,11 +1577,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var pathConditions = CollectPathConditionsForUse(
-                useNode,
-                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
-                semanticModel,
-                cancellationToken);
+            var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
             return SymbolicReachabilityService.PathConditionsAllowAndImply(
                 pathConditions,

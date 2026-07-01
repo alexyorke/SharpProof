@@ -36,32 +36,11 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var pathConditions = new List<SmtFormula>();
-            AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
-            AddSharedAncestorPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
-            foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
-            {
-                if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
-                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, ifStatement.Statement, useNode.SpanStart, semanticModel, cancellationToken))
-                {
-                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
-                }
-
-                if (ifStatement.Else?.Statement is { } elseStatement &&
-                    elseStatement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
-                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, elseStatement, useNode.SpanStart, semanticModel, cancellationToken))
-                {
-                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
-                }
-            }
-
-            AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-            AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-            AddCatchFilterPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-            AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-            AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
+            var pathConditions = CollectPathConditionsForUse(
+                useNode,
+                invalidatedSymbols,
+                semanticModel,
+                cancellationToken);
             return pathConditions.Count > 0 &&
                 SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula, smtAnalysis);
         }
@@ -161,6 +140,18 @@ namespace PurelySharp.Analyzer
                     AddCompletedIfStatementFacts(ifStatement, symbol, semanticModel, cancellationToken, pathConditions);
                 }
             }
+        }
+
+        private static List<SmtFormula> CollectPathConditionsForUse(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return CollectPathConditionsForUse(
+                useNode,
+                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
+                semanticModel,
+                cancellationToken);
         }
 
         private static List<SmtFormula> CollectPathConditionsForUse(
@@ -563,11 +554,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var pathConditions = CollectPathConditionsForUse(
-                useNode,
-                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
-                semanticModel,
-                cancellationToken);
+            var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
             return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
