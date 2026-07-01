@@ -12,7 +12,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Smt
 {
-    public static partial class CSharpConditionToFormula
+    internal static partial class CSharpConditionToFormula
     {
         private const int MaxSourcePredicateInlineDepth = 4;
         private const int MaxConditionalPatternDistributionDepth = 4;

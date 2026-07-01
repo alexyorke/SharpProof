@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 using NUnit.Framework;
+using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Test
 {
@@ -47,6 +49,15 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("PathConditionsImply"));
             Assert.That(source, Does.Contain("ClassifyBranchReachability"));
             Assert.That(source, Does.Contain("CollectPathConditionsAt"));
+        }
+
+        [Test]
+        public void SymbolicPublicSurface_HidesImplementationTranslators()
+        {
+            Assert.That(typeof(CSharpConditionToFormula).IsPublic, Is.False);
+            Assert.That(typeof(SymbolicQueryService).IsPublic, Is.True);
+            Assert.That(typeof(SmtAnalysisService).IsPublic, Is.True);
+            Assert.That(typeof(SmtAnalysisOptions).IsPublic, Is.True);
         }
 
         [Test]

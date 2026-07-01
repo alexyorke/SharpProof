@@ -12,7 +12,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Smt
 {
-    public static partial class CSharpConditionToFormula
+    internal static partial class CSharpConditionToFormula
     {        public static bool TryTranslateValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
