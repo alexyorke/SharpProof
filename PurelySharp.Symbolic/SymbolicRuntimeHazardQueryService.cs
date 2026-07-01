@@ -601,33 +601,6 @@ namespace PurelySharp.Symbolic
                 span.End - endLine.Start + 1);
         }
 
-        private readonly struct RuntimeHazardCandidate
-        {
-            public RuntimeHazardCandidate(
-                SyntaxNode site,
-                SymbolicRuntimeHazardKind kind,
-                SmtFormula triggerCondition,
-                string exceptionType,
-                string category)
-            {
-                Site = site;
-                Kind = kind;
-                TriggerCondition = triggerCondition;
-                ExceptionType = exceptionType;
-                Category = category;
-            }
-
-            public SyntaxNode Site { get; }
-
-            public SymbolicRuntimeHazardKind Kind { get; }
-
-            public SmtFormula TriggerCondition { get; }
-
-            public string ExceptionType { get; }
-
-            public string Category { get; }
-        }
-
         private readonly struct LineColumn
         {
             public LineColumn(int line, int column)
