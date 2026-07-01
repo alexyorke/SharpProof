@@ -672,7 +672,7 @@ public class TestClass
         }
 
         [Test]
-        public void CSharpConditionToFormula_ElementAccessInRange_RejectsReassignedLocalRange()
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesLatestReassignedLocalRange()
         {
             var source = @"
 using System;
@@ -689,6 +689,36 @@ public class TestClass
             var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
                 source,
                 "ElementAccessReassignedLocalRangeHost");
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(inRangeFormula, Is.Not.Null);
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_RejectsUnknownReassignedLocalRange()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values, Range other)
+    {
+        Range range = 0..^0;
+        range = other;
+        return values[range];
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessUnknownReassignedLocalRangeHost");
             var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
             Assert.That(

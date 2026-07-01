@@ -564,7 +564,7 @@ public class TestClass
         }
 
         [Test]
-        public void SymbolicSourceQueryService_ReassignedRangeRemainsUnknown()
+        public void SymbolicSourceQueryService_ReassignedRangeUsesLatestKnownAssignment()
         {
             const string source = @"
 using System;
@@ -575,6 +575,34 @@ public class TestClass
     {
         Range slice = 1..^1;
         slice = 0..^0;
+        if (values != null && values.Length >= 2)
+        {
+            var result = values[slice].Length;
+            return result;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return result;",
+                "result == values.Length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_UnknownReassignedRangeRemainsUnknown()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, Range other)
+    {
+        Range slice = 1..^1;
+        slice = other;
         if (values != null && values.Length >= 2)
         {
             var result = values[slice].Length;

@@ -1323,8 +1323,7 @@ namespace PurelySharp.Symbolic.Smt
                         continue;
                     }
 
-                    if (foundAssignment ||
-                        !assignedRangeShape.HasValue)
+                    if (!assignedRangeShape.HasValue)
                     {
                         rangeShape = default;
                         return false;
@@ -2014,8 +2013,7 @@ namespace PurelySharp.Symbolic.Smt
                         continue;
                     }
 
-                    if (foundAssignment ||
-                        !assignedIndexShape.HasValue)
+                    if (!assignedIndexShape.HasValue)
                     {
                         indexShape = default;
                         return false;
