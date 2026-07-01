@@ -6061,13 +6061,6 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        private static string GetReferenceFormulaName(SmtFormula receiverFormula)
-        {
-            return receiverFormula is SmtVariable variable
-                ? variable.Name
-                : receiverFormula.ToString() ?? string.Empty;
-        }
-
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
         {
             foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
@@ -6674,14 +6667,7 @@ namespace PurelySharp.Symbolic
                 _ => null
             };
 
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                formula = new SmtVariable(GetSmtVariableName(symbol) + ".String", SmtValueKind.String);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateStringContentFormula(GetSmtVariableName(symbol), type, out formula);
         }
 
         private static bool TryCreateStringContentFormulaForReference(
@@ -6689,16 +6675,9 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? type,
             out SmtFormula formula)
         {
-            if (type?.SpecialType != SpecialType.System_String ||
-                receiverFormula.Kind != SmtValueKind.Reference)
-            {
-                formula = null!;
-                return false;
-            }
-
-            var receiverName = receiverFormula is SmtVariable variable ? variable.Name : receiverFormula.ToString();
-            formula = new SmtVariable(receiverName + ".String", SmtValueKind.String);
-            return true;
+            formula = null!;
+            return type?.SpecialType == SpecialType.System_String &&
+                SymbolicFactFactory.TryCreateReferenceStringContentFormula(receiverFormula, out formula);
         }
 
         private static void AddFiniteArrayElementAssignedValueFacts(
@@ -7130,7 +7109,7 @@ namespace PurelySharp.Symbolic
 
             var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
             return SymbolicFactFactory.TryCreateBuiltInLengthFormula(
-                GetReferenceFormulaName(elementFormula),
+                SymbolicFactFactory.GetReferenceFormulaName(elementFormula),
                 elementType,
                 out formula);
         }
@@ -7151,10 +7130,11 @@ namespace PurelySharp.Symbolic
             }
 
             var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
-            formula = new SmtVariable(
-                GetReferenceFormulaName(elementFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
-                SmtValueKind.Int);
-            return true;
+            return SymbolicFactFactory.TryCreateArrayDimensionLengthFormulaForReference(
+                elementFormula,
+                arrayType,
+                dimension,
+                out formula);
         }
 
         private static void AddCoalesceAssignmentFacts(

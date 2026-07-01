@@ -128,6 +128,18 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        public static bool TryCreateStringContentFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
+        {
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtVariable(variableName + ".String", SmtValueKind.String);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
         public static bool TryCreateBuiltInLengthFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
         {
             if (type?.SpecialType == SpecialType.System_String)

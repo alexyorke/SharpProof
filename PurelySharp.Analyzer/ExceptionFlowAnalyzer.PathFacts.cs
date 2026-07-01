@@ -1857,14 +1857,7 @@ namespace PurelySharp.Analyzer
                 _ => null
             };
 
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                formula = new SmtVariable(GetSmtVariableName(symbol) + ".String", SmtValueKind.String);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateStringContentFormula(GetSmtVariableName(symbol), type, out formula);
         }
 
         private static bool TryCreateBuiltInLengthFormula(ISymbol symbol, out SmtFormula formula)

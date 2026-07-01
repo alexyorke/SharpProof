@@ -4392,14 +4392,10 @@ namespace PurelySharp.Analyzer.Engine
                 _ => null
             };
 
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                formula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion) + ".String", SmtValueKind.String);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateStringContentFormula(
+                GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
+                type,
+                out formula);
         }
 
         private static bool TryCreateBuiltInLengthFormula(
