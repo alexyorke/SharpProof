@@ -963,14 +963,13 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            var falseBranchConditions = pathConditions.ToList();
-            return CSharpConditionToFormula.TryCollectBranchAssumptions(
-                    filterExpression,
-                    branchWhenTrue: false,
-                    semanticModel,
-                    cancellationToken,
-                    falseBranchConditions) &&
-                !PathConditionsAreSatisfiable(falseBranchConditions, smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsImplyBranch(
+                pathConditions,
+                filterExpression,
+                branchWhenTrue: true,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
         }
 
         private static bool PathConditionsAreSatisfiable(

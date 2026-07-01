@@ -752,7 +752,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var trueConditions = CreateBranchConditions(
+            var trueConditions = SymbolicReachabilityService.TryCollectBranchConditions(
                 pathConditions,
                 ifStatement.Condition,
                 branchWhenTrue: true,
@@ -770,7 +770,7 @@ namespace PurelySharp.Analyzer
             if (ifStatement.Else?.Statement is not { } elseStatement)
             {
                 return trueReachable && trueExits &&
-                    PathConditionsImplyBranch(
+                    SymbolicReachabilityService.PathConditionsImplyBranch(
                         pathConditions,
                         ifStatement.Condition,
                         branchWhenTrue: true,
@@ -779,7 +779,7 @@ namespace PurelySharp.Analyzer
                         smtAnalysis);
             }
 
-            var falseConditions = CreateBranchConditions(
+            var falseConditions = SymbolicReachabilityService.TryCollectBranchConditions(
                 pathConditions,
                 ifStatement.Condition,
                 branchWhenTrue: false,
@@ -795,42 +795,6 @@ namespace PurelySharp.Analyzer
                 StatementExitIsProven(elseStatement, falseConditions, semanticModel, cancellationToken, smtAnalysis);
 
             return trueExits && falseExits && (trueReachable || falseReachable);
-        }
-
-        private static List<SmtFormula>? CreateBranchConditions(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            ExpressionSyntax condition,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            var branchConditions = pathConditions.ToList();
-            return CSharpConditionToFormula.TryCollectBranchAssumptions(
-                    condition,
-                    branchWhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    branchConditions)
-                ? branchConditions
-                : null;
-        }
-
-        private static bool PathConditionsImplyBranch(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            ExpressionSyntax condition,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            var oppositeConditions = pathConditions.ToList();
-            return CSharpConditionToFormula.TryCollectBranchAssumptions(
-                    condition,
-                    !branchWhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    oppositeConditions) &&
-                !PathConditionsAreSatisfiable(oppositeConditions, smtAnalysis);
         }
 
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode useNode)

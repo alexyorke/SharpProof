@@ -31,6 +31,75 @@ namespace PurelySharp.Symbolic
             return ClassifyImplication(pathConditions, factFormula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
         }
 
+        public static List<SmtFormula>? TryCollectBranchConditions(
+            IEnumerable<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var branchConditions = pathConditions.ToList();
+            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    branchConditions)
+                ? branchConditions
+                : null;
+        }
+
+        public static bool IsBranchReachable(
+            IEnumerable<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return TryCollectBranchConditions(
+                    pathConditions,
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken) is { } branchConditions &&
+                IsSatisfiable(branchConditions, smtAnalysis);
+        }
+
+        public static bool IsBranchUnreachable(
+            IEnumerable<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return TryCollectBranchConditions(
+                    pathConditions,
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken) is { } branchConditions &&
+                IsUnsatisfiable(branchConditions, smtAnalysis);
+        }
+
+        public static bool PathConditionsImplyBranch(
+            IEnumerable<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsBranchUnreachable(
+                pathConditions,
+                condition,
+                !branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
         public static PurityProofResult ClassifyImplication(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula,

@@ -1045,26 +1045,25 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService? smtAnalysis,
             IReadOnlyCollection<SmtFormula>? pathConditions = null)
         {
-            var trueBranchFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
-            if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+            var basePathConditions = pathConditions ?? Array.Empty<SmtFormula>();
+            if (SymbolicReachabilityService.IsBranchUnreachable(
+                    basePathConditions,
                     expression,
                     branchWhenTrue: true,
                     semanticModel,
                     cancellationToken,
-                    trueBranchFacts) &&
-                IsBranchConditionUnreachable(new SmtBooleanConstant(true), trueBranchFacts, smtAnalysis))
+                    smtAnalysis))
             {
                 return KnownBooleanValue.False;
             }
 
-            var falseBranchFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
-            if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+            if (SymbolicReachabilityService.IsBranchUnreachable(
+                    basePathConditions,
                     expression,
                     branchWhenTrue: false,
                     semanticModel,
                     cancellationToken,
-                    falseBranchFacts) &&
-                IsBranchConditionUnreachable(new SmtBooleanConstant(true), falseBranchFacts, smtAnalysis))
+                    smtAnalysis))
             {
                 return KnownBooleanValue.True;
             }
