@@ -1491,7 +1491,11 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking ThrowOperations...");
                         foreach (var firstThrowOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IThrowOperation>())
                         {
-                            if (IsInStaticallyUnreachableBranch(firstThrowOp.Syntax, semanticModel, activeSmtAnalysis))
+                            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                                    firstThrowOp.Syntax,
+                                    semanticModel,
+                                    CancellationToken.None,
+                                    activeSmtAnalysis))
                             {
                                 LogDebug($"{indent}    Post-CFG: Skipping statically unreachable throw: {firstThrowOp.Syntax}");
                                 continue;
@@ -1550,7 +1554,11 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Known Impure Invocations...");
                         foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IInvocationOperation>())
                         {
-                            if (IsInStaticallyUnreachableBranch(invocationOp.Syntax, semanticModel, activeSmtAnalysis))
+                            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                                    invocationOp.Syntax,
+                                    semanticModel,
+                                    CancellationToken.None,
+                                    activeSmtAnalysis))
                             {
                                 continue;
                             }
@@ -1734,7 +1742,11 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService smtAnalysis)
         {
             return operation.Syntax != null &&
-                IsInStaticallyUnreachableBranch(operation.Syntax, semanticModel, smtAnalysis);
+                ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    operation.Syntax,
+                    semanticModel,
+                    CancellationToken.None,
+                    smtAnalysis);
         }
 
 
@@ -2784,15 +2796,6 @@ namespace PurelySharp.Analyzer.Engine
                 : name;
         }
 
-        private static bool IsInStaticallyUnreachableBranch(SyntaxNode syntaxNode, SemanticModel semanticModel, SmtAnalysisService smtAnalysis)
-        {
-            return ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                syntaxNode,
-                semanticModel,
-                CancellationToken.None,
-                smtAnalysis);
-        }
-
         internal static PurityAnalysisResult CheckSingleOperation(IOperation operation, Rules.PurityAnalysisContext context, PurityAnalysisState currentState)
         {
             LogDebug($"    [CSO] Enter CheckSingleOperation for Kind: {operation.Kind}, Syntax: '{operation.Syntax.ToString().Trim()}'");
@@ -2820,7 +2823,11 @@ namespace PurelySharp.Analyzer.Engine
 
             var canUseSyntaxOnlyReachability = currentState.SmtSymbolVersions.Count == 0;
             if (canUseSyntaxOnlyReachability &&
-                IsInStaticallyUnreachableBranch(operation.Syntax, context.SemanticModel, context.SmtAnalysis))
+                ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    operation.Syntax,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    context.SmtAnalysis))
             {
                 LogDebug($"    [CSO] Operation is in a statically unreachable branch. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
