@@ -451,6 +451,43 @@ namespace PurelySharp.Analyzer
             return symbols;
         }
 
+        private static HashSet<ISymbol> CollectRelevantSymbols(
+            SyntaxNode primaryRoot,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return new HashSet<ISymbol>(
+                CollectLocalAndParameterSymbols(primaryRoot, semanticModel, cancellationToken),
+                SymbolEqualityComparer.Default);
+        }
+
+        private static HashSet<ISymbol> CollectRelevantSymbols(
+            SyntaxNode primaryRoot,
+            SyntaxNode? additionalRoot,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var symbols = CollectRelevantSymbols(primaryRoot, semanticModel, cancellationToken);
+            if (additionalRoot != null && !ReferenceEquals(additionalRoot, primaryRoot))
+            {
+                AddRelevantSymbols(symbols, additionalRoot, semanticModel, cancellationToken);
+            }
+
+            return symbols;
+        }
+
+        private static void AddRelevantSymbols(
+            ICollection<ISymbol> symbols,
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var symbol in CollectLocalAndParameterSymbols(root, semanticModel, cancellationToken))
+            {
+                symbols.Add(symbol);
+            }
+        }
+
         private static void AddPriorAssignmentPathConditions(
             SyntaxNode useNode,
             SemanticModel semanticModel,
@@ -565,15 +602,10 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var relevantSymbols = new HashSet<ISymbol>(
-                CollectLocalAndParameterSymbols(candidate.CallSite, semanticModel, cancellationToken),
-                SymbolEqualityComparer.Default);
+            var relevantSymbols = CollectRelevantSymbols(candidate.CallSite, semanticModel, cancellationToken);
             if (candidate.UsingDisposeGuard?.ResourceExpression is { } resourceExpression)
             {
-                foreach (var symbol in CollectLocalAndParameterSymbols(resourceExpression, semanticModel, cancellationToken))
-                {
-                    relevantSymbols.Add(symbol);
-                }
+                AddRelevantSymbols(relevantSymbols, resourceExpression, semanticModel, cancellationToken);
             }
 
             var pathConditions = CollectPathConditionsForUse(
@@ -601,16 +633,11 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            var relevantSymbols = new HashSet<ISymbol>(
-                CollectLocalAndParameterSymbols(exceptionSite, semanticModel, cancellationToken),
-                SymbolEqualityComparer.Default);
-            if (relevantRoot != null && !ReferenceEquals(relevantRoot, exceptionSite))
-            {
-                foreach (var symbol in CollectLocalAndParameterSymbols(relevantRoot, semanticModel, cancellationToken))
-                {
-                    relevantSymbols.Add(symbol);
-                }
-            }
+            var relevantSymbols = CollectRelevantSymbols(
+                exceptionSite,
+                relevantRoot,
+                semanticModel,
+                cancellationToken);
 
             return CollectPathConditionsForUse(
                 exceptionSite,
