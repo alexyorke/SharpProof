@@ -1253,6 +1253,100 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver()
+        {
+            var guard = new SmtVariable("conditional_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var selected = new SmtVariable("conditional_int_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var fallback = new SmtVariable("conditional_int_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Int);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                guard,
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, conditional, new SmtIntegerConstant(10)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, selected, new SmtIntegerConstant(10)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_ConditionalReferenceNullFactWithKnownGuard_BypassesSolver()
+        {
+            var guard = new SmtVariable("conditional_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var left = new SmtVariable("conditional_ref_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var right = new SmtVariable("conditional_ref_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var conditional = new SmtConditionalFormula(guard, left, right, SmtValueKind.Reference);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant()),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, conditional, new SmtNullConstant());
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_ConditionalBooleanWithKnownGuard_BypassesSolver()
+        {
+            var guard = new SmtVariable("conditional_bool_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var selected = new SmtVariable("conditional_bool_selected_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var fallback = new SmtVariable("conditional_bool_fallback_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var conditional = new SmtConditionalFormula(guard, selected, fallback, SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                guard,
+                conditional,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, selected),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_ConditionalWithEqualBranchesCollapsesBeforeSolver()
+        {
+            var guard = new SmtVariable("conditional_equal_branch_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var value = new SmtVariable("conditional_equal_branch_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var conditional = new SmtConditionalFormula(guard, value, value, SmtValueKind.Int);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, conditional, new SmtIntegerConstant(7)),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtIntegerConstant(7)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality()
         {
             var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);

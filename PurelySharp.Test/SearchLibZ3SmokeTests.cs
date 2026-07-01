@@ -584,6 +584,57 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_OctalRegexEscapeImpliesSpaceLiteral()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\040\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant(" ")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_OctalRegexEscapeConsumesAtMostTwoFollowingDigits()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\0408\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant(" 8")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_OctalRegexClassEscapeContradictsDifferentCharacter()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[\040]\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_AtomicGroupRegexContradictsWrongPrefix()
         {
             using var solver = new SmtSolver();

@@ -309,6 +309,56 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null ? text.Length == 3 : false)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text != null");
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text.Length == 3");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomGuardedDivisionFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor != 0 ? value / divisor == 3 : false)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "divisor != 0");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
         {
             const string source = @"

@@ -1204,6 +1204,12 @@ namespace SearchLib.Smt
                     return true;
                 }
 
+                if (escaped == '0')
+                {
+                    regex = CreateLiteralRegex(ReadNullPrefixedOctalEscape().ToString());
+                    return true;
+                }
+
                 var literal = escaped switch
                 {
                     'a' => "\a",
@@ -1514,6 +1520,12 @@ namespace SearchLib.Smt
                     }
 
                     part = CreateClassCharacterPart(controlChar);
+                    return true;
+                }
+
+                if (escaped == '0')
+                {
+                    part = CreateClassCharacterPart(ReadNullPrefixedOctalEscape());
                     return true;
                 }
 
@@ -1921,6 +1933,25 @@ namespace SearchLib.Smt
                 _position++;
                 value = (char)(control - '@');
                 return true;
+            }
+
+            private char ReadNullPrefixedOctalEscape()
+            {
+                var value = 0;
+                for (var digitCount = 0;
+                     digitCount < 2 && _position < _pattern.Length && IsOctalDigit(_pattern[_position]);
+                     digitCount++)
+                {
+                    value = (value * 8) + (_pattern[_position] - '0');
+                    _position++;
+                }
+
+                return (char)value;
+            }
+
+            private static bool IsOctalDigit(char value)
+            {
+                return value is >= '0' and <= '7';
             }
 
             private static int HexValue(char value)

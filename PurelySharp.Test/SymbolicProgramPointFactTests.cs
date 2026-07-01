@@ -1034,6 +1034,103 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_UsingExpressionThrowGuardNormalCompletionProvesResourceNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System;
+
+public sealed class Resource : IDisposable
+{
+    public void Dispose()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Resource? resource)
+    {
+        using (resource ?? throw new InvalidOperationException())
+        {
+        }
+
+        return resource.GetHashCode();
+    }
+}";
+
+            var marker = FindMarker(source, "return resource.GetHashCode();");
+            var proof = ProveAtMarker(source, marker, "resource != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_UsingDeclarationInitializerThrowGuardNormalCompletionProvesInputNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System;
+
+public sealed class Resource : IDisposable
+{
+    public void Dispose()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Resource? resource)
+    {
+        using (var disposable = resource ?? throw new InvalidOperationException())
+        {
+        }
+
+        return resource.GetHashCode();
+    }
+}";
+
+            var marker = FindMarker(source, "return resource.GetHashCode();");
+            var proof = ProveAtMarker(source, marker, "resource != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_UsingExpressionThrowGuardFactDoesNotSurviveBodyReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System;
+
+public sealed class Resource : IDisposable
+{
+    public void Dispose()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Resource? resource)
+    {
+        using (resource ?? throw new InvalidOperationException())
+        {
+            resource = null;
+        }
+
+        return resource.GetHashCode();
+    }
+}";
+
+            var marker = FindMarker(source, "return resource.GetHashCode();");
+            var proof = ProveAtMarker(source, marker, "resource != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
         {
             const string source = @"

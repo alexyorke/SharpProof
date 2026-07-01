@@ -496,6 +496,14 @@ public class TestClass
             Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
             Assert.That(result.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
             Assert.That(result.InvariantQuery.Summary, Does.Contain("unresolved"));
+            var targetSummary = result.InvariantQuery.TargetSummaries.Single();
+            Assert.That(result.InvariantQuery.TargetSummaryCount, Is.EqualTo(1));
+            Assert.That(targetSummary.Target, Is.EqualTo("value"));
+            Assert.That(targetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
+            Assert.That(targetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+            Assert.That(targetSummary.MustFacts, Is.Empty);
+            Assert.That(targetSummary.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
+            Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
             Assert.That(
                 result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
                 Is.EquivalentTo(new[] { "PS-SYM-MAYBE-FACTS", "PS-SYM-CONSERVATIVE-UNKNOWN", "PS-SYM-PROOF-UNKNOWN" }));
@@ -526,6 +534,12 @@ public class TestClass
             Assert.That(positiveReturn.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
             Assert.That(positiveReturn.InvariantQuery.Diagnostics, Is.Empty);
             Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+            var positiveTargetSummary = positiveReturn.InvariantQuery.TargetSummaries.Single();
+            Assert.That(positiveTargetSummary.Target, Is.EqualTo("value"));
+            Assert.That(positiveTargetSummary.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
+            Assert.That(positiveTargetSummary.MaybeFacts, Is.Empty);
+            Assert.That(positiveTargetSummary.UnknownFacts, Is.Empty);
+            Assert.That(positiveTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
         }
 
         [Test]
@@ -1464,6 +1478,15 @@ public class TestClass
             Assert.That(invariantResult.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
             Assert.That(invariantResult.InvariantQuery.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
             Assert.That(invariantResult.InvariantQuery.MaybeFactsTruncated, Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
+            Assert.That(invariantResult.InvariantQuery.TargetSummaryCount, Is.EqualTo(result.InvariantQuery.TargetSummaryCount));
+            Assert.That(invariantResult.InvariantQuery.TargetSummaries, Has.Count.LessThanOrEqualTo(1));
+            var compactTargetSummary = invariantResult.InvariantQuery.TargetSummaries.Single();
+            Assert.That(compactTargetSummary.Target, Is.EqualTo("copy"));
+            Assert.That(compactTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+            Assert.That(compactTargetSummary.MaybeFactCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(compactTargetSummary.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
+            Assert.That(compactTargetSummary.MaybeFactsTruncated, Is.True);
+            Assert.That(compactTargetSummary.UnknownFacts, Does.Contain("unknown(copy)"));
             Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
             Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
             Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
@@ -2060,6 +2083,19 @@ public class TestClass
                 Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
                 Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
                 Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+                Assert.That(invariantQuery.GetProperty("targetSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+                Assert.That(invariantQuery.GetProperty("targetSummaries").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(invariantQuery.GetProperty("targetSummariesTruncated").GetBoolean(), Is.False);
+                var targetSummary = invariantQuery.GetProperty("targetSummaries")[0];
+                Assert.That(targetSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
+                Assert.That(targetSummary.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+                Assert.That(targetSummary.GetProperty("statusReason").GetString(), Is.EqualTo("target_has_conservative_unknowns"));
+                Assert.That(targetSummary.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(targetSummary.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(targetSummary.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
+                Assert.That(
+                    targetSummary.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                    Does.Contain("unknown(copy)"));
 
                 Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));

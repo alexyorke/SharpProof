@@ -529,6 +529,43 @@ public class TestClass
         }
 
         [Test]
+        public void UsingExpressionThrowGuard_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+        {
+            var source = @"
+using System;
+
+public sealed class Resource : IDisposable
+{
+    public void Dispose()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Resource resource)
+    {
+        using (resource ?? throw new InvalidOperationException())
+        {
+        }
+
+        return resource is null ? Impure() : 0;
+    }
+
+    private static int Impure() => 1;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
         public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
         {
             var test = @"

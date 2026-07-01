@@ -1867,6 +1867,10 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedTryStatementFacts(tryStatement, semanticModel, cancellationToken, facts);
             }
+            else if (statement is UsingStatementSyntax usingStatement)
+            {
+                AddCompletedUsingStatementFacts(usingStatement, semanticModel, cancellationToken, facts);
+            }
             else if (statement is ExpressionStatementSyntax completedExpressionStatement)
             {
                 AddNormalCompletionFacts(
@@ -2086,6 +2090,50 @@ namespace PurelySharp.Symbolic
             }
 
             AddVisibleSingleBranchFacts(finallyFacts, finallyBlock, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedUsingStatementFacts(
+            UsingStatementSyntax usingStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (StatementDefinitelyExits(usingStatement.Statement, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            if (usingStatement.Expression != null)
+            {
+                AddNormalCompletionFacts(
+                    usingStatement.Expression,
+                    usingStatement,
+                    true,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
+            if (usingStatement.Declaration == null)
+            {
+                return;
+            }
+
+            foreach (var declarator in usingStatement.Declaration.Variables)
+            {
+                if (declarator.Initializer == null)
+                {
+                    continue;
+                }
+
+                AddNormalCompletionFacts(
+                    declarator.Initializer.Value,
+                    usingStatement,
+                    true,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
         }
 
         private static void AddIdenticalCompletedBranchFacts(

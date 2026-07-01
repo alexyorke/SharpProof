@@ -165,6 +165,70 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCompoundDivideByZero()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor == 0)
+        {
+            value /= divisor;
+        }
+
+        return value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "value /= divisor;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedCompoundModuloByNonZeroIsPruned()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor != 0)
+        {
+            value %= divisor;
+        }
+
+        return value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "value %= divisor;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_modulo_by_zero"));
+        }
+
+        [Test]
         public void QueryNodeRuntimeHazards_DefaultExcludesNestedCallableHazards()
         {
             const string source = @"
@@ -2007,6 +2071,40 @@ public class TestClass
             var result = QueryLine(
                 source,
                 "value += 1;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedCompoundDivisionOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value == int.MinValue && divisor == -1)
+        {
+            checked
+            {
+                value /= divisor;
+            }
+        }
+
+        return value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "value /= divisor;",
                 smtAnalysis,
                 new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
 

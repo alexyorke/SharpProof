@@ -265,8 +265,15 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
-                TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue, getSymbolVersion, inlineDepth) &&
-                conditionalValue is { Kind: SmtValueKind.Bool })
+                TryTranslateConditionalBooleanExpression(
+                    conditionalExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionalValue,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) &&
+                conditionalValue != null)
             {
                 formula = conditionalValue;
                 return true;
@@ -501,6 +508,80 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateConditionalBooleanExpression(
+            ConditionalExpressionSyntax conditionalExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors)
+        {
+            formula = null;
+            if (!HasSupportedBooleanType(conditionalExpression, semanticModel, cancellationToken) ||
+                !TryTranslateCore(
+                    conditionalExpression.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionFormula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) ||
+                conditionFormula is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            var whenTrueNonZeroDivisors = AddNonZeroDivisorFacts(
+                conditionalExpression.Condition,
+                branchWhenTrue: true,
+                semanticModel,
+                cancellationToken,
+                nonZeroDivisors,
+                getSymbolVersion,
+                inlineDepth);
+            if (!TryTranslateCore(
+                    conditionalExpression.WhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenTrueFormula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    whenTrueNonZeroDivisors) ||
+                whenTrueFormula is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            var whenFalseNonZeroDivisors = AddNonZeroDivisorFacts(
+                conditionalExpression.Condition,
+                branchWhenTrue: false,
+                semanticModel,
+                cancellationToken,
+                nonZeroDivisors,
+                getSymbolVersion,
+                inlineDepth);
+            if (!TryTranslateCore(
+                    conditionalExpression.WhenFalse,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenFalseFormula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    whenFalseNonZeroDivisors) ||
+                whenFalseFormula is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                conditionFormula,
+                whenTrueFormula,
+                whenFalseFormula,
+                SmtValueKind.Bool);
+            return true;
         }
 
         private static bool TryTranslateAsExpressionNullComparison(
@@ -11097,6 +11178,19 @@ namespace PurelySharp.Symbolic.Smt
                 formula is { Kind: SmtValueKind.Bool })
             {
                 return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslateConditionalBooleanExpression(
+                    conditionalExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors: null))
+            {
+                return formula != null;
             }
 
             if (expression is BinaryExpressionSyntax binaryExpression)

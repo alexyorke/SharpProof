@@ -1600,6 +1600,16 @@ namespace PurelySharp.Symbolic.Smt
                 var condition = NormalizeAliases(formula.Condition, visiting);
                 var whenTrue = NormalizeAliases(formula.WhenTrue, visiting);
                 var whenFalse = NormalizeAliases(formula.WhenFalse, visiting);
+                if (TryEvaluateBoolean(condition, out var conditionValue))
+                {
+                    return conditionValue ? whenTrue : whenFalse;
+                }
+
+                if (whenTrue.Equals(whenFalse))
+                {
+                    return whenTrue;
+                }
+
                 return condition.Equals(formula.Condition) &&
                     whenTrue.Equals(formula.WhenTrue) &&
                     whenFalse.Equals(formula.WhenFalse)

@@ -2268,6 +2268,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<string> maybeFacts,
             IReadOnlyList<string> unknownFacts,
             IReadOnlyList<SymbolicConservativeUnknownDiagnostic> unknownDiagnostics,
+            IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
             int candidateProgramPointCount,
             int unreachableProgramPointCount,
             bool isUnreachable,
@@ -2281,6 +2282,7 @@ namespace PurelySharp.Symbolic
             MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
             UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
             UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
+            TargetSummaries = targetSummaries ?? throw new ArgumentNullException(nameof(targetSummaries));
             CandidateProgramPointCount = candidateProgramPointCount;
             UnreachableProgramPointCount = unreachableProgramPointCount;
             IsUnreachable = isUnreachable;
@@ -2310,6 +2312,10 @@ namespace PurelySharp.Symbolic
         public int UnknownFactCount => UnknownFacts.Count;
 
         public IReadOnlyList<SymbolicConservativeUnknownDiagnostic> UnknownDiagnostics { get; }
+
+        public IReadOnlyList<SymbolicInvariantTargetSummary> TargetSummaries { get; }
+
+        public int TargetSummaryCount => TargetSummaries.Count;
 
         public int CandidateProgramPointCount { get; }
 
@@ -2361,6 +2367,7 @@ namespace PurelySharp.Symbolic
                     .Select(static condition => condition.Text)
                     .ToArray(),
                 Array.Empty<SymbolicConservativeUnknownDiagnostic>(),
+                SymbolicInvariantTargetSummary.FromPoint(result),
                 result.Reachability == SymbolicReachability.Unreachable ? 0 : 1,
                 result.Reachability == SymbolicReachability.Unreachable ? 1 : 0,
                 result.Reachability == SymbolicReachability.Unreachable,
@@ -2393,6 +2400,7 @@ namespace PurelySharp.Symbolic
                 mergedPathFacts.MaybeFacts,
                 mergedPathFacts.ConservativeUnknowns,
                 mergedPathFacts.ConservativeUnknownDiagnostics,
+                SymbolicInvariantTargetSummary.FromMergedPathFacts(invariant, mergedPathFacts),
                 mergedPathFacts.CandidateProgramPointCount,
                 mergedPathFacts.UnreachableProgramPointCount,
                 mergedPathFacts.IsUnreachable,
@@ -2542,6 +2550,270 @@ namespace PurelySharp.Symbolic
             }
 
             return diagnostics;
+        }
+    }
+
+    public sealed class SymbolicInvariantTargetSummary
+    {
+        private SymbolicInvariantTargetSummary(
+            string target,
+            IReadOnlyList<string> mustFacts,
+            IReadOnlyList<string> maybeFacts,
+            IReadOnlyList<string> unknownFacts)
+        {
+            Target = string.IsNullOrWhiteSpace(target) ? "path" : target;
+            MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
+            Status = ResolveStatus();
+            StatusReason = ResolveStatusReason();
+        }
+
+        public string Target { get; }
+
+        public IReadOnlyList<string> MustFacts { get; }
+
+        public int MustFactCount => MustFacts.Count;
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public int MaybeFactCount => MaybeFacts.Count;
+
+        public IReadOnlyList<string> UnknownFacts { get; }
+
+        public int UnknownFactCount => UnknownFacts.Count;
+
+        public bool HasMaybeFacts => MaybeFactCount != 0;
+
+        public bool HasUnknowns => UnknownFactCount != 0;
+
+        public SymbolicInvariantQueryStatus Status { get; }
+
+        public string StatusReason { get; }
+
+        internal static IReadOnlyList<SymbolicInvariantTargetSummary> FromPoint(SymbolicSourceQueryResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var builders = new Dictionary<string, TargetFactBuilder>(StringComparer.Ordinal);
+            foreach (var condition in result.Invariant.Conditions)
+            {
+                AddCondition(builders, condition, isMaybe: false);
+            }
+
+            return BuildSummaries(builders);
+        }
+
+        internal static IReadOnlyList<SymbolicInvariantTargetSummary> FromMergedPathFacts(
+            SymbolicInvariantResult invariant,
+            SymbolicMergedPathFacts mergedPathFacts)
+        {
+            if (invariant == null)
+            {
+                throw new ArgumentNullException(nameof(invariant));
+            }
+
+            if (mergedPathFacts == null)
+            {
+                throw new ArgumentNullException(nameof(mergedPathFacts));
+            }
+
+            var builders = new Dictionary<string, TargetFactBuilder>(StringComparer.Ordinal);
+            foreach (var condition in invariant.Conditions)
+            {
+                AddCondition(builders, condition, isMaybe: false);
+            }
+
+            foreach (var diagnostic in mergedPathFacts.ConservativeUnknownDiagnostics)
+            {
+                var builder = GetBuilder(builders, diagnostic.Target);
+                builder.AddUnknown(diagnostic.UnknownText);
+                foreach (var maybeFact in diagnostic.MaybeFacts)
+                {
+                    builder.AddMaybe(maybeFact);
+                }
+            }
+
+            return BuildSummaries(builders);
+        }
+
+        private SymbolicInvariantQueryStatus ResolveStatus()
+        {
+            return HasUnknowns || HasMaybeFacts
+                ? SymbolicInvariantQueryStatus.Conservative
+                : SymbolicInvariantQueryStatus.Exact;
+        }
+
+        private string ResolveStatusReason()
+        {
+            if (HasUnknowns)
+            {
+                return "target_has_conservative_unknowns";
+            }
+
+            if (HasMaybeFacts)
+            {
+                return "target_has_path_specific_facts";
+            }
+
+            return "target_exact";
+        }
+
+        private static void AddCondition(
+            Dictionary<string, TargetFactBuilder> builders,
+            SymbolicInvariantCondition condition,
+            bool isMaybe)
+        {
+            var builder = GetBuilder(builders, GetConditionTarget(condition));
+            if (condition.IsConservativeUnknown)
+            {
+                builder.AddUnknown(condition.Text);
+            }
+            else if (isMaybe)
+            {
+                builder.AddMaybe(condition.Text);
+            }
+            else
+            {
+                builder.AddMust(condition.Text);
+            }
+        }
+
+        private static string GetConditionTarget(SymbolicInvariantCondition condition)
+        {
+            if (string.Equals(condition.FormulaKind, "Text", StringComparison.Ordinal) &&
+                string.Equals(condition.Target, condition.Text, StringComparison.Ordinal))
+            {
+                var extracted = TryExtractTextFactTarget(condition.Text);
+                if (!string.IsNullOrWhiteSpace(extracted))
+                {
+                    return extracted!;
+                }
+            }
+
+            return condition.Target;
+        }
+
+        private static string? TryExtractTextFactTarget(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            var value = text!.Trim();
+            while (value.StartsWith("!", StringComparison.Ordinal) ||
+                (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)))
+            {
+                value = value.StartsWith("!", StringComparison.Ordinal)
+                    ? value.Substring(1).TrimStart()
+                    : value.Substring(1, value.Length - 2).Trim();
+            }
+
+            for (var index = 0; index < value.Length; index++)
+            {
+                if (!SyntaxFacts.IsIdentifierStartCharacter(value[index]) && value[index] != '@')
+                {
+                    continue;
+                }
+
+                var start = index;
+                index++;
+                while (index < value.Length && SyntaxFacts.IsIdentifierPartCharacter(value[index]))
+                {
+                    index++;
+                }
+
+                var target = value.Substring(start, index - start);
+                if (index + ".Length".Length <= value.Length &&
+                    string.Equals(value.Substring(index, ".Length".Length), ".Length", StringComparison.Ordinal))
+                {
+                    target += ".Length";
+                }
+
+                return target;
+            }
+
+            return null;
+        }
+
+        private static TargetFactBuilder GetBuilder(
+            Dictionary<string, TargetFactBuilder> builders,
+            string? target)
+        {
+            var normalizedTarget = string.IsNullOrWhiteSpace(target) ? "path" : target!.Trim();
+            if (!builders.TryGetValue(normalizedTarget, out var builder))
+            {
+                builder = new TargetFactBuilder(normalizedTarget);
+                builders.Add(normalizedTarget, builder);
+            }
+
+            return builder;
+        }
+
+        private static IReadOnlyList<SymbolicInvariantTargetSummary> BuildSummaries(
+            Dictionary<string, TargetFactBuilder> builders)
+        {
+            return builders.Values
+                .OrderBy(static builder => builder.Target, StringComparer.Ordinal)
+                .Select(static builder => builder.ToSummary())
+                .ToArray();
+        }
+
+        private sealed class TargetFactBuilder
+        {
+            private readonly List<string> _mustFacts = new();
+            private readonly List<string> _maybeFacts = new();
+            private readonly List<string> _unknownFacts = new();
+
+            public TargetFactBuilder(string target)
+            {
+                Target = target;
+            }
+
+            public string Target { get; }
+
+            public void AddMust(string? fact)
+            {
+                AddFact(_mustFacts, fact);
+            }
+
+            public void AddMaybe(string? fact)
+            {
+                AddFact(_maybeFacts, fact);
+            }
+
+            public void AddUnknown(string? fact)
+            {
+                AddFact(_unknownFacts, fact);
+            }
+
+            public SymbolicInvariantTargetSummary ToSummary()
+            {
+                return new SymbolicInvariantTargetSummary(
+                    Target,
+                    Distinct(_mustFacts),
+                    Distinct(_maybeFacts),
+                    Distinct(_unknownFacts));
+            }
+
+            private static void AddFact(List<string> facts, string? fact)
+            {
+                if (!string.IsNullOrWhiteSpace(fact))
+                {
+                    facts.Add(fact!.Trim());
+                }
+            }
+
+            private static IReadOnlyList<string> Distinct(List<string> facts)
+            {
+                return facts
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+            }
         }
     }
 
@@ -4439,6 +4711,8 @@ namespace PurelySharp.Symbolic
             int unknownFactCount,
             IReadOnlyList<string> unknownFacts,
             IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> unknownDiagnostics,
+            int targetSummaryCount,
+            IReadOnlyList<SymbolicCompactInvariantTargetSummary> targetSummaries,
             int diagnosticCount,
             IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> diagnostics,
             int candidateProgramPointCount,
@@ -4454,6 +4728,7 @@ namespace PurelySharp.Symbolic
             bool maybeFactsTruncated,
             bool unknownFactsTruncated,
             bool unknownDiagnosticsTruncated,
+            bool targetSummariesTruncated,
             bool diagnosticsTruncated)
         {
             Text = text ?? string.Empty;
@@ -4465,6 +4740,8 @@ namespace PurelySharp.Symbolic
             UnknownFactCount = unknownFactCount;
             UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
             UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
+            TargetSummaryCount = targetSummaryCount;
+            TargetSummaries = targetSummaries ?? throw new ArgumentNullException(nameof(targetSummaries));
             DiagnosticCount = diagnosticCount;
             Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
             CandidateProgramPointCount = candidateProgramPointCount;
@@ -4480,6 +4757,7 @@ namespace PurelySharp.Symbolic
             MaybeFactsTruncated = maybeFactsTruncated;
             UnknownFactsTruncated = unknownFactsTruncated;
             UnknownDiagnosticsTruncated = unknownDiagnosticsTruncated;
+            TargetSummariesTruncated = targetSummariesTruncated;
             DiagnosticsTruncated = diagnosticsTruncated;
         }
 
@@ -4500,6 +4778,10 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> UnknownFacts { get; }
 
         public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> UnknownDiagnostics { get; }
+
+        public int TargetSummaryCount { get; }
+
+        public IReadOnlyList<SymbolicCompactInvariantTargetSummary> TargetSummaries { get; }
 
         public int DiagnosticCount { get; }
 
@@ -4531,6 +4813,8 @@ namespace PurelySharp.Symbolic
 
         public bool UnknownDiagnosticsTruncated { get; }
 
+        public bool TargetSummariesTruncated { get; }
+
         public bool DiagnosticsTruncated { get; }
 
         public bool IsTruncated =>
@@ -4538,9 +4822,11 @@ namespace PurelySharp.Symbolic
             MaybeFactsTruncated ||
             UnknownFactsTruncated ||
             UnknownDiagnosticsTruncated ||
+            TargetSummariesTruncated ||
             DiagnosticsTruncated ||
             Diagnostics.Any(static diagnostic => diagnostic.EvidenceTruncated) ||
-            UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated);
+            UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
+            TargetSummaries.Any(static target => target.IsTruncated);
 
         internal static SymbolicCompactInvariantQueryView FromQueryView(
             SymbolicInvariantQueryView query,
@@ -4554,6 +4840,10 @@ namespace PurelySharp.Symbolic
             var unknownDiagnostics = SymbolicCompactProjection
                 .Take(query.UnknownDiagnostics, options.MaxConditions)
                 .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
+                .ToArray();
+            var targetSummaries = SymbolicCompactProjection
+                .Take(query.TargetSummaries, options.MaxConditions)
+                .Select(target => SymbolicCompactInvariantTargetSummary.FromSummary(target, options))
                 .ToArray();
             var diagnostics = SymbolicCompactProjection
                 .Take(query.Diagnostics, options.MaxConditions)
@@ -4569,6 +4859,8 @@ namespace PurelySharp.Symbolic
                 query.UnknownFactCount,
                 SymbolicCompactProjection.Take(query.UnknownFacts, options.MaxConditions),
                 unknownDiagnostics,
+                query.TargetSummaryCount,
+                targetSummaries,
                 query.DiagnosticCount,
                 diagnostics,
                 query.CandidateProgramPointCount,
@@ -4584,7 +4876,84 @@ namespace PurelySharp.Symbolic
                 query.MaybeFactCount > options.MaxConditions,
                 query.UnknownFactCount > options.MaxConditions,
                 query.UnknownDiagnostics.Count > options.MaxConditions,
+                query.TargetSummaryCount > targetSummaries.Length,
                 query.Diagnostics.Count > options.MaxConditions);
+        }
+    }
+
+    public sealed class SymbolicCompactInvariantTargetSummary
+    {
+        private SymbolicCompactInvariantTargetSummary(
+            string target,
+            string status,
+            string statusReason,
+            int mustFactCount,
+            IReadOnlyList<string> mustFacts,
+            int maybeFactCount,
+            IReadOnlyList<string> maybeFacts,
+            int unknownFactCount,
+            IReadOnlyList<string> unknownFacts,
+            bool mustFactsTruncated,
+            bool maybeFactsTruncated,
+            bool unknownFactsTruncated)
+        {
+            Target = target ?? string.Empty;
+            Status = status ?? string.Empty;
+            StatusReason = statusReason ?? string.Empty;
+            MustFactCount = mustFactCount;
+            MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
+            MaybeFactCount = maybeFactCount;
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            UnknownFactCount = unknownFactCount;
+            UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
+            MustFactsTruncated = mustFactsTruncated;
+            MaybeFactsTruncated = maybeFactsTruncated;
+            UnknownFactsTruncated = unknownFactsTruncated;
+        }
+
+        public string Target { get; }
+
+        public string Status { get; }
+
+        public string StatusReason { get; }
+
+        public int MustFactCount { get; }
+
+        public IReadOnlyList<string> MustFacts { get; }
+
+        public int MaybeFactCount { get; }
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public int UnknownFactCount { get; }
+
+        public IReadOnlyList<string> UnknownFacts { get; }
+
+        public bool MustFactsTruncated { get; }
+
+        public bool MaybeFactsTruncated { get; }
+
+        public bool UnknownFactsTruncated { get; }
+
+        internal bool IsTruncated => MustFactsTruncated || MaybeFactsTruncated || UnknownFactsTruncated;
+
+        internal static SymbolicCompactInvariantTargetSummary FromSummary(
+            SymbolicInvariantTargetSummary summary,
+            SymbolicCompactQueryOptions options)
+        {
+            return new SymbolicCompactInvariantTargetSummary(
+                summary.Target,
+                summary.Status.ToString(),
+                summary.StatusReason,
+                summary.MustFactCount,
+                SymbolicCompactProjection.Take(summary.MustFacts, options.MaxConditions),
+                summary.MaybeFactCount,
+                SymbolicCompactProjection.Take(summary.MaybeFacts, options.MaxConditions),
+                summary.UnknownFactCount,
+                SymbolicCompactProjection.Take(summary.UnknownFacts, options.MaxConditions),
+                summary.MustFactCount > options.MaxConditions,
+                summary.MaybeFactCount > options.MaxConditions,
+                summary.UnknownFactCount > options.MaxConditions);
         }
     }
 

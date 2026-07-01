@@ -635,6 +635,11 @@ namespace PurelySharp.Symbolic
 
                     break;
                 case AssignmentExpressionSyntax assignment:
+                    if (TryCreateCompoundAssignmentDivideByZeroCandidate(assignment, semanticModel, cancellationToken, out var compoundDivideCandidate))
+                    {
+                        yield return compoundDivideCandidate;
+                    }
+
                     if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken, out var arrayTypeMismatchCandidate))
                     {
                         yield return arrayTypeMismatchCandidate;
@@ -966,6 +971,35 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.OverflowException",
                 "definite_checked_integral_overflow");
+            return true;
+        }
+
+        private static bool TryCreateCompoundAssignmentDivideByZeroCandidate(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!assignment.IsKind(SyntaxKind.DivideAssignmentExpression) &&
+                !assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
+            {
+                return false;
+            }
+
+            var rightType = semanticModel.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType;
+            if (!IsThrowingDivideByZeroType(rightType) ||
+                !TryTranslateZeroCondition(assignment.Right, semanticModel, cancellationToken, out var trigger))
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                assignment,
+                SymbolicRuntimeHazardKind.DivideByZero,
+                trigger,
+                "System.DivideByZeroException",
+                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? "definite_modulo_by_zero" : "definite_divide_by_zero");
             return true;
         }
 
@@ -1919,6 +1953,9 @@ namespace PurelySharp.Symbolic
                     return true;
                 case SyntaxKind.MultiplyAssignmentExpression:
                     smtOperator = SmtIntegerBinaryOperator.Multiply;
+                    return true;
+                case SyntaxKind.DivideAssignmentExpression when minValue < 0:
+                    smtOperator = SmtIntegerBinaryOperator.Divide;
                     return true;
                 default:
                     return false;

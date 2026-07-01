@@ -406,6 +406,8 @@ static void PrintInvariantQuery(
         Console.WriteLine(label + " unknowns: " + string.Join("; ", query.UnknownFacts));
     }
 
+    PrintInvariantTargetSummaries(label, query.TargetSummaries);
+
     foreach (var diagnostic in query.Diagnostics)
     {
         Console.WriteLine(
@@ -420,6 +422,28 @@ static void PrintInvariantQuery(
                 string.Join("; ", diagnostic.Evidence) +
                 suffix);
         }
+    }
+}
+
+static void PrintInvariantTargetSummaries(
+    string label,
+    IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries)
+{
+    const int maxTextTargets = 16;
+    foreach (var target in targetSummaries.Take(maxTextTargets))
+    {
+        Console.WriteLine(
+            label + " target: " +
+            $"{target.Target} status={target.Status} " +
+            $"must={target.MustFactCount} maybe={target.MaybeFactCount} unknown={target.UnknownFactCount}");
+    }
+
+    if (targetSummaries.Count > maxTextTargets)
+    {
+        Console.WriteLine(
+            label + " target summaries truncated: " +
+            (targetSummaries.Count - maxTextTargets).ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            " omitted");
     }
 }
 
