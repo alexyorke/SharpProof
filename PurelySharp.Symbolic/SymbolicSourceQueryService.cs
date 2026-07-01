@@ -655,8 +655,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
-                GetContainingMethodName(query.Node),
-                GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
         }
 
         public SymbolicLineQueryResult QuerySyntaxTreeLine(
@@ -730,8 +730,8 @@ namespace PurelySharp.Symbolic
                         nodeSourceSpan.StartColumn,
                         nodeSourceSpan.EndLine,
                         nodeSourceSpan.EndColumn,
-                        GetContainingMethodName(query.Node),
-                        GetProgramPointKind(query.Node));
+                        SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
+                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
                 })
                 .ToArray();
 
@@ -825,8 +825,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
-                GetContainingMethodName(query.Node),
-                GetProgramPointKind(query.Node),
+                SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
                 line,
                 column,
                 position,
@@ -905,8 +905,8 @@ namespace PurelySharp.Symbolic
                         nodeSourceSpan.StartColumn,
                         nodeSourceSpan.EndLine,
                         nodeSourceSpan.EndColumn,
-                        GetContainingMethodName(query.Node),
-                        GetProgramPointKind(query.Node));
+                        SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
+                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
                 })
                 .ToArray();
             var startLineColumn = SymbolicSourceLocation.GetLineAndColumn(
@@ -1066,8 +1066,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
-                GetContainingMethodName(query.Node),
-                GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -1103,7 +1103,7 @@ namespace PurelySharp.Symbolic
                 query.Node.SpanStart,
                 query.Node.Kind().ToString(),
                 query.Analysis,
-                GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTreeAtPosition(
@@ -1142,7 +1142,7 @@ namespace PurelySharp.Symbolic
                 query.Node.SpanStart,
                 query.Node.Kind().ToString(),
                 query.Analysis,
-                GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
         }
 
         public SymbolicConditionProofResult ProveConditionAtFile(
@@ -1616,40 +1616,6 @@ namespace PurelySharp.Symbolic
             }
 
             return textLine.Start + zeroBasedColumn;
-        }
-
-        private static string? GetContainingMethodName(SyntaxNode node)
-        {
-            foreach (var ancestor in node.AncestorsAndSelf())
-            {
-                switch (ancestor)
-                {
-                    case MethodDeclarationSyntax method:
-                        return method.Identifier.ValueText;
-                    case LocalFunctionStatementSyntax localFunction:
-                        return localFunction.Identifier.ValueText;
-                    case ConstructorDeclarationSyntax constructor:
-                        return constructor.Identifier.ValueText;
-                    case DestructorDeclarationSyntax destructor:
-                        return "~" + destructor.Identifier.ValueText;
-                    case OperatorDeclarationSyntax operatorDeclaration:
-                        return "operator " + operatorDeclaration.OperatorToken.ValueText;
-                    case ConversionOperatorDeclarationSyntax conversionOperator:
-                        return "operator " + conversionOperator.Type;
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetProgramPointKind(SyntaxNode node)
-        {
-            return node switch
-            {
-                StatementSyntax => SymbolicProgramPointKinds.Statement,
-                ExpressionSyntax => SymbolicProgramPointKinds.Expression,
-                _ => SymbolicProgramPointKinds.Other,
-            };
         }
 
         private sealed class ProgramPointQueryContext

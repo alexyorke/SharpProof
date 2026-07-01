@@ -451,7 +451,7 @@ namespace PurelySharp.Symbolic
                 span.StartColumn,
                 span.EndLine,
                 span.EndColumn,
-                GetContainingMethodName(node),
+                SymbolicProgramPointMetadata.GetContainingMethodName(node),
                 SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()));
         }
 
@@ -508,30 +508,6 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.StartColumn,
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn);
-        }
-
-        private static string? GetContainingMethodName(SyntaxNode node)
-        {
-            foreach (var ancestor in node.AncestorsAndSelf())
-            {
-                switch (ancestor)
-                {
-                    case MethodDeclarationSyntax method:
-                        return method.Identifier.ValueText;
-                    case LocalFunctionStatementSyntax localFunction:
-                        return localFunction.Identifier.ValueText;
-                    case ConstructorDeclarationSyntax constructor:
-                        return constructor.Identifier.ValueText;
-                    case DestructorDeclarationSyntax destructor:
-                        return "~" + destructor.Identifier.ValueText;
-                    case OperatorDeclarationSyntax operatorDeclaration:
-                        return "operator " + operatorDeclaration.OperatorToken.ValueText;
-                    case ConversionOperatorDeclarationSyntax conversionOperator:
-                        return "operator " + conversionOperator.Type;
-                }
-            }
-
-            return null;
         }
 
         private SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazards(
