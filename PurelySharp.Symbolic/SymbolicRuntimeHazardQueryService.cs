@@ -121,7 +121,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SymbolicRuntimeHazardQueryOptions? options = null)
         {
-            var (syntaxTree, compilation) = CreateCompilation(sourceText, filePath, references, cancellationToken);
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+                sourceText,
+                filePath,
+                "PurelySharp.Symbolic.RuntimeHazards.cs",
+                "PurelySharp.Symbolic.RuntimeHazards",
+                references,
+                cancellationToken);
             return QuerySyntaxTreeRuntimeHazards(
                 syntaxTree,
                 compilation,
@@ -139,7 +145,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SymbolicRuntimeHazardQueryOptions? options = null)
         {
-            var (syntaxTree, compilation) = CreateCompilation(sourceText, filePath, references, cancellationToken);
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+                sourceText,
+                filePath,
+                "PurelySharp.Symbolic.RuntimeHazards.cs",
+                "PurelySharp.Symbolic.RuntimeHazards",
+                references,
+                cancellationToken);
             return QuerySyntaxTreeRuntimeHazardsLine(
                 syntaxTree,
                 compilation,
@@ -159,7 +171,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SymbolicRuntimeHazardQueryOptions? options = null)
         {
-            var (syntaxTree, compilation) = CreateCompilation(sourceText, filePath, references, cancellationToken);
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+                sourceText,
+                filePath,
+                "PurelySharp.Symbolic.RuntimeHazards.cs",
+                "PurelySharp.Symbolic.RuntimeHazards",
+                references,
+                cancellationToken);
             return QuerySyntaxTreeRuntimeHazardsSpan(
                 syntaxTree,
                 compilation,
@@ -503,21 +521,6 @@ namespace PurelySharp.Symbolic
             }
 
             return (SymbolicRuntimeHazardStatus.Unknown, proven.Reason);
-        }
-
-        private static (SyntaxTree SyntaxTree, Compilation Compilation) CreateCompilation(
-            string sourceText,
-            string filePath,
-            IEnumerable<MetadataReference>? references,
-            CancellationToken cancellationToken)
-        {
-            return SymbolicSourceCompilation.Create(
-                sourceText,
-                filePath,
-                "PurelySharp.Symbolic.RuntimeHazards.cs",
-                "PurelySharp.Symbolic.RuntimeHazards",
-                references,
-                cancellationToken);
         }
 
     }
