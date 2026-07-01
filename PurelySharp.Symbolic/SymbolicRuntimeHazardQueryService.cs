@@ -511,28 +511,13 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references,
             CancellationToken cancellationToken)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.RuntimeHazards.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            return SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? SymbolicSourceQueryService.GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.RuntimeHazards.cs",
                 "PurelySharp.Symbolic.RuntimeHazards",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            return (syntaxTree, compilation);
+                references,
+                cancellationToken);
         }
 
     }

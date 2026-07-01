@@ -358,27 +358,13 @@ namespace PurelySharp.Symbolic
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTree(
                 syntaxTree,
                 compilation,
@@ -398,27 +384,13 @@ namespace PurelySharp.Symbolic
             SmtAnalysisService? smtAnalysis = null,
             IEnumerable<string>? impliedConditions = null)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeAtPosition(
                 syntaxTree,
                 compilation,
@@ -439,27 +411,13 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints = false,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeLine(
                 syntaxTree,
                 compilation,
@@ -483,27 +441,13 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints = false,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeLinePoint(
                 syntaxTree,
                 compilation,
@@ -528,27 +472,13 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints = false,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeSpan(
                 syntaxTree,
                 compilation,
@@ -575,27 +505,13 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints = false,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeLineSpan(
                 syntaxTree,
                 compilation,
@@ -620,27 +536,13 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints = false,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return QuerySyntaxTreeAllLines(
                 syntaxTree,
                 compilation,
@@ -660,27 +562,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return AnalyzeSyntaxTree(
                 syntaxTree,
                 compilation,
@@ -698,27 +586,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return AnalyzeSyntaxTreeAtPosition(
                 syntaxTree,
                 compilation,
@@ -1283,27 +1157,13 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references = null,
             CancellationToken cancellationToken = default)
         {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = "PurelySharp.Symbolic.Query.cs";
-            }
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
                 sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
-            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query.cs",
                 "PurelySharp.Symbolic.Query",
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                references,
+                cancellationToken);
             return ProveConditionAtSyntaxTree(
                 syntaxTree,
                 compilation,
