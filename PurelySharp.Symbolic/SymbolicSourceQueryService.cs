@@ -973,7 +973,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(compilation));
             }
 
-            var sourceSpan = GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
+            var sourceSpan = SymbolicSourceLocation.GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
             var nodes = FindQueryNodesInSpan(
@@ -1597,7 +1597,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             bool includeExpressionProgramPoints)
         {
-            var lineSpan = GetLineSpan(syntaxTree, line, cancellationToken);
+            var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
             return FindQueryNodesInSpan(root, lineSpan, includeExpressionProgramPoints);
         }
 
@@ -1728,50 +1728,6 @@ namespace PurelySharp.Symbolic
             }
 
             return textLine.Start + zeroBasedColumn;
-        }
-
-        private static TextSpan GetLineSpan(
-            SyntaxTree syntaxTree,
-            int line,
-            CancellationToken cancellationToken)
-        {
-            if (line < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
-            }
-
-            var text = syntaxTree.GetText(cancellationToken);
-            if (line > text.Lines.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
-            }
-
-            return text.Lines[line - 1].Span;
-        }
-
-        private static TextSpan GetSourceSpan(
-            SyntaxTree syntaxTree,
-            int spanStart,
-            int spanEnd,
-            CancellationToken cancellationToken)
-        {
-            var text = syntaxTree.GetText(cancellationToken);
-            if (spanStart < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(spanStart), "--span-start must be zero or greater.");
-            }
-
-            if (spanEnd < spanStart)
-            {
-                throw new ArgumentOutOfRangeException(nameof(spanEnd), "--span-end cannot be less than --span-start.");
-            }
-
-            if (spanEnd > text.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(spanEnd), "--span-end exceeds the source text length.");
-            }
-
-            return TextSpan.FromBounds(spanStart, spanEnd);
         }
 
         private static LineColumn GetLineAndColumn(
