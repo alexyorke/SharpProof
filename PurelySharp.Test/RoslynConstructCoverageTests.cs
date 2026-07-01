@@ -72,6 +72,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuleRegistry_AlwaysPureOperationsUseDeclarativeDescriptors()
+        {
+            var expectedDeclarativeKinds = new[]
+            {
+                OperationKind.InstanceReference,
+                OperationKind.DefaultValue,
+                OperationKind.Literal,
+                OperationKind.TypeOf,
+                OperationKind.NameOf,
+                OperationKind.ConstantPattern,
+                OperationKind.DeclarationPattern,
+                OperationKind.DiscardPattern,
+                OperationKind.Branch
+            };
+
+            var declarativeKinds = GetRegisteredRuleOperationKinds()
+                .Where(static item => item.RuleName == "DeclarativePureOperationRule")
+                .Select(static item => item.OperationKind)
+                .ToArray();
+
+            Assert.That(declarativeKinds, Is.EquivalentTo(expectedDeclarativeKinds));
+        }
+
+        [Test]
         public void AnalyzerActionSurfaceCoverageTests()
         {
             var surfaces = RoslynShapeManifest.ActionSurfaceEntries.ToImmutableDictionary(surface => surface.Name, StringComparer.Ordinal);

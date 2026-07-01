@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {
@@ -24,7 +25,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new ParameterReferencePurityRule(),
 				new LocalReferencePurityRule(),
 				new FieldReferencePurityRule(),
-				new InstanceReferencePurityRule(),
+				CreateAlwaysPureRule(OperationKind.InstanceReference, "InstRefRule", "InstanceReference"),
 				
 				// Object/Array creation and initialization
 				new ObjectCreationPurityRule(),
@@ -46,21 +47,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new RangeOperationPurityRule(),
 				new ImplicitIndexerReferencePurityRule(),
 				new ConversionPurityRule(),
-				new DefaultValuePurityRule(),
+				CreateAlwaysPureRule(OperationKind.DefaultValue, "DefaultValueRule", "DefaultValue operation", includeSyntaxInLog: false),
 				new InterpolatedStringPurityRule(),
 				new PropertyReferencePurityRule(),
-				new LiteralPurityRule(),
+				CreateAlwaysPureRule(OperationKind.Literal, "LiteralRule", "Literal operation"),
 				new TuplePurityRule(),
-				new TypeOfPurityRule(),
-				new NameOfPurityRule(),
+				CreateAlwaysPureRule(OperationKind.TypeOf, "TypeOfRule", "TypeOf operation"),
+				CreateAlwaysPureRule(OperationKind.NameOf, "NameOfRule", "NameOf operation"),
 				new Utf8StringLiteralPurityRule(),
 				new SizeOfPurityRule(),
 				
 				// Patterns
 				new BinaryPatternPurityRule(),
-				new ConstantPatternPurityRule(),
-				new DeclarationPatternPurityRule(),
-				new DiscardPatternPurityRule(),
+				CreateAlwaysPureRule(OperationKind.ConstantPattern, "ConstantPatternRule", "Constant pattern"),
+				CreateAlwaysPureRule(OperationKind.DeclarationPattern, "DeclarationPatternRule", "Declaration pattern"),
+				CreateAlwaysPureRule(OperationKind.DiscardPattern, "DiscardPatternRule", "Discard pattern"),
 				new NegatedPatternPurityRule(),
 				new ListPatternPurityRule(),
 				new PropertySubpatternPurityRule(),
@@ -72,7 +73,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new StructuralPurityRule(),
 				
 				// Control Flow
-				new BranchPurityRule(),
+				CreateAlwaysPureRule(OperationKind.Branch, "BranchRule", "Branch operation"),
 				new SwitchStatementPurityRule(),
 				new SwitchCasePurityRule(),
 				new SwitchExpressionPurityRule(),
@@ -89,6 +90,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new LocalFunctionOperationPurityRule(),
 				new WithOperationPurityRule()
 			);
+		}
+
+		private static IPurityRule CreateAlwaysPureRule(
+			OperationKind operationKind,
+			string ruleName,
+			string operationDescription,
+			bool includeSyntaxInLog = true)
+		{
+			return new DeclarativePureOperationRule(new PureOperationRuleDescriptor(
+				operationKind,
+				ruleName,
+				operationDescription,
+				includeSyntaxInLog));
 		}
 	}
 }
