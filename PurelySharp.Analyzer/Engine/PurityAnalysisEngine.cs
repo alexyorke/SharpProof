@@ -4427,124 +4427,13 @@ namespace PurelySharp.Analyzer.Engine
             Func<ISymbol, int> getSymbolVersion,
             out SmtFormula formula)
         {
-            valueExpression = UnwrapSmtFactExpression(valueExpression);
-            var valueTypeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
-            var valueType = valueTypeInfo.ConvertedType ?? valueTypeInfo.Type;
-            if (valueType is IArrayTypeSymbol { Rank: 1 })
-            {
-                return TryCreateArrayLengthValueFormula(valueExpression, semanticModel, cancellationToken, getSymbolVersion, out formula);
-            }
-
-            if (valueType?.SpecialType == SpecialType.System_String)
-            {
-                return TryCreateStringLengthValueFormula(valueExpression, semanticModel, cancellationToken, getSymbolVersion, out formula);
-            }
-
-            formula = null!;
-            return false;
-        }
-
-        private static bool TryCreateArrayLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            Func<ISymbol, int> getSymbolVersion,
-            out SmtFormula formula)
-        {
-            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation)
-            {
-                if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
-                    arrayCreation.Type.RankSpecifiers[0].Sizes.Count == 1 &&
-                    !arrayCreation.Type.RankSpecifiers[0].Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
-                    CSharpConditionToFormula.TryTranslateValue(
-                        arrayCreation.Type.RankSpecifiers[0].Sizes[0],
-                        semanticModel,
-                        cancellationToken,
-                        out var sizeFormula,
-                        getSymbolVersion) &&
-                    sizeFormula is { Kind: SmtValueKind.Int })
-                {
-                    formula = sizeFormula;
-                    return true;
-                }
-
-                if (arrayCreation.Initializer != null)
-                {
-                    formula = new SmtIntegerConstant(arrayCreation.Initializer.Expressions.Count);
-                    return true;
-                }
-            }
-
-            if (valueExpression is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
-            {
-                formula = new SmtIntegerConstant(implicitArrayCreation.Initializer.Expressions.Count);
-                return true;
-            }
-
-            if (TryCreateCollectionExpressionLengthFormula(valueExpression, out formula))
-            {
-                return true;
-            }
-
-            if (IsArrayEmptyInvocation(valueExpression, semanticModel, cancellationToken))
-            {
-                formula = new SmtIntegerConstant(0);
-                return true;
-            }
-
-            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, getSymbolVersion, out formula);
-        }
-
-        private static bool TryCreateStringLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            Func<ISymbol, int> getSymbolVersion,
-            out SmtFormula formula)
-        {
-            if (CSharpConditionToFormula.TryGetKnownStringLength(valueExpression, semanticModel, cancellationToken, out var stringLength))
-            {
-                formula = new SmtIntegerConstant(stringLength);
-                return true;
-            }
-
-            if (CSharpConditionToFormula.TryTranslateStringValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var stringFormula,
-                    getSymbolVersion) &&
-                stringFormula != null)
-            {
-                formula = new SmtStringLengthTerm(stringFormula);
-                return true;
-            }
-
-            formula = null!;
-            return false;
-        }
-
-        private static bool TryCreateReferenceLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            Func<ISymbol, int> getSymbolVersion,
-            out SmtFormula formula)
-        {
-            if (CSharpConditionToFormula.TryTranslateValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var receiverFormula,
-                    getSymbolVersion) &&
-                receiverFormula is SmtVariable { Kind: SmtValueKind.Reference })
-            {
-                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
-                return true;
-            }
-
-            formula = null!;
-            return false;
+            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth: 0);
         }
 
         private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
@@ -4559,21 +4448,6 @@ namespace PurelySharp.Analyzer.Engine
                     targetLengthFormula,
                     UnwrapSmtFactExpression(valueExpression),
                     out fact);
-        }
-
-        private static bool TryCreateCollectionExpressionLengthFormula(
-            ExpressionSyntax valueExpression,
-            out SmtFormula formula)
-        {
-            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
-                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = new SmtIntegerConstant(collectionExpression.Elements.Count);
-            return true;
         }
 
         private static ExpressionSyntax UnwrapSmtFactExpression(ExpressionSyntax expression)
@@ -4595,20 +4469,6 @@ namespace PurelySharp.Analyzer.Engine
 
                 return expression;
             }
-        }
-
-        private static bool IsArrayEmptyInvocation(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return valueExpression is InvocationExpressionSyntax invocation &&
-                semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol
-                {
-                    Name: "Empty",
-                    IsStatic: true,
-                    ContainingType.SpecialType: SpecialType.System_Array
-                };
         }
 
         private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)

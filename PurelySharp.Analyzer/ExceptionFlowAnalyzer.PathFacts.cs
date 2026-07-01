@@ -1582,7 +1582,14 @@ namespace PurelySharp.Analyzer
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
                 if (!SymbolicFactFactory.TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
-                    !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                    !CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                        valueExpression,
+                        dimension,
+                        semanticModel,
+                        cancellationToken,
+                        out var valueDimensionLength,
+                        getSymbolVersion: null,
+                        inlineDepth: 0))
                 {
                     continue;
                 }
@@ -1650,7 +1657,14 @@ namespace PurelySharp.Analyzer
             for (var dimension = 0; dimension < targetArrayType.Rank; dimension++)
             {
                 if (!TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength) ||
-                    !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                    !CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                        valueExpression,
+                        dimension,
+                        semanticModel,
+                        cancellationToken,
+                        out var valueDimensionLength,
+                        getSymbolVersion: null,
+                        inlineDepth: 0))
                 {
                     continue;
                 }
@@ -1660,39 +1674,6 @@ namespace PurelySharp.Analyzer
                     targetDimensionLength,
                     valueDimensionLength));
             }
-        }
-
-        private static bool TryCreateArrayDimensionLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            int dimension,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            valueExpression = UnwrapFactExpression(valueExpression);
-            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation &&
-                TryGetExplicitArraySizeExpression(arrayCreation, dimension, out var sizeExpression) &&
-                CSharpConditionToFormula.TryTranslateValue(
-                    sizeExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var sizeFormula,
-                    getSymbolVersion: null) &&
-                sizeFormula is { Kind: SmtValueKind.Int })
-            {
-                formula = sizeFormula;
-                return true;
-            }
-
-            var sourceSymbol = GetLocalOrParameterSymbol(valueExpression, semanticModel, cancellationToken);
-            if (sourceSymbol != null &&
-                TryCreateArrayDimensionLengthFormula(sourceSymbol, dimension, out formula))
-            {
-                return true;
-            }
-
-            formula = null!;
-            return false;
         }
 
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
@@ -1707,24 +1688,6 @@ namespace PurelySharp.Analyzer
                     }
                 }
             }
-        }
-
-        private static bool TryGetExplicitArraySizeExpression(
-            ArrayCreationExpressionSyntax arrayCreation,
-            int dimension,
-            out ExpressionSyntax sizeExpression)
-        {
-            if (dimension >= 0 &&
-                arrayCreation.Type.RankSpecifiers.Count == 1 &&
-                arrayCreation.Type.RankSpecifiers[0].Sizes.Count > dimension &&
-                !arrayCreation.Type.RankSpecifiers[0].Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression))
-            {
-                sizeExpression = arrayCreation.Type.RankSpecifiers[0].Sizes[dimension];
-                return true;
-            }
-
-            sizeExpression = null!;
-            return false;
         }
 
         private static bool TryGetThrowGuardedValue(
