@@ -231,6 +231,59 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesArrayAsSpanAndAsMemoryResultLengths()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int Tail(int[] values, int start)
+    {
+        if (values != null && start >= 0 && start <= values.Length)
+        {
+            return values.AsSpan(start).Length;
+        }
+
+        return 0;
+    }
+
+    public int Window(int[] values, int start, int length)
+    {
+        if (values != null && start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.AsMemory(start, length).Length;
+        }
+
+        return 0;
+    }
+
+    public int RangeWindow(int[] values)
+    {
+        if (values != null && values.Length >= 2)
+        {
+            return values.AsSpan(1..^1).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return values.AsSpan(start).Length;",
+                "values.AsSpan(start).Length == values.Length - start");
+            AssertConditionProven(
+                source,
+                "return values.AsMemory(start, length).Length;",
+                "values.AsMemory(start, length).Length == length");
+            AssertConditionProven(
+                source,
+                "return values.AsSpan(1..^1).Length;",
+                "values.AsSpan(1..^1).Length == values.Length - 2");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesListIndexerRangeThroughCountGuard()
         {
             const string source = @"

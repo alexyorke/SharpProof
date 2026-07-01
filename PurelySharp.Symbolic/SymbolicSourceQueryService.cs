@@ -1968,7 +1968,8 @@ namespace PurelySharp.Symbolic
                 MergedPathFacts,
                 Reachability,
                 ProgramPointSummary.ProofOutcomes,
-                SmtDiagnostics);
+                SmtDiagnostics,
+                ProgramPoints);
         }
 
         public string FilePath { get; }
@@ -2080,7 +2081,8 @@ namespace PurelySharp.Symbolic
                 MergedPathFacts,
                 Reachability,
                 ProgramPointSummary.ProofOutcomes,
-                SmtDiagnostics);
+                SmtDiagnostics,
+                ProgramPoints);
         }
 
         public string FilePath { get; }
@@ -2195,7 +2197,8 @@ namespace PurelySharp.Symbolic
                 MergedPathFacts,
                 Reachability,
                 ProgramPointSummary.ProofOutcomes,
-                SmtDiagnostics);
+                SmtDiagnostics,
+                programPoints);
         }
 
         public string FilePath { get; }
@@ -2269,6 +2272,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<string> unknownFacts,
             IReadOnlyList<SymbolicConservativeUnknownDiagnostic> unknownDiagnostics,
             IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
+            IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries,
             int candidateProgramPointCount,
             int unreachableProgramPointCount,
             bool isUnreachable,
@@ -2283,6 +2287,7 @@ namespace PurelySharp.Symbolic
             UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
             UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
             TargetSummaries = targetSummaries ?? throw new ArgumentNullException(nameof(targetSummaries));
+            TargetPathSummaries = targetPathSummaries ?? throw new ArgumentNullException(nameof(targetPathSummaries));
             CandidateProgramPointCount = candidateProgramPointCount;
             UnreachableProgramPointCount = unreachableProgramPointCount;
             IsUnreachable = isUnreachable;
@@ -2316,6 +2321,10 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicInvariantTargetSummary> TargetSummaries { get; }
 
         public int TargetSummaryCount => TargetSummaries.Count;
+
+        public IReadOnlyList<SymbolicInvariantTargetPathSummary> TargetPathSummaries { get; }
+
+        public int TargetPathSummaryCount => TargetPathSummaries.Count;
 
         public int CandidateProgramPointCount { get; }
 
@@ -2368,6 +2377,7 @@ namespace PurelySharp.Symbolic
                     .ToArray(),
                 Array.Empty<SymbolicConservativeUnknownDiagnostic>(),
                 SymbolicInvariantTargetSummary.FromPoint(result),
+                SymbolicInvariantTargetPathSummary.FromProgramPoints(new[] { result }),
                 result.Reachability == SymbolicReachability.Unreachable ? 0 : 1,
                 result.Reachability == SymbolicReachability.Unreachable ? 1 : 0,
                 result.Reachability == SymbolicReachability.Unreachable,
@@ -2381,7 +2391,8 @@ namespace PurelySharp.Symbolic
             SymbolicMergedPathFacts mergedPathFacts,
             SymbolicReachabilitySummary reachability,
             SymbolicProofOutcomeSummary proofOutcomes,
-            SymbolicSmtDiagnostics smtDiagnostics)
+            SymbolicSmtDiagnostics smtDiagnostics,
+            IEnumerable<SymbolicSourceQueryResult>? programPoints = null)
         {
             if (invariant == null)
             {
@@ -2401,6 +2412,7 @@ namespace PurelySharp.Symbolic
                 mergedPathFacts.ConservativeUnknowns,
                 mergedPathFacts.ConservativeUnknownDiagnostics,
                 SymbolicInvariantTargetSummary.FromMergedPathFacts(invariant, mergedPathFacts),
+                SymbolicInvariantTargetPathSummary.FromProgramPoints(programPoints ?? Array.Empty<SymbolicSourceQueryResult>()),
                 mergedPathFacts.CandidateProgramPointCount,
                 mergedPathFacts.UnreachableProgramPointCount,
                 mergedPathFacts.IsUnreachable,
@@ -2849,6 +2861,289 @@ namespace PurelySharp.Symbolic
                 return facts
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
+            }
+        }
+    }
+
+    public sealed class SymbolicInvariantTargetPathSummary
+    {
+        public const int DefaultMaxConditions = 8;
+
+        private SymbolicInvariantTargetPathSummary(
+            string target,
+            int pathConditionCount,
+            int smtConditionCount,
+            int conservativeUnknownCount,
+            int programPointCount,
+            int reachableProgramPointCount,
+            int proofTotalCount,
+            int proofUnknownCount,
+            int proofProvenTrueCount,
+            int proofProvenFalseCount,
+            int proofUnreachableCount,
+            IReadOnlyList<string> conditions,
+            bool conditionsTruncated)
+        {
+            Target = string.IsNullOrWhiteSpace(target) ? "path" : target;
+            PathConditionCount = pathConditionCount;
+            SmtConditionCount = smtConditionCount;
+            ConservativeUnknownCount = conservativeUnknownCount;
+            ProgramPointCount = programPointCount;
+            ReachableProgramPointCount = reachableProgramPointCount;
+            ProofTotalCount = proofTotalCount;
+            ProofUnknownCount = proofUnknownCount;
+            ProofProvenTrueCount = proofProvenTrueCount;
+            ProofProvenFalseCount = proofProvenFalseCount;
+            ProofUnreachableCount = proofUnreachableCount;
+            Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
+            ConditionsTruncated = conditionsTruncated;
+            StatusReason = ResolveStatusReason();
+            ReasonCode = ResolveReasonCode();
+            Summary = CreateSummary();
+        }
+
+        public string Target { get; }
+
+        public int PathConditionCount { get; }
+
+        public int SmtConditionCount { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public int ProgramPointCount { get; }
+
+        public int ReachableProgramPointCount { get; }
+
+        public int ProofTotalCount { get; }
+
+        public int ProofUnknownCount { get; }
+
+        public int ProofProvenTrueCount { get; }
+
+        public int ProofProvenFalseCount { get; }
+
+        public int ProofUnreachableCount { get; }
+
+        public IReadOnlyList<string> Conditions { get; }
+
+        public bool ConditionsTruncated { get; }
+
+        public bool HasPathConditions => PathConditionCount != 0;
+
+        public bool HasProofs => ProofTotalCount != 0;
+
+        public bool HasUnknownProofs => ProofUnknownCount != 0;
+
+        public string StatusReason { get; }
+
+        public string ReasonCode { get; }
+
+        public string Summary { get; }
+
+        internal static IReadOnlyList<SymbolicInvariantTargetPathSummary> FromProgramPoints(
+            IEnumerable<SymbolicSourceQueryResult> programPoints)
+        {
+            if (programPoints == null)
+            {
+                throw new ArgumentNullException(nameof(programPoints));
+            }
+
+            var builders = new Dictionary<string, TargetPathBuilder>(StringComparer.Ordinal);
+            foreach (var point in programPoints)
+            {
+                if (point == null)
+                {
+                    continue;
+                }
+
+                var pointTargets = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var condition in point.PathConditions)
+                {
+                    var builder = GetBuilder(builders, condition.Target);
+                    builder.AddCondition(condition);
+                    pointTargets.Add(builder.Target);
+                }
+
+                foreach (var proof in point.ConditionProofs)
+                {
+                    var builder = GetBuilder(builders, proof.Target);
+                    builder.AddProof(proof);
+                    pointTargets.Add(builder.Target);
+                }
+
+                foreach (var target in pointTargets)
+                {
+                    GetBuilder(builders, target).AddProgramPoint(point.Reachability);
+                }
+            }
+
+            return builders.Values
+                .OrderBy(static builder => builder.Target, StringComparer.Ordinal)
+                .Select(static builder => builder.ToSummary())
+                .ToArray();
+        }
+
+        private string ResolveStatusReason()
+        {
+            if (ProofUnknownCount != 0)
+            {
+                return "target_has_unknown_proofs";
+            }
+
+            if (PathConditionCount != 0)
+            {
+                return "target_has_path_conditions";
+            }
+
+            if (ProofTotalCount != 0)
+            {
+                return "target_has_proofs";
+            }
+
+            return "target_has_no_path_conditions";
+        }
+
+        private string ResolveReasonCode()
+        {
+            if (ProofUnknownCount != 0)
+            {
+                return "PS-SYM-TARGET-PROOF-UNKNOWN";
+            }
+
+            if (PathConditionCount != 0)
+            {
+                return "PS-SYM-TARGET-PATH-CONDITIONS";
+            }
+
+            if (ProofTotalCount != 0)
+            {
+                return "PS-SYM-TARGET-PROOFS";
+            }
+
+            return "PS-SYM-TARGET-NO-PATH-CONDITIONS";
+        }
+
+        private string CreateSummary()
+        {
+            if (ProofUnknownCount != 0)
+            {
+                return "This target has path facts or proof requests with unresolved bounded-SMT outcomes.";
+            }
+
+            if (PathConditionCount != 0)
+            {
+                return "This target has source-location path conditions available for invariant queries.";
+            }
+
+            if (ProofTotalCount != 0)
+            {
+                return "This target appears in proof requests, but no direct path conditions were recorded for it.";
+            }
+
+            return "No path conditions or proof requests were recorded for this target.";
+        }
+
+        private static TargetPathBuilder GetBuilder(
+            Dictionary<string, TargetPathBuilder> builders,
+            string? target)
+        {
+            var normalizedTarget = string.IsNullOrWhiteSpace(target) ? "path" : target!.Trim();
+            if (!builders.TryGetValue(normalizedTarget, out var builder))
+            {
+                builder = new TargetPathBuilder(normalizedTarget);
+                builders.Add(normalizedTarget, builder);
+            }
+
+            return builder;
+        }
+
+        private sealed class TargetPathBuilder
+        {
+            private readonly List<string> _conditions = new();
+            private int _pathConditionCount;
+            private int _smtConditionCount;
+            private int _conservativeUnknownCount;
+            private int _programPointCount;
+            private int _reachableProgramPointCount;
+            private int _proofTotalCount;
+            private int _proofUnknownCount;
+            private int _proofProvenTrueCount;
+            private int _proofProvenFalseCount;
+            private int _proofUnreachableCount;
+
+            public TargetPathBuilder(string target)
+            {
+                Target = target;
+            }
+
+            public string Target { get; }
+
+            public void AddCondition(SymbolicInvariantCondition condition)
+            {
+                _pathConditionCount++;
+                if (condition.HasSmtFormula)
+                {
+                    _smtConditionCount++;
+                }
+
+                if (condition.IsConservativeUnknown)
+                {
+                    _conservativeUnknownCount++;
+                }
+
+                if (_conditions.Count < DefaultMaxConditions &&
+                    !string.IsNullOrWhiteSpace(condition.Text) &&
+                    !_conditions.Contains(condition.Text, StringComparer.Ordinal))
+                {
+                    _conditions.Add(condition.Text);
+                }
+            }
+
+            public void AddProof(SymbolicConditionProofResult proof)
+            {
+                _proofTotalCount++;
+                switch (proof.TruthValue)
+                {
+                    case SymbolicTruthValue.Unknown:
+                        _proofUnknownCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenTrue:
+                        _proofProvenTrueCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenFalse:
+                        _proofProvenFalseCount++;
+                        break;
+                    case SymbolicTruthValue.Unreachable:
+                        _proofUnreachableCount++;
+                        break;
+                }
+            }
+
+            public void AddProgramPoint(SymbolicReachability reachability)
+            {
+                _programPointCount++;
+                if (reachability == SymbolicReachability.Reachable)
+                {
+                    _reachableProgramPointCount++;
+                }
+            }
+
+            public SymbolicInvariantTargetPathSummary ToSummary()
+            {
+                return new SymbolicInvariantTargetPathSummary(
+                    Target,
+                    _pathConditionCount,
+                    _smtConditionCount,
+                    _conservativeUnknownCount,
+                    _programPointCount,
+                    _reachableProgramPointCount,
+                    _proofTotalCount,
+                    _proofUnknownCount,
+                    _proofProvenTrueCount,
+                    _proofProvenFalseCount,
+                    _proofUnreachableCount,
+                    _conditions.ToArray(),
+                    _pathConditionCount > _conditions.Count);
             }
         }
     }
@@ -4070,6 +4365,7 @@ namespace PurelySharp.Symbolic
             return result.ConservativeInvariant.Targets
                 .Concat(result.ObservedInvariant.Targets)
                 .Concat(result.ConditionProofs.Select(static proof => proof.Target))
+                .Concat(result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target))
                 .Where(static target => IsSummaryTarget(target))
                 .Where(static target => !string.IsNullOrWhiteSpace(target))
                 .Distinct(StringComparer.Ordinal)
@@ -4749,6 +5045,8 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> unknownDiagnostics,
             int targetSummaryCount,
             IReadOnlyList<SymbolicCompactInvariantTargetSummary> targetSummaries,
+            int targetPathSummaryCount,
+            IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> targetPathSummaries,
             int diagnosticCount,
             IReadOnlyList<SymbolicCompactInvariantQueryDiagnostic> diagnostics,
             int candidateProgramPointCount,
@@ -4765,6 +5063,7 @@ namespace PurelySharp.Symbolic
             bool unknownFactsTruncated,
             bool unknownDiagnosticsTruncated,
             bool targetSummariesTruncated,
+            bool targetPathSummariesTruncated,
             bool diagnosticsTruncated)
         {
             Text = text ?? string.Empty;
@@ -4778,6 +5077,8 @@ namespace PurelySharp.Symbolic
             UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
             TargetSummaryCount = targetSummaryCount;
             TargetSummaries = targetSummaries ?? throw new ArgumentNullException(nameof(targetSummaries));
+            TargetPathSummaryCount = targetPathSummaryCount;
+            TargetPathSummaries = targetPathSummaries ?? throw new ArgumentNullException(nameof(targetPathSummaries));
             DiagnosticCount = diagnosticCount;
             Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
             CandidateProgramPointCount = candidateProgramPointCount;
@@ -4794,6 +5095,7 @@ namespace PurelySharp.Symbolic
             UnknownFactsTruncated = unknownFactsTruncated;
             UnknownDiagnosticsTruncated = unknownDiagnosticsTruncated;
             TargetSummariesTruncated = targetSummariesTruncated;
+            TargetPathSummariesTruncated = targetPathSummariesTruncated;
             DiagnosticsTruncated = diagnosticsTruncated;
         }
 
@@ -4818,6 +5120,10 @@ namespace PurelySharp.Symbolic
         public int TargetSummaryCount { get; }
 
         public IReadOnlyList<SymbolicCompactInvariantTargetSummary> TargetSummaries { get; }
+
+        public int TargetPathSummaryCount { get; }
+
+        public IReadOnlyList<SymbolicCompactInvariantTargetPathSummary> TargetPathSummaries { get; }
 
         public int DiagnosticCount { get; }
 
@@ -4851,6 +5157,8 @@ namespace PurelySharp.Symbolic
 
         public bool TargetSummariesTruncated { get; }
 
+        public bool TargetPathSummariesTruncated { get; }
+
         public bool DiagnosticsTruncated { get; }
 
         public bool IsTruncated =>
@@ -4859,10 +5167,12 @@ namespace PurelySharp.Symbolic
             UnknownFactsTruncated ||
             UnknownDiagnosticsTruncated ||
             TargetSummariesTruncated ||
+            TargetPathSummariesTruncated ||
             DiagnosticsTruncated ||
             Diagnostics.Any(static diagnostic => diagnostic.EvidenceTruncated) ||
             UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated) ||
-            TargetSummaries.Any(static target => target.IsTruncated);
+            TargetSummaries.Any(static target => target.IsTruncated) ||
+            TargetPathSummaries.Any(static target => target.ConditionsTruncated);
 
         internal static SymbolicCompactInvariantQueryView FromQueryView(
             SymbolicInvariantQueryView query,
@@ -4881,6 +5191,10 @@ namespace PurelySharp.Symbolic
                 .Take(query.TargetSummaries, options.MaxConditions)
                 .Select(target => SymbolicCompactInvariantTargetSummary.FromSummary(target, options))
                 .ToArray();
+            var targetPathSummaries = SymbolicCompactProjection
+                .Take(query.TargetPathSummaries, options.MaxConditions)
+                .Select(target => SymbolicCompactInvariantTargetPathSummary.FromSummary(target, options))
+                .ToArray();
             var diagnostics = SymbolicCompactProjection
                 .Take(query.Diagnostics, options.MaxConditions)
                 .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
@@ -4897,6 +5211,8 @@ namespace PurelySharp.Symbolic
                 unknownDiagnostics,
                 query.TargetSummaryCount,
                 targetSummaries,
+                query.TargetPathSummaryCount,
+                targetPathSummaries,
                 query.DiagnosticCount,
                 diagnostics,
                 query.CandidateProgramPointCount,
@@ -4913,6 +5229,7 @@ namespace PurelySharp.Symbolic
                 query.UnknownFactCount > options.MaxConditions,
                 query.UnknownDiagnostics.Count > options.MaxConditions,
                 query.TargetSummaryCount > targetSummaries.Length,
+                query.TargetPathSummaryCount > targetPathSummaries.Length,
                 query.Diagnostics.Count > options.MaxConditions);
         }
     }
@@ -5000,6 +5317,101 @@ namespace PurelySharp.Symbolic
                 summary.MustFactCount > options.MaxConditions,
                 summary.MaybeFactCount > options.MaxConditions,
                 summary.UnknownFactCount > options.MaxConditions);
+        }
+    }
+
+    public sealed class SymbolicCompactInvariantTargetPathSummary
+    {
+        private SymbolicCompactInvariantTargetPathSummary(
+            string target,
+            int pathConditionCount,
+            int smtConditionCount,
+            int conservativeUnknownCount,
+            int programPointCount,
+            int reachableProgramPointCount,
+            int proofTotalCount,
+            int proofUnknownCount,
+            int proofProvenTrueCount,
+            int proofProvenFalseCount,
+            int proofUnreachableCount,
+            IReadOnlyList<string> conditions,
+            bool conditionsTruncated,
+            string statusReason,
+            string reasonCode,
+            string summary)
+        {
+            Target = target ?? string.Empty;
+            PathConditionCount = pathConditionCount;
+            SmtConditionCount = smtConditionCount;
+            ConservativeUnknownCount = conservativeUnknownCount;
+            ProgramPointCount = programPointCount;
+            ReachableProgramPointCount = reachableProgramPointCount;
+            ProofTotalCount = proofTotalCount;
+            ProofUnknownCount = proofUnknownCount;
+            ProofProvenTrueCount = proofProvenTrueCount;
+            ProofProvenFalseCount = proofProvenFalseCount;
+            ProofUnreachableCount = proofUnreachableCount;
+            Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
+            ConditionsTruncated = conditionsTruncated;
+            StatusReason = statusReason ?? string.Empty;
+            ReasonCode = reasonCode ?? string.Empty;
+            Summary = summary ?? string.Empty;
+        }
+
+        public string Target { get; }
+
+        public int PathConditionCount { get; }
+
+        public int SmtConditionCount { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public int ProgramPointCount { get; }
+
+        public int ReachableProgramPointCount { get; }
+
+        public int ProofTotalCount { get; }
+
+        public int ProofUnknownCount { get; }
+
+        public int ProofProvenTrueCount { get; }
+
+        public int ProofProvenFalseCount { get; }
+
+        public int ProofUnreachableCount { get; }
+
+        public IReadOnlyList<string> Conditions { get; }
+
+        public bool ConditionsTruncated { get; }
+
+        public string StatusReason { get; }
+
+        public string ReasonCode { get; }
+
+        public string Summary { get; }
+
+        internal static SymbolicCompactInvariantTargetPathSummary FromSummary(
+            SymbolicInvariantTargetPathSummary summary,
+            SymbolicCompactQueryOptions options)
+        {
+            var conditions = SymbolicCompactProjection.Take(summary.Conditions, options.MaxConditions);
+            return new SymbolicCompactInvariantTargetPathSummary(
+                summary.Target,
+                summary.PathConditionCount,
+                summary.SmtConditionCount,
+                summary.ConservativeUnknownCount,
+                summary.ProgramPointCount,
+                summary.ReachableProgramPointCount,
+                summary.ProofTotalCount,
+                summary.ProofUnknownCount,
+                summary.ProofProvenTrueCount,
+                summary.ProofProvenFalseCount,
+                summary.ProofUnreachableCount,
+                conditions,
+                summary.ConditionsTruncated || summary.Conditions.Count > conditions.Count,
+                summary.StatusReason,
+                summary.ReasonCode,
+                summary.Summary);
         }
     }
 

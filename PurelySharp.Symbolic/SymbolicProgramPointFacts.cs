@@ -329,6 +329,7 @@ namespace PurelySharp.Symbolic
                         forEachStatementSyntax.Expression,
                         semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken) as ILocalSymbol,
                         forEachStatementSyntax,
+                        forEachStatementSyntax.Statement,
                         semanticModel,
                         cancellationToken);
                 }
@@ -346,6 +347,7 @@ namespace PurelySharp.Symbolic
                         forEachVariableStatementSyntax.Expression,
                         iterationSymbol: null,
                         forEachVariableStatementSyntax,
+                        forEachVariableStatementSyntax.Statement,
                         semanticModel,
                         cancellationToken);
                 }
@@ -1675,6 +1677,7 @@ namespace PurelySharp.Symbolic
                         forEachStatement.Expression,
                         semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken) as ILocalSymbol,
                         forEachStatement,
+                        forEachStatement.Statement,
                         semanticModel,
                         cancellationToken);
                     break;
@@ -1684,6 +1687,7 @@ namespace PurelySharp.Symbolic
                         forEachVariableStatement.Expression,
                         iterationSymbol: null,
                         forEachVariableStatement,
+                        forEachVariableStatement.Statement,
                         semanticModel,
                         cancellationToken);
                     break;
@@ -2545,36 +2549,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts)
         {
             expression = UnwrapAwaitedNormalCompletionExpression(expression);
-            if (!TryGetThrowGuardedValue(
-                    expression,
-                    out var effectiveValueExpression,
-                    out var guardExpression,
-                    out var guardBranchWhenTrue,
-                    out var requiresNonNullValue))
-            {
-                return;
-            }
-
-            if (guardExpression != null)
-            {
-                if (!AnyConditionSymbolInvalidatedInStatement(guardExpression, statement, semanticModel, cancellationToken))
-                {
-                    AddBranchConditionFacts(
-                        guardExpression,
-                        guardBranchWhenTrue,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                }
-
-                return;
-            }
-
-            if (requiresNonNullValue &&
-                !AnyConditionSymbolInvalidatedInStatement(effectiveValueExpression, statement, semanticModel, cancellationToken))
-            {
-                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
-            }
+            AddThrowGuardedExpressionFacts(expression, statement, semanticModel, cancellationToken, facts);
         }
 
         private static void AddTopLevelDereferenceNormalCompletionFacts(
@@ -4437,9 +4412,11 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax expressionSyntax,
             ILocalSymbol? iterationSymbol,
             StatementSyntax foreachStatement,
+            StatementSyntax foreachBody,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            AddThrowGuardedExpressionFacts(expressionSyntax, foreachBody, semanticModel, cancellationToken, facts);
             AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
             AddFiniteForeachIterationFact(facts, expressionSyntax, iterationSymbol, foreachStatement, semanticModel, cancellationToken);
 
@@ -7075,6 +7052,45 @@ namespace PurelySharp.Symbolic
             guardBranchWhenTrue = true;
             requiresNonNullValue = false;
             return false;
+        }
+
+        private static void AddThrowGuardedExpressionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!TryGetThrowGuardedValue(
+                    expression,
+                    out var effectiveValueExpression,
+                    out var guardExpression,
+                    out var guardBranchWhenTrue,
+                    out var requiresNonNullValue))
+            {
+                return;
+            }
+
+            if (guardExpression != null)
+            {
+                if (!AnyConditionSymbolInvalidatedInStatement(guardExpression, statement, semanticModel, cancellationToken))
+                {
+                    AddBranchConditionFacts(
+                        guardExpression,
+                        guardBranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                }
+
+                return;
+            }
+
+            if (requiresNonNullValue &&
+                !AnyConditionSymbolInvalidatedInStatement(effectiveValueExpression, statement, semanticModel, cancellationToken))
+            {
+                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
         }
 
         private static void AddReferenceNonNullFact(

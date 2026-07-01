@@ -253,6 +253,94 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesForeachCoalesceThrowReceiverNonNullInBody()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        foreach (var value in values ?? throw new System.InvalidOperationException())
+        {
+            return values.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ForeachCoalesceThrowReceiverNonNull.cs",
+                FindLine(source, "return values.Length;"),
+                20,
+                "values != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesForeachConditionalThrowReceiverGuardInBody()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool enabled, string[] values)
+    {
+        foreach (var value in enabled ? values : throw new System.InvalidOperationException())
+        {
+            return enabled ? values.Length : 0;
+        }
+
+        return 0;
+    }
+}";
+
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ForeachConditionalThrowReceiverGuard.cs",
+                FindLine(source, "return enabled ? values.Length : 0;"),
+                20,
+                "enabled",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ForeachCoalesceThrowReceiverFactYieldsToBodyMutation()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        foreach (var value in values ?? throw new System.InvalidOperationException())
+        {
+            values = null;
+            return values == null ? 0 : values.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ForeachCoalesceThrowReceiverMutation.cs",
+                FindLine(source, "return values == null ? 0 : values.Length;"),
+                20,
+                "values != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
+        }
+
+        [Test]
         public async Task Ps0010_FiniteForeachNonNullElementContradictoryNullDereference_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

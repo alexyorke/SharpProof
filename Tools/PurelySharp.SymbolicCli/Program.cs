@@ -407,6 +407,7 @@ static void PrintInvariantQuery(
     }
 
     PrintInvariantTargetSummaries(label, query.TargetSummaries);
+    PrintInvariantTargetPathSummaries(label, query.TargetPathSummaries);
 
     foreach (var diagnostic in query.Diagnostics)
     {
@@ -445,6 +446,40 @@ static void PrintInvariantTargetSummaries(
         Console.WriteLine(
             label + " target summaries truncated: " +
             (targetSummaries.Count - maxTextTargets).ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            " omitted");
+    }
+}
+
+static void PrintInvariantTargetPathSummaries(
+    string label,
+    IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries)
+{
+    const int maxTextTargets = 16;
+    foreach (var target in targetPathSummaries.Take(maxTextTargets))
+    {
+        Console.WriteLine(
+            label + " target path: " +
+            $"{target.Target} conditions={target.PathConditionCount} " +
+            $"smt={target.SmtConditionCount} points={target.ProgramPointCount} " +
+            $"reachablePoints={target.ReachableProgramPointCount} " +
+            $"proofs={target.ProofTotalCount} unknownProofs={target.ProofUnknownCount} " +
+            $"reason={target.StatusReason} code={target.ReasonCode}");
+        Console.WriteLine(label + " target path summary: " + target.Summary);
+        if (target.Conditions.Count != 0)
+        {
+            var suffix = target.ConditionsTruncated ? " ..." : string.Empty;
+            Console.WriteLine(
+                label + " target path conditions: " +
+                string.Join("; ", target.Conditions) +
+                suffix);
+        }
+    }
+
+    if (targetPathSummaries.Count > maxTextTargets)
+    {
+        Console.WriteLine(
+            label + " target path summaries truncated: " +
+            (targetPathSummaries.Count - maxTextTargets).ToString(System.Globalization.CultureInfo.InvariantCulture) +
             " omitted");
     }
 }

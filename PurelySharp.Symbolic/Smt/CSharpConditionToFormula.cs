@@ -7916,6 +7916,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateMemoryExtensionsViewResultLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (TryCreateBuiltInSliceInvocationResultLengthFormula(
                     receiverExpression,
                     semanticModel,
@@ -8597,6 +8608,196 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth))
             {
+                return false;
+            }
+
+            lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, endFormula, startFormula);
+            return true;
+        }
+
+        private static bool TryCreateMemoryExtensionsViewResultLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverExpression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (!IsMemoryExtensionsViewMethod(method) ||
+                !IsBuiltInSpanOrMemoryType(method.ReturnType) ||
+                !TryGetMemoryExtensionsViewSourceExpression(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceExpression,
+                    out var firstArgumentIndex) ||
+                !IsSupportedMemoryExtensionsViewSource(sourceExpression, semanticModel, cancellationToken) ||
+                !TryCreateBuiltInElementAccessLengthFormula(
+                    sourceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            var remainingArgumentCount = invocationExpression.ArgumentList.Arguments.Count - firstArgumentIndex;
+            if (remainingArgumentCount == 0)
+            {
+                lengthFormula = sourceLength;
+                return true;
+            }
+
+            if (remainingArgumentCount == 1)
+            {
+                var argument = invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression;
+                if (IsSystemRangeExpression(argument, semanticModel, cancellationToken))
+                {
+                    return TryCreateRangeResultLengthFormula(
+                        argument,
+                        sourceLength,
+                        semanticModel,
+                        cancellationToken,
+                        out lengthFormula,
+                        getSymbolVersion,
+                        inlineDepth);
+                }
+
+                if (!TryTranslateValue(
+                        argument,
+                        semanticModel,
+                        cancellationToken,
+                        out var start,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    start is not { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = null!;
+                    return false;
+                }
+
+                lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, start);
+                return true;
+            }
+
+            if (remainingArgumentCount != 2 ||
+                !TryTranslateValue(
+                    invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedStart,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                translatedStart is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateValue(
+                    invocationExpression.ArgumentList.Arguments[firstArgumentIndex + 1].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var resultLength,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                resultLength is not { Kind: SmtValueKind.Int })
+            {
+                lengthFormula = null!;
+                return false;
+            }
+
+            lengthFormula = resultLength;
+            return true;
+        }
+
+        private static bool IsMemoryExtensionsViewMethod(IMethodSymbol method)
+        {
+            var definition = method.ReducedFrom ?? method;
+            return definition.Name is "AsSpan" or "AsMemory" &&
+                definition.IsExtensionMethod &&
+                definition.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
+        }
+
+        private static bool TryGetMemoryExtensionsViewSourceExpression(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax sourceExpression,
+            out int firstArgumentIndex)
+        {
+            if (invocationExpression.Expression is MemberAccessExpressionSyntax memberAccess &&
+                semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type != null)
+            {
+                sourceExpression = memberAccess.Expression;
+                firstArgumentIndex = 0;
+                return true;
+            }
+
+            if (invocationExpression.ArgumentList.Arguments.Count == 0)
+            {
+                sourceExpression = null!;
+                firstArgumentIndex = 0;
+                return false;
+            }
+
+            sourceExpression = invocationExpression.ArgumentList.Arguments[0].Expression;
+            firstArgumentIndex = 1;
+            return true;
+        }
+
+        private static bool IsSupportedMemoryExtensionsViewSource(
+            ExpressionSyntax sourceExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var sourceTypeInfo = semanticModel.GetTypeInfo(sourceExpression, cancellationToken);
+            var sourceType = sourceTypeInfo.ConvertedType ?? sourceTypeInfo.Type;
+            return sourceType?.SpecialType == SpecialType.System_String ||
+                sourceType is IArrayTypeSymbol { Rank: 1 };
+        }
+
+        private static bool TryCreateRangeResultLengthFormula(
+            ExpressionSyntax rangeExpression,
+            SmtFormula sourceLengthFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (!TryResolveBuiltInRangeAccessRangeShape(
+                    rangeExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rangeShape) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeShape,
+                    useStart: true,
+                    sourceLengthFormula,
+                    defaultWhenOmitted: new SmtIntegerConstant(0),
+                    semanticModel,
+                    cancellationToken,
+                    out var startFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeShape,
+                    useStart: false,
+                    sourceLengthFormula,
+                    defaultWhenOmitted: sourceLengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var endFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                lengthFormula = null!;
                 return false;
             }
 

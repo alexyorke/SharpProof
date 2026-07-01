@@ -506,6 +506,15 @@ public class TestClass
             Assert.That(targetSummary.MustFacts, Is.Empty);
             Assert.That(targetSummary.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
             Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
+            var targetPathSummary = result.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "value");
+            Assert.That(result.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaries.Count));
+            Assert.That(targetPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.ProgramPointCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(targetPathSummary.ProofUnknownCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(targetPathSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-PROOF-UNKNOWN"));
+            Assert.That(targetPathSummary.Conditions, Does.Contain("value > 0"));
             Assert.That(
                 result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
                 Is.EquivalentTo(new[] { "PS-SYM-MAYBE-FACTS", "PS-SYM-CONSERVATIVE-UNKNOWN", "PS-SYM-PROOF-UNKNOWN" }));
@@ -545,6 +554,14 @@ public class TestClass
             Assert.That(positiveTargetSummary.StatusReason, Is.EqualTo("target_exact"));
             Assert.That(positiveTargetSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-EXACT"));
             Assert.That(positiveTargetSummary.Summary, Does.Contain("agree"));
+            var positivePathSummary = positiveReturn.InvariantQuery.TargetPathSummaries.Single();
+            Assert.That(positivePathSummary.Target, Is.EqualTo("value"));
+            Assert.That(positivePathSummary.PathConditionCount, Is.EqualTo(1));
+            Assert.That(positivePathSummary.SmtConditionCount, Is.EqualTo(1));
+            Assert.That(positivePathSummary.ProofTotalCount, Is.EqualTo(1));
+            Assert.That(positivePathSummary.ProofProvenTrueCount, Is.EqualTo(1));
+            Assert.That(positivePathSummary.StatusReason, Is.EqualTo("target_has_path_conditions"));
+            Assert.That(positivePathSummary.ReasonCode, Is.EqualTo("PS-SYM-TARGET-PATH-CONDITIONS"));
         }
 
         [Test]
@@ -1388,6 +1405,11 @@ public class TestClass
             Assert.That(compact.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
             Assert.That(compact.InvariantQuery.HasUnresolvedAnalysis, Is.True);
             Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo(result.InvariantQuery.StatusReason));
+            Assert.That(compact.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+            var compactPathSummary = compact.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "copy");
+            Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(2));
+            Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
             Assert.That(compact.AnalysisSummary.MustFactCount, Is.EqualTo(result.InvariantQuery.MustFactCount));
             Assert.That(compact.AnalysisSummary.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
             Assert.That(compact.AnalysisSummary.UnknownFactCount, Is.EqualTo(result.InvariantQuery.UnknownFactCount));
@@ -1495,6 +1517,16 @@ public class TestClass
             Assert.That(compactTargetSummary.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
             Assert.That(compactTargetSummary.MaybeFactsTruncated, Is.True);
             Assert.That(compactTargetSummary.UnknownFacts, Does.Contain("unknown(copy)"));
+            Assert.That(invariantResult.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+            Assert.That(invariantResult.InvariantQuery.TargetPathSummaries, Has.Count.LessThanOrEqualTo(1));
+            var compactPathSummary = invariantResult.InvariantQuery.TargetPathSummaries.Single();
+            Assert.That(compactPathSummary.Target, Is.EqualTo("copy"));
+            Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(compactPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(compactPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(1));
+            Assert.That(compactPathSummary.ConditionsTruncated, Is.True);
+            Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
             Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
             Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
             Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
@@ -1904,6 +1936,14 @@ public class TestClass
                 Assert.That(
                     invariantQuery.GetProperty("diagnostics").EnumerateArray().Select(static diagnostic => diagnostic.GetProperty("code").GetString()),
                     Does.Contain("PS-SYM-CONSERVATIVE-UNKNOWN"));
+                Assert.That(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+                var targetPathSummary = invariantQuery.GetProperty("targetPathSummaries")
+                    .EnumerateArray()
+                    .Single(static summary => summary.GetProperty("target").GetString() == "copy");
+                Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(targetPathSummary.GetProperty("smtConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(targetPathSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+                Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
 
                 var analysisSummary = root.GetProperty("analysisSummary");
                 Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
@@ -2106,6 +2146,20 @@ public class TestClass
                 Assert.That(
                     targetSummary.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
                     Does.Contain("unknown(copy)"));
+                var targetPathSummaryCount = invariantQuery.GetProperty("targetPathSummaryCount").GetInt32();
+                var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries");
+                Assert.That(targetPathSummaryCount, Is.GreaterThanOrEqualTo(1));
+                Assert.That(targetPathSummaries.GetArrayLength(), Is.EqualTo(1));
+                Assert.That(
+                    invariantQuery.GetProperty("targetPathSummariesTruncated").GetBoolean(),
+                    Is.EqualTo(targetPathSummaryCount > targetPathSummaries.GetArrayLength()));
+                var targetPathSummary = targetPathSummaries[0];
+                Assert.That(targetPathSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
+                Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(targetPathSummary.GetProperty("conditions").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(targetPathSummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
+                Assert.That(targetPathSummary.GetProperty("statusReason").GetString(), Is.Not.Empty);
+                Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
 
                 Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
@@ -2390,6 +2444,9 @@ public class TestClass
                 Assert.That(result.StandardOutput, Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
                 Assert.That(result.StandardOutput, Does.Contain("Line invariant query target: value status=Exact reason=target_exact code=PS-SYM-TARGET-EXACT"));
                 Assert.That(result.StandardOutput, Does.Contain("Line invariant query target summary: All selected reachable program points agree on the facts for this target."));
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path: value conditions=1 smt=1"));
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path summary: This target has source-location path conditions available for invariant queries."));
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path conditions: value > 0"));
                 Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' target=value kind=SmtBinary summary: Status=AlwaysTrue"));
                 Assert.That(result.StandardOutput, Does.Contain("Proof summary: The condition is proven true at every reachable candidate program point."));
             }

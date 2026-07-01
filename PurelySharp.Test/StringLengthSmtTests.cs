@@ -218,6 +218,59 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringAsSpanAndAsMemoryResultLengths()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int Tail(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.AsSpan(start).Length;
+        }
+
+        return 0;
+    }
+
+    public int Window(string text, int start, int length)
+    {
+        if (text != null && start >= 0 && length >= 0 && start + length <= text.Length)
+        {
+            return text.AsMemory(start, length).Length;
+        }
+
+        return 0;
+    }
+
+    public int RangeWindow(string text)
+    {
+        if (text != null && text.Length >= 2)
+        {
+            return text.AsSpan(1..^1).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return text.AsSpan(start).Length;",
+                "text.AsSpan(start).Length == text.Length - start");
+            AssertConditionProven(
+                source,
+                "return text.AsMemory(start, length).Length;",
+                "text.AsMemory(start, length).Length == length");
+            AssertConditionProven(
+                source,
+                "return text.AsSpan(1..^1).Length;",
+                "text.AsSpan(1..^1).Length == text.Length - 2");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesAssignedSpanLengthSnapshot()
         {
             const string source = @"

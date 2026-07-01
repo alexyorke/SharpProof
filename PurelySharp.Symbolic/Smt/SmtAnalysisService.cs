@@ -831,12 +831,215 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
+                var added = false;
+                if (TryAddAffineIntegerEqualityFact(formula, out var affineContradiction))
+                {
+                    added = true;
+                    hasContradiction |= affineContradiction;
+                }
+
+                if (hasContradiction ||
+                    formula is SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left.Kind: SmtValueKind.Int,
+                        Right.Kind: SmtValueKind.Int,
+                    })
+                {
+                    return added || hasContradiction;
+                }
+
                 if (!TryGetAliasComparison(formula, out var left, out var right))
+                {
+                    return added;
+                }
+
+                var addedAlias = UnionAliases(left, right, out var aliasContradiction);
+                hasContradiction |= aliasContradiction;
+                return added || addedAlias;
+            }
+
+            private bool TryAddAffineIntegerEqualityFact(SmtFormula formula, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binary ||
+                    binary.Left.Kind != SmtValueKind.Int ||
+                    binary.Right.Kind != SmtValueKind.Int)
                 {
                     return false;
                 }
 
-                return UnionAliases(left, right, out hasContradiction);
+                var leftFormula = NormalizeAliases(binary.Left);
+                var rightFormula = NormalizeAliases(binary.Right);
+                if (!TryGetAffineIntegerTerm(leftFormula, depth: 0, out var left) ||
+                    !TryGetAffineIntegerTerm(rightFormula, depth: 0, out var right))
+                {
+                    return false;
+                }
+
+                if (TrySubtract(left, right, out var difference))
+                {
+                    if (difference.BaseTerm == null)
+                    {
+                        hasContradiction = difference.Offset != 0;
+                        return hasContradiction;
+                    }
+
+                    if (TrySolveSingleAffineEquality(
+                        difference,
+                        out var solvedTerm,
+                        out var solvedConstant,
+                        out hasContradiction))
+                    {
+                        if (hasContradiction)
+                        {
+                            return true;
+                        }
+
+                        return AddIntegerIntervalFact(
+                            solvedTerm,
+                            SmtBinaryOperator.Equal,
+                            solvedConstant,
+                            out hasContradiction);
+                    }
+                }
+
+                return TryAddUnitAffineAlias(left, right, out hasContradiction);
+            }
+
+            private bool TryAddUnitAffineAlias(
+                AffineIntegerTerm left,
+                AffineIntegerTerm right,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (left.BaseTerm == null ||
+                    right.BaseTerm == null ||
+                    left.Scale != 1 ||
+                    right.Scale != 1 ||
+                    left.BaseTerm.Equals(right.BaseTerm) ||
+                    !CanAliasTerm(left.BaseTerm) ||
+                    !CanAliasTerm(right.BaseTerm))
+                {
+                    return false;
+                }
+
+                SmtFormula alias;
+                SmtFormula baseTerm;
+                long offset;
+                var leftHasInterval = _integerIntervals.ContainsKey(left.BaseTerm);
+                var rightHasInterval = _integerIntervals.ContainsKey(right.BaseTerm);
+                if (leftHasInterval && !rightHasInterval)
+                {
+                    alias = right.BaseTerm;
+                    baseTerm = left.BaseTerm;
+                    if (!TrySubtract(left.Offset, right.Offset, out offset))
+                    {
+                        return false;
+                    }
+                }
+                else if (rightHasInterval && !leftHasInterval)
+                {
+                    alias = left.BaseTerm;
+                    baseTerm = right.BaseTerm;
+                    if (!TrySubtract(right.Offset, left.Offset, out offset))
+                    {
+                        return false;
+                    }
+                }
+                else if (string.CompareOrdinal(left.BaseTerm.ToString(), right.BaseTerm.ToString()) <= 0)
+                {
+                    alias = right.BaseTerm;
+                    baseTerm = left.BaseTerm;
+                    if (!TrySubtract(left.Offset, right.Offset, out offset))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    alias = left.BaseTerm;
+                    baseTerm = right.BaseTerm;
+                    if (!TrySubtract(right.Offset, left.Offset, out offset))
+                    {
+                        return false;
+                    }
+                }
+
+                var replacement = CreateOffsetTerm(baseTerm, offset);
+                return AddDirectedAlias(alias, replacement, out hasContradiction);
+            }
+
+            private bool AddDirectedAlias(
+                SmtFormula alias,
+                SmtFormula canonical,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                alias = NormalizeAliases(alias);
+                canonical = NormalizeAliases(canonical);
+                if (alias.Kind != canonical.Kind ||
+                    alias.Equals(canonical) ||
+                    ReferencesFormula(canonical, alias))
+                {
+                    return false;
+                }
+
+                _aliases[alias] = canonical;
+                MergeIntegerFacts(canonical, alias, out var integerContradiction);
+                MergeStringFacts(canonical, alias, out var stringContradiction);
+                MergeReferenceFacts(canonical, alias, out var referenceContradiction);
+                hasContradiction = integerContradiction || stringContradiction || referenceContradiction;
+                return true;
+            }
+
+            private static bool TrySolveSingleAffineEquality(
+                AffineIntegerTerm difference,
+                out SmtFormula term,
+                out long constant,
+                out bool hasContradiction)
+            {
+                term = null!;
+                constant = default;
+                hasContradiction = false;
+                if (difference.BaseTerm == null ||
+                    difference.Scale == 0)
+                {
+                    hasContradiction = difference.Offset != 0;
+                    return hasContradiction;
+                }
+
+                try
+                {
+                    if (difference.Offset % difference.Scale != 0)
+                    {
+                        hasContradiction = true;
+                        return true;
+                    }
+
+                    var quotient = difference.Offset / difference.Scale;
+                    if (!TryNegate(quotient, out constant))
+                    {
+                        return false;
+                    }
+
+                    term = difference.BaseTerm;
+                    return true;
+                }
+                catch (OverflowException)
+                {
+                    return false;
+                }
+            }
+
+            private static SmtFormula CreateOffsetTerm(SmtFormula baseTerm, long offset)
+            {
+                return offset == 0
+                    ? baseTerm
+                    : new SmtIntegerBinaryTerm(
+                        SmtIntegerBinaryOperator.Add,
+                        baseTerm,
+                        new SmtIntegerConstant(offset));
             }
 
             private static bool TryGetAliasComparison(
@@ -848,6 +1051,7 @@ namespace PurelySharp.Symbolic.Smt
                 right = null!;
                 if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binary ||
                     binary.Left.Kind != binary.Right.Kind ||
+                    binary.Left.Kind == SmtValueKind.Int ||
                     binary.Left.Kind == SmtValueKind.Bool ||
                     !CanAliasTerm(binary.Left) ||
                     !CanAliasTerm(binary.Right))

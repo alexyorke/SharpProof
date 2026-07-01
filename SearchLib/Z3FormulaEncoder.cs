@@ -826,6 +826,21 @@ namespace SearchLib.Smt
                         return true;
                     }
 
+                    if (TryParseLookbehindAssertion(out var lookbehind))
+                    {
+                        if (parts.Count == 0)
+                        {
+                            regex = null!;
+                            return false;
+                        }
+
+                        var prefix = parts.Count == 1 ? parts[0] : _context.MkConcat(parts.ToArray());
+                        parts.Clear();
+                        parts.Add(ConstrainPrefixWithLookbehind(lookbehind, prefix));
+                        consumedAny = true;
+                        continue;
+                    }
+
                     if (!TryParseRepeat(out var part))
                     {
                         regex = null!;
@@ -884,6 +899,46 @@ namespace SearchLib.Smt
                 return true;
             }
 
+            private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion)
+            {
+                assertion = default;
+                SkipIgnoredPatternTrivia();
+                var savedPosition = _position;
+                var savedOptions = CaptureOptions();
+                var savedIsExact = _isExact;
+                if (_position + 3 >= _pattern.Length ||
+                    _pattern[_position] != '(' ||
+                    _pattern[_position + 1] != '?' ||
+                    _pattern[_position + 2] != '<' ||
+                    _pattern[_position + 3] is not ('=' or '!'))
+                {
+                    return false;
+                }
+
+                var positive = _pattern[_position + 3] == '=';
+                _position += 4;
+                if (!TryParseExpression(out var lookbehindRegex) || !Peek(')'))
+                {
+                    _position = savedPosition;
+                    ApplyOptions(savedOptions);
+                    _isExact = savedIsExact;
+                    return false;
+                }
+
+                _position++;
+                var lookbehindIsExact = _isExact;
+                ApplyOptions(savedOptions);
+                _isExact = savedIsExact;
+                if (!positive && !lookbehindIsExact)
+                {
+                    _position = savedPosition;
+                    return false;
+                }
+
+                assertion = new RegexLookaheadAssertion(lookbehindRegex, positive, lookbehindIsExact);
+                return true;
+            }
+
             private ReExpr ConstrainSuffixWithLookahead(RegexLookaheadAssertion assertion, ReExpr suffix)
             {
                 _isExact &= assertion.IsExact;
@@ -891,6 +946,15 @@ namespace SearchLib.Smt
                 return assertion.IsPositive
                     ? _context.MkIntersect(new[] { suffix, lookaheadLanguage })
                     : _context.MkDiff(suffix, lookaheadLanguage);
+            }
+
+            private ReExpr ConstrainPrefixWithLookbehind(RegexLookaheadAssertion assertion, ReExpr prefix)
+            {
+                _isExact &= assertion.IsExact;
+                var lookbehindLanguage = CreateConcat(CreateAnyStringRegex(), assertion.Regex);
+                return assertion.IsPositive
+                    ? _context.MkIntersect(new[] { prefix, lookbehindLanguage })
+                    : _context.MkDiff(prefix, lookbehindLanguage);
             }
 
             private readonly struct RegexLookaheadAssertion

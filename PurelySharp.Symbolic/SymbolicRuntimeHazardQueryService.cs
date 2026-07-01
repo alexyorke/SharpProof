@@ -1799,7 +1799,11 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            trigger = CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            trigger = smtOperator == SmtIntegerBinaryOperator.Divide
+                ? Conjoin(
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
+                : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
             return true;
         }
 
