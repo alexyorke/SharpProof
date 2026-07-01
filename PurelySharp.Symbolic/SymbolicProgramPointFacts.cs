@@ -12,7 +12,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
-    public static class SymbolicProgramPointFacts
+    internal static class SymbolicProgramPointFacts
     {
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;

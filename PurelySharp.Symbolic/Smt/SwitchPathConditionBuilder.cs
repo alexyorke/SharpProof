@@ -8,7 +8,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Smt
 {
-    public static class SwitchPathConditionBuilder
+    internal static class SwitchPathConditionBuilder
     {
         public static bool TryCreateSwitchStatementSectionCondition(
             ExpressionSyntax governingExpression,
