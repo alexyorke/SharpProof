@@ -753,7 +753,7 @@ namespace PurelySharp.Symbolic
                 column,
                 smtAnalysis,
                 cancellationToken);
-            var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+            var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
@@ -824,7 +824,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         includeCurrentStatementCompletionFacts);
                     var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
-                    var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+                    var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
                     var conditionProofs = ProveConditions(
                         query.SemanticModel,
                         query.Position,
@@ -915,7 +915,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 includeCurrentStatementCompletionFacts);
             var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
-            var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+            var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
@@ -991,7 +991,7 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         includeCurrentStatementCompletionFacts);
                     var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
-                    var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+                    var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
                     var conditionProofs = ProveConditions(
                         query.SemanticModel,
                         query.Position,
@@ -1140,7 +1140,7 @@ namespace PurelySharp.Symbolic
                 smtAnalysis,
                 cancellationToken);
             var lineColumn = GetLineAndColumn(syntaxTree, position, cancellationToken);
-            var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+            var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
@@ -1779,29 +1779,11 @@ namespace PurelySharp.Symbolic
             int position,
             CancellationToken cancellationToken)
         {
-            var text = syntaxTree.GetText(cancellationToken);
-            if (position < 0 || position > text.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-            }
-
-            var line = text.Lines.GetLineFromPosition(position);
-            return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
-        }
-
-        private static NodeSourceSpan GetNodeSourceSpan(
-            SyntaxTree syntaxTree,
-            TextSpan span,
-            CancellationToken cancellationToken)
-        {
-            var text = syntaxTree.GetText(cancellationToken);
-            var startLine = text.Lines.GetLineFromPosition(span.Start);
-            var endLine = text.Lines.GetLineFromPosition(span.End);
-            return new NodeSourceSpan(
-                startLine.LineNumber + 1,
-                span.Start - startLine.Start + 1,
-                endLine.LineNumber + 1,
-                span.End - endLine.Start + 1);
+            return SymbolicSourceLocation.GetLineAndColumn(
+                syntaxTree,
+                position,
+                cancellationToken,
+                validatePosition: true);
         }
 
         private static string? GetContainingMethodName(SyntaxNode node)
@@ -1836,42 +1818,6 @@ namespace PurelySharp.Symbolic
                 ExpressionSyntax => SymbolicProgramPointKinds.Expression,
                 _ => SymbolicProgramPointKinds.Other,
             };
-        }
-
-        private readonly struct LineColumn
-        {
-            public LineColumn(int line, int column)
-            {
-                Line = line;
-                Column = column;
-            }
-
-            public int Line { get; }
-
-            public int Column { get; }
-        }
-
-        private readonly struct NodeSourceSpan
-        {
-            public NodeSourceSpan(
-                int startLine,
-                int startColumn,
-                int endLine,
-                int endColumn)
-            {
-                StartLine = startLine;
-                StartColumn = startColumn;
-                EndLine = endLine;
-                EndColumn = endColumn;
-            }
-
-            public int StartLine { get; }
-
-            public int StartColumn { get; }
-
-            public int EndLine { get; }
-
-            public int EndColumn { get; }
         }
 
         private sealed class ProgramPointQueryContext

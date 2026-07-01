@@ -389,8 +389,8 @@ namespace PurelySharp.Symbolic
                 analysis,
                 triggerCondition,
                 smtAnalysis);
-            var lineColumn = GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
-            var sourceSpan = GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
+            var lineColumn = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
+            var sourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
 
             return new SymbolicRuntimeHazard(
                 syntaxTree.FilePath,
@@ -576,66 +576,6 @@ namespace PurelySharp.Symbolic
             return TextSpan.FromBounds(spanStart, spanEnd);
         }
 
-        private static LineColumn GetLineAndColumn(
-            SyntaxTree syntaxTree,
-            int position,
-            CancellationToken cancellationToken)
-        {
-            var text = syntaxTree.GetText(cancellationToken);
-            var line = text.Lines.GetLineFromPosition(position);
-            return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
-        }
-
-        private static NodeSourceSpan GetNodeSourceSpan(
-            SyntaxTree syntaxTree,
-            TextSpan span,
-            CancellationToken cancellationToken)
-        {
-            var text = syntaxTree.GetText(cancellationToken);
-            var startLine = text.Lines.GetLineFromPosition(span.Start);
-            var endLine = text.Lines.GetLineFromPosition(span.End);
-            return new NodeSourceSpan(
-                startLine.LineNumber + 1,
-                span.Start - startLine.Start + 1,
-                endLine.LineNumber + 1,
-                span.End - endLine.Start + 1);
-        }
-
-        private readonly struct LineColumn
-        {
-            public LineColumn(int line, int column)
-            {
-                Line = line;
-                Column = column;
-            }
-
-            public int Line { get; }
-
-            public int Column { get; }
-        }
-
-        private readonly struct NodeSourceSpan
-        {
-            public NodeSourceSpan(
-                int startLine,
-                int startColumn,
-                int endLine,
-                int endColumn)
-            {
-                StartLine = startLine;
-                StartColumn = startColumn;
-                EndLine = endLine;
-                EndColumn = endColumn;
-            }
-
-            public int StartLine { get; }
-
-            public int StartColumn { get; }
-
-            public int EndLine { get; }
-
-            public int EndColumn { get; }
-        }
     }
 
     public sealed class SymbolicRuntimeHazardQueryOptions
