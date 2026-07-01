@@ -3808,6 +3808,13 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     out breakCondition) ||
+                    TryCreateNestedGuardedBreakCondition(
+                        breakStatement,
+                        loopStatement,
+                        loopBody,
+                        semanticModel,
+                        cancellationToken,
+                        out breakCondition) ||
                     TryCreateGuardedContinueBeforeBreakCondition(
                         loopStatement,
                         loopBody,
@@ -3875,6 +3882,76 @@ namespace PurelySharp.Symbolic
                 breakCondition = new SmtBinaryFormula(SmtBinaryOperator.And, fallThroughCondition, breakCondition);
             }
 
+            return true;
+        }
+
+        private static bool TryCreateNestedGuardedBreakCondition(
+            BreakStatementSyntax breakStatement,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula breakCondition)
+        {
+            breakCondition = null!;
+
+            var guards = new List<(IfStatementSyntax IfStatement, bool BranchWhenTrue)>();
+            StatementSyntax currentStatement = breakStatement;
+            while (TryGetOnlyParentIfBranch(currentStatement, out var ifStatement, out var branchWhenTrue))
+            {
+                guards.Add((ifStatement, branchWhenTrue));
+                currentStatement = ifStatement;
+            }
+
+            if (guards.Count <= 1 ||
+                !IsTopLevelLoopBodyStatement(currentStatement, loopBody))
+            {
+                return false;
+            }
+
+            SmtFormula? combinedCondition = null;
+            for (var index = guards.Count - 1; index >= 0; index--)
+            {
+                var guard = guards[index];
+                if (AnyConditionSymbolInvalidatedBeforeStatement(
+                        guard.IfStatement.Condition,
+                        loopBody,
+                        guard.IfStatement.SpanStart,
+                        semanticModel,
+                        cancellationToken) ||
+                    !TryCreateBranchConditionFormula(
+                        guard.IfStatement.Condition,
+                        guard.BranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        out var guardCondition))
+                {
+                    breakCondition = null!;
+                    return false;
+                }
+
+                combinedCondition = combinedCondition == null
+                    ? guardCondition
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, combinedCondition, guardCondition);
+            }
+
+            if (combinedCondition == null)
+            {
+                return false;
+            }
+
+            if (TryCreateGuardedContinueFallThroughBeforeStatement(
+                loopStatement,
+                loopBody,
+                currentStatement,
+                semanticModel,
+                cancellationToken,
+                out var fallThroughCondition))
+            {
+                combinedCondition = new SmtBinaryFormula(SmtBinaryOperator.And, fallThroughCondition, combinedCondition);
+            }
+
+            breakCondition = combinedCondition;
             return true;
         }
 
@@ -3982,6 +4059,49 @@ namespace PurelySharp.Symbolic
             return ReferenceEquals(statement, loopBody) ||
                 loopBody is BlockSyntax block &&
                 ReferenceEquals(statement.Parent, block);
+        }
+
+        private static bool TryGetOnlyParentIfBranch(
+            StatementSyntax statement,
+            out IfStatementSyntax ifStatement,
+            out bool branchWhenTrue)
+        {
+            ifStatement = null!;
+            branchWhenTrue = false;
+
+            StatementSyntax branchStatement = statement;
+            if (branchStatement.Parent is BlockSyntax block)
+            {
+                if (block.Statements.Count != 1 ||
+                    !ReferenceEquals(block.Statements[0], branchStatement))
+                {
+                    return false;
+                }
+
+                branchStatement = block;
+            }
+
+            if (branchStatement.Parent is not IfStatementSyntax parentIf)
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(parentIf.Statement, branchStatement))
+            {
+                ifStatement = parentIf;
+                branchWhenTrue = true;
+                return true;
+            }
+
+            if (parentIf.Else?.Statement is { } elseStatement &&
+                ReferenceEquals(elseStatement, branchStatement))
+            {
+                ifStatement = parentIf;
+                branchWhenTrue = false;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryGetDirectBreakBranch(

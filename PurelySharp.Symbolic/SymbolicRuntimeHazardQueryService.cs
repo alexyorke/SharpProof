@@ -640,6 +640,11 @@ namespace PurelySharp.Symbolic
                         yield return compoundDivideCandidate;
                     }
 
+                    if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken, out var deconstructionNullCandidate))
+                    {
+                        yield return deconstructionNullCandidate;
+                    }
+
                     if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken, out var arrayTypeMismatchCandidate))
                     {
                         yield return arrayTypeMismatchCandidate;
@@ -1013,6 +1018,43 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.DivideByZeroException",
                 assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? "definite_modulo_by_zero" : "definite_divide_by_zero");
+            return true;
+        }
+
+        private static bool TryCreateDeconstructionNullReceiverCandidate(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not TupleExpressionSyntax and not DeclarationExpressionSyntax)
+            {
+                return false;
+            }
+
+            var deconstructionInfo = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeconstructionInfo(semanticModel, assignment);
+            if (deconstructionInfo.Method is not IMethodSymbol { IsStatic: false })
+            {
+                return false;
+            }
+
+            var receiver = assignment.Right;
+            var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
+            if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+                !IsReferenceType(receiverType) ||
+                !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                assignment,
+                SymbolicRuntimeHazardKind.NullDereference,
+                trigger,
+                "System.NullReferenceException",
+                "definite_deconstruction_null");
             return true;
         }
 

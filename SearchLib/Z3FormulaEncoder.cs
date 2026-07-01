@@ -841,6 +841,25 @@ namespace SearchLib.Smt
                         continue;
                     }
 
+                    if (TryParseWordBoundaryAssertion(out var wordBoundary))
+                    {
+                        var prefix = parts.Count == 0
+                            ? CreateLiteralRegex(string.Empty)
+                            : parts.Count == 1
+                                ? parts[0]
+                                : _context.MkConcat(parts.ToArray());
+                        if (!TryParseConcat(out var suffix, out var suffixConsumed) ||
+                            !TryConstrainSplitWithWordBoundary(prefix, suffix, wordBoundary, out var constrained))
+                        {
+                            regex = null!;
+                            return false;
+                        }
+
+                        consumedAny |= suffixConsumed;
+                        regex = constrained;
+                        return true;
+                    }
+
                     if (!TryParseRepeat(out var part))
                     {
                         regex = null!;
@@ -939,6 +958,22 @@ namespace SearchLib.Smt
                 return true;
             }
 
+            private bool TryParseWordBoundaryAssertion(out bool isBoundary)
+            {
+                isBoundary = false;
+                SkipIgnoredPatternTrivia();
+                if (_position + 1 >= _pattern.Length ||
+                    _pattern[_position] != '\\' ||
+                    _pattern[_position + 1] is not ('b' or 'B'))
+                {
+                    return false;
+                }
+
+                isBoundary = _pattern[_position + 1] == 'b';
+                _position += 2;
+                return true;
+            }
+
             private ReExpr ConstrainSuffixWithLookahead(RegexLookaheadAssertion assertion, ReExpr suffix)
             {
                 _isExact &= assertion.IsExact;
@@ -955,6 +990,56 @@ namespace SearchLib.Smt
                 return assertion.IsPositive
                     ? _context.MkIntersect(new[] { prefix, lookbehindLanguage })
                     : _context.MkDiff(prefix, lookbehindLanguage);
+            }
+
+            private bool TryConstrainSplitWithWordBoundary(
+                ReExpr prefix,
+                ReExpr suffix,
+                bool isBoundary,
+                out ReExpr regex)
+            {
+                regex = null!;
+                if (!TryCreateCharacterRangesRegex(WordRanges.Value, out var wordChar))
+                {
+                    return false;
+                }
+
+                var nonWordChar = _context.MkDiff(CreateAnyCharRegex(), wordChar);
+                var leftWord = ConstrainPrefixEnd(prefix, wordChar);
+                var leftNonWord = _context.MkUnion(new[]
+                {
+                    ConstrainPrefixEnd(prefix, nonWordChar),
+                    _context.MkIntersect(new[] { prefix, CreateLiteralRegex(string.Empty) }),
+                });
+                var rightWord = ConstrainSuffixStart(suffix, wordChar);
+                var rightNonWord = _context.MkUnion(new[]
+                {
+                    ConstrainSuffixStart(suffix, nonWordChar),
+                    _context.MkIntersect(new[] { suffix, CreateLiteralRegex(string.Empty) }),
+                });
+
+                var first = CreateConcat(leftWord, isBoundary ? rightNonWord : rightWord);
+                var second = CreateConcat(leftNonWord, isBoundary ? rightWord : rightNonWord);
+                regex = _context.MkUnion(new[] { first, second });
+                return true;
+            }
+
+            private ReExpr ConstrainPrefixEnd(ReExpr prefix, ReExpr finalCharacter)
+            {
+                return _context.MkIntersect(new[]
+                {
+                    prefix,
+                    CreateConcat(CreateAnyStringRegex(), finalCharacter),
+                });
+            }
+
+            private ReExpr ConstrainSuffixStart(ReExpr suffix, ReExpr firstCharacter)
+            {
+                return _context.MkIntersect(new[]
+                {
+                    suffix,
+                    CreateConcat(firstCharacter, CreateAnyStringRegex()),
+                });
             }
 
             private readonly struct RegexLookaheadAssertion
@@ -1388,9 +1473,7 @@ namespace SearchLib.Smt
 
                 if (escaped is 'b' or 'B')
                 {
-                    _isExact = false;
-                    regex = CreateLiteralRegex(string.Empty);
-                    return true;
+                    return false;
                 }
 
                 if (literal == null)

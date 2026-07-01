@@ -16,6 +16,7 @@ namespace PurelySharp.Symbolic.Smt
     {
         private const int MaxSourcePredicateInlineDepth = 4;
         private const int MaxConditionalPatternDistributionDepth = 4;
+        private const int MaxCollectionExpressionLengthSpreads = 8;
         private const string ImplicitThisVariableName = "this";
         private const string NotNullIfNotNullAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
         private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
@@ -9930,7 +9931,13 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (TryCreateCollectionExpressionLengthFormula(receiverExpression, out lengthFormula))
+            if (TryCreateCollectionExpressionLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
             {
                 return true;
             }
@@ -10102,17 +10109,146 @@ namespace PurelySharp.Symbolic.Smt
 
         private static bool TryCreateCollectionExpressionLengthFormula(
             ExpressionSyntax receiverExpression,
-            out SmtFormula lengthFormula)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
-            if (receiverExpression is not CollectionExpressionSyntax collectionExpression ||
-                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
+            if (receiverExpression is not CollectionExpressionSyntax collectionExpression)
             {
                 lengthFormula = null!;
                 return false;
             }
 
-            lengthFormula = new SmtIntegerConstant(collectionExpression.Elements.Count);
+            SmtFormula? current = null;
+            var spreadCount = 0;
+            foreach (var element in collectionExpression.Elements)
+            {
+                if (element is ExpressionElementSyntax)
+                {
+                    current = AddLengthTerm(current, new SmtIntegerConstant(1));
+                    continue;
+                }
+
+                if (element is not SpreadElementSyntax spreadElement ||
+                    ++spreadCount > MaxCollectionExpressionLengthSpreads ||
+                    !TryCreateCollectionSpreadLengthFormula(
+                        spreadElement.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var spreadLength,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    spreadLength is not { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = null!;
+                    return false;
+                }
+
+                current = AddLengthTerm(current, spreadLength);
+            }
+
+            lengthFormula = current ?? new SmtIntegerConstant(0);
             return true;
+        }
+
+        private static bool TryCreateCollectionSpreadLengthFormula(
+            ExpressionSyntax spreadExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            spreadExpression = UnwrapExpression(spreadExpression);
+            if (spreadExpression is CollectionExpressionSyntax)
+            {
+                return TryCreateCollectionExpressionLengthFormula(
+                    spreadExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth);
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(spreadExpression, cancellationToken);
+            var spreadType = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (IsSupportedBuiltInLengthReceiver(spreadType) &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    spreadExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            return TryCreateKnownCollectionCountLengthFormula(
+                spreadExpression,
+                spreadType,
+                semanticModel,
+                cancellationToken,
+                out lengthFormula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryCreateKnownCollectionCountLengthFormula(
+            ExpressionSyntax receiverExpression,
+            ITypeSymbol? receiverType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverType == null ||
+                !EnumerateKnownNonNegativeCountInterfaces(receiverType, semanticModel.Compilation).Any() ||
+                !TryCreateBuiltInLengthReceiverFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(receiverFormula, "Count", intType, out var countFormula) ||
+                countFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            lengthFormula = countFormula;
+            return true;
+        }
+
+        private static SmtFormula AddLengthTerm(SmtFormula? current, SmtFormula term)
+        {
+            if (current == null)
+            {
+                return term;
+            }
+
+            if (term is SmtIntegerConstant { Value: 0 })
+            {
+                return current;
+            }
+
+            if (current is SmtIntegerConstant { Value: 0 })
+            {
+                return term;
+            }
+
+            return new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, current, term);
         }
 
         private static bool IsArrayEmptyInvocation(

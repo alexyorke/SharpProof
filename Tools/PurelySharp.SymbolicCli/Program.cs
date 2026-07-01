@@ -219,7 +219,7 @@ static void PrintFileResult(
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Merged invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Merged invariant conditions: {result.MergedInvariant.ConditionCount}");
-    PrintInvariantQuery("Merged invariant query", result.InvariantQuery);
+    PrintInvariantQuery("Merged invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Merged path facts", result.MergedPathFacts);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
@@ -257,7 +257,7 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
-    PrintInvariantQuery("Line invariant query", result.InvariantQuery);
+    PrintInvariantQuery("Line invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(result.ConditionProofs);
     foreach (var point in result.ProgramPoints)
@@ -282,7 +282,7 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Span merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Span invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Span invariant conditions: {result.MergedInvariant.ConditionCount}");
-    PrintInvariantQuery("Span invariant query", result.InvariantQuery);
+    PrintInvariantQuery("Span invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(result.ConditionProofs);
     foreach (var point in result.ProgramPoints)
@@ -379,7 +379,8 @@ static void PrintMergedPathFacts(
 
 static void PrintInvariantQuery(
     string label,
-    SymbolicInvariantQueryView query)
+    SymbolicInvariantQueryView query,
+    SymbolicCliOptions options)
 {
     Console.WriteLine(
         $"{label}: " +
@@ -406,8 +407,24 @@ static void PrintInvariantQuery(
         Console.WriteLine(label + " unknowns: " + string.Join("; ", query.UnknownFacts));
     }
 
-    PrintInvariantTargetSummaries(label, query.TargetSummaries);
-    PrintInvariantTargetPathSummaries(label, query.TargetPathSummaries);
+    var targetSummaries = FilterInvariantTargets(
+        query.TargetSummaries,
+        options,
+        static target => target.Target);
+    var targetPathSummaries = FilterInvariantTargets(
+        query.TargetPathSummaries,
+        options,
+        static target => target.Target);
+    if (options.HasInvariantTargetFilter)
+    {
+        Console.WriteLine(label + " target filter: " + string.Join(", ", options.InvariantTargets));
+        Console.WriteLine(
+            label + " target filter matched: " +
+            (targetSummaries.Count != 0 || targetPathSummaries.Count != 0));
+    }
+
+    PrintInvariantTargetSummaries(label, targetSummaries);
+    PrintInvariantTargetPathSummaries(label, targetPathSummaries);
 
     foreach (var diagnostic in query.Diagnostics)
     {
@@ -424,6 +441,30 @@ static void PrintInvariantQuery(
                 suffix);
         }
     }
+}
+
+static IReadOnlyList<TTarget> FilterInvariantTargets<TTarget>(
+    IReadOnlyList<TTarget> targets,
+    SymbolicCliOptions options,
+    Func<TTarget, string> targetSelector)
+{
+    if (!options.HasInvariantTargetFilter)
+    {
+        return targets;
+    }
+
+    return targets
+        .Where(target => options.InvariantTargets.Contains(
+            NormalizeInvariantTarget(targetSelector(target)),
+            StringComparer.Ordinal))
+        .ToArray();
+}
+
+static string NormalizeInvariantTarget(string? target)
+{
+    return string.IsNullOrWhiteSpace(target)
+        ? "path"
+        : target!.Trim();
 }
 
 static void PrintInvariantTargetSummaries(
@@ -515,7 +556,7 @@ static void PrintPointResult(
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
     Console.WriteLine($"Conservative unknown conditions: {result.Invariant.ConservativeUnknownCount}");
-    PrintInvariantQuery("Invariant query", result.InvariantQuery);
+    PrintInvariantQuery("Invariant query", result.InvariantQuery, options);
     if (result.Invariant.ConditionCount != 0)
     {
         Console.WriteLine("Invariant conditions:");
@@ -731,6 +772,8 @@ Options:
                       Keep only program points inside a method/local function containing text. Can be repeated.
   --condition-target <target>
                       Keep only program points with a path condition for the target. Can be repeated.
+  --invariant-target <target>
+                      In compact, invariant, or text output, show per-target invariant summaries only for this target. Can be repeated.
   --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
   --condition-contains <text>
                       Keep only program points with a path condition containing text. Can be repeated.
@@ -783,7 +826,7 @@ Runtime hazard notes:
 
 Examples:
   PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
-  PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json
+  PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
   PurelySharp.SymbolicCli --file Example.cs --line 42 --runtime-hazards
   PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
   PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
@@ -840,6 +883,10 @@ Examples:
     public List<string> MethodNameContains { get; } = new();
 
     public List<string> ConditionTargets { get; } = new();
+
+    public List<string> InvariantTargets { get; } = new();
+
+    public bool HasInvariantTargetFilter => InvariantTargets.Count != 0;
 
     public List<string> Conditions { get; } = new();
 
@@ -945,6 +992,23 @@ Examples:
         ProofConditions.Count != 0 ||
         ProofConditionContains.Count != 0;
 
+    private static void NormalizeStringList(List<string> values)
+    {
+        if (values.Count == 0)
+        {
+            return;
+        }
+
+        var normalized = values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        values.Clear();
+        values.AddRange(normalized);
+    }
+
     public static SymbolicCliOptions Parse(string[] args)
     {
         var options = new SymbolicCliOptions();
@@ -1038,6 +1102,10 @@ Examples:
                 case "--condition-target":
                 case "--target":
                     options.ConditionTargets.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--invariant-target":
+                case "--focus-target":
+                    options.InvariantTargets.Add(ReadString(args, ref index, arg));
                     break;
                 case "--condition":
                     options.Conditions.Add(ReadString(args, ref index, arg));
@@ -1150,6 +1218,8 @@ Examples:
 
         if (!options.ShowHelp)
         {
+            NormalizeStringList(options.InvariantTargets);
+
             if (options.CompactSummaryOnly)
             {
                 options.CompactMaxLines = SymbolicCompactQueryOptions.SummaryOnly.MaxLines;
@@ -1170,6 +1240,11 @@ Examples:
             if (options.CompactJson && options.InvariantJson)
             {
                 throw new ArgumentException("--compact-json cannot be combined with --invariant-json.");
+            }
+
+            if (options.Json && options.HasInvariantTargetFilter)
+            {
+                throw new ArgumentException("--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
             }
 
             if (options.HasCompactOutputLimit && !options.CompactJson && !options.InvariantJson)
@@ -1290,6 +1365,11 @@ Examples:
                 throw new ArgumentException("--invariant-json cannot be combined with --runtime-hazards.");
             }
 
+            if (options.RuntimeHazards && options.HasInvariantTargetFilter)
+            {
+                throw new ArgumentException("--invariant-target cannot be combined with --runtime-hazards.");
+            }
+
             if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1 || options.IsLineColumnSpanQuery))
             {
                 throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
@@ -1377,7 +1457,8 @@ Examples:
             CompactMaxProgramPoints,
             CompactMaxFacts,
             CompactMaxConditions,
-            CompactMaxProofs);
+            CompactMaxProofs,
+            InvariantTargets);
     }
 
     public CompactRuntimeHazardQueryOptions CreateCompactHazardOptions()

@@ -1042,6 +1042,72 @@ namespace PurelySharp.Symbolic.Smt
                         new SmtIntegerConstant(offset));
             }
 
+            private static SmtFormula CreateAffineTerm(AffineIntegerTerm term)
+            {
+                if (term.BaseTerm == null ||
+                    term.Scale == 0)
+                {
+                    return new SmtIntegerConstant(term.Offset);
+                }
+
+                SmtFormula scaled = term.Scale switch
+                {
+                    1 => term.BaseTerm,
+                    -1 => new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, term.BaseTerm),
+                    _ => new SmtIntegerBinaryTerm(
+                        SmtIntegerBinaryOperator.Multiply,
+                        term.BaseTerm,
+                        new SmtIntegerConstant(term.Scale)),
+                };
+
+                return term.Offset == 0
+                    ? scaled
+                    : new SmtIntegerBinaryTerm(
+                        SmtIntegerBinaryOperator.Add,
+                        scaled,
+                        new SmtIntegerConstant(term.Offset));
+            }
+
+            private static bool TryGetIntegerBinaryComparison(
+                SmtFormula formula,
+                out SmtFormula left,
+                out SmtBinaryOperator op,
+                out SmtFormula right)
+            {
+                left = null!;
+                op = default;
+                right = null!;
+
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+                {
+                    if (!TryGetIntegerBinaryComparison(negated.Operand, out left, out op, out right))
+                    {
+                        return false;
+                    }
+
+                    op = NegateComparison(op);
+                    return true;
+                }
+
+                if (formula is not SmtBinaryFormula binary ||
+                    binary.Operator is not (SmtBinaryOperator.Equal or
+                        SmtBinaryOperator.NotEqual or
+                        SmtBinaryOperator.LessThan or
+                        SmtBinaryOperator.LessThanOrEqual or
+                        SmtBinaryOperator.GreaterThan or
+                        SmtBinaryOperator.GreaterThanOrEqual) ||
+                    binary.Left.Kind != SmtValueKind.Int ||
+                    binary.Right.Kind != SmtValueKind.Int)
+                {
+                    return false;
+                }
+
+                left = binary.Left;
+                op = binary.Operator;
+                right = binary.Right;
+                return true;
+            }
+
             private static bool TryGetAliasComparison(
                 SmtFormula formula,
                 out SmtFormula left,
@@ -2149,7 +2215,7 @@ namespace PurelySharp.Symbolic.Smt
                 hasContradiction = false;
                 if (!TryGetIntegerComparison(formula, out var term, out var op, out var constant))
                 {
-                    return false;
+                    return TryAddAffineIntegerComparisonFact(formula, out hasContradiction);
                 }
 
                 term = NormalizeAliases(term);
@@ -2193,6 +2259,132 @@ namespace PurelySharp.Symbolic.Smt
                 added |= AddIntegerIntervalFact(normalizedTerm, normalizedOp, normalizedConstant, out var normalizedContradiction);
                 hasContradiction |= normalizedContradiction;
                 return added;
+            }
+
+            private bool TryAddAffineIntegerComparisonFact(
+                SmtFormula formula,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!TryGetIntegerBinaryComparison(formula, out var left, out var op, out var right))
+                {
+                    return false;
+                }
+
+                left = NormalizeAliases(left);
+                right = NormalizeAliases(right);
+                if (TryGetKnownInteger(left, out var leftKnown) &&
+                    TryGetKnownInteger(right, out var rightKnown))
+                {
+                    return TryClassifyConstantComparison(
+                        leftKnown,
+                        op,
+                        rightKnown,
+                        out hasContradiction);
+                }
+
+                if (TryGetKnownInteger(right, out var rightConstant) &&
+                    TryGetAffineIntegerTerm(left, depth: 0, out var leftAffine))
+                {
+                    return AddAffineIntegerComparisonFact(
+                        leftAffine,
+                        op,
+                        rightConstant,
+                        out hasContradiction);
+                }
+
+                if (TryGetKnownInteger(left, out var leftConstant) &&
+                    TryGetAffineIntegerTerm(right, depth: 0, out var rightAffine))
+                {
+                    return AddAffineIntegerComparisonFact(
+                        rightAffine,
+                        ReverseComparison(op),
+                        leftConstant,
+                        out hasContradiction);
+                }
+
+                if (!TryGetAffineIntegerTerm(left, depth: 0, out var leftTerm) ||
+                    !TryGetAffineIntegerTerm(right, depth: 0, out var rightTerm) ||
+                    !TrySubtract(leftTerm, rightTerm, out var difference))
+                {
+                    return false;
+                }
+
+                return AddAffineIntegerComparisonFact(
+                    difference,
+                    op,
+                    0,
+                    out hasContradiction);
+            }
+
+            private bool AddAffineIntegerComparisonFact(
+                AffineIntegerTerm term,
+                SmtBinaryOperator op,
+                long constant,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (term.BaseTerm == null ||
+                    term.Scale == 0)
+                {
+                    return TryClassifyConstantComparison(
+                        term.Offset,
+                        op,
+                        constant,
+                        out hasContradiction);
+                }
+
+                var formula = CreateAffineTerm(term);
+                if (!TryNormalizeAffineIntegerComparison(
+                    formula,
+                    op,
+                    constant,
+                    out var normalizedTerm,
+                    out var normalizedOp,
+                    out var normalizedConstant,
+                    out var affineContradiction,
+                    out var affineTautology))
+                {
+                    return false;
+                }
+
+                if (affineContradiction)
+                {
+                    hasContradiction = true;
+                    return true;
+                }
+
+                if (affineTautology)
+                {
+                    return false;
+                }
+
+                return AddIntegerIntervalFact(
+                    normalizedTerm,
+                    normalizedOp,
+                    normalizedConstant,
+                    out hasContradiction);
+            }
+
+            private static bool TryClassifyConstantComparison(
+                long left,
+                SmtBinaryOperator op,
+                long right,
+                out bool hasContradiction)
+            {
+                if (!TryEvaluateConstantComparison(
+                    left,
+                    op,
+                    right,
+                    out var constantContradiction,
+                    out var constantTautology))
+                {
+                    hasContradiction = false;
+                    return false;
+                }
+
+                hasContradiction = constantContradiction;
+                return constantContradiction || !constantTautology;
             }
 
             private bool AddIntegerIntervalFact(

@@ -284,6 +284,82 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadArrayLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values != null)
+        {
+            int[] copy = [0, .. values, 1];
+            return copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return copy.Length;",
+                "copy.Length == values.Length + 2");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadCountLength()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyCollection<int> values)
+    {
+        if (values != null)
+        {
+            int[] copy = [0, .. values, 1];
+            return copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return copy.Length;",
+                "copy.Length == values.Count + 2");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_EnumerableCollectionExpressionSpreadLengthRemainsUnknown()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IEnumerable<int> values)
+    {
+        if (values != null)
+        {
+            int[] copy = [.. values, 1];
+            return copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return copy.Length;",
+                "copy.Length == 1");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesListIndexerRangeThroughCountGuard()
         {
             const string source = @"

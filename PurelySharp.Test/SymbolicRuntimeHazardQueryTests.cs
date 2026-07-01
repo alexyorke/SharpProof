@@ -383,6 +383,181 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesDeconstructionNullReceiverDereference()
+        {
+            const string source = @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is null)
+        {
+            int left;
+            int right;
+            (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "(left, right) = pair;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.SimpleAssignmentExpression.ToString()));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_PrunesDeconstructionNullReceiverAfterNonNullGuard()
+        {
+            const string source = @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is not null)
+        {
+            int left;
+            int right;
+            (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "(left, right) = pair;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesDeconstructionDeclarationNullReceiverDereference()
+        {
+            const string source = @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is null)
+        {
+            var (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "var (left, right) = pair;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_deconstruction_null"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DoesNotTreatExtensionDeconstructionNullSourceAsImplicitDereference()
+        {
+            const string source = @"
+public sealed class Pair
+{
+}
+
+public static class PairExtensions
+{
+    public static void Deconstruct(this Pair pair, out int left, out int right)
+    {
+        left = 1;
+        right = 2;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Pair? pair)
+    {
+        if (pair is null)
+        {
+            int left;
+            int right;
+            (left, right) = pair;
+            return left + right;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "(left, right) = pair;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesForeachNullSourceDereference()
         {
             const string source = @"

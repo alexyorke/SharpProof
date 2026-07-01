@@ -1541,6 +1541,74 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSpanQueryResult_ToInvariantQueryResult_FiltersTargetSummaries()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        var other = value;
+        if (copy > 0 && other < 10)
+        {
+            return copy + other;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "InvariantQueryTargetFilter.cs");
+            var compilation = CSharpCompilation.Create(
+                "InvariantQueryTargetFilter",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0", "other < 10" });
+            Assert.That(
+                result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+                Does.Contain("copy"));
+            Assert.That(
+                result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+                Does.Contain("other"));
+
+            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+                maxConditions: 10,
+                maxProofs: 10,
+                invariantTargets: new[] { " copy ", "copy" }));
+
+            Assert.That(invariantResult.InvariantQuery.HasTargetFilter, Is.True);
+            Assert.That(invariantResult.InvariantQuery.TargetFilterCount, Is.EqualTo(1));
+            Assert.That(invariantResult.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(invariantResult.InvariantQuery.TargetFilterMatched, Is.True);
+            Assert.That(
+                invariantResult.InvariantQuery.UnfilteredTargetPathSummaryCount,
+                Is.GreaterThan(invariantResult.InvariantQuery.TargetPathSummaryCount));
+            Assert.That(
+                invariantResult.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+                Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(
+                invariantResult.InvariantQuery.TargetSummaries.Select(static summary => summary.Target),
+                Is.All.EqualTo("copy"));
+            Assert.That(invariantResult.QuerySummary.Targets, Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(invariantResult.QuerySummary.Targets, Does.Not.Contain("other"));
+            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(result.ConditionProofs.Count));
+        }
+
+        [Test]
         public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
         {
             var points = new[]
@@ -2017,6 +2085,91 @@ public class TestClass
                         .SelectMany(static point => point.GetProperty("conditionProofs").EnumerateArray())
                         .Any(static proof => proof.GetProperty("truthValue").GetString() == SymbolicTruthValue.ProvenTrue.ToString()),
                     Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_InvariantTargetFilter_NarrowsInvariantJsonTargetSections()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        var other = value;
+        if (copy > 0 && other < 10)
+        {
+            return copy + other;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvariantTargetFilter-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
+                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--span-start",
+                    spanStart.ToString(),
+                    "--span-end",
+                    spanEnd.ToString(),
+                    "--check-reachability",
+                    "--implies",
+                    "copy > 0",
+                    "--implies",
+                    "other < 10",
+                    "--invariant-json",
+                    "--invariant-target",
+                    "copy",
+                    "--max-conditions",
+                    "10",
+                    "--max-proofs",
+                    "10");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
+
+                var querySummary = root.GetProperty("querySummary");
+                Assert.That(
+                    querySummary.GetProperty("targets").EnumerateArray().Select(static target => target.GetString()),
+                    Is.EquivalentTo(new[] { "copy" }));
+
+                var invariantQuery = root.GetProperty("invariantQuery");
+                Assert.That(invariantQuery.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
+                Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(invariantQuery.GetProperty("targetFilters")[0].GetString(), Is.EqualTo("copy"));
+                Assert.That(invariantQuery.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
+                Assert.That(
+                    invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
+                    Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
+
+                var targetSummaries = invariantQuery.GetProperty("targetSummaries")
+                    .EnumerateArray()
+                    .Select(static summary => summary.GetProperty("target").GetString())
+                    .ToArray();
+                Assert.That(targetSummaries, Is.All.EqualTo("copy"));
+                Assert.That(targetSummaries, Does.Not.Contain("other"));
+
+                var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries")
+                    .EnumerateArray()
+                    .Select(static summary => summary.GetProperty("target").GetString())
+                    .ToArray();
+                Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
             }
             finally
             {

@@ -847,7 +847,7 @@ namespace PurelySharp.Test
                 {
                     new SmtUnaryFormula(
                         SmtUnaryOperator.Not,
-                        new SmtRegexMatchFormula(text, @"\A\bA\z")),
+                        new SmtRegexMatchFormula(text, @"\A(?>A*)A\z")),
                     new SmtBinaryFormula(
                         SmtBinaryOperator.Equal,
                         new SmtStringLengthTerm(text),
@@ -859,7 +859,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_ApproximateRegexSatisfiableResult_ReturnsUnknown()
+        public void SmtSolver_WordBoundaryRegexSatisfiableResult_IsSatisfiable()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -872,7 +872,58 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_WordBoundaryBetweenWordsIsUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AA\bB\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NonWordBoundaryBetweenWordsIsSatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AA\BB\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NonWordBoundaryBetweenWordAndPunctuationIsUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AA\B!\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("A!")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
         }
 
         [Test]
@@ -1089,7 +1140,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_ApproximateRegexPathStillProvesLengthImplication()
+        public void SmtSolver_WordBoundaryRegexPathProvesLengthImplication()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -1110,7 +1161,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_ApproximateRegexConclusionDoesNotBecomeProof()
+        public void SmtSolver_WordBoundaryRegexConclusionDoesNotBecomeProof()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -1125,7 +1176,7 @@ namespace PurelySharp.Test
                 textIsBoundaryA,
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
         }
 
         [Test]
