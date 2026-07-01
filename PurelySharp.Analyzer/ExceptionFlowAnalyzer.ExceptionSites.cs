@@ -171,47 +171,19 @@ namespace PurelySharp.Analyzer
         {
             foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
-                if (node is MemberAccessExpressionSyntax memberAccess)
+                if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                        node,
+                        UnwrapFactExpression,
+                        out var site,
+                        out var receiver,
+                        out var category,
+                        out var source) &&
+                    IsDefiniteDynamicNullReceiver(receiver, site, semanticModel, cancellationToken, smtAnalysis))
                 {
-                    if ((memberAccess.Parent is InvocationExpressionSyntax { Expression: var invocationExpression } &&
-                         ReferenceEquals(invocationExpression, memberAccess)) ||
-                        !IsDefiniteDynamicNullReceiver(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis))
-                    {
-                        continue;
-                    }
-
                     yield return new DynamicNullBindingSite(
-                        memberAccess,
-                        "definite_dynamic_member_null_binding",
-                        "dynamic_member");
-                }
-                else if (node is ElementAccessExpressionSyntax elementAccess)
-                {
-                    if (!IsDefiniteDynamicNullReceiver(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis))
-                    {
-                        continue;
-                    }
-
-                    yield return new DynamicNullBindingSite(
-                        elementAccess,
-                        "definite_dynamic_index_null_binding",
-                        "dynamic_index");
-                }
-                else if (node is InvocationExpressionSyntax invocation)
-                {
-                    var invocationExpression = UnwrapFactExpression(invocation.Expression);
-                    var receiver = invocationExpression is MemberAccessExpressionSyntax invocationMemberAccess
-                        ? invocationMemberAccess.Expression
-                        : invocation.Expression;
-                    if (!IsDefiniteDynamicNullReceiver(receiver, invocation, semanticModel, cancellationToken, smtAnalysis))
-                    {
-                        continue;
-                    }
-
-                    yield return new DynamicNullBindingSite(
-                        invocation,
-                        "definite_dynamic_invocation_null_binding",
-                        "dynamic_invocation");
+                        site,
+                        category,
+                        source);
                 }
             }
         }

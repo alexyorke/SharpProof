@@ -108,19 +108,22 @@ namespace PurelySharp.Symbolic
                         yield return nullableCandidate;
                     }
 
-                    if (memberAccess.Parent is not InvocationExpressionSyntax { Expression: var invocationExpression } ||
-                        !ReferenceEquals(invocationExpression, memberAccess))
+                    if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                            memberAccess,
+                            UnwrapDynamicExpression,
+                            out var memberDynamicSite,
+                            out var memberDynamicReceiver,
+                            out var memberDynamicCategory,
+                            out _) &&
+                        TryCreateDynamicNullBindingCandidate(
+                            memberDynamicSite,
+                            memberDynamicReceiver,
+                            memberDynamicCategory,
+                            semanticModel,
+                            cancellationToken,
+                            out var memberDynamicCandidate))
                     {
-                        if (TryCreateDynamicNullBindingCandidate(
-                                memberAccess,
-                                memberAccess.Expression,
-                                "definite_dynamic_member_null_binding",
-                                semanticModel,
-                                cancellationToken,
-                                out var memberDynamicCandidate))
-                        {
-                            yield return memberDynamicCandidate;
-                        }
+                        yield return memberDynamicCandidate;
                     }
 
                     if (TryCreateNullDereferenceCandidate(memberAccess, memberAccess.Expression, semanticModel, cancellationToken, out var memberNullCandidate))
@@ -130,10 +133,17 @@ namespace PurelySharp.Symbolic
 
                     break;
                 case ElementAccessExpressionSyntax elementAccess:
-                    if (TryCreateDynamicNullBindingCandidate(
+                    if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
                             elementAccess,
-                            elementAccess.Expression,
-                            "definite_dynamic_index_null_binding",
+                            UnwrapDynamicExpression,
+                            out var elementDynamicSite,
+                            out var elementDynamicReceiver,
+                            out var elementDynamicCategory,
+                            out _) &&
+                        TryCreateDynamicNullBindingCandidate(
+                            elementDynamicSite,
+                            elementDynamicReceiver,
+                            elementDynamicCategory,
                             semanticModel,
                             cancellationToken,
                             out var elementDynamicCandidate))
@@ -920,15 +930,21 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardCandidate candidate)
         {
             candidate = default;
-            var expression = UnwrapExpression(invocation.Expression);
-            var receiver = expression is MemberAccessExpressionSyntax memberAccess
-                ? memberAccess.Expression
-                : invocation.Expression;
+            if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                    invocation,
+                    UnwrapExpression,
+                    out var site,
+                    out var receiver,
+                    out var category,
+                    out _))
+            {
+                return false;
+            }
 
             return TryCreateDynamicNullBindingCandidate(
-                invocation,
+                site,
                 receiver,
-                "definite_dynamic_invocation_null_binding",
+                category,
                 semanticModel,
                 cancellationToken,
                 out candidate);
@@ -953,7 +969,7 @@ namespace PurelySharp.Symbolic
                 site,
                 SymbolicRuntimeHazardKind.DynamicNullBinding,
                 trigger,
-                "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException",
+                SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
                 category);
             return true;
         }

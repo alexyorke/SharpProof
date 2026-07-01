@@ -302,7 +302,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException");
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType);
                 if (IsCaughtWithinMethod(dynamicNullBindingSite.Site, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
@@ -313,7 +313,7 @@ namespace PurelySharp.Analyzer
                     methodSymbol,
                     new ExceptionCandidate(
                         exceptionType,
-                        "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException",
+                        SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
                         dynamicNullBindingSite.Category,
                         dynamicNullBindingSite.Source));
             }
@@ -814,9 +814,7 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_lock_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_throw_null", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_dynamic_member_null_binding", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_dynamic_invocation_null_binding", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_dynamic_index_null_binding", StringComparison.Ordinal) ||
+                SymbolicDynamicNullBindingFacts.IsDynamicNullBindingCategory(category) ||
                 string.Equals(category, "definite_negative_array_length", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
