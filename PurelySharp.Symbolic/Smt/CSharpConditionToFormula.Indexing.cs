@@ -13,7 +13,48 @@ using SearchLib.Smt;
 namespace PurelySharp.Symbolic.Smt
 {
     public static partial class CSharpConditionToFormula
-    {        private static bool TryTranslateBuiltInElementAccessValue(
+    {
+        internal static SmtFormula CreateSubsequenceInRangeFormula(
+            SmtFormula sourceLength,
+            SmtFormula start,
+            SmtFormula? count,
+            bool oneArgumentUpperBoundIsInclusive)
+        {
+            var startNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                start,
+                new SmtIntegerConstant(0));
+
+            if (count == null)
+            {
+                var upperBound = new SmtBinaryFormula(
+                    oneArgumentUpperBoundIsInclusive
+                        ? SmtBinaryOperator.LessThanOrEqual
+                        : SmtBinaryOperator.LessThan,
+                    start,
+                    sourceLength);
+                return new SmtBinaryFormula(SmtBinaryOperator.And, startNonNegative, upperBound);
+            }
+
+            var countNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                count,
+                new SmtIntegerConstant(0));
+            var end = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                start,
+                count);
+            var endWithinLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                end,
+                sourceLength);
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                startNonNegative,
+                new SmtBinaryFormula(SmtBinaryOperator.And, countNonNegative, endWithinLength));
+        }
+
+        private static bool TryTranslateBuiltInElementAccessValue(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,

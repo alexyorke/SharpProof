@@ -1048,46 +1048,26 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            SmtFormula inRange;
-            var startNonNegative = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                start,
-                new SmtIntegerConstant(0));
-            if (countExpression == null)
-            {
-                var upperBound = new SmtBinaryFormula(
-                    oneArgumentUpperBoundIsInclusive
-                        ? SmtBinaryOperator.LessThanOrEqual
-                        : SmtBinaryOperator.LessThan,
-                    start,
-                    sourceLength);
-                inRange = Conjoin(startNonNegative, upperBound);
-            }
-            else
+            SmtFormula? count = null;
+            if (countExpression != null)
             {
                 if (!CSharpConditionToFormula.TryTranslateValue(
                         countExpression,
                         semanticModel,
                         cancellationToken,
-                        out var count,
+                        out count,
                         getSymbolVersion: null) ||
                     count is not { Kind: SmtValueKind.Int })
                 {
                     return false;
                 }
-
-                var countNonNegative = new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
-                    count,
-                    new SmtIntegerConstant(0));
-                var end = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, start, count);
-                var endWithinLength = new SmtBinaryFormula(
-                    SmtBinaryOperator.LessThanOrEqual,
-                    end,
-                    sourceLength);
-                inRange = Conjoin(startNonNegative, Conjoin(countNonNegative, endWithinLength));
             }
 
+            var inRange = CSharpConditionToFormula.CreateSubsequenceInRangeFormula(
+                sourceLength,
+                start,
+                count,
+                oneArgumentUpperBoundIsInclusive);
             candidate = new RuntimeHazardCandidate(
                 invocation,
                 SymbolicRuntimeHazardKind.ArgumentOutOfRange,

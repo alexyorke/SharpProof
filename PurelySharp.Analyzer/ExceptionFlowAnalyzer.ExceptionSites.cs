@@ -1299,42 +1299,18 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var nonNegativeStart = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                startFormula,
-                new SmtIntegerConstant(0));
-
-            if (lengthExpression == null)
-            {
-                var startWithinLength = new SmtBinaryFormula(
-                    SmtBinaryOperator.LessThanOrEqual,
-                    startFormula,
-                    receiverLengthFormula);
-                inRangeFormula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNegativeStart, startWithinLength);
-                return true;
-            }
-
-            if (!TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out var sliceLengthFormula))
+            SmtFormula? sliceLengthFormula = null;
+            if (lengthExpression != null &&
+                !TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out sliceLengthFormula))
             {
                 return false;
             }
 
-            var nonNegativeLength = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                sliceLengthFormula,
-                new SmtIntegerConstant(0));
-            var end = new SmtIntegerBinaryTerm(
-                SmtIntegerBinaryOperator.Add,
+            inRangeFormula = CSharpConditionToFormula.CreateSubsequenceInRangeFormula(
+                receiverLengthFormula,
                 startFormula,
-                sliceLengthFormula);
-            var endWithinLength = new SmtBinaryFormula(
-                SmtBinaryOperator.LessThanOrEqual,
-                end,
-                receiverLengthFormula);
-            inRangeFormula = new SmtBinaryFormula(
-                SmtBinaryOperator.And,
-                nonNegativeStart,
-                new SmtBinaryFormula(SmtBinaryOperator.And, nonNegativeLength, endWithinLength));
+                sliceLengthFormula,
+                oneArgumentUpperBoundIsInclusive: true);
             return true;
         }
 
