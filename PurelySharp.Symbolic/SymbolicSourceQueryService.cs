@@ -765,7 +765,7 @@ namespace PurelySharp.Symbolic
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
-            var position = GetPosition(syntaxTree, line, column, cancellationToken);
+            var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
             var nodes = FindQueryNodesOnLine(
                 root,
                 syntaxTree,
@@ -950,8 +950,8 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(syntaxTree));
             }
 
-            var spanStart = GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
-            var spanEnd = GetPosition(syntaxTree, endLine, endColumn, cancellationToken);
+            var spanStart = SymbolicSourceLocation.GetPosition(syntaxTree, startLine, startColumn, cancellationToken);
+            var spanEnd = SymbolicSourceLocation.GetPosition(syntaxTree, endLine, endColumn, cancellationToken);
             return QuerySyntaxTreeSpan(
                 syntaxTree,
                 compilation,
@@ -1257,7 +1257,7 @@ namespace PurelySharp.Symbolic
         {
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
-            var position = GetPosition(syntaxTree, line, column, cancellationToken);
+            var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
             var node = FindQueryNode(root, position);
             return AnalyzeProgramPointNode(semanticModel, position, node, smtAnalysis, cancellationToken);
         }
@@ -1409,21 +1409,6 @@ namespace PurelySharp.Symbolic
                 SymbolicTruthValue.Unknown,
                 falseProof.Reason,
                 conditionFormula);
-        }
-
-        public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-        {
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            {
-                return ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
-            }
-
-            return trustedPlatformAssemblies!
-                .Split(Path.PathSeparator)
-                .Where(static path => !string.IsNullOrWhiteSpace(path))
-                .Select(static path => MetadataReference.CreateFromFile(path))
-                .ToImmutableArray<MetadataReference>();
         }
 
         private static bool TryCreateSpeculativeCondition(
@@ -1584,38 +1569,6 @@ namespace PurelySharp.Symbolic
                 .OrderBy(node => node.Span.Length)
                 .FirstOrDefault()
                 ?? expression;
-        }
-
-        private static int GetPosition(
-            SyntaxTree syntaxTree,
-            int line,
-            int column,
-            CancellationToken cancellationToken)
-        {
-            if (line < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
-            }
-
-            if (column < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(column), "--column must be 1 or greater.");
-            }
-
-            var text = syntaxTree.GetText(cancellationToken);
-            if (line > text.Lines.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
-            }
-
-            var textLine = text.Lines[line - 1];
-            var zeroBasedColumn = column - 1;
-            if (zeroBasedColumn > textLine.Span.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(column), "--column exceeds the line length.");
-            }
-
-            return textLine.Start + zeroBasedColumn;
         }
 
         private sealed class ProgramPointQueryContext

@@ -51,6 +51,38 @@ namespace PurelySharp.Symbolic
             return TextSpan.FromBounds(spanStart, spanEnd);
         }
 
+        public static int GetPosition(
+            SyntaxTree syntaxTree,
+            int line,
+            int column,
+            CancellationToken cancellationToken)
+        {
+            if (line < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
+            }
+
+            if (column < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(column), "--column must be 1 or greater.");
+            }
+
+            var text = syntaxTree.GetText(cancellationToken);
+            if (line > text.Lines.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
+            }
+
+            var textLine = text.Lines[line - 1];
+            var zeroBasedColumn = column - 1;
+            if (zeroBasedColumn > textLine.Span.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(column), "--column exceeds the line length.");
+            }
+
+            return textLine.Start + zeroBasedColumn;
+        }
+
         public static LineColumn GetLineAndColumn(
             SyntaxTree syntaxTree,
             int position,

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,6 +11,21 @@ namespace PurelySharp.Symbolic
 {
     internal static class SymbolicSourceCompilation
     {
+        public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        {
+            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+            {
+                return ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
+            }
+
+            return trustedPlatformAssemblies!
+                .Split(Path.PathSeparator)
+                .Where(static path => !string.IsNullOrWhiteSpace(path))
+                .Select(static path => MetadataReference.CreateFromFile(path))
+                .ToImmutableArray<MetadataReference>();
+        }
+
         public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
             string sourceText,
             string filePath,
@@ -32,7 +49,7 @@ namespace PurelySharp.Symbolic
                 new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
                 cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray() ?? SymbolicSourceQueryService.GetTrustedPlatformReferences();
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
