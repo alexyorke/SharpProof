@@ -8000,25 +8000,25 @@ namespace PurelySharp.Symbolic
         {
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                targetFormula.Kind != SmtValueKind.Int ||
-                previousValue.Kind != SmtValueKind.Int ||
-                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)) ||
-                ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken) ||
                 !CSharpConditionToFormula.TryTranslateValue(
                     assignment.Right,
                     semanticModel,
                     cancellationToken,
                     out var rightValue,
                     getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                rightValue is not { Kind: SmtValueKind.Int } ||
-                !TryCreateCompoundAssignmentValue(assignment.Kind(), previousValue, rightValue, out var updatedValue))
+                    inlineDepth: 0))
             {
                 return false;
             }
 
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
-            return true;
+            return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
+                targetFormula,
+                previousValue,
+                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)),
+                ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken),
+                assignment.Kind(),
+                rightValue,
+                out fact);
         }
 
         private static bool TryCreateIncrementOrDecrementFact(
@@ -8028,43 +8028,17 @@ namespace PurelySharp.Symbolic
             out SmtFormula fact)
         {
             fact = null!;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                targetFormula.Kind != SmtValueKind.Int ||
-                previousValue.Kind != SmtValueKind.Int ||
-                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)))
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula))
             {
                 return false;
             }
 
-            var updatedValue = delta > 0
-                ? new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, new SmtIntegerConstant(delta))
-                : new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, new SmtIntegerConstant(-delta));
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
-            return true;
-        }
-
-        private static bool TryCreateCompoundAssignmentValue(
-            SyntaxKind assignmentKind,
-            SmtFormula previousValue,
-            SmtFormula rightValue,
-            out SmtFormula updatedValue)
-        {
-            switch (assignmentKind)
-            {
-                case SyntaxKind.AddAssignmentExpression:
-                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, rightValue);
-                    return true;
-                case SyntaxKind.SubtractAssignmentExpression:
-                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, rightValue);
-                    return true;
-                case SyntaxKind.MultiplyAssignmentExpression
-                    when previousValue is SmtIntegerConstant || rightValue is SmtIntegerConstant:
-                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, previousValue, rightValue);
-                    return true;
-                default:
-                    updatedValue = null!;
-                    return false;
-            }
+            return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
+                targetFormula,
+                previousValue,
+                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)),
+                delta,
+                out fact);
         }
 
         private static bool TryGetCurrentSymbolValue(
