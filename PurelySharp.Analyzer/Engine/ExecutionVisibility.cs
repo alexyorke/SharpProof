@@ -452,7 +452,10 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            var pathConditions = CollectPathConditionsAt(syntaxNode, semanticModel, cancellationToken);
+            var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(
+                syntaxNode,
+                semanticModel,
+                cancellationToken);
             return PathConditionsAreUnsatisfiable(pathConditions, smtAnalysis);
         }
 
@@ -494,9 +497,9 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysFalseUsingSmt(
+            return SymbolicReachabilityService.IsFormulaAlwaysFalse(
                 sectionCondition,
-                CollectPathConditionsAt(switchStatement, semanticModel, cancellationToken),
+                SymbolicReachabilityService.CollectPathConditionsAt(switchStatement, semanticModel, cancellationToken),
                 smtAnalysis);
         }
 
@@ -677,15 +680,10 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysFalseUsingSmt(
+            return SymbolicReachabilityService.IsFormulaAlwaysFalse(
                 armCondition,
-                CollectPathConditionsAt(switchExpression, semanticModel, cancellationToken),
+                SymbolicReachabilityService.CollectPathConditionsAt(switchExpression, semanticModel, cancellationToken),
                 smtAnalysis);
-        }
-
-        private static bool IsFormulaAlwaysFalseUsingSmt(SmtFormula formula, SmtAnalysisService? smtAnalysis)
-        {
-            return IsFormulaAlwaysFalseUsingSmt(formula, Array.Empty<SmtFormula>(), smtAnalysis);
         }
 
         private static bool IsReferenceKnownNullAt(
@@ -705,9 +703,9 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysTrueUsingSmt(
+            return SymbolicReachabilityService.IsFormulaAlwaysTrue(
                 nullFormula,
-                CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken),
                 smtAnalysis);
         }
 
@@ -728,9 +726,9 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysTrueUsingSmt(
+            return SymbolicReachabilityService.IsFormulaAlwaysTrue(
                 nonNullFormula,
-                CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken),
                 smtAnalysis);
         }
 
@@ -778,25 +776,6 @@ namespace PurelySharp.Analyzer.Engine
             return true;
         }
 
-        private static bool IsFormulaAlwaysTrueUsingSmt(
-            SmtFormula formula,
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SmtAnalysisService? smtAnalysis)
-        {
-            return IsFormulaAlwaysFalseUsingSmt(
-                new SmtUnaryFormula(SmtUnaryOperator.Not, formula),
-                pathConditions,
-                smtAnalysis);
-        }
-
-        private static bool IsFormulaAlwaysFalseUsingSmt(
-            SmtFormula formula,
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SmtAnalysisService? smtAnalysis)
-        {
-            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
-        }
-
         private static bool IsForInitialEntryConditionAlwaysFalseUsingSmt(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
@@ -808,7 +787,7 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
+            var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
             if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
@@ -826,7 +805,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
-            return IsBranchConditionUnreachable(formula, pathConditions, smtAnalysis);
+            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
         private static bool IsConditionAlwaysFalseAt(
@@ -841,7 +820,7 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
         }
 
         private static bool IsConditionAlwaysTrueAt(
@@ -856,7 +835,7 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
         }
 
         public static bool IsConditionAlwaysTrue(
@@ -1025,12 +1004,12 @@ namespace PurelySharp.Analyzer.Engine
             var domainFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
             CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, domainFacts);
 
-            if (IsBranchConditionUnreachable(formula, domainFacts, smtAnalysis))
+            if (SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, domainFacts, smtAnalysis))
             {
                 return KnownBooleanValue.False;
             }
 
-            if (IsBranchConditionUnreachable(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), domainFacts, smtAnalysis))
+            if (SymbolicReachabilityService.IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), domainFacts, smtAnalysis))
             {
                 return KnownBooleanValue.True;
             }
@@ -1069,22 +1048,6 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return KnownBooleanValue.Unknown;
-        }
-
-        private static bool IsBranchConditionUnreachable(
-            SmtFormula formula,
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SmtAnalysisService? smtAnalysis)
-        {
-            return SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
-        }
-
-        private static List<SmtFormula> CollectPathConditionsAt(
-            SyntaxNode site,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
         }
 
         private static bool PathConditionsAreUnsatisfiable(
