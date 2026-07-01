@@ -2145,23 +2145,7 @@ namespace PurelySharp.Analyzer
 
         private static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)
         {
-            while (true)
-            {
-                if (expression is ParenthesizedExpressionSyntax parenthesized)
-                {
-                    expression = parenthesized.Expression;
-                    continue;
-                }
-
-                if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                    postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-                {
-                    expression = postfixUnary.Operand;
-                    continue;
-                }
-
-                return expression;
-            }
+            return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         }
 
         private static bool ExpressionMatchesSymbol(

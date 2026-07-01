@@ -2727,21 +2727,7 @@ namespace PurelySharp.Symbolic
 
         private static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression)
         {
-            while (true)
-            {
-                switch (expression)
-                {
-                    case ParenthesizedExpressionSyntax parenthesized:
-                        expression = parenthesized.Expression;
-                        continue;
-                    case PostfixUnaryExpressionSyntax postfixUnary
-                        when postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression):
-                        expression = postfixUnary.Operand;
-                        continue;
-                    default:
-                        return expression;
-                }
-            }
+            return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         }
 
     }

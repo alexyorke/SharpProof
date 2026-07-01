@@ -940,23 +940,7 @@ namespace PurelySharp.Analyzer.Engine
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
         {
-            while (true)
-            {
-                if (expression is ParenthesizedExpressionSyntax parenthesizedExpression)
-                {
-                    expression = parenthesizedExpression.Expression;
-                    continue;
-                }
-
-                if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                    postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-                {
-                    expression = postfixUnary.Operand;
-                    continue;
-                }
-
-                return expression;
-            }
+            return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         }
 
         private static KnownBooleanValue Negate(KnownBooleanValue value)
