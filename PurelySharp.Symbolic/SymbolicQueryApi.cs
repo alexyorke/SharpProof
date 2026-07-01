@@ -423,8 +423,12 @@ namespace PurelySharp.Symbolic
                     options.SmtAnalysis,
                     cancellationToken,
                     options.IncludeCurrentStatementCompletionFacts);
-            var linePosition = GetLineAndColumn(node.SyntaxTree, node.SpanStart, cancellationToken);
-            var span = GetNodeSourceSpan(node.SyntaxTree, node.Span, cancellationToken);
+            var linePosition = SymbolicSourceLocation.GetLineAndColumn(
+                node.SyntaxTree,
+                node.SpanStart,
+                cancellationToken,
+                validatePosition: true);
+            var span = SymbolicSourceLocation.GetNodeSourceSpan(node.SyntaxTree, node.Span, cancellationToken);
             var proofs = CreateNodeProofs(
                 semanticModel,
                 node.SpanStart,
@@ -455,7 +459,7 @@ namespace PurelySharp.Symbolic
                 SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()));
         }
 
-        private static IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
+        private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
             SemanticModel semanticModel,
             int position,
             SymbolicProgramPointAnalysis analysis,
@@ -468,12 +472,15 @@ namespace PurelySharp.Symbolic
                 return Array.Empty<SymbolicConditionProofResult>();
             }
 
-            var service = new SymbolicSourceQueryService();
             var syntaxTree = semanticModel.SyntaxTree;
-            var lineColumn = GetLineAndColumn(syntaxTree, position, cancellationToken);
+            var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+                syntaxTree,
+                position,
+                cancellationToken,
+                validatePosition: true);
             return conditionTexts
                 .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-                .Select(condition => service.ProveConditionAtSyntaxTree(
+                .Select(condition => _sourceQueryService.ProveConditionAtSyntaxTree(
                     syntaxTree,
                     semanticModel.Compilation,
                     lineColumn.Line,
@@ -482,32 +489,6 @@ namespace PurelySharp.Symbolic
                     smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
                     cancellationToken))
                 .ToArray();
-        }
-
-        private static (int Line, int Column) GetLineAndColumn(
-            SyntaxTree syntaxTree,
-            int position,
-            CancellationToken cancellationToken)
-        {
-            var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-                syntaxTree,
-                position,
-                cancellationToken,
-                validatePosition: true);
-            return (lineColumn.Line, lineColumn.Column);
-        }
-
-        private static (int StartLine, int StartColumn, int EndLine, int EndColumn) GetNodeSourceSpan(
-            SyntaxTree syntaxTree,
-            TextSpan span,
-            CancellationToken cancellationToken)
-        {
-            var nodeSourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, span, cancellationToken);
-            return (
-                nodeSourceSpan.StartLine,
-                nodeSourceSpan.StartColumn,
-                nodeSourceSpan.EndLine,
-                nodeSourceSpan.EndColumn);
         }
 
         private SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazards(
