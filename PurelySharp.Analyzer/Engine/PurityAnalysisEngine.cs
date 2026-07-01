@@ -4252,7 +4252,7 @@ namespace PurelySharp.Analyzer.Engine
 
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
+                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
                 CSharpConditionToFormula.TryCreateStringNonNullFormula(
                     valueExpression,
                     semanticModel,
@@ -4327,11 +4327,6 @@ namespace PurelySharp.Analyzer.Engine
                             ? valueString
                             : null,
                     out fact);
-        }
-
-        private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
-        {
-            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
         }
 
         private static bool TryCreateSymbolSmtValue(

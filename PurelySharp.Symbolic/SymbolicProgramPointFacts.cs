@@ -4807,7 +4807,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken)
         {
             SmtFormula? finiteDomainFact = null;
-            var allReferenceElementsDefinitelyNonNull = GetSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
+            var allReferenceElementsDefinitelyNonNull = SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
             foreach (var elementExpression in elementExpressions)
             {
                 if (ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken))
@@ -4987,7 +4987,7 @@ namespace PurelySharp.Symbolic
             valueFormulas = ImmutableArray<SmtFormula>.Empty;
             if (semanticModel.GetSymbolInfo(UnwrapExpression(expressionSyntax), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
                 receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
-                GetSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                SymbolicFactFactory.GetTrackedSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
                 !TryGetPriorAssignedFiniteElementCount(
                     expressionSyntax,
                     foreachStatement,
@@ -5454,7 +5454,7 @@ namespace PurelySharp.Symbolic
         {
             foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
             {
-                if (GetSymbolType(symbol) is IArrayTypeSymbol)
+                if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is IArrayTypeSymbol)
                 {
                     yield return symbol;
                 }
@@ -5467,7 +5467,7 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            if (!IsPotentiallyMutableThroughReference(GetSymbolType(symbol)))
+            if (!IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
             {
                 return false;
             }
@@ -5570,7 +5570,7 @@ namespace PurelySharp.Symbolic
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
                 TryCreateSymbolSmtValue(assignedSymbol, out var targetReferenceFormula) &&
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                GetSymbolType(assignedSymbol)?.SpecialType == SpecialType.System_String &&
+                SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol)?.SpecialType == SpecialType.System_String &&
                 CSharpConditionToFormula.TryCreateStringNonNullFormula(
                     effectiveValueExpression,
                     semanticModel,
@@ -5740,7 +5740,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (!TryGetDirectLocalOrParameterSymbol(valueExpression, semanticModel, cancellationToken, out var sourceSymbol) ||
+            if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                    UnwrapExpression(valueExpression),
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceSymbol) ||
                 SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol))
             {
                 return;
@@ -6007,8 +6011,8 @@ namespace PurelySharp.Symbolic
             ISymbol sourceSymbol,
             List<SmtFormula> facts)
         {
-            if (GetSymbolType(assignedSymbol) is not IArrayTypeSymbol assignedArrayType ||
-                GetSymbolType(sourceSymbol) is not IArrayTypeSymbol sourceArrayType ||
+            if (SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol) is not IArrayTypeSymbol assignedArrayType ||
+                SymbolicFactFactory.GetTrackedSymbolType(sourceSymbol) is not IArrayTypeSymbol sourceArrayType ||
                 assignedArrayType.Rank != sourceArrayType.Rank ||
                 assignedArrayType.Rank <= 1)
             {
@@ -6032,7 +6036,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (GetSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
+            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
             {
                 return;
             }
@@ -6073,19 +6077,6 @@ namespace PurelySharp.Symbolic
                     }
                 }
             }
-        }
-
-        private static bool TryGetDirectLocalOrParameterSymbol(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out ISymbol symbol)
-        {
-            return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-                UnwrapExpression(expression),
-                semanticModel,
-                cancellationToken,
-                out symbol);
         }
 
         private static void AddTupleElementSourceSymbolSnapshotFacts(
@@ -6683,7 +6674,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (GetSymbolType(assignedSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+            if (SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
                 !TryGetFiniteElementExpressions(valueExpression, out var elementExpressions))
             {
                 return;
@@ -6833,7 +6824,7 @@ namespace PurelySharp.Symbolic
                     out var priorIndex) ||
                 semanticModel.GetSymbolInfo(UnwrapExpression(elementAccess.Expression), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
                 receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
-                GetSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                SymbolicFactFactory.GetTrackedSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
                 !TryCreateArrayElementSmtValue(receiverSymbol, arrayType.ElementType, priorIndex, out formula))
             {
                 formula = null;
@@ -7057,7 +7048,7 @@ namespace PurelySharp.Symbolic
             string elementName,
             out ITypeSymbol elementType)
         {
-            var type = GetSymbolType(tupleSymbol);
+            var type = SymbolicFactFactory.GetTrackedSymbolType(tupleSymbol);
             if (type is not INamedTypeSymbol { IsTupleType: true } tupleType)
             {
                 elementType = null!;
@@ -7220,7 +7211,7 @@ namespace PurelySharp.Symbolic
             List<SmtFormula> facts)
         {
             if (!TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) ||
-                !TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType))
+                !TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol), out var underlyingType))
             {
                 return;
             }
@@ -7525,7 +7516,7 @@ namespace PurelySharp.Symbolic
 
             if (TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) &&
                 TryCreateNullableValueFormula(assignedSymbol, out var targetValue) &&
-                TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
+                TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol), out var underlyingType) &&
                 ConditionalAccessWhenNotNullHasType(
                     conditionalAccess,
                     underlyingType,
@@ -7690,7 +7681,7 @@ namespace PurelySharp.Symbolic
                     facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
                 }
             }
-            else if (TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
+            else if (TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol), out var underlyingType) &&
                      TryTranslateNullableWrappedValueForUnderlyingType(
                          valueExpression,
                          underlyingType,
@@ -7742,7 +7733,7 @@ namespace PurelySharp.Symbolic
 
         private static bool TryCreateNullableHasValueFormula(ISymbol symbol, out SmtFormula formula)
         {
-            if (!TryGetNullableUnderlyingType(GetSymbolType(symbol), out _))
+            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out _))
             {
                 formula = null!;
                 return false;
@@ -7754,7 +7745,7 @@ namespace PurelySharp.Symbolic
 
         private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
         {
-            if (!TryGetNullableUnderlyingType(GetSymbolType(symbol), out var underlyingType) ||
+            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out var underlyingType) ||
                 !TryGetValueKind(underlyingType, out var kind))
             {
                 formula = null!;
@@ -7941,19 +7932,19 @@ namespace PurelySharp.Symbolic
             SmtFormula sourceFormula,
             List<SmtFormula> facts)
         {
-            if (TryCreateBuiltInLengthFormulaForReference(sourceFormula, GetSymbolType(targetSymbol), out var sourceLength) &&
+            if (TryCreateBuiltInLengthFormulaForReference(sourceFormula, SymbolicFactFactory.GetTrackedSymbolType(targetSymbol), out var sourceLength) &&
                 TryCreateBuiltInLengthFormula(targetSymbol, out var targetLength))
             {
                 AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
             }
 
-            if (TryCreateStringContentFormulaForReference(sourceFormula, GetSymbolType(targetSymbol), out var sourceString) &&
+            if (TryCreateStringContentFormulaForReference(sourceFormula, SymbolicFactFactory.GetTrackedSymbolType(targetSymbol), out var sourceString) &&
                 TryCreateStringContentFormula(targetSymbol, out var targetString))
             {
                 AddSubstitutedCurrentFacts(facts, sourceString, targetString);
             }
 
-            if (GetSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } arrayType)
+            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } arrayType)
             {
                 return;
             }
@@ -8349,7 +8340,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             if (dimension < 0 ||
-                GetSymbolType(symbol) is not IArrayTypeSymbol arrayType)
+                SymbolicFactFactory.GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType)
             {
                 formula = null!;
                 return false;
@@ -8441,11 +8432,6 @@ namespace PurelySharp.Symbolic
 
             formula = null!;
             return false;
-        }
-
-        private static ITypeSymbol? GetSymbolType(ISymbol symbol)
-        {
-            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
         }
 
         private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)

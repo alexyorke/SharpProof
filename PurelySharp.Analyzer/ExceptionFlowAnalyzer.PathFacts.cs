@@ -1380,7 +1380,7 @@ namespace PurelySharp.Analyzer
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetReferenceFormula) &&
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
+                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 CSharpConditionToFormula.TryCreateStringNonNullFormula(
                     effectiveValueExpression,
@@ -1453,7 +1453,7 @@ namespace PurelySharp.Analyzer
                     facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
                 }
             }
-            else if (TryGetNullableUnderlyingType(GetTrackedSymbolType(targetSymbol), out var underlyingType) &&
+            else if (TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(targetSymbol), out var underlyingType) &&
                      TryTranslateNullableWrappedValueForUnderlyingType(
                          valueExpression,
                          underlyingType,
@@ -1505,7 +1505,7 @@ namespace PurelySharp.Analyzer
 
         private static bool TryCreateNullableHasValueFormula(ISymbol symbol, out SmtFormula formula)
         {
-            if (!TryGetNullableUnderlyingType(GetTrackedSymbolType(symbol), out _))
+            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out _))
             {
                 formula = null!;
                 return false;
@@ -1517,7 +1517,7 @@ namespace PurelySharp.Analyzer
 
         private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
         {
-            if (!TryGetNullableUnderlyingType(GetTrackedSymbolType(symbol), out var underlyingType) ||
+            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out var underlyingType) ||
                 !TryGetValueKind(underlyingType, out var kind))
             {
                 formula = null!;
@@ -1649,7 +1649,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
+            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } targetArrayType)
             {
                 return;
             }
@@ -1776,11 +1776,6 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
-        {
-            return SymbolicFactFactory.GetTrackedSymbolType(symbol);
-        }
-
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
         {
             var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
@@ -1868,7 +1863,7 @@ namespace PurelySharp.Analyzer
             out SmtFormula formula)
         {
             if (dimension < 0 ||
-                GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType)
+                SymbolicFactFactory.GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType)
             {
                 formula = null!;
                 return false;
@@ -2208,8 +2203,8 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 out var symbol)
-                    ? symbol
-                    : null;
+                ? symbol
+                : null;
         }
 
         private static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)

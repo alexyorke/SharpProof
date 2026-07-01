@@ -1371,7 +1371,7 @@ namespace PurelySharp.Analyzer
 
             var symbol = GetLocalOrParameterSymbol(nullableExpression, semanticModel, cancellationToken);
             if (symbol == null ||
-                !IsNullableType(GetTrackedSymbolType(symbol)) ||
+                !IsNullableType(SymbolicFactFactory.GetTrackedSymbolType(symbol)) ||
                 !TryResolveCurrentNullableValueExpression(
                     symbol,
                     useNode,
@@ -2005,7 +2005,7 @@ namespace PurelySharp.Analyzer
             valueExpression = null!;
             var symbol = GetLocalOrParameterSymbol(indexExpression, semanticModel, cancellationToken);
             if (symbol == null ||
-                !IsSystemIndexType(GetTrackedSymbolType(symbol)))
+                !IsSystemIndexType(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
             {
                 return false;
             }
@@ -2082,7 +2082,7 @@ namespace PurelySharp.Analyzer
             valueExpression = null!;
             var symbol = GetLocalOrParameterSymbol(rangeExpression, semanticModel, cancellationToken);
             if (symbol == null ||
-                !IsSystemRangeType(GetTrackedSymbolType(symbol)))
+                !IsSystemRangeType(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
             {
                 return false;
             }
