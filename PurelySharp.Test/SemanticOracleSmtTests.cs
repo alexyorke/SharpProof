@@ -998,6 +998,36 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_EnumLocalAssignment_PrunesUnreachableIfBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        Mode state;
+        state = Mode.Ready;
+        if (state != Mode.Ready)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_MutationBeforeBranch_InvalidatesPriorFact()
         {
             Assert.That(
@@ -8411,6 +8441,60 @@ public class TestClass
         if (x != 5)
         {
             Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_UlongLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        ulong value;
+        value = 0UL;
+        if (value != 0UL)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EnumLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        Mode state;
+        state = Mode.Ready;
+        if (state != Mode.Ready)
+        {
+            Console.WriteLine(state);
         }
     }
 }");

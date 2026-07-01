@@ -1781,7 +1781,7 @@ namespace PurelySharp.Analyzer
             return SymbolicFactFactory.TryCreateSymbolVariableFormula(
                 GetSmtVariableName(symbol),
                 SymbolicFactFactory.GetTrackedSymbolType(symbol),
-                IsSearchLibIntegralType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 IsReferenceType,
                 out formula);
         }
@@ -1790,7 +1790,7 @@ namespace PurelySharp.Analyzer
         {
             return SymbolicFactFactory.TryGetValueKind(
                 type,
-                IsSearchLibIntegralType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 IsReferenceType,
                 out kind);
         }
@@ -2271,7 +2271,7 @@ namespace PurelySharp.Analyzer
             var type = GetExpressionType(expression, semanticModel, cancellationToken);
             return IsDefaultExpressionSyntax(expression) &&
                 type != null &&
-                IsSearchLibIntegralType(type);
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(type);
         }
 
         private static bool IsDefaultExpressionSyntax(ExpressionSyntax expression)
@@ -2374,7 +2374,7 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            if (!IsSearchLibIntegralType(typeSymbol))
+            if (!SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol))
             {
                 return false;
             }
@@ -2384,25 +2384,6 @@ namespace PurelySharp.Analyzer
                 new SmtVariable(variableName, SmtValueKind.Int),
                 new SmtIntegerConstant(0));
             return true;
-        }
-
-        private static bool IsSearchLibIntegralType(ITypeSymbol typeSymbol)
-        {
-            if (typeSymbol.SpecialType is
-                SpecialType.System_SByte or
-                SpecialType.System_Byte or
-                SpecialType.System_Int16 or
-                SpecialType.System_UInt16 or
-                SpecialType.System_Int32 or
-                SpecialType.System_UInt32 or
-                SpecialType.System_Int64 or
-                SpecialType.System_UInt64)
-            {
-                return true;
-            }
-
-            return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
-                IsSearchLibIntegralType(underlyingType);
         }
 
         private static string GetSmtVariableName(ISymbol symbol)

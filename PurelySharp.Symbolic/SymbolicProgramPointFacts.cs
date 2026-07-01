@@ -8406,7 +8406,7 @@ namespace PurelySharp.Symbolic
             return SymbolicFactFactory.TryCreateSymbolVariableFormula(
                 GetSmtVariableName(symbol),
                 SymbolicFactFactory.GetTrackedSymbolType(symbol),
-                IsIntegralType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 IsReferenceLikeType,
                 out formula);
         }
@@ -8691,8 +8691,7 @@ namespace PurelySharp.Symbolic
 
         private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
         {
-            return IsIntegralType(typeSymbol) ||
-                typeSymbol.TypeKind == TypeKind.Enum;
+            return SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol);
         }
     }
 }

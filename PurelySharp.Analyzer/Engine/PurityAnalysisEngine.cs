@@ -4337,7 +4337,7 @@ namespace PurelySharp.Analyzer.Engine
             return SymbolicFactFactory.TryCreateSymbolVariableFormula(
                 GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
                 SymbolicFactFactory.GetTrackedSymbolType(symbol),
-                IsSmtIntegralType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 static type => type.IsReferenceType,
                 out formula);
         }
@@ -4429,18 +4429,6 @@ namespace PurelySharp.Analyzer.Engine
             return left.Kind == right.Kind ||
                 left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
                 right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
-        }
-
-        private static bool IsSmtIntegralType(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol.SpecialType is
-                SpecialType.System_SByte or
-                SpecialType.System_Byte or
-                SpecialType.System_Int16 or
-                SpecialType.System_UInt16 or
-                SpecialType.System_Int32 or
-                SpecialType.System_UInt32 or
-                SpecialType.System_Int64;
         }
 
         private static PurityAnalysisState ApplyWrittenLocalStateUpdates(

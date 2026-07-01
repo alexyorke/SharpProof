@@ -321,6 +321,30 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        public static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            if (typeSymbol.SpecialType is
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64)
+            {
+                return true;
+            }
+
+            return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
+                IsSupportedSmtIntegralOrEnumType(underlyingType);
+        }
+
         public static string GetReferenceFormulaName(SmtFormula receiverFormula)
         {
             return receiverFormula is SmtVariable variable
