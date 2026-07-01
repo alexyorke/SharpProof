@@ -187,7 +187,7 @@ namespace PurelySharp.Analyzer.Engine
                     getSymbolVersion);
 
                 if (pathConditions.Count > originalCount &&
-                    PathConditionsAreUnsatisfiable(pathConditions, smtAnalysis))
+                    SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis))
                 {
                     return true;
                 }
@@ -456,7 +456,8 @@ namespace PurelySharp.Analyzer.Engine
                 syntaxNode,
                 semanticModel,
                 cancellationToken);
-            return PathConditionsAreUnsatisfiable(pathConditions, smtAnalysis);
+            return pathConditions.Count > 0 &&
+                SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsInReachableConstantSwitchGotoSection(SyntaxNode syntaxNode, SemanticModel semanticModel)
@@ -1048,18 +1049,6 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return KnownBooleanValue.Unknown;
-        }
-
-        private static bool PathConditionsAreUnsatisfiable(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SmtAnalysisService? smtAnalysis)
-        {
-            if (pathConditions.Count == 0)
-            {
-                return false;
-            }
-
-            return SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis);
         }
 
         private enum KnownBooleanValue
