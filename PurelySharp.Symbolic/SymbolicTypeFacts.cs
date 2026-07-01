@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace PurelySharp.Symbolic
 {
-    public static class SymbolicTypeFacts
+    internal static class SymbolicTypeFacts
     {
         public static bool IsReferenceType(ITypeSymbol? typeSymbol)
         {

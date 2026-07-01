@@ -8,7 +8,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
-    public static class SymbolicFactFactory
+    internal static class SymbolicFactFactory
     {
         public static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
         {
