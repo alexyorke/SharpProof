@@ -3078,7 +3078,8 @@ namespace PurelySharp.Symbolic
                 elementAccess.ArgumentList.Arguments[0].Expression,
                 semanticModel,
                 cancellationToken);
-            if (argumentType?.SpecialType != SpecialType.System_Int32)
+            if (argumentType?.SpecialType != SpecialType.System_Int32 &&
+                !IsSystemIndexType(argumentType))
             {
                 return false;
             }
@@ -3212,6 +3213,16 @@ namespace PurelySharp.Symbolic
             return typeSymbol is INamedTypeSymbol
             {
                 Name: "Range",
+                ContainingNamespace: { } containingNamespace
+            } &&
+            containingNamespace.ToDisplayString() == "System";
+        }
+
+        private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                Name: "Index",
                 ContainingNamespace: { } containingNamespace
             } &&
             containingNamespace.ToDisplayString() == "System";

@@ -2578,6 +2578,63 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
+            private bool TryGetKnownStringLength(SmtFormula formula, out long length)
+            {
+                formula = NormalizeAliases(formula);
+                if (TryGetKnownString(formula, out var stringValue))
+                {
+                    length = stringValue.Length;
+                    return true;
+                }
+
+                var lengthFormula = new SmtStringLengthTerm(formula);
+                if (_integerIntervals.TryGetValue(lengthFormula, out var interval) &&
+                    interval.ExactValue is { } exactLength &&
+                    exactLength >= 0)
+                {
+                    length = exactLength;
+                    return true;
+                }
+
+                switch (formula)
+                {
+                    case SmtStringConcatTerm concat
+                        when TryGetKnownStringLength(concat.Left, out var leftLength) &&
+                             TryGetKnownStringLength(concat.Right, out var rightLength):
+                        try
+                        {
+                            checked
+                            {
+                                length = leftLength + rightLength;
+                            }
+
+                            return true;
+                        }
+                        catch (OverflowException)
+                        {
+                            break;
+                        }
+
+                    case SmtConditionalFormula conditional
+                        when conditional.Kind == SmtValueKind.String &&
+                             TryEvaluateBoolean(conditional.Condition, out var conditionValue):
+                        return TryGetKnownStringLength(
+                            conditionValue ? conditional.WhenTrue : conditional.WhenFalse,
+                            out length);
+
+                    case SmtConditionalFormula conditional
+                        when conditional.Kind == SmtValueKind.String &&
+                             TryGetKnownStringLength(conditional.WhenTrue, out var trueLength) &&
+                             TryGetKnownStringLength(conditional.WhenFalse, out var falseLength) &&
+                             trueLength == falseLength:
+                        length = trueLength;
+                        return true;
+                }
+
+                length = 0;
+                return false;
+            }
+
             private bool TryGetKnownInteger(SmtFormula formula, out long value)
             {
                 formula = NormalizeAliases(formula);
@@ -2588,14 +2645,21 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryCreateIntrinsicIntegerInterval(formula, out var intrinsicInterval) &&
+                    intrinsicInterval.ExactValue.HasValue)
+                {
+                    value = intrinsicInterval.ExactValue.Value;
+                    return true;
+                }
+
                 switch (formula)
                 {
                     case SmtIntegerConstant integerConstant:
                         value = integerConstant.Value;
                         return true;
                     case SmtStringLengthTerm stringLength
-                        when TryGetKnownString(stringLength.Value, out var stringValue):
-                        value = stringValue.Length;
+                        when TryGetKnownStringLength(stringLength.Value, out var length):
+                        value = length;
                         return true;
                     case SmtConditionalFormula conditional
                         when conditional.Kind == SmtValueKind.Int &&
@@ -2838,12 +2902,36 @@ namespace PurelySharp.Symbolic.Smt
                 long constant,
                 out bool hasContradiction)
             {
-                var interval = _integerIntervals.TryGetValue(term, out var existing)
-                    ? existing
+                term = NormalizeAliases(term);
+                var interval = TryCreateIntrinsicIntegerInterval(term, out var intrinsicInterval)
+                    ? intrinsicInterval
                     : IntegerInterval.Unbounded;
+                if (_integerIntervals.TryGetValue(term, out var existing))
+                {
+                    interval = interval.Intersect(existing);
+                }
+
                 interval = interval.Apply(op, constant);
                 hasContradiction = interval.IsContradictory;
                 _integerIntervals[term] = interval;
+                return true;
+            }
+
+            private bool TryCreateIntrinsicIntegerInterval(SmtFormula term, out IntegerInterval interval)
+            {
+                term = NormalizeAliases(term);
+                interval = IntegerInterval.Unbounded;
+                if (term is not SmtStringLengthTerm stringLength)
+                {
+                    return false;
+                }
+
+                interval = interval.Apply(SmtBinaryOperator.GreaterThanOrEqual, 0);
+                if (TryGetKnownStringLength(stringLength.Value, out var length))
+                {
+                    interval = interval.Apply(SmtBinaryOperator.Equal, length);
+                }
+
                 return true;
             }
 

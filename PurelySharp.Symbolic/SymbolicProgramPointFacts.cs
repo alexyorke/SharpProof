@@ -1358,6 +1358,29 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool ExpressionMutatesAnySymbol(
+            ExpressionSyntax expression,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (symbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var node in expression.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (symbols.Any(symbol => NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool IsLocalOrParameterReference(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -5525,6 +5548,11 @@ namespace PurelySharp.Symbolic
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
+                AddSwitchExpressionAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
                 AddMathAbsRemainderAssignedRangeFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
@@ -5635,6 +5663,73 @@ namespace PurelySharp.Symbolic
                      !ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddSwitchExpressionAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (UnwrapExpression(valueExpression) is not SwitchExpressionSyntax switchExpression ||
+                switchExpression.Arms.Count == 0)
+            {
+                return;
+            }
+
+            var conditionSymbols = GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken);
+            if (ExpressionMutatesAnySymbol(switchExpression, conditionSymbols, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var addedCount = 0;
+            foreach (var arm in switchExpression.Arms)
+            {
+                if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                        switchExpression.GoverningExpression,
+                        arm,
+                        semanticModel,
+                        cancellationToken,
+                        out var armCondition))
+                {
+                    continue;
+                }
+
+                SmtFormula? armFact = null;
+                if (UnwrapExpression(arm.Expression) is ThrowExpressionSyntax)
+                {
+                    armFact = new SmtUnaryFormula(SmtUnaryOperator.Not, armCondition);
+                }
+                else if (TryCreateAssignedValueFact(
+                             assignedSymbol,
+                             arm.Expression,
+                             semanticModel,
+                             cancellationToken,
+                             new[] { armCondition },
+                             out var assignedValueFact))
+                {
+                    armFact = new SmtBinaryFormula(
+                        SmtBinaryOperator.Or,
+                        new SmtUnaryFormula(SmtUnaryOperator.Not, armCondition),
+                        assignedValueFact);
+                }
+
+                if (armFact == null ||
+                    !existingKeys.Add(GetFormulaKey(armFact)))
+                {
+                    continue;
+                }
+
+                facts.Add(armFact);
+                addedCount++;
+                if (addedCount >= MaxMergedSwitchFacts)
+                {
+                    return;
+                }
             }
         }
 

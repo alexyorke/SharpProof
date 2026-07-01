@@ -3598,6 +3598,34 @@ namespace PurelySharp.Symbolic
                 .ToArray();
         }
 
+        internal static IReadOnlyList<SymbolicConditionProofResult> ApplyToProofResults(
+            IReadOnlyList<SymbolicConditionProofResult> proofs,
+            SymbolicCompactQueryOptions options)
+        {
+            if (!options.HasInvariantTargetFilter)
+            {
+                return proofs;
+            }
+
+            return proofs
+                .Where(proof => Matches(proof.Target, options.InvariantTargets))
+                .ToArray();
+        }
+
+        internal static IReadOnlyList<SymbolicInvariantCondition> ApplyToConditions(
+            IReadOnlyList<SymbolicInvariantCondition> conditions,
+            SymbolicCompactQueryOptions options)
+        {
+            if (!options.HasInvariantTargetFilter)
+            {
+                return conditions;
+            }
+
+            return conditions
+                .Where(condition => Matches(condition.Target, options.InvariantTargets))
+                .ToArray();
+        }
+
         internal static bool Matches(string? target, IReadOnlyList<string> invariantTargets)
         {
             return invariantTargets.Contains(NormalizeTarget(target), StringComparer.Ordinal);
@@ -4790,16 +4818,29 @@ namespace PurelySharp.Symbolic
                 result.Invariant,
                 null,
                 options);
-            var facts = SymbolicCompactProjection.Take(result.Facts, options.MaxFacts);
-            var pathConditions = SymbolicCompactProjection.Take(result.PathConditions, options.MaxConditions);
-            var conditionProofs = SymbolicCompactProjection.Take(result.ConditionProofs, options.MaxProofs);
+            var focusedPathConditions = SymbolicInvariantTargetFilter.ApplyToConditions(
+                result.PathConditions,
+                options);
+            var focusedFacts = options.HasInvariantTargetFilter
+                ? focusedPathConditions
+                    .Select(static condition => condition.Text)
+                    .Where(static fact => !string.IsNullOrWhiteSpace(fact))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray()
+                : result.Facts;
+            var focusedConditionProofs = SymbolicInvariantTargetFilter.ApplyToProofResults(
+                result.ConditionProofs,
+                options);
+            var facts = SymbolicCompactProjection.Take(focusedFacts, options.MaxFacts);
+            var pathConditions = SymbolicCompactProjection.Take(focusedPathConditions, options.MaxConditions);
+            var conditionProofs = SymbolicCompactProjection.Take(focusedConditionProofs, options.MaxProofs);
             var truncation = SymbolicCompactOutputTruncation.Combine(
                 new SymbolicCompactOutputTruncation(
                     false,
                     false,
-                    result.Facts.Count > facts.Count,
-                    result.PathConditions.Count > pathConditions.Count,
-                    result.ConditionProofs.Count > conditionProofs.Count),
+                    focusedFacts.Count > facts.Count,
+                    focusedPathConditions.Count > pathConditions.Count,
+                    focusedConditionProofs.Count > conditionProofs.Count),
                 SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
                 SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant));
 
@@ -4818,12 +4859,12 @@ namespace PurelySharp.Symbolic
                 result.NodeKind,
                 result.MethodName,
                 result.ProgramPointKind,
-                result.Facts.Count,
+                focusedFacts.Count,
                 facts,
                 observedInvariant,
                 conservativeInvariant,
                 SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
-                result.PathConditionCount,
+                focusedPathConditions.Count,
                 pathConditions,
                 result.Reachability.ToString(),
                 result.ReachabilityReason,

@@ -17,6 +17,7 @@ namespace SearchLib.Smt
             RegexOptions.Compiled |
             RegexOptions.CultureInvariant |
             RegexOptions.Singleline |
+            RegexOptions.Multiline |
             RegexOptions.IgnorePatternWhitespace |
             RegexOptions.IgnoreCase;
 
@@ -570,11 +571,18 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                var startAnchored = TryFindLeadingStartAnchor(pattern, options, out var startAnchorStart, out var startAnchorLength);
+                var multiline = (options & RegexOptions.Multiline) != 0;
+                var startAnchored = TryFindLeadingStartAnchor(
+                    pattern,
+                    options,
+                    allowCaretAnchor: !multiline,
+                    out var startAnchorStart,
+                    out var startAnchorLength);
                 var strictEndAnchored = EndsWithUnescapedAnchor(pattern, @"\z");
                 var finalNewlineEndAnchored = !strictEndAnchored && EndsWithUnescapedAnchor(pattern, @"\Z");
                 var dollarEndAnchored = !strictEndAnchored &&
                     !finalNewlineEndAnchored &&
+                    !multiline &&
                     pattern.EndsWith("$", StringComparison.Ordinal) &&
                     !IsEscaped(pattern, pattern.Length - 1);
                 var bodyEndTrim = strictEndAnchored || finalNewlineEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
@@ -625,6 +633,7 @@ namespace SearchLib.Smt
             private static bool TryFindLeadingStartAnchor(
                 string pattern,
                 RegexOptions options,
+                bool allowCaretAnchor,
                 out int anchorStart,
                 out int anchorLength)
             {
@@ -650,7 +659,7 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                if (pattern[index] == '^')
+                if (pattern[index] == '^' && allowCaretAnchor)
                 {
                     anchorStart = index;
                     anchorLength = 1;

@@ -1508,6 +1508,60 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_StringConcatKnownOperandLengths_BypassesSolver()
+        {
+            var left = new SmtVariable("concat_length_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var right = new SmtVariable("concat_length_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var concatLength = new SmtStringLengthTerm(new SmtStringConcatTerm(left, right));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtStringLengthTerm(left),
+                    new SmtIntegerConstant(2)),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtStringLengthTerm(right),
+                    new SmtIntegerConstant(3)),
+            };
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                concatLength,
+                new SmtIntegerConstant(5));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_NegativeStringLength_BypassesSolver()
+        {
+            var text = new SmtVariable("negative_length_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    new SmtStringLengthTerm(text),
+                    new SmtIntegerConstant(0)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_ConditionalIntegerComparisonWithKnownGuard_BypassesSolver()
         {
             var guard = new SmtVariable("conditional_int_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);

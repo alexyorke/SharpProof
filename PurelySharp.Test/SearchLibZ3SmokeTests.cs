@@ -146,6 +146,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_MultilineOptionStrictAnchorsRemainExact()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var textIsAb = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                text,
+                new SmtStringConstant("AB"));
+
+            var result = solver.Implies(
+                new[]
+                {
+                    new SmtRegexMatchFormula(text, @"\AAB\z", RegexOptions.Multiline),
+                },
+                textIsAb,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_MultilineCaretAnchorWithoutConcreteInput_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, "^AB", RegexOptions.Multiline),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_LeadingContiguousAnchorRegexAcceptsInitialMatch()
         {
             using var solver = new SmtSolver();

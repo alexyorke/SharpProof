@@ -1632,6 +1632,82 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSpanQueryResult_ToCompactResult_FiltersPerPointTargetDetails()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        var other = value;
+        if (copy > 0)
+        {
+            if (other < 10)
+            {
+                return copy + other;
+            }
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactTargetFilter.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactTargetFilter",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0", "other < 10" });
+            Assert.That(
+                result.ConditionProofs.Select(static proof => proof.Target),
+                Does.Contain("copy"));
+            Assert.That(
+                result.ConditionProofs.Select(static proof => proof.Target),
+                Does.Contain("other"));
+
+            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxProgramPoints: 20,
+                maxFacts: 20,
+                maxConditions: 20,
+                maxProofs: 20,
+                invariantTargets: new[] { " copy " }));
+
+            Assert.That(compact.InvariantQuery.HasTargetFilter, Is.True);
+            Assert.That(compact.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(compact.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
+
+            var pointProofs = compact.ProgramPoints
+                .SelectMany(static point => point.ConditionProofs)
+                .ToArray();
+            Assert.That(pointProofs, Is.Not.Empty);
+            Assert.That(pointProofs.Select(static proof => proof.Target), Is.All.EqualTo("copy"));
+            Assert.That(pointProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
+
+            var pointConditions = compact.ProgramPoints
+                .SelectMany(static point => point.PathConditions)
+                .ToArray();
+            Assert.That(pointConditions.Select(static condition => condition.Target), Does.Contain("copy"));
+            Assert.That(pointConditions.Select(static condition => condition.Target), Does.Not.Contain("other"));
+            Assert.That(
+                compact.ProgramPoints.SelectMany(static point => point.Facts),
+                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+        }
+
+        [Test]
         public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
         {
             var points = new[]

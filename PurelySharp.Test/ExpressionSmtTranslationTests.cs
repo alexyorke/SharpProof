@@ -205,6 +205,80 @@ public class TestClass
                 "right != null && right.Count > 0");
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalReceiverMemberArmFacts()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Count { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box left, Box right, bool flag)
+    {
+        if ((flag ? left : right).Count > 0)
+        {
+            if (flag)
+            {
+                return left.Count;
+            }
+
+            return right.Count;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return left.Count;",
+                "left.Count > 0");
+            AssertConditionProven(
+                source,
+                "return right.Count;",
+                "right.Count > 0");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesCoalesceReceiverMemberArmFacts()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Count { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box left, Box right)
+    {
+        if ((left ?? right).Count == 3)
+        {
+            if (left != null)
+            {
+                return left.Count;
+            }
+
+            return right.Count;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return left.Count;",
+                "left.Count == 3");
+            AssertConditionProven(
+                source,
+                "return right.Count;",
+                "right.Count == 3");
+        }
+
         private static void AssertConditionProven(string source, string sourceLine, string condition)
         {
             var proof = ProveCondition(source, sourceLine, condition);

@@ -643,6 +643,60 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesExhaustiveBooleanSwitchExpressionAssignmentRelationAfterJoin()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool choose)
+    {
+        var divisor = choose switch
+        {
+            true => 1,
+            false => 2
+        };
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var query = AnalyzeAtPosition(source, marker.Position);
+            var proof = ProveAtMarker(
+                source,
+                marker,
+                "(choose && divisor == 1) || (!choose && divisor == 2)");
+
+            Assert.That(query.MergedInvariantText, Does.Contain("choose"));
+            Assert.That(query.MergedInvariantText, Does.Contain("divisor"));
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ExcludesThrowingSwitchExpressionArmAfterNormalAssignmentCompletion()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var divisor = value switch
+        {
+            0 => throw new System.InvalidOperationException(),
+            _ => value
+        };
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "value != 0 && divisor != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_DoesNotTreatEnumSwitchWithoutDefaultAsExhaustive()
         {
             const string source = @"
@@ -741,6 +795,57 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ExhaustiveBooleanSwitchExpressionValueJoinPrunesDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool choose)
+    {
+        var divisor = choose switch
+        {
+            true => 1,
+            false => 2
+        };
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ThrowingSwitchExpressionArmPrunesDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var divisor = value switch
+        {
+            0 => throw new System.InvalidOperationException(),
+            _ => value
+        };
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionTypesProperty, out var exceptionTypes) &&
+                    exceptionTypes?.Contains("System.DivideByZeroException", StringComparison.Ordinal) == true),
+                Is.False);
         }
 
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)

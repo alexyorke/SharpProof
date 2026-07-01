@@ -13594,6 +13594,11 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryTranslateConditionalReceiverMemberValue(memberAccess, memberSymbol, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
+            {
+                return true;
+            }
+
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
             if (type == null)
             {
@@ -13601,6 +13606,105 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return TryCreateMemberFormula(receiver, memberSymbol.Name, type, out formula);
+        }
+
+        private static bool TryTranslateConditionalReceiverMemberValue(
+            MemberAccessExpressionSyntax memberAccess,
+            ISymbol memberSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryGetMemberType(memberSymbol, out var memberType))
+            {
+                return false;
+            }
+
+            var receiverExpression = UnwrapExpression(memberAccess.Expression);
+            if (receiverExpression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
+                conditionFormula != null &&
+                TryCreateReceiverMemberFormula(
+                    conditionalExpression.WhenTrue,
+                    memberSymbol.Name,
+                    memberType,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenTrue,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                whenTrue != null &&
+                TryCreateReceiverMemberFormula(
+                    conditionalExpression.WhenFalse,
+                    memberSymbol.Name,
+                    memberType,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenFalse,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                whenFalse != null &&
+                whenTrue.Kind == whenFalse.Kind)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrue, whenFalse, whenTrue.Kind);
+                return true;
+            }
+
+            if (receiverExpression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var leftReceiver, getSymbolVersion, inlineDepth) &&
+                leftReceiver is { Kind: SmtValueKind.Reference } &&
+                TryCreateReceiverMemberFormula(
+                    coalesceExpression.Left,
+                    memberSymbol.Name,
+                    memberType,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftMember,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                leftMember != null &&
+                TryCreateReceiverMemberFormula(
+                    coalesceExpression.Right,
+                    memberSymbol.Name,
+                    memberType,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightMember,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                rightMember != null &&
+                leftMember.Kind == rightMember.Kind)
+            {
+                formula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, leftReceiver, new SmtNullConstant()),
+                    leftMember,
+                    rightMember,
+                    leftMember.Kind);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateReceiverMemberFormula(
+            ExpressionSyntax receiverExpression,
+            string memberName,
+            ITypeSymbol memberType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            return TryTranslateValue(receiverExpression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) &&
+                receiver is { Kind: SmtValueKind.Reference } &&
+                TryCreateMemberFormula(receiver, memberName, memberType, out formula) &&
+                formula != null;
         }
 
         private static bool TryTranslateImplicitThisMemberValue(
