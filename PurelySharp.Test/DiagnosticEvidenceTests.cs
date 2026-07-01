@@ -13870,6 +13870,41 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_SourceCallee_AwaitNullPropagation_PreservesAwaitNullSourceEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> Caller()
+    {
+        return await Callee();
+    }
+
+    private async Task<int> Callee()
+    {
+        Task<int> task = null!;
+        return await task;
+    }
+}",
+                CheckedExceptionsOptions());
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.NullReferenceException=source_callee:"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("Callee()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("definite_await_null:await_expression"));
+        }
+
+        [Test]
         public async Task Ps0011_SourceCallee_LocalFunctionPropagation_EmitsExceptionEdges()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

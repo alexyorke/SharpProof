@@ -69,6 +69,7 @@ namespace PurelySharp.Symbolic
                 string.Equals(category, ExceptionCategories.EffectSummary, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteDivideByZero, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNullDereference, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteAwaitNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteLockNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteThrowNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNegativeArrayLength, System.StringComparison.Ordinal) ||

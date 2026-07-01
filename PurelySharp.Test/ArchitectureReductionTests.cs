@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
 using PurelySharp.Symbolic;
@@ -59,6 +60,21 @@ namespace PurelySharp.Test
             Assert.That(typeof(SymbolicQueryService).IsPublic, Is.True);
             Assert.That(typeof(SmtAnalysisService).IsPublic, Is.True);
             Assert.That(typeof(SmtAnalysisOptions).IsPublic, Is.True);
+        }
+
+        [Test]
+        public void RuntimeExceptionEvidenceFacts_AcceptsAllSharedCategories()
+        {
+            var rejectedCategories = typeof(SymbolicRuntimeExceptionFacts.ExceptionCategories)
+                .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+                .Where(static field => field.IsLiteral &&
+                    !field.IsInitOnly &&
+                    field.FieldType == typeof(string))
+                .Select(static field => (string)field.GetRawConstantValue()!)
+                .Where(static category => !SymbolicRuntimeExceptionFacts.IsKnownEvidenceCategory(category))
+                .ToArray();
+
+            Assert.That(rejectedCategories, Is.Empty);
         }
 
         [Test]
