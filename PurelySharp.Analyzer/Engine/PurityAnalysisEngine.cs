@@ -4178,7 +4178,7 @@ namespace PurelySharp.Analyzer.Engine
                 valueFormula != null &&
                 CanCompareSmtValues(targetFormula, valueFormula))
             {
-                var assignedFact = CreateAssignedValueFact(targetFormula, valueFormula);
+                var assignedFact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
             }
 
@@ -4281,23 +4281,23 @@ namespace PurelySharp.Analyzer.Engine
             out SmtFormula fact)
         {
             fact = null!;
-            var valueType = semanticModel.GetTypeInfo(UnwrapSmtFactExpression(valueExpression), CancellationToken.None).Type;
-            if (valueType is not IArrayTypeSymbol { Rank: 1 } ||
-                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) ||
-                targetReference is not { Kind: SmtValueKind.Reference } ||
-                !TryCreateReferenceBuiltInLengthFormula(targetReference, out var targetLength) ||
-                !TryCreateBuiltInLengthValueFormula(
+            return TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) &&
+                SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
+                    targetReference,
                     valueExpression,
+                    UnwrapSmtFactExpression(valueExpression),
                     semanticModel,
                     CancellationToken.None,
-                    valueState.GetSmtSymbolVersion,
-                    out var valueLength))
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength);
-            return true;
+                    (expression, model, token) =>
+                        TryCreateBuiltInLengthValueFormula(
+                            expression,
+                            model,
+                            token,
+                            valueState.GetSmtSymbolVersion,
+                            out var formula)
+                                ? formula
+                                : null,
+                    out fact);
         }
 
         private static bool TryCreateReferenceBackedStringContentFact(
@@ -4309,24 +4309,24 @@ namespace PurelySharp.Analyzer.Engine
             out SmtFormula fact)
         {
             fact = null!;
-            var valueType = semanticModel.GetTypeInfo(UnwrapSmtFactExpression(valueExpression), CancellationToken.None).Type;
-            if (valueType?.SpecialType != SpecialType.System_String ||
-                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) ||
-                targetReference is not { Kind: SmtValueKind.Reference } ||
-                !TryCreateReferenceStringContentFormula(targetReference, out var targetString) ||
-                !CSharpConditionToFormula.TryTranslateStringValue(
+            return TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) &&
+                SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
+                    targetReference,
                     valueExpression,
+                    UnwrapSmtFactExpression(valueExpression),
                     semanticModel,
                     CancellationToken.None,
-                    out var valueString,
-                    valueState.GetSmtSymbolVersion) ||
-                valueString == null)
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString);
-            return true;
+                    (expression, model, token) =>
+                        CSharpConditionToFormula.TryTranslateStringValue(
+                            expression,
+                            model,
+                            token,
+                            out var valueString,
+                            valueState.GetSmtSymbolVersion) &&
+                        valueString != null
+                            ? valueString
+                            : null,
+                    out fact);
         }
 
         private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
@@ -4337,19 +4337,6 @@ namespace PurelySharp.Analyzer.Engine
                 IParameterSymbol parameterSymbol => parameterSymbol.Type,
                 _ => null
             };
-        }
-
-        private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
-        {
-            if (targetFormula.Kind == SmtValueKind.Bool &&
-                valueFormula is SmtBooleanConstant booleanConstant)
-            {
-                return booleanConstant.Value
-                    ? targetFormula
-                    : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula);
-            }
-
-            return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
         }
 
         private static bool TryCreateSymbolSmtValue(
@@ -4437,43 +4424,11 @@ namespace PurelySharp.Analyzer.Engine
                 IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
-                formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
-                return true;
+                return SymbolicFactFactory.TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
             }
 
             formula = null!;
             return false;
-        }
-
-        private static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
-        {
-            if (receiverFormula.Kind != SmtValueKind.Reference)
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
-            return true;
-        }
-
-        private static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
-        {
-            if (receiverFormula.Kind != SmtValueKind.Reference)
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".String", SmtValueKind.String);
-            return true;
-        }
-
-        private static string GetReferenceFormulaName(SmtFormula receiverFormula)
-        {
-            return receiverFormula is SmtVariable variable
-                ? variable.Name
-                : receiverFormula.ToString() ?? string.Empty;
         }
 
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
@@ -4620,41 +4575,11 @@ namespace PurelySharp.Analyzer.Engine
             out SmtFormula fact)
         {
             fact = null!;
-            valueExpression = UnwrapSmtFactExpression(valueExpression);
-            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
-                !TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) ||
-                !TryGetCollectionExpressionFixedLowerBound(collectionExpression, out var lowerBound))
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                targetLengthFormula,
-                new SmtIntegerConstant(lowerBound));
-            return true;
-        }
-
-        private static bool TryGetCollectionExpressionFixedLowerBound(
-            CollectionExpressionSyntax collectionExpression,
-            out int lowerBound)
-        {
-            lowerBound = 0;
-            var hasSpread = false;
-            foreach (var element in collectionExpression.Elements)
-            {
-                switch (element)
-                {
-                    case ExpressionElementSyntax:
-                        lowerBound++;
-                        break;
-                    case SpreadElementSyntax:
-                        hasSpread = true;
-                        break;
-                }
-            }
-
-            return hasSpread && lowerBound > 0;
+            return TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
+                SymbolicFactFactory.TryCreateCollectionExpressionLengthLowerBoundFact(
+                    targetLengthFormula,
+                    UnwrapSmtFactExpression(valueExpression),
+                    out fact);
         }
 
         private static bool TryCreateCollectionExpressionLengthFormula(

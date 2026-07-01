@@ -5920,18 +5920,18 @@ namespace PurelySharp.Symbolic
             out SmtFormula fact)
         {
             fact = null!;
-            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
-            if (valueType is not IArrayTypeSymbol { Rank: 1 } ||
-                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
-                targetReference is not { Kind: SmtValueKind.Reference } ||
-                !TryCreateReferenceBuiltInLengthFormula(targetReference, out var targetLength) ||
-                !TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLength))
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength);
-            return true;
+            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
+                SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
+                    targetReference,
+                    valueExpression,
+                    UnwrapExpression(valueExpression),
+                    semanticModel,
+                    cancellationToken,
+                    (expression, model, token) =>
+                        TryCreateBuiltInLengthValueFormula(expression, model, token, out var formula)
+                            ? formula
+                            : null,
+                    out fact);
         }
 
         private static void AddReferenceBackedArrayDimensionLengthFacts(
@@ -5951,7 +5951,7 @@ namespace PurelySharp.Symbolic
 
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
+                if (!SymbolicFactFactory.TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
                     !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
                 {
                     continue;
@@ -5974,25 +5974,25 @@ namespace PurelySharp.Symbolic
             out SmtFormula fact)
         {
             fact = null!;
-            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
-            if (valueType?.SpecialType != SpecialType.System_String ||
-                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
-                targetReference is not { Kind: SmtValueKind.Reference } ||
-                !TryCreateStringContentFormulaForReference(targetReference, valueType, out var targetString) ||
-                !CSharpConditionToFormula.TryTranslateStringValue(
+            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
+                SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
+                    targetReference,
                     valueExpression,
+                    UnwrapExpression(valueExpression),
                     semanticModel,
                     cancellationToken,
-                    out var valueString,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                valueString == null)
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString);
-            return true;
+                    (expression, model, token) =>
+                        CSharpConditionToFormula.TryTranslateStringValue(
+                            expression,
+                            model,
+                            token,
+                            out var valueString,
+                            getSymbolVersion: null,
+                            inlineDepth: 0) &&
+                        valueString != null
+                            ? valueString
+                            : null,
+                    out fact);
         }
 
         private static void AddArrayDimensionLengthSourceSymbolSnapshotFacts(
@@ -6077,36 +6077,6 @@ namespace PurelySharp.Symbolic
 
             formula = null!;
             return false;
-        }
-
-        private static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
-        {
-            if (receiverFormula.Kind != SmtValueKind.Reference)
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
-            return true;
-        }
-
-        private static bool TryCreateReferenceArrayDimensionLengthFormula(
-            SmtFormula receiverFormula,
-            int dimension,
-            out SmtFormula formula)
-        {
-            if (receiverFormula.Kind != SmtValueKind.Reference ||
-                dimension < 0)
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = new SmtVariable(
-                GetReferenceFormulaName(receiverFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
-                SmtValueKind.Int);
-            return true;
         }
 
         private static string GetReferenceFormulaName(SmtFormula receiverFormula)
@@ -6798,7 +6768,7 @@ namespace PurelySharp.Symbolic
                     valueFormula != null &&
                     CanCompareSmtValues(targetFormula, valueFormula))
                 {
-                    facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
                 }
 
                 if (targetFormula.Kind == SmtValueKind.Reference &&
@@ -6863,7 +6833,7 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+            facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
         }
 
         private static bool TryTranslateFiniteElementAccessValue(
@@ -7013,7 +6983,7 @@ namespace PurelySharp.Symbolic
                     continue;
                 }
 
-                facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+                facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
             }
         }
 
@@ -7531,7 +7501,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            fact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
             return true;
         }
 
@@ -7587,7 +7557,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            fact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
             return true;
         }
 
@@ -7776,12 +7746,12 @@ namespace PurelySharp.Symbolic
                     getSymbolVersion: null,
                     inlineDepth: 0))
             {
-                facts.Add(CreateAssignedValueFact(targetHasValue, parts.HasValue));
+                facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetHasValue, parts.HasValue));
 
                 if (parts.Value != null &&
                     CanCompareSmtValues(targetValue, parts.Value))
                 {
-                    facts.Add(CreateAssignedValueFact(targetValue, parts.Value));
+                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
                 }
             }
             else if (TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
@@ -7796,7 +7766,7 @@ namespace PurelySharp.Symbolic
 
                 if (CanCompareSmtValues(targetValue, wrappedValueFormula))
                 {
-                    facts.Add(CreateAssignedValueFact(targetValue, wrappedValueFormula));
+                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, wrappedValueFormula));
                 }
             }
         }
@@ -8430,41 +8400,11 @@ namespace PurelySharp.Symbolic
             out SmtFormula fact)
         {
             fact = null!;
-            valueExpression = UnwrapExpression(valueExpression);
-            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
-                !TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) ||
-                !TryGetCollectionExpressionFixedLowerBound(collectionExpression, out var lowerBound))
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                targetLengthFormula,
-                new SmtIntegerConstant(lowerBound));
-            return true;
-        }
-
-        private static bool TryGetCollectionExpressionFixedLowerBound(
-            CollectionExpressionSyntax collectionExpression,
-            out int lowerBound)
-        {
-            lowerBound = 0;
-            var hasSpread = false;
-            foreach (var element in collectionExpression.Elements)
-            {
-                switch (element)
-                {
-                    case ExpressionElementSyntax:
-                        lowerBound++;
-                        break;
-                    case SpreadElementSyntax:
-                        hasSpread = true;
-                        break;
-                }
-            }
-
-            return hasSpread && lowerBound > 0;
+            return TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
+                SymbolicFactFactory.TryCreateCollectionExpressionLengthLowerBoundFact(
+                    targetLengthFormula,
+                    UnwrapExpression(valueExpression),
+                    out fact);
         }
 
         private static bool TryCreateArrayDimensionLengthFormula(
@@ -8679,19 +8619,6 @@ namespace PurelySharp.Symbolic
 
             underlyingType = null!;
             return false;
-        }
-
-        private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
-        {
-            if (targetFormula.Kind == SmtValueKind.Bool &&
-                valueFormula is SmtBooleanConstant booleanConstant)
-            {
-                return booleanConstant.Value
-                    ? targetFormula
-                    : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula);
-            }
-
-            return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
         }
 
         private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
