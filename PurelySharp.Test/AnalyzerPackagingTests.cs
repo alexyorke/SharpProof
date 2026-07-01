@@ -444,9 +444,14 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--proof-outcome <v>"));
             Assert.That(source, Does.Contain("--proof-condition <expr>"));
             Assert.That(source, Does.Contain("--proof-condition-contains <text>"));
-            Assert.That(source, Does.Contain("queryService.QueryFileAllLines"));
+            Assert.That(source, Does.Contain("new SymbolicQueryService()"));
+            Assert.That(source, Does.Contain("new SymbolicQueryRequest("));
+            Assert.That(source, Does.Contain("new SymbolicRuntimeHazardRequest("));
+            Assert.That(source, Does.Contain("SymbolicSourceInput.FromFile(options.FilePath)"));
+            Assert.That(source, Does.Contain("options.CreateQueryTarget()"));
+            Assert.That(source, Does.Contain("options.CreateRuntimeHazardTarget()"));
+            Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis, includeResultFilter: true)"));
             Assert.That(source, Does.Contain("SymbolicFileQueryResult"));
-            Assert.That(source, Does.Contain("QueryFileAtPosition"));
             Assert.That(source, Does.Contain("SymbolicSourceQueryFilter"));
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
             Assert.That(source, Does.Contain("Merged invariant"));
@@ -465,6 +470,9 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("Executed queries"));
             Assert.That(source, Does.Contain("Cache entries"));
             Assert.That(source, Does.Not.Contain("new SmtAnalysisService(SmtAnalysisOptions.Default)"));
+            Assert.That(source, Does.Not.Contain("queryService.QueryFileAllLines"));
+            Assert.That(source, Does.Not.Contain("QueryFileAtPosition"));
+            Assert.That(source, Does.Not.Contain("new SymbolicFileQuery("));
         }
 
         [Test]

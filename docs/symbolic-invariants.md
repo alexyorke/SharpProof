@@ -3,12 +3,14 @@
 `PurelySharp.Symbolic` exposes a Roslyn-based invariant query surface that can be used without the analyzer package.
 The API accepts a `SyntaxTree` plus `Compilation`, or raw source/file helpers that create a compilation from trusted platform references.
 
-The primary entrypoint is `SymbolicSourceQueryService`:
+The primary entrypoint is `SymbolicQueryService`:
 
-- `QuerySyntaxTree` reports the merged invariant at a specific line and column.
-- `QuerySyntaxTreeAtPosition` reports the merged invariant at an absolute source position.
-- `QuerySyntaxTreeLine` reports statement-level program points that intersect a source line. Pass `includeExpressionProgramPoints: true` to also include selected expression nodes such as calls, element access, member access, assignments, binary expressions, conditionals, and patterns.
-- `QuerySyntaxTreeAllLines` reports every non-empty invariant line from one parse/compilation pass. It accepts the same expression-program-point option for callers that need finer line-level query results.
+- `Query(new SymbolicQueryRequest(source, target, options))` reports invariants for a file, text buffer, syntax tree, or node.
+- `SymbolicSourceInput.FromFile`, `FromText`, `FromSyntaxTree`, and `FromNode` describe the analyzed source without selecting a location.
+- `SymbolicQueryTarget.Point`, `Position`, `Line`, `Span`, `LineSpan`, `AllLines`, and `Node` select the requested program point or aggregate scope.
+- `SymbolicQueryOptions` carries metadata references, an optional `SmtAnalysisService`, implied conditions, expression-point inclusion, post-line invariant facts, and post-query filters.
+- `Prove(new SymbolicConditionProofRequest(...))` checks whether a source-level condition follows at a point.
+- `QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(...))` queries proven or optionally unproven runtime-hazard candidates through the same source/target model.
 - `SymbolicSourceQueryResult.Invariant` exposes a typed program-point invariant descriptor. Its `Conditions` are the SMT-backed path conditions, `MergeKind` is `Conjunction`, and `MergedInvariantText` is the condition conjunction used for proof queries.
 - `SymbolicSourceQueryResult.PathConditions` is a convenience view over the typed condition descriptors, including source-like condition text such as `value > 0`, formula kind, SMT value kind, merge target, whether the condition came from a real SMT formula, and whether it is a conservative unknown placeholder.
 - `SymbolicSourceQueryResult.PathConditionCount` and `ProofOutcomes` summarize the current point without requiring callers to traverse `PathConditions` or `ConditionProofs`. `SymbolicConditionProofSummary.TotalCount` is included on aggregate proof summaries.
@@ -27,8 +29,7 @@ The primary entrypoint is `SymbolicSourceQueryService`:
 - `analysisSummary` is the smallest status surface for tools that do not want nested payloads: it includes program-point count, invariant condition count, conservative unknown count, total/max path-condition counts, checked/known/unknown reachability counts, resolved/unknown proof counts, SMT enablement, executed query count, and `hasUnresolvedAnalysis`.
 - `SymbolicCompactQueryOptions.SummaryOnly` is a preset for aggregate-only compact output. It keeps invariant, reachability, proof, and truncation metadata while omitting nested line and program-point arrays.
 - Compact program points include file path, line, column, absolute position, node span start/end/length, node start/end line and column, containing method name, program-point kind, direct merged invariant text, reachability and reachability reason, proof outcomes, and bounded proof details. This metadata remains available at the top level for a single point result even when `--max-points 0` suppresses nested program point arrays.
-- `QueryFileLine` and `QuerySourceLine` are convenience wrappers for standalone tools.
-- `QueryFileAllLines` and `QuerySourceAllLines` provide the same all-lines summary for file or raw source input.
+- `SymbolicQueryResult` is the unified public result for point, line, span, and all-lines queries. It exposes program points, observed and conservative merged invariants, reachability, proof summaries, SMT diagnostics, and compact/invariant projections.
 
 Pass a bounded `SmtAnalysisService` to classify reachability or prove `--implies` conditions.
 If SMT is disabled, times out, exceeds budget, or cannot load its native solver, callers should treat the result as unknown rather than proven.

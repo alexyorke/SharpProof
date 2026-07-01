@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
@@ -12,6 +13,126 @@ namespace PurelySharp.Test
     [TestFixture]
     public sealed class SymbolicSourceQueryLineTests
     {
+        [Test]
+        public void SymbolicQueryService_RoutesFileTextSyntaxTreeAndNodeQueries()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "NewSymbolicApi.cs");
+            var compilation = CSharpCompilation.Create(
+                "NewSymbolicApi",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var service = new SymbolicQueryService();
+            var options = new SymbolicQueryOptions(references: AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            var textLine = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromText(source, "TextInput.cs"),
+                SymbolicQueryTarget.Line(FindLine(source, "if (value > 0)")),
+                options));
+            Assert.That(textLine.ScopeKind, Is.EqualTo("line"));
+            Assert.That(textLine.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+
+            var textPosition = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromText(source, "PositionInput.cs"),
+                SymbolicQueryTarget.Position(FindPosition(source, "return value;")),
+                options));
+            Assert.That(textPosition.ScopeKind, Is.EqualTo("point"));
+            Assert.That(textPosition.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+
+            var syntaxSpan = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SymbolicQueryTarget.Span(
+                    FindPosition(source, "if (value > 0)"),
+                    FindPosition(source, "return 0;")),
+                SymbolicQueryOptions.Default));
+            Assert.That(syntaxSpan.ScopeKind, Is.EqualTo("span"));
+            Assert.That(syntaxSpan.ProgramPointCount, Is.GreaterThan(0));
+
+            var syntaxAllLines = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+                SymbolicQueryTarget.AllLines()));
+            Assert.That(syntaxAllLines.ScopeKind, Is.EqualTo("file"));
+            Assert.That(syntaxAllLines.LineCount, Is.GreaterThan(0));
+
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var returnNode = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single(statement => statement.ToString().Contains("return value;", StringComparison.Ordinal));
+            var nodeResult = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromNode(returnNode, semanticModel),
+                SymbolicQueryTarget.Node()));
+            Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
+            Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+
+            var sourcePath = Path.Combine(Path.GetTempPath(), "PurelySharp.SymbolicQueryApi." + Guid.NewGuid().ToString("N") + ".cs");
+            try
+            {
+                File.WriteAllText(sourcePath, source);
+                var filePoint = service.Query(new SymbolicQueryRequest(
+                    SymbolicSourceInput.FromFile(sourcePath),
+                    SymbolicQueryTarget.Point(FindLine(source, "return value;"))));
+                Assert.That(filePoint.ScopeKind, Is.EqualTo("point"));
+                Assert.That(filePoint.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public void SymbolicQueryService_QueryRuntimeHazards_UsesRequestApi()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value / 0;
+    }
+}";
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicQueryService().QueryRuntimeHazards(
+                new SymbolicRuntimeHazardRequest(
+                    SymbolicSourceInput.FromText(source, "HazardInput.cs"),
+                    SymbolicQueryTarget.AllLines(),
+                    new SymbolicQueryOptions(
+                        references: AnalyzerTestHost.GetTrustedPlatformReferences(),
+                        smtAnalysis: smtAnalysis),
+                    new SymbolicRuntimeHazardQueryOptions(
+                        kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero })));
+
+            Assert.That(result.Hazards.Single().Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+        }
+
+        [Test]
+        public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
+        {
+            var assembly = typeof(SymbolicQueryService).Assembly;
+            Assert.That(assembly.GetType("PurelySharp.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
+            Assert.That(assembly.GetType("PurelySharp.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
+            Assert.That(assembly.GetType("PurelySharp.Symbolic.SymbolicFileQuery")!.IsPublic, Is.False);
+            Assert.That(typeof(SymbolicSourceQueryResult).GetConstructors(), Is.Empty);
+            Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
+        }
+
         [Test]
         public void QuerySyntaxTreeLine_ReturnsEveryProgramPointOnLine()
         {

@@ -15,7 +15,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
-    public sealed class SymbolicSourceQueryService
+    internal sealed class SymbolicSourceQueryService
     {
         private readonly SymbolicInvariantService _invariantService;
 
@@ -1894,7 +1894,7 @@ namespace PurelySharp.Symbolic
         }
     }
 
-    public sealed class SymbolicFileQuery
+    internal sealed class SymbolicFileQuery
     {
         public SymbolicFileQuery(
             string filePath,
@@ -1940,7 +1940,7 @@ namespace PurelySharp.Symbolic
 
     public sealed class SymbolicLineQueryResult
     {
-        public SymbolicLineQueryResult(
+        internal SymbolicLineQueryResult(
             string filePath,
             int line,
             IReadOnlyList<SymbolicSourceQueryResult> programPoints,
@@ -2027,7 +2027,7 @@ namespace PurelySharp.Symbolic
 
     public sealed class SymbolicSpanQueryResult
     {
-        public SymbolicSpanQueryResult(
+        internal SymbolicSpanQueryResult(
             string filePath,
             int spanStart,
             int spanEnd,
@@ -2161,7 +2161,7 @@ namespace PurelySharp.Symbolic
 
     public sealed class SymbolicFileQueryResult
     {
-        public SymbolicFileQueryResult(
+        internal SymbolicFileQueryResult(
             string filePath,
             int lineCount,
             IReadOnlyList<SymbolicLineQueryResult> lines,
@@ -3579,63 +3579,6 @@ namespace PurelySharp.Symbolic
             }
 
             return "uniform_program_point_reachability";
-        }
-    }
-
-    internal static class SymbolicInvariantTargetFilter
-    {
-        internal static IReadOnlyList<SymbolicConditionProofSummary> ApplyToProofSummaries(
-            IReadOnlyList<SymbolicConditionProofSummary> proofs,
-            SymbolicCompactQueryOptions options)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return proofs;
-            }
-
-            return proofs
-                .Where(proof => Matches(proof.Target, options.InvariantTargets))
-                .ToArray();
-        }
-
-        internal static IReadOnlyList<SymbolicConditionProofResult> ApplyToProofResults(
-            IReadOnlyList<SymbolicConditionProofResult> proofs,
-            SymbolicCompactQueryOptions options)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return proofs;
-            }
-
-            return proofs
-                .Where(proof => Matches(proof.Target, options.InvariantTargets))
-                .ToArray();
-        }
-
-        internal static IReadOnlyList<SymbolicInvariantCondition> ApplyToConditions(
-            IReadOnlyList<SymbolicInvariantCondition> conditions,
-            SymbolicCompactQueryOptions options)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return conditions;
-            }
-
-            return conditions
-                .Where(condition => Matches(condition.Target, options.InvariantTargets))
-                .ToArray();
-        }
-
-        internal static bool Matches(string? target, IReadOnlyList<string> invariantTargets)
-        {
-            return invariantTargets.Contains(NormalizeTarget(target), StringComparer.Ordinal);
-        }
-
-        internal static string NormalizeTarget(string? target)
-        {
-            return string.IsNullOrWhiteSpace(target)
-                ? "path"
-                : target!.Trim();
         }
     }
 
@@ -5354,21 +5297,21 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(query));
             }
 
-            var filteredTargetSummaries = ApplyTargetFilter(
+            var filteredTargetSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
                 query.TargetSummaries,
                 options,
                 static summary => summary.Target);
-            var focusedMustFacts = GetFocusedFacts(
+            var focusedMustFacts = SymbolicInvariantTargetFilter.SelectFacts(
                 query.MustFacts,
                 filteredTargetSummaries,
                 options,
                 static summary => summary.MustFacts);
-            var focusedMaybeFacts = GetFocusedFacts(
+            var focusedMaybeFacts = SymbolicInvariantTargetFilter.SelectFacts(
                 query.MaybeFacts,
                 filteredTargetSummaries,
                 options,
                 static summary => summary.MaybeFacts);
-            var focusedUnknownFacts = GetFocusedFacts(
+            var focusedUnknownFacts = SymbolicInvariantTargetFilter.SelectFacts(
                 query.UnknownFacts,
                 filteredTargetSummaries,
                 options,
@@ -5379,7 +5322,7 @@ namespace PurelySharp.Symbolic
             var focusedText = options.HasInvariantTargetFilter
                 ? SymbolicInvariantService.FormatMergedInvariantFacts(focusedMergedFacts)
                 : query.Text;
-            var filteredUnknownDiagnostics = ApplyTargetFilter(
+            var filteredUnknownDiagnostics = SymbolicInvariantTargetFilter.ApplyToTargets(
                 query.UnknownDiagnostics,
                 options,
                 static diagnostic => diagnostic.Target);
@@ -5391,7 +5334,7 @@ namespace PurelySharp.Symbolic
                 .Take(filteredTargetSummaries, options.MaxConditions)
                 .Select(target => SymbolicCompactInvariantTargetSummary.FromSummary(target, options))
                 .ToArray();
-            var filteredTargetPathSummaries = ApplyTargetFilter(
+            var filteredTargetPathSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
                 query.TargetPathSummaries,
                 options,
                 static summary => summary.Target);
@@ -5403,8 +5346,8 @@ namespace PurelySharp.Symbolic
                 .Take(query.Diagnostics, options.MaxConditions)
                 .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
                 .ToArray();
-            var matchedTargetFilters = GetMatchedTargetFilters(query, options);
-            var unmatchedTargetFilters = GetUnmatchedTargetFilters(options, matchedTargetFilters);
+            var matchedTargetFilters = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(query, options);
+            var unmatchedTargetFilters = SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options, matchedTargetFilters);
             var visibleMatchedTargetFilters = SymbolicCompactProjection.Take(matchedTargetFilters, options.MaxConditions);
             var visibleUnmatchedTargetFilters = SymbolicCompactProjection.Take(unmatchedTargetFilters, options.MaxConditions);
             var targetFilterMatched = !options.HasInvariantTargetFilter || matchedTargetFilters.Count != 0;
@@ -5454,87 +5397,6 @@ namespace PurelySharp.Symbolic
                 query.Diagnostics.Count > options.MaxConditions);
         }
 
-        private static IReadOnlyList<string> GetFocusedFacts(
-            IReadOnlyList<string> facts,
-            IReadOnlyList<SymbolicInvariantTargetSummary> filteredTargetSummaries,
-            SymbolicCompactQueryOptions options,
-            Func<SymbolicInvariantTargetSummary, IReadOnlyList<string>> factSelector)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return facts;
-            }
-
-            return filteredTargetSummaries
-                .SelectMany(factSelector)
-                .Where(static fact => !string.IsNullOrWhiteSpace(fact))
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static IReadOnlyList<string> GetMatchedTargetFilters(
-            SymbolicInvariantQueryView query,
-            SymbolicCompactQueryOptions options)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return Array.Empty<string>();
-            }
-
-            var availableTargets = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var summary in query.TargetSummaries)
-            {
-                availableTargets.Add(NormalizeTarget(summary.Target));
-            }
-
-            foreach (var summary in query.TargetPathSummaries)
-            {
-                availableTargets.Add(NormalizeTarget(summary.Target));
-            }
-
-            return options.InvariantTargets
-                .Where(availableTargets.Contains)
-                .ToArray();
-        }
-
-        private static IReadOnlyList<string> GetUnmatchedTargetFilters(
-            SymbolicCompactQueryOptions options,
-            IReadOnlyList<string> matchedTargetFilters)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return Array.Empty<string>();
-            }
-
-            var matched = new HashSet<string>(matchedTargetFilters, StringComparer.Ordinal);
-            return options.InvariantTargets
-                .Where(target => !matched.Contains(target))
-                .ToArray();
-        }
-
-        private static IReadOnlyList<TSummary> ApplyTargetFilter<TSummary>(
-            IReadOnlyList<TSummary> summaries,
-            SymbolicCompactQueryOptions options,
-            Func<TSummary, string> targetSelector)
-        {
-            if (!options.HasInvariantTargetFilter)
-            {
-                return summaries;
-            }
-
-            return summaries
-                .Where(summary => options.InvariantTargets.Contains(
-                    NormalizeTarget(targetSelector(summary)),
-                    StringComparer.Ordinal))
-                .ToArray();
-        }
-
-        private static string NormalizeTarget(string? target)
-        {
-            return string.IsNullOrWhiteSpace(target)
-                ? "path"
-                : target!.Trim();
-        }
     }
 
     public sealed class SymbolicCompactInvariantTargetSummary
@@ -7377,7 +7239,7 @@ namespace PurelySharp.Symbolic
 
     public sealed class SymbolicSourceQueryResult
     {
-        public SymbolicSourceQueryResult(
+        internal SymbolicSourceQueryResult(
             string filePath,
             int line,
             int column,
@@ -7811,7 +7673,7 @@ namespace PurelySharp.Symbolic
 
     public sealed class SymbolicConditionProofResult
     {
-        public SymbolicConditionProofResult(
+        internal SymbolicConditionProofResult(
             string condition,
             SymbolicTruthValue truthValue,
             string reason,

@@ -305,6 +305,104 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_UsesGeneratedInventoryForSymbolReferences()
+        {
+            const string changedFile = "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "inventory-symbol-reference");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
+            Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("CodeFixes"));
+            Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
+            Assert.That(GetStringArray(evidence, "tokens"), Does.Contain("PurelySharpCodeFixProvider"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_InventoryBroadDependencyTriggersFullSuiteFallback()
+        {
+            const string changedFile = "PurelySharp.Analyzer/PurelySharpDiagnostics.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+            Assert.That(
+                GetStringArray(root, "fullSuiteFallbackReasons"),
+                Does.Contain(changedFile + " is broad generated fixture dependency"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_IncludesInventorySummary()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs");
+            var inventory = recommendation.RootElement.GetProperty("inventory");
+
+            Assert.That(inventory.GetProperty("loaded").GetBoolean(), Is.True);
+            Assert.That(inventory.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Analyzer"));
+            Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Symbolic"));
+            Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Shared"));
+        }
+
+        [Test]
+        public async Task ListOnlyExplain_PrintsInventoryEvidence()
+        {
+            var output = await RunImpactedSelectorTextAsync(
+                explain: true,
+                "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs");
+
+            Assert.That(output, Does.Contain("Impact-selection evidence:"));
+            Assert.That(output, Does.Contain("Inventory loaded: True"));
+            Assert.That(output, Does.Contain("inventory-symbol-reference"));
+            Assert.That(output, Does.Contain("module=CodeFixes"));
+            Assert.That(output, Does.Contain("tokens=PurelySharpCodeFixProvider"));
+        }
+
+        [Test]
+        public void TestImpactInventory_DefinesModulesFixturesAndDependencies()
+        {
+            using var inventory = ReadImpactInventory();
+            var root = inventory.RootElement;
+            var moduleNames = GetStringArray(root, "modules", "name");
+            var fixtureNames = GetStringArray(root, "testFixtures", "name");
+            var codeFixDependency = GetInventoryEntry(root, "fixtureDependencies", "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs");
+
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(moduleNames, Does.Contain("Analyzer"));
+            Assert.That(moduleNames, Does.Contain("Symbolic"));
+            Assert.That(moduleNames, Does.Contain("SearchLib"));
+            Assert.That(moduleNames, Does.Contain("Shared"));
+            Assert.That(moduleNames, Does.Contain("TestInfrastructure"));
+            Assert.That(fixtureNames, Does.Contain("ImpactedTestSelectionScriptTests"));
+            Assert.That(fixtureNames, Does.Contain("SymbolicSourceQueryLineTests"));
+            Assert.That(codeFixDependency.GetProperty("module").GetString(), Is.EqualTo("CodeFixes"));
+            Assert.That(GetStringArray(codeFixDependency, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
+        }
+
+        [Test]
+        public void TestImpactInventory_SourceFilesStayWithinKnownModules()
+        {
+            using var inventory = ReadImpactInventory();
+            var sourceFiles = inventory.RootElement.GetProperty("sourceFiles").EnumerateArray().ToArray();
+            var unknownSources = sourceFiles
+                .Where(static entry => string.Equals(entry.GetProperty("module").GetString(), "Unknown", StringComparison.Ordinal))
+                .Select(static entry => entry.GetProperty("path").GetString())
+                .ToArray();
+
+            Assert.That(sourceFiles.Length, Is.GreaterThan(50));
+            Assert.That(unknownSources, Is.Empty);
+            Assert.That(
+                GetInventoryEntry(inventory.RootElement, "highFanoutFiles", "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs")
+                    .GetProperty("reason")
+                    .GetString(),
+                Is.EqualTo("high-fanout analyzer core"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_IgnoresDocumentationOnlyChanges()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(
@@ -318,6 +416,15 @@ namespace PurelySharp.Test
                 GetEvidenceEntry(root, "docs/symbolic-invariants.md", "ignored").GetProperty("reason").GetString(),
                 Is.EqualTo("Documentation-only change"));
             Assert.That(root.GetProperty("testFilter").GetString(), Is.Empty);
+        }
+
+        private static JsonDocument ReadImpactInventory()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            return JsonDocument.Parse(File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "scripts",
+                "test-impact-inventory.json")));
         }
 
         private static Task<JsonDocument> RunImpactedSelectorJsonAsync(params string[] changedFiles)
@@ -392,12 +499,99 @@ namespace PurelySharp.Test
             return JsonDocument.Parse(output);
         }
 
+        private static async Task<string> RunImpactedSelectorTextAsync(bool explain, params string[] changedFiles)
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var startInfo = CreatePowerShellStartInfo(repositoryRoot);
+
+            startInfo.ArgumentList.Add("-File");
+            startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Invoke-PurelySharpImpactedTests.ps1"));
+            startInfo.ArgumentList.Add("-ListOnly");
+            if (explain)
+            {
+                startInfo.ArgumentList.Add("-Explain");
+            }
+
+            startInfo.ArgumentList.Add("-ChangedFile");
+            foreach (var changedFile in changedFiles)
+            {
+                startInfo.ArgumentList.Add(changedFile);
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start impacted test selector.");
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            catch (TimeoutException)
+            {
+                process.Kill(entireProcessTree: true);
+                throw;
+            }
+
+            var output = await outputTask;
+            var error = await errorTask;
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(string.Join(
+                    Environment.NewLine,
+                    "Impacted test selector failed.",
+                    "Exit code: " + process.ExitCode,
+                    "stdout:",
+                    output,
+                    "stderr:",
+                    error));
+            }
+
+            Assert.That(error, Is.Empty);
+            return output;
+        }
+
+        private static ProcessStartInfo CreatePowerShellStartInfo(string repositoryRoot)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = FindPowerShellExecutable(),
+                WorkingDirectory = repositoryRoot,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+
+            startInfo.ArgumentList.Add("-NoLogo");
+            startInfo.ArgumentList.Add("-NoProfile");
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo.ArgumentList.Add("-ExecutionPolicy");
+                startInfo.ArgumentList.Add("Bypass");
+            }
+
+            return startInfo;
+        }
+
         private static string[] GetStringArray(JsonElement root, string propertyName)
         {
             return root.GetProperty(propertyName)
                 .EnumerateArray()
                 .Select(static element => element.GetString() ?? string.Empty)
                 .ToArray();
+        }
+
+        private static string[] GetStringArray(JsonElement root, string arrayPropertyName, string elementPropertyName)
+        {
+            return root.GetProperty(arrayPropertyName)
+                .EnumerateArray()
+                .Select(element => element.GetProperty(elementPropertyName).GetString() ?? string.Empty)
+                .ToArray();
+        }
+
+        private static JsonElement GetInventoryEntry(JsonElement root, string propertyName, string path)
+        {
+            return root.GetProperty(propertyName)
+                .EnumerateArray()
+                .Single(entry => entry.GetProperty("path").GetString() == path);
         }
 
         private static JsonElement GetEvidenceEntry(JsonElement root, string changedFile, string source)

@@ -96,7 +96,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | Z3/SMT service | [~] | One bounded `SmtAnalysisService` classifies reachability and implication, caches repeated queries, handles budgets/timeouts, and falls back conservatively when SMT is off, over budget, or unavailable. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SearchLibZ3SmokeTests.cs](PurelySharp.Test/SearchLibZ3SmokeTests.cs) |
 | Path-sensitive facts | [~] | Path facts include local/parameter versions, constants, null/non-null, numeric comparisons, affine arithmetic, multiplication by constant, boolean short-circuiting, conditionals, coalesce, switch arms, relational patterns, property/list patterns, assignments, tuple/array/list facts, and guarded exception hazards. | [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionFlowPathFactStressTests.cs](PurelySharp.Test/ExceptionFlowPathFactStressTests.cs) |
 | String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](PurelySharp.Test/RegexTests.cs) |
-| Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, syntax position, or all source lines, and can use SMT to check reachability or implication. Line and file queries expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicSourceQueryService.cs](PurelySharp.Symbolic/SymbolicSourceQueryService.cs) |
+| Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, syntax position, span, node, or all source lines through `SymbolicQueryService`, and can use SMT to check reachability or implication. Query results expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicQueryApi.cs](PurelySharp.Symbolic/SymbolicQueryApi.cs) |
 | Symbolic runtime-hazard API | [~] | `PurelySharp.Symbolic` can query proven runtime hazards at a line, span, syntax tree, or file, including direct throws, rethrows, divide-by-zero, null dereference, nullable value access, index/range hazards, casts, array covariance stores, checked overflow, negative array lengths, and dynamic null-binding hazards. Unknown candidates stay hidden by default unless explicitly requested. | [SymbolicRuntimeHazardQueryTests.cs](PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs), [SymbolicRuntimeHazardQueryService.cs](PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs) |
 | Symbolic CLI | [x] | `Tools/PurelySharp.SymbolicCli` exposes line, position, span, and all-lines invariant queries, runtime-hazard queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [SymbolicRuntimeHazardQueryTests.cs](PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs), [Program.cs](Tools/PurelySharp.SymbolicCli/Program.cs) |
 | Runtime hazards and exception flow | [~] | `purelysharp_runtime_hazard_mode = sites` reports `PS0011` operation-site hazards without requiring purity attributes. `all` also emits `PS0010` method summaries. Legacy `purelysharp_report_exceptions` and `purelysharp_checked_exceptions` remain supported. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, dynamic null binding, negative array lengths, index hazards, catch filters, and some resource disposal flows. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](PurelySharp.Test/RecursiveExceptionFlowTests.cs) |
@@ -206,16 +206,12 @@ than by hard-coding one method's control flow.
 
 `PurelySharp.Symbolic` exposes:
 
-- `QuerySyntaxTree`
-- `QuerySyntaxTreeAtPosition`
-- `QuerySyntaxTreeLine`
-- `QuerySyntaxTreeAllLines`
-- `QueryFileLine`
-- `QueryFileAllLines`
-- `QuerySourceLine`
-- `QuerySourceAllLines`
-- line-level merged fact summaries via `SymbolicLineQueryResult`
-- file-level aggregate summaries via `SymbolicFileQueryResult`
+- `SymbolicQueryService.Query(SymbolicQueryRequest)` for point, position, line, span, line-span, all-lines, and node queries
+- `SymbolicSourceInput.FromFile`, `FromText`, `FromSyntaxTree`, and `FromNode`
+- `SymbolicQueryTarget.Point`, `Position`, `Line`, `Span`, `LineSpan`, `AllLines`, and `Node`
+- `SymbolicQueryService.Prove(SymbolicConditionProofRequest)` for condition implication checks
+- `SymbolicQueryService.QueryRuntimeHazards(SymbolicRuntimeHazardRequest)` for symbolic runtime-hazard queries
+- aggregate summaries via `SymbolicQueryResult`
 - post-query result filters via `SymbolicSourceQueryFilter`
 
 The CLI mirrors the library:
@@ -365,20 +361,24 @@ It can also emit a TRX slow-test profile and test bounded worker counts:
 
 For local iteration, the impacted-test wrapper can derive a VSTest filter from
 changed files. It falls back to the full suite for shared infrastructure,
-high-fanout analyzer core, or unmapped files unless `-ForcePartial` is set:
+high-fanout analyzer core, broad generated dependency maps, or unmapped files
+unless `-ForcePartial` is set. The wrapper combines curated path maps with the
+checked-in generated inventory in `scripts/test-impact-inventory.json`:
 
 ```powershell
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly -Json
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly -Explain
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild -ForcePartial
 ```
 
 Use `-ChangedFile <path>` with `-ListOnly` to preview the mapping for a
-specific edit before staging it. The helper is deliberately conservative and is
-not a CI replacement; run the full wrapper or GitHub CI before relying on broad
-behavioral changes.
+specific edit before staging it. Use `scripts/Get-PurelySharpTestImpactInventory.ps1`
+to regenerate the inventory after adding modules, fixtures, or production
+types. The helper is deliberately conservative and is not a CI replacement; run
+the full wrapper or GitHub CI before relying on broad behavioral changes.
 
 Representative evidence suites:
 

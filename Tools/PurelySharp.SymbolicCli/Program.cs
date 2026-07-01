@@ -20,113 +20,26 @@ try
     object result;
     if (options.RuntimeHazards)
     {
-        var hazardService = new SymbolicRuntimeHazardQueryService();
-        var hazardOptions = options.CreateRuntimeHazardOptions();
-        result = options.AllLines
-            ? hazardService.QueryFileRuntimeHazards(
-                options.FilePath,
-                smtAnalysis!,
-                options.CreateReferences(),
-                options: hazardOptions)
-            : options.IsSpanQuery
-            ? hazardService.QueryFileRuntimeHazardsSpan(
-                options.FilePath,
-                options.SpanStart!.Value,
-                options.SpanEnd!.Value,
-                smtAnalysis!,
-                options.CreateReferences(),
-                options: hazardOptions)
-            : hazardService.QueryFileRuntimeHazardsLine(
-                options.FilePath,
-                options.Line,
-                smtAnalysis!,
-                options.CreateReferences(),
-                options: hazardOptions);
+        result = new SymbolicQueryService().QueryRuntimeHazards(
+            new SymbolicRuntimeHazardRequest(
+                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateRuntimeHazardTarget(),
+                options.CreateQueryOptions(smtAnalysis, includeResultFilter: false),
+                options.CreateRuntimeHazardOptions()));
     }
     else
     {
-        var queryService = new SymbolicSourceQueryService();
-        result = options.AllLines
-            ? queryService.QueryFileAllLines(
-                options.FilePath,
-                options.CreateReferences(),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions,
-                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-            : options.LineInvariants
-            ? options.HasColumn
-            ? queryService.QueryFileLinePoint(
-                options.FilePath,
-                options.Line,
-                options.Column,
-                options.CreateReferences(),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions,
-                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-            : queryService.QueryFileLine(
-                options.FilePath,
-                options.Line,
-                options.CreateReferences(),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions,
-                includeExpressionProgramPoints: options.LineExpressions,
-                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-            : options.IsAnySpanQuery
-            ? options.IsLineColumnSpanQuery
-                ? queryService.QueryFileLineSpan(
-                    options.FilePath,
-                    options.SpanStartLine!.Value,
-                    options.SpanStartColumn!.Value,
-                    options.SpanEndLine!.Value,
-                    options.SpanEndColumn!.Value,
-                    options.CreateReferences(),
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: options.ImpliedConditions,
-                    includeExpressionProgramPoints: options.LineExpressions,
-                    includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-                : queryService.QueryFileSpan(
-                    options.FilePath,
-                    options.SpanStart!.Value,
-                    options.SpanEnd!.Value,
-                    options.CreateReferences(),
-                    smtAnalysis: smtAnalysis,
-                    impliedConditions: options.ImpliedConditions,
-                    includeExpressionProgramPoints: options.LineExpressions,
-                    includeCurrentStatementCompletionFacts: options.PostLineInvariants)
-            : options.Position.HasValue
-            ? queryService.QueryFileAtPosition(
-                options.FilePath,
-                options.Position.Value,
-                options.CreateReferences(),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: options.ImpliedConditions)
-            : queryService.QueryFile(
-                new SymbolicFileQuery(
-                    options.FilePath,
-                    options.Line,
-                    options.Column,
-                    options.CreateReferences(),
-                    options.ImpliedConditions),
-                smtAnalysis: smtAnalysis);
+        result = new SymbolicQueryService()
+            .Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateQueryTarget(),
+                options.CreateQueryOptions(smtAnalysis, includeResultFilter: true)))
+            .InnerResult;
     }
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
     {
         result = options.FilterRuntimeHazards(runtimeHazardResult);
-    }
-
-    if (options.HasResultFilter)
-    {
-        var filter = options.CreateResultFilter();
-        result = result switch
-        {
-            SymbolicFileQueryResult fileResult => fileResult.Filter(filter),
-            SymbolicLineQueryResult lineResult => lineResult.Filter(filter),
-            SymbolicSpanQueryResult spanResult => spanResult.Filter(filter),
-            _ => result,
-        };
     }
 
     if (options.InvariantJson)
@@ -472,16 +385,7 @@ static IReadOnlyList<TTarget> FilterInvariantTargets<TTarget>(
     SymbolicCliOptions options,
     Func<TTarget, string> targetSelector)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return targets;
-    }
-
-    return targets
-        .Where(target => options.InvariantTargets.Contains(
-            NormalizeInvariantTarget(targetSelector(target)),
-            StringComparer.Ordinal))
-        .ToArray();
+    return SymbolicInvariantTargetFilter.ApplyToTargets(targets, options.InvariantTargets, targetSelector);
 }
 
 static IReadOnlyList<string> SelectInvariantFacts(
@@ -490,16 +394,11 @@ static IReadOnlyList<string> SelectInvariantFacts(
     SymbolicCliOptions options,
     Func<SymbolicInvariantTargetSummary, IReadOnlyList<string>> factSelector)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return facts;
-    }
-
-    return targetSummaries
-        .SelectMany(factSelector)
-        .Where(static fact => !string.IsNullOrWhiteSpace(fact))
-        .Distinct(StringComparer.Ordinal)
-        .ToArray();
+    return SymbolicInvariantTargetFilter.SelectFacts(
+        facts,
+        targetSummaries,
+        options.InvariantTargets,
+        factSelector);
 }
 
 static IReadOnlyList<string> GetMatchedInvariantTargetFilters(
@@ -507,40 +406,19 @@ static IReadOnlyList<string> GetMatchedInvariantTargetFilters(
     IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries,
     IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return Array.Empty<string>();
-    }
-
-    var availableTargets = new HashSet<string>(StringComparer.Ordinal);
-    foreach (var summary in targetSummaries)
-    {
-        availableTargets.Add(NormalizeInvariantTarget(summary.Target));
-    }
-
-    foreach (var summary in targetPathSummaries)
-    {
-        availableTargets.Add(NormalizeInvariantTarget(summary.Target));
-    }
-
-    return options.InvariantTargets
-        .Where(availableTargets.Contains)
-        .ToArray();
+    return SymbolicInvariantTargetFilter.GetMatchedTargetFilters(
+        targetSummaries,
+        targetPathSummaries,
+        options.InvariantTargets);
 }
 
 static IReadOnlyList<string> GetUnmatchedInvariantTargetFilters(
     SymbolicCliOptions options,
     IReadOnlyList<string> matchedTargetFilters)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return Array.Empty<string>();
-    }
-
-    var matched = new HashSet<string>(matchedTargetFilters, StringComparer.Ordinal);
-    return options.InvariantTargets
-        .Where(target => !matched.Contains(target))
-        .ToArray();
+    return SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(
+        options.InvariantTargets,
+        matchedTargetFilters);
 }
 
 static void PrintInvariantTargetFilterList(
@@ -559,13 +437,6 @@ static void PrintInvariantTargetFilterList(
         ? " ... " + (values.Count - visibleValues.Length).ToString(System.Globalization.CultureInfo.InvariantCulture) + " omitted"
         : string.Empty;
     Console.WriteLine(label + " " + name + ": " + string.Join(", ", visibleValues) + suffix);
-}
-
-static string NormalizeInvariantTarget(string? target)
-{
-    return string.IsNullOrWhiteSpace(target)
-        ? "path"
-        : target!.Trim();
 }
 
 static void PrintInvariantTargetSummaries(
@@ -793,9 +664,7 @@ static IReadOnlyList<SymbolicConditionProofSummary> FilterConditionProofSummarie
     }
 
     return proofs
-        .Where(proof => options.InvariantTargets.Contains(
-            NormalizeInvariantTarget(proof.Target),
-            StringComparer.Ordinal))
+        .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
         .ToArray();
 }
 
@@ -809,9 +678,7 @@ static IReadOnlyList<SymbolicConditionProofResult> FilterConditionProofResults(
     }
 
     return proofs
-        .Where(proof => options.InvariantTargets.Contains(
-            NormalizeInvariantTarget(proof.Target),
-            StringComparer.Ordinal))
+        .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
         .ToArray();
 }
 
@@ -1581,6 +1448,61 @@ Examples:
             SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
             SmtMaxPathConditions,
             SmtMaxExpressionNodes);
+    }
+
+    public SymbolicQueryOptions CreateQueryOptions(
+        SmtAnalysisService? smtAnalysis,
+        bool includeResultFilter)
+    {
+        return new SymbolicQueryOptions(
+            CreateReferences(),
+            smtAnalysis,
+            ImpliedConditions,
+            LineExpressions,
+            PostLineInvariants,
+            includeResultFilter && HasResultFilter ? CreateResultFilter() : null);
+    }
+
+    public SymbolicQueryTarget CreateQueryTarget()
+    {
+        if (AllLines)
+        {
+            return SymbolicQueryTarget.AllLines();
+        }
+
+        if (LineInvariants)
+        {
+            return HasColumn
+                ? SymbolicQueryTarget.Point(Line, Column)
+                : SymbolicQueryTarget.Line(Line);
+        }
+
+        if (IsAnySpanQuery)
+        {
+            return IsLineColumnSpanQuery
+                ? SymbolicQueryTarget.LineSpan(
+                    SpanStartLine!.Value,
+                    SpanStartColumn!.Value,
+                    SpanEndLine!.Value,
+                    SpanEndColumn!.Value)
+                : SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value);
+        }
+
+        return Position.HasValue
+            ? SymbolicQueryTarget.Position(Position.Value)
+            : SymbolicQueryTarget.Point(Line, Column);
+    }
+
+    public SymbolicQueryTarget CreateRuntimeHazardTarget()
+    {
+        if (AllLines)
+        {
+            return SymbolicQueryTarget.AllLines();
+        }
+
+        return IsSpanQuery
+            ? SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value)
+            : SymbolicQueryTarget.Line(Line);
     }
 
     public SymbolicCompactQueryOptions CreateCompactOptions()

@@ -39,6 +39,12 @@ param(
     [switch]$Json,
 
     [Parameter()]
+    [switch]$Explain,
+
+    [Parameter()]
+    [string]$ImpactInventoryPath = '',
+
+    [Parameter()]
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
@@ -246,7 +252,10 @@ function Add-SelectionEvidence
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [string[]]$FullSuiteFallbackReasons = @()
+        [string[]]$FullSuiteFallbackReasons = @(),
+
+        [Parameter()]
+        [string]$Module = ''
     )
 
     if ($null -eq $Evidence)
@@ -260,6 +269,7 @@ function Add-SelectionEvidence
         reason = $Reason
         selectedTestFixtures = @($SelectedTestFixtures | Sort-Object -Unique)
         tokens = @($Tokens | Sort-Object -Unique)
+        module = $Module
         fullSuiteFallbackReasons = @($FullSuiteFallbackReasons)
     }
 
@@ -293,7 +303,10 @@ function Add-SelectionEvidenceForAddedTests
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [string[]]$Tokens = @()
+        [string[]]$Tokens = @(),
+
+        [Parameter()]
+        [string]$Module = ''
     )
 
     $added = @(Get-AddedTestClasses -Set $Set -Before $Before)
@@ -303,7 +316,8 @@ function Add-SelectionEvidenceForAddedTests
         -Source $Source `
         -Reason $Reason `
         -SelectedTestFixtures $added `
-        -Tokens $Tokens
+        -Tokens $Tokens `
+        -Module $Module
 }
 
 function Add-FullSuiteFallbackReason
@@ -332,6 +346,146 @@ function Add-FullSuiteFallbackReason
         -Source 'full-suite-fallback' `
         -Reason $Reason `
         -FullSuiteFallbackReasons @($Reason)
+}
+
+function Resolve-TestImpactInventoryPath
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$RequestedPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RequestedPath))
+    {
+        return Join-Path $RepoRoot 'scripts\test-impact-inventory.json'
+    }
+
+    if ([System.IO.Path]::IsPathRooted($RequestedPath))
+    {
+        return $RequestedPath
+    }
+
+    return Join-Path $RepoRoot $RequestedPath
+}
+
+function Get-TestImpactInventory
+{
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path))
+    {
+        return $null
+    }
+
+    $json = Get-Content -LiteralPath $Path -Raw
+    if ([string]::IsNullOrWhiteSpace($json))
+    {
+        return $null
+    }
+
+    $inventory = $json | ConvertFrom-Json
+    if ($null -eq $inventory.schemaVersion -or [int]$inventory.schemaVersion -ne 1)
+    {
+        throw "Unsupported impacted-test inventory schema in $Path"
+    }
+
+    return $inventory
+}
+
+function Get-InventoryDependency
+{
+    param(
+        [AllowNull()]
+        $Inventory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ($null -eq $Inventory -or $null -eq $Inventory.fixtureDependencies)
+    {
+        return $null
+    }
+
+    foreach ($entry in @($Inventory.fixtureDependencies))
+    {
+        if ([string]::Equals([string]$entry.path, $Path, [StringComparison]::OrdinalIgnoreCase))
+        {
+            return $entry
+        }
+    }
+
+    return $null
+}
+
+function Get-InventoryHighFanoutReason
+{
+    param(
+        [AllowNull()]
+        $Inventory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ($null -eq $Inventory -or $null -eq $Inventory.highFanoutFiles)
+    {
+        return ''
+    }
+
+    foreach ($entry in @($Inventory.highFanoutFiles))
+    {
+        if ([string]::Equals([string]$entry.path, $Path, [StringComparison]::OrdinalIgnoreCase))
+        {
+            return [string]$entry.reason
+        }
+    }
+
+    return ''
+}
+
+function Add-InventoryMappedTests
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [AllowNull()]
+        $Inventory,
+
+        [Parameter()]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence = $null
+    )
+
+    $dependency = Get-InventoryDependency -Inventory $Inventory -Path $Path
+    if ($null -eq $dependency)
+    {
+        return $false
+    }
+
+    $fixtures = @($dependency.selectedTestFixtures | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($fixtures.Count -eq 0)
+    {
+        return $false
+    }
+
+    Add-TestClasses $Set $fixtures
+    Add-SelectionEvidence `
+        -Evidence $Evidence `
+        -Path $Path `
+        -Source 'inventory-symbol-reference' `
+        -Reason 'Generated inventory maps changed source symbols to referencing test fixtures' `
+        -SelectedTestFixtures $fixtures `
+        -Tokens @($dependency.tokens | ForEach-Object { [string]$_ }) `
+        -Module ([string]$dependency.module)
+
+    return $true
 }
 
 function Add-SearchLibSmtTestClasses
@@ -822,6 +976,15 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $repoRoot
 try
 {
+    $resolvedImpactInventoryPath = Resolve-TestImpactInventoryPath -RepoRoot $repoRoot -RequestedPath $ImpactInventoryPath
+    $impactInventory = Get-TestImpactInventory -Path $resolvedImpactInventoryPath
+    $inventorySummary = [ordered]@{
+        loaded = $null -ne $impactInventory
+        path = Convert-ToRepoPath $resolvedImpactInventoryPath
+        schemaVersion = if ($null -ne $impactInventory) { [int]$impactInventory.schemaVersion } else { 0 }
+        modules = if ($null -ne $impactInventory -and $null -ne $impactInventory.modules) { @($impactInventory.modules | ForEach-Object { [string]$_.name }) } else { @() }
+    }
+
     $changedFiles = @(Get-ChangedRepoFiles -RequestedBaseRef $BaseRef -IncludeUncommitted $IncludeUncommitted -ExplicitChangedFiles $ChangedFile)
     if ($changedFiles.Count -eq 0)
     {
@@ -835,6 +998,7 @@ try
                 requiresFullSuite = $false
                 fullSuiteFallbackReasons = @()
                 selectionEvidence = @()
+                inventory = $inventorySummary
                 suggestedAction = 'Skip'
                 suggestedCommand = ''
                 note = 'No changed files detected. No impacted tests to run.'
@@ -934,6 +1098,7 @@ try
         $beforeMappedEvidenceCount = $selectionEvidence.Count
         Add-PathMappedTests $testClasses $path $selectionEvidence
         $hasPathMapEvidence = $selectionEvidence.Count -gt $beforeMappedEvidenceCount
+        $hasInventoryEvidence = Add-InventoryMappedTests $testClasses $path $impactInventory $selectionEvidence
 
         if ($path -match '^PurelySharp\.Analyzer/')
         {
@@ -952,11 +1117,16 @@ try
                     -Tokens $tokens
             }
 
-            if ($path -match '^PurelySharp\.Analyzer/Engine/(PurityAnalysisEngine|CompilationPurityService|Rules/RuleRegistry)\.cs$')
+            $inventoryHighFanoutReason = Get-InventoryHighFanoutReason -Inventory $impactInventory -Path $path
+            if (-not [string]::IsNullOrWhiteSpace($inventoryHighFanoutReason))
+            {
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is $inventoryHighFanoutReason"
+            }
+            elseif ($path -match '^PurelySharp\.Analyzer/Engine/(PurityAnalysisEngine|CompilationPurityService|Rules/RuleRegistry)\.cs$')
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is high-fanout analyzer core"
             }
-            elseif ($path -match '\.cs$' -and -not $hasPathMapEvidence -and $testClasses.Count -eq $beforeMappedCount)
+            elseif ($path -match '\.cs$' -and -not $hasPathMapEvidence -and -not $hasInventoryEvidence -and $testClasses.Count -eq $beforeMappedCount)
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }
@@ -1029,6 +1199,7 @@ try
         requiresFullSuite = $requiresFull
         fullSuiteFallbackReasons = @($fullReasons)
         selectionEvidence = @($selectionEvidence.ToArray())
+        inventory = $inventorySummary
         filterTooLong = $filterTooLong
         forcePartial = [bool]$ForcePartial
         suggestedAction = $suggestedAction
@@ -1074,6 +1245,35 @@ try
         foreach ($reason in $fullReasons)
         {
             Write-Host "  $reason"
+        }
+    }
+
+    if ($Explain)
+    {
+        Write-Host ''
+        Write-Host 'Impact-selection evidence:'
+        Write-Host "  Inventory loaded: $($inventorySummary.loaded) ($($inventorySummary.path))"
+        foreach ($entry in $selectionEvidence)
+        {
+            $fixtures = @($entry.selectedTestFixtures) -join ', '
+            $tokens = @($entry.tokens) -join ', '
+            $module = [string]$entry.module
+            if ([string]::IsNullOrWhiteSpace($fixtures))
+            {
+                $fixtures = '<none>'
+            }
+
+            if ([string]::IsNullOrWhiteSpace($tokens))
+            {
+                $tokens = '<none>'
+            }
+
+            if ([string]::IsNullOrWhiteSpace($module))
+            {
+                $module = '<unknown>'
+            }
+
+            Write-Host "  $($entry.changedFile): $($entry.source); module=$module; fixtures=$fixtures; tokens=$tokens; reason=$($entry.reason)"
         }
     }
 
