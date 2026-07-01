@@ -141,6 +141,57 @@ namespace PurelySharp.Symbolic
             return IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), pathConditions, smtAnalysis);
         }
 
+        public static bool? EvaluateConditionTruth(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis,
+            IEnumerable<SmtFormula>? pathConditions = null)
+        {
+            var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
+            if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                if (IsBranchUnreachable(
+                        basePathConditions,
+                        expression,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis))
+                {
+                    return false;
+                }
+
+                if (IsBranchUnreachable(
+                        basePathConditions,
+                        expression,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis))
+                {
+                    return true;
+                }
+
+                return null;
+            }
+
+            CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, basePathConditions);
+            if (!IsSatisfiable(basePathConditions, smtAnalysis) ||
+                IsFormulaAlwaysFalse(formula, basePathConditions, smtAnalysis))
+            {
+                return false;
+            }
+
+            if (IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), basePathConditions, smtAnalysis))
+            {
+                return true;
+            }
+
+            return null;
+        }
+
         public static bool IsNodeReachable(
             SyntaxNode node,
             SemanticModel semanticModel,

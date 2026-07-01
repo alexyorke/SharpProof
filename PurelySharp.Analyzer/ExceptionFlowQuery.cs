@@ -950,20 +950,12 @@ namespace PurelySharp.Analyzer
                 filterExpression,
                 semanticModel,
                 cancellationToken);
-            CSharpConditionToFormula.TryCollectDomainFacts(filterExpression, semanticModel, cancellationToken, pathConditions);
-            if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
-            {
-                return false;
-            }
-
-            if (CSharpConditionToFormula.TryTranslate(filterExpression, semanticModel, cancellationToken, out var filterFormula) &&
-                filterFormula != null &&
-                SymbolicReachabilityService.PathConditionsImply(pathConditions, filterFormula, smtAnalysis))
-            {
-                return true;
-            }
-
-            return SymbolicReachabilityService.PathConditionsImplyBranch(
+            return SymbolicReachabilityService.EvaluateConditionTruth(
+                filterExpression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranch(
                 pathConditions,
                 filterExpression,
                 branchWhenTrue: true,

@@ -996,59 +996,17 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService? smtAnalysis,
             IReadOnlyCollection<SmtFormula>? pathConditions = null)
         {
-            if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
-                formula == null)
+            return SymbolicReachabilityService.EvaluateConditionTruth(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                pathConditions) switch
             {
-                return EvaluateBranchAssumptionFeasibility(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
-            }
-
-            var domainFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
-            CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, domainFacts);
-
-            if (SymbolicReachabilityService.IsFormulaAlwaysFalse(formula, domainFacts, smtAnalysis))
-            {
-                return KnownBooleanValue.False;
-            }
-
-            if (SymbolicReachabilityService.IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), domainFacts, smtAnalysis))
-            {
-                return KnownBooleanValue.True;
-            }
-
-            return KnownBooleanValue.Unknown;
-        }
-
-        private static KnownBooleanValue EvaluateBranchAssumptionFeasibility(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis,
-            IReadOnlyCollection<SmtFormula>? pathConditions = null)
-        {
-            var basePathConditions = pathConditions ?? Array.Empty<SmtFormula>();
-            if (SymbolicReachabilityService.IsBranchUnreachable(
-                    basePathConditions,
-                    expression,
-                    branchWhenTrue: true,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
-            {
-                return KnownBooleanValue.False;
-            }
-
-            if (SymbolicReachabilityService.IsBranchUnreachable(
-                    basePathConditions,
-                    expression,
-                    branchWhenTrue: false,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
-            {
-                return KnownBooleanValue.True;
-            }
-
-            return KnownBooleanValue.Unknown;
+                true => KnownBooleanValue.True,
+                false => KnownBooleanValue.False,
+                _ => KnownBooleanValue.Unknown
+            };
         }
 
         private enum KnownBooleanValue
