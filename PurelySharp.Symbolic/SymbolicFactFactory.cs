@@ -128,6 +128,97 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        public static bool TryCreateBuiltInLengthFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
+        {
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtStringLengthTerm(new SmtVariable(variableName + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
+            {
+                return TryCreateReferenceBuiltInLengthFormula(new SmtVariable(variableName, SmtValueKind.Reference), out formula);
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        public static bool TryCreateBuiltInLengthFormulaForReference(
+            SmtFormula receiverFormula,
+            ITypeSymbol? type,
+            out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtStringLengthTerm(
+                    new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
+            {
+                return TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        public static bool TryCreateArrayDimensionLengthFormula(
+            string variableName,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (dimension < 0 ||
+                dimension >= arrayType.Rank)
+            {
+                formula = null!;
+                return false;
+            }
+
+            return TryCreateReferenceArrayDimensionLengthFormula(
+                new SmtVariable(variableName, SmtValueKind.Reference),
+                dimension,
+                out formula);
+        }
+
+        public static bool TryCreateArrayDimensionLengthFormulaForReference(
+            SmtFormula receiverFormula,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (dimension < 0 ||
+                dimension >= arrayType.Rank)
+            {
+                formula = null!;
+                return false;
+            }
+
+            return TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, dimension, out formula);
+        }
+
+        public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is
+                    "System.Span<T>" or
+                    "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or
+                    "System.ReadOnlyMemory<T>";
+        }
+
         public static string GetReferenceFormulaName(SmtFormula receiverFormula)
         {
             return receiverFormula is SmtVariable variable

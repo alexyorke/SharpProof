@@ -1913,21 +1913,7 @@ namespace PurelySharp.Analyzer
                 _ => null
             };
 
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                formula = new SmtStringLengthTerm(new SmtVariable(GetSmtVariableName(symbol) + ".String", SmtValueKind.String));
-                return true;
-            }
-
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                IsBuiltInSpanOrMemoryType(type))
-            {
-                var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
-                return SymbolicFactFactory.TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
-            }
-
-            formula = null!;
-            return false;
+            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(GetSmtVariableName(symbol), type, out formula);
         }
 
         private static bool TryCreateArrayDimensionLengthFormula(
@@ -1936,16 +1922,17 @@ namespace PurelySharp.Analyzer
             out SmtFormula formula)
         {
             if (dimension < 0 ||
-                GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType ||
-                dimension >= arrayType.Rank ||
-                !TryCreateSymbolSmtValue(symbol, out var receiverFormula) ||
-                receiverFormula is not { Kind: SmtValueKind.Reference })
+                GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType)
             {
                 formula = null!;
                 return false;
             }
 
-            return SymbolicFactFactory.TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, dimension, out formula);
+            return SymbolicFactFactory.TryCreateArrayDimensionLengthFormula(
+                GetSmtVariableName(symbol),
+                arrayType,
+                dimension,
+                out formula);
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(

@@ -4414,31 +4414,10 @@ namespace PurelySharp.Analyzer.Engine
                 _ => null
             };
 
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                formula = new SmtStringLengthTerm(new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion) + ".String", SmtValueKind.String));
-                return true;
-            }
-
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                IsBuiltInSpanOrMemoryType(type))
-            {
-                var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
-                return SymbolicFactFactory.TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
-            }
-
-            formula = null!;
-            return false;
-        }
-
-        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
-        {
-            return typeSymbol is INamedTypeSymbol namedType &&
-                namedType.OriginalDefinition.ToDisplayString() is
-                    "System.Span<T>" or
-                    "System.ReadOnlySpan<T>" or
-                    "System.Memory<T>" or
-                    "System.ReadOnlyMemory<T>";
+            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(
+                GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
+                type,
+                out formula);
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(
