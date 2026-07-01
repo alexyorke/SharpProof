@@ -1490,7 +1490,10 @@ namespace PurelySharp.Symbolic
                     "condition_not_supported");
             }
 
-            var trueProof = smtAnalysis.ClassifyImplication(analysis.PathConditions, conditionFormula);
+            var trueProof = SymbolicReachabilityService.ClassifyImplication(
+                analysis.PathConditions,
+                conditionFormula,
+                smtAnalysis);
             if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
             {
                 return new SymbolicConditionProofResult(
@@ -1500,9 +1503,10 @@ namespace PurelySharp.Symbolic
                     conditionFormula);
             }
 
-            var falseProof = smtAnalysis.ClassifyImplication(
+            var falseProof = SymbolicReachabilityService.ClassifyImplication(
                 analysis.PathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
+                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula),
+                smtAnalysis);
             if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
             {
                 return new SymbolicConditionProofResult(

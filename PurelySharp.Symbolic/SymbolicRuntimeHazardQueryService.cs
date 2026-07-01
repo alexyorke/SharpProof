@@ -484,15 +484,19 @@ namespace PurelySharp.Symbolic
                 return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false");
             }
 
-            var proven = smtAnalysis.ClassifyImplication(analysis.PathConditions, triggerCondition);
+            var proven = SymbolicReachabilityService.ClassifyImplication(
+                analysis.PathConditions,
+                triggerCondition,
+                smtAnalysis);
             if (proven.Outcome == PurityProofOutcome.ProvablyPure)
             {
                 return (SymbolicRuntimeHazardStatus.Proven, proven.Reason);
             }
 
-            var disproven = smtAnalysis.ClassifyImplication(
+            var disproven = SymbolicReachabilityService.ClassifyImplication(
                 analysis.PathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, triggerCondition));
+                new SmtUnaryFormula(SmtUnaryOperator.Not, triggerCondition),
+                smtAnalysis);
             if (disproven.Outcome == PurityProofOutcome.ProvablyPure)
             {
                 return (SymbolicRuntimeHazardStatus.Unreachable, disproven.Reason);

@@ -27,8 +27,16 @@ namespace PurelySharp.Symbolic
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
         {
+            return ClassifyImplication(pathConditions, factFormula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
+        public static PurityProofResult ClassifyImplication(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula,
+            SmtAnalysisService? smtAnalysis)
+        {
             using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            return (smtAnalysis ?? fallbackSmtAnalysis!).PathConditionsImply(pathConditions, factFormula);
+            return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyImplication(pathConditions, factFormula);
         }
 
         public static bool IsFormulaAlwaysFalse(
