@@ -63,8 +63,7 @@ namespace PurelySharp.Analyzer
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions.Count > 0 &&
-                PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
-                PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
+                SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula, smtAnalysis);
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -570,7 +569,7 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
 
-            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
+            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         internal static bool IsMethodCallCandidatePathReachable(
@@ -606,7 +605,7 @@ namespace PurelySharp.Analyzer
                     pathConditions);
             }
 
-            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
+            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         internal static List<SmtFormula> CollectExceptionSitePathConditions(
@@ -675,7 +674,7 @@ namespace PurelySharp.Analyzer
                 finallyBlock,
                 semanticModel,
                 cancellationToken);
-            if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+            if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
             {
                 return false;
             }
@@ -688,7 +687,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 AddPriorStatementFacts(statement, semanticModel, cancellationToken, pathConditions);
-                if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+                if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
                 {
                     return false;
                 }
@@ -736,7 +735,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockConditions);
-                if (!PathConditionsAreSatisfiable(blockConditions, smtAnalysis))
+                if (!SymbolicReachabilityService.IsSatisfiable(blockConditions, smtAnalysis))
                 {
                     return false;
                 }
@@ -763,7 +762,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var trueReachable = PathConditionsAreSatisfiable(trueConditions, smtAnalysis);
+            var trueReachable = SymbolicReachabilityService.IsSatisfiable(trueConditions, smtAnalysis);
             var trueExits = !trueReachable ||
                 StatementExitIsProven(ifStatement.Statement, trueConditions, semanticModel, cancellationToken, smtAnalysis);
 
@@ -790,7 +789,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var falseReachable = PathConditionsAreSatisfiable(falseConditions, smtAnalysis);
+            var falseReachable = SymbolicReachabilityService.IsSatisfiable(falseConditions, smtAnalysis);
             var falseExits = !falseReachable ||
                 StatementExitIsProven(elseStatement, falseConditions, semanticModel, cancellationToken, smtAnalysis);
 
@@ -2787,21 +2786,6 @@ namespace PurelySharp.Analyzer
         {
             return typeSymbol?.IsValueType == true &&
                 typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
-        }
-
-        private static bool PathConditionsImplyFact(
-            IEnumerable<SmtFormula> pathConditions,
-            SmtFormula factFormula,
-            SmtAnalysisService smtAnalysis)
-        {
-            return SymbolicReachabilityService.PathConditionsImply(pathConditions, factFormula, smtAnalysis);
-        }
-
-        private static bool PathConditionsAreSatisfiable(
-            IEnumerable<SmtFormula> pathConditions,
-            SmtAnalysisService smtAnalysis)
-        {
-            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsSymbolAssignedBeforeUse(

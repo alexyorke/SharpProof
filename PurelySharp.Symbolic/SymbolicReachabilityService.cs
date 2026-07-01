@@ -31,6 +31,15 @@ namespace PurelySharp.Symbolic
             return ClassifyImplication(pathConditions, factFormula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
         }
 
+        public static bool PathConditionsAllowAndImply(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsSatisfiable(pathConditions, smtAnalysis) &&
+                PathConditionsImply(pathConditions, factFormula, smtAnalysis);
+        }
+
         public static List<SmtFormula>? TryCollectBranchConditions(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,

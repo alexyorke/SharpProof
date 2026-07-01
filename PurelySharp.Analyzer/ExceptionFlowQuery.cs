@@ -951,7 +951,7 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
             CSharpConditionToFormula.TryCollectDomainFacts(filterExpression, semanticModel, cancellationToken, pathConditions);
-            if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+            if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
             {
                 return false;
             }
@@ -970,13 +970,6 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
-        }
-
-        private static bool PathConditionsAreSatisfiable(
-            IEnumerable<SmtFormula> pathConditions,
-            SmtAnalysisService smtAnalysis)
-        {
-            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)

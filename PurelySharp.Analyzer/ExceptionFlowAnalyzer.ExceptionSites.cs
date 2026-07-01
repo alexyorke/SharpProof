@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -1567,8 +1568,10 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
 
-            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
-                PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsAllowAndImply(
+                pathConditions,
+                outOfRangeFormula,
+                smtAnalysis);
         }
 
         private static bool IsDefinitelyTrueAtUse(
@@ -1584,8 +1587,10 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
 
-            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
-                PathConditionsImplyFact(pathConditions, formula, smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsAllowAndImply(
+                pathConditions,
+                formula,
+                smtAnalysis);
         }
 
         private static bool IsBuiltInSequenceElementAccess(
