@@ -807,7 +807,7 @@ namespace PurelySharp.Analyzer
                 conversionOperation.Conversion.IsUserDefined ||
                 conversionOperation.Conversion.MethodSymbol != null ||
                 !TryGetCheckedNumericConversionRange(
-                    GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
+                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
                     out minValue,
                     out maxValue))
             {
@@ -815,7 +815,7 @@ namespace PurelySharp.Analyzer
             }
 
             if (TryGetCheckedNumericConversionRange(
-                    GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken),
+                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken),
                     out var sourceMinValue,
                     out var sourceMaxValue) &&
                 sourceMinValue >= minValue &&
@@ -965,7 +965,7 @@ namespace PurelySharp.Analyzer
             if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
             {
                 if (IsDefinitelyNullExpression(castExpression.Expression, castExpression, semanticModel, cancellationToken, smtAnalysis) ||
-                    !TryGetExactRuntimeType(
+                    !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                         castExpression.Expression,
                         castExpression,
                         semanticModel,
@@ -975,13 +975,13 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
-                return !CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType);
+                return !SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType);
             }
 
             var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
             if (!IsReferenceType(targetType) ||
                 !IsReferenceType(operandType) ||
-                !TryGetExactRuntimeType(
+                !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                     castExpression.Expression,
                     castExpression,
                     semanticModel,
@@ -991,7 +991,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            return !CanCastExactRuntimeTypeToReferenceType(
+            return !SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
                 exactReferenceRuntimeType,
                 targetType,
                 semanticModel.Compilation);
@@ -1007,7 +1007,7 @@ namespace PurelySharp.Analyzer
                 UnwrapFactExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess ||
                 !IsObjectArrayElementStore(elementAccess, semanticModel, cancellationToken) ||
                 IsDefinitelyNullExpression(assignment.Right, assignment, semanticModel, cancellationToken, smtAnalysis) ||
-                !TryGetExactRuntimeType(
+                !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                     elementAccess.Expression,
                     assignment,
                     semanticModel,
@@ -1018,7 +1018,7 @@ namespace PurelySharp.Analyzer
                 !IsReferenceType(exactArrayType.ElementType) ||
                 exactArrayType.ElementType.TypeKind == TypeKind.Dynamic ||
                 !IsDefinitelyInRangeElementStore(elementAccess, semanticModel, cancellationToken, smtAnalysis) ||
-                !TryGetExactRuntimeType(
+                !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                     assignment.Right,
                     assignment,
                     semanticModel,
@@ -1028,7 +1028,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            return !CanStoreExactRuntimeTypeInArrayElement(
+            return !SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
                 exactAssignedType,
                 exactArrayType.ElementType,
                 semanticModel.Compilation);
@@ -1069,20 +1069,6 @@ namespace PurelySharp.Analyzer
             return IsDefinitelyTrueAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
         }
 
-        private static bool CanStoreExactRuntimeTypeInArrayElement(
-            ITypeSymbol exactRuntimeType,
-            ITypeSymbol elementType,
-            Compilation compilation)
-        {
-            if (exactRuntimeType.TypeKind == TypeKind.Dynamic ||
-                elementType.TypeKind == TypeKind.Dynamic)
-            {
-                return true;
-            }
-
-            return CanCastExactRuntimeTypeToReferenceType(exactRuntimeType, elementType, compilation);
-        }
-
         private static bool IsUnboxingCastShape(
             CastExpressionSyntax castExpression,
             ITypeSymbol? targetType,
@@ -1110,207 +1096,6 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
-        private static bool TryGetExactRuntimeType(
-            ExpressionSyntax expression,
-            SyntaxNode useNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out ITypeSymbol exactType,
-            int inlineDepth = 0)
-        {
-            exactType = null!;
-            if (inlineDepth > 8)
-            {
-                return false;
-            }
-
-            expression = UnwrapFactExpression(expression);
-            if (TryResolveCurrentSimpleValueExpression(
-                    expression,
-                    useNode,
-                    semanticModel,
-                    cancellationToken,
-                    out var currentValueExpression))
-            {
-                return TryGetExactRuntimeType(
-                    currentValueExpression,
-                    useNode,
-                    semanticModel,
-                    cancellationToken,
-                    out exactType,
-                    inlineDepth + 1);
-            }
-
-            var expressionType = GetNaturalExpressionType(expression, semanticModel, cancellationToken);
-            if (expressionType != null && IsNonNullableValueType(expressionType))
-            {
-                exactType = expressionType;
-                return true;
-            }
-
-            if (expressionType?.TypeKind == TypeKind.Dynamic)
-            {
-                return false;
-            }
-
-            if (expression is CastExpressionSyntax castExpression)
-            {
-                var targetType = GetExpressionType(castExpression, semanticModel, cancellationToken);
-                if (targetType == null ||
-                    targetType.TypeKind == TypeKind.Dynamic)
-                {
-                    return false;
-                }
-
-                if (IsReferenceType(targetType))
-                {
-                    var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
-                    if (IsNonNullableValueType(operandType) &&
-                        TryGetExactRuntimeType(
-                            castExpression.Expression,
-                            useNode,
-                            semanticModel,
-                            cancellationToken,
-                            out var boxedValueType,
-                            inlineDepth + 1))
-                    {
-                        exactType = boxedValueType;
-                        return true;
-                    }
-
-                    if (TryGetExactRuntimeType(
-                            castExpression.Expression,
-                            useNode,
-                            semanticModel,
-                            cancellationToken,
-                            out var operandExactType,
-                            inlineDepth + 1) &&
-                        CanCastExactRuntimeTypeToReferenceType(
-                            operandExactType,
-                            targetType,
-                            semanticModel.Compilation))
-                    {
-                        exactType = operandExactType;
-                        return true;
-                    }
-                }
-
-                if (IsNonNullableValueType(targetType))
-                {
-                    exactType = targetType;
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or
-                ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax or AnonymousObjectCreationExpressionSyntax)
-            {
-                if (expressionType != null && !expressionType.IsAbstract)
-                {
-                    exactType = expressionType;
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (expression.IsKind(SyntaxKind.StringLiteralExpression) &&
-                expressionType?.SpecialType == SpecialType.System_String)
-            {
-                exactType = expressionType;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryResolveCurrentSimpleValueExpression(
-            ExpressionSyntax expression,
-            SyntaxNode useNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out ExpressionSyntax valueExpression)
-        {
-            valueExpression = null!;
-            var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-            if (symbol == null)
-            {
-                return false;
-            }
-
-            ExpressionSyntax? currentValue = null;
-            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
-            {
-                foreach (var statement in block.Statements)
-                {
-                    if (ReferenceEquals(statement, containingStatement))
-                    {
-                        break;
-                    }
-
-                    if (statement is LocalDeclarationStatementSyntax localDeclaration)
-                    {
-                        foreach (var declarator in localDeclaration.Declaration.Variables)
-                        {
-                            if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
-                                SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
-                            {
-                                currentValue = declarator.Initializer?.Value;
-                            }
-                        }
-
-                        if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
-                        {
-                            currentValue = null;
-                        }
-
-                        continue;
-                    }
-
-                    if (statement is ExpressionStatementSyntax
-                        {
-                            Expression: AssignmentExpressionSyntax assignment
-                        } &&
-                        ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
-                    {
-                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                            ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken))
-                        {
-                            currentValue = null;
-                            continue;
-                        }
-
-                        currentValue = assignment.Right;
-                        continue;
-                    }
-
-                    if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
-                    {
-                        currentValue = null;
-                    }
-                }
-            }
-
-            if (currentValue == null)
-            {
-                return false;
-            }
-
-            valueExpression = currentValue;
-            return true;
-        }
-
-        private static ITypeSymbol? GetNaturalExpressionType(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-            return typeInfo.Type ?? typeInfo.ConvertedType;
-        }
-
         private static IEnumerable<ExpressionSyntax> GetArrayLengthExpressions(ArrayCreationExpressionSyntax arrayCreation)
         {
             foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
@@ -1323,38 +1108,6 @@ namespace PurelySharp.Analyzer
                     }
                 }
             }
-        }
-
-        private static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType)
-        {
-            if (!IsNonNullableValueType(targetType))
-            {
-                return false;
-            }
-
-            return SymbolEqualityComparer.Default.Equals(exactRuntimeType, targetType);
-        }
-
-        private static bool CanCastExactRuntimeTypeToReferenceType(
-            ITypeSymbol exactRuntimeType,
-            ITypeSymbol targetType,
-            Compilation compilation)
-        {
-            if (targetType.TypeKind == TypeKind.Dynamic ||
-                exactRuntimeType.TypeKind == TypeKind.Dynamic)
-            {
-                return true;
-            }
-
-            if (IsReferenceType(targetType) &&
-                targetType.SpecialType == SpecialType.System_Object)
-            {
-                return true;
-            }
-
-            var conversion = compilation.ClassifyCommonConversion(exactRuntimeType, targetType);
-            return conversion.Exists &&
-                (conversion.IsIdentity || conversion.IsImplicit);
         }
 
         private static bool IsKnownMissingNullableValueByPriorAssignment(
