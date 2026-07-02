@@ -14,6 +14,9 @@ namespace PurelySharp.Test
         private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
             new Lazy<ImmutableArray<MetadataReference>>(CreateTrustedPlatformReferences);
 
+        private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferences =
+            new Lazy<ImmutableArray<MetadataReference>>(CreateMinimalFrameworkReferences);
+
         private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
             new Lazy<MetadataReference>(() => MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
 
@@ -143,7 +146,7 @@ public static class ConditionHost
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
                 new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
+                GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -181,7 +184,7 @@ public static class ConditionHost
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
                 new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
+                GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -199,6 +202,11 @@ public static class ConditionHost
             return TrustedPlatformReferences.Value;
         }
 
+        internal static ImmutableArray<MetadataReference> GetMinimalFrameworkReferences()
+        {
+            return MinimalFrameworkReferences.Value;
+        }
+
         private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
@@ -214,6 +222,38 @@ public static class ConditionHost
                 .Select(path => MetadataReference.CreateFromFile(path))
                 .Cast<MetadataReference>()
                 .ToImmutableArray();
+        }
+
+        private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferences()
+        {
+            var references = new Dictionary<string, MetadataReference>(StringComparer.OrdinalIgnoreCase)
+            {
+                [typeof(object).Assembly.Location] = MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                [typeof(Console).Assembly.Location] = MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+                [typeof(Enumerable).Assembly.Location] = MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
+                [typeof(List<>).Assembly.Location] = MetadataReference.CreateFromFile(typeof(List<>).Assembly.Location),
+                [typeof(ImmutableArray).Assembly.Location] = MetadataReference.CreateFromFile(typeof(ImmutableArray).Assembly.Location),
+                [typeof(System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute).Assembly.Location] = MetadataReference.CreateFromFile(typeof(System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute).Assembly.Location),
+            };
+
+            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+            {
+                foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator))
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(path);
+                    if (string.Equals(fileName, "System.Runtime", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(fileName, "netstandard", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(fileName, "System.Runtime.Extensions", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(fileName, "System.ObjectModel", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(fileName, "System.Text.RegularExpressions", StringComparison.OrdinalIgnoreCase))
+                    {
+                        references[path] = MetadataReference.CreateFromFile(path);
+                    }
+                }
+            }
+
+            return references.Values.ToImmutableArray();
         }
 
         internal sealed class InMemoryAdditionalText : AdditionalText
