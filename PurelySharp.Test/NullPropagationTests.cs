@@ -1,12 +1,7 @@
-using System;
+using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using PurelySharp.Analyzer;
-using PurelySharp.Attributes;
-using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
-    PurelySharp.Analyzer.PurelySharpAnalyzer>;
 
 namespace PurelySharp.Test
 {
@@ -38,19 +33,8 @@ public class TestClass
     }
 }
 """;
-
-
-
-
-
-
-
-
-
-            var expectedGetName = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 19, 7, 23).WithArguments("get_Name");
-            var expectedGetAge = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 19, 8, 22).WithArguments("get_Age");
-            var expectedMethod = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId).WithSpan(14, 19, 14, 29).WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetName, expectedGetAge, expectedMethod);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
         [Test]
@@ -79,19 +63,8 @@ public class TestClass
     }
 }
 """;
-
-
-            var expectedTestMethod = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
-                       .WithSpan(16, 17, 16, 27)
-                       .WithArguments("TestMethod");
-            var expectedGetName = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 19, 7, 23).WithArguments("get_Name");
-            var expectedGetAge = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 19, 8, 22).WithArguments("get_Age");
-
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                expectedTestMethod,
-                expectedGetName,
-                expectedGetAge
-                );
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
         [Test]
@@ -125,14 +98,29 @@ public class TestClass
     }
 }
 """;
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
+        }
 
+        private static void AssertExpectedNullPropagationDiagnostics(
+            System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic> diagnostics,
+            string methodName)
+        {
+            var ps0004Messages = diagnostics
+                .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.MissingEnforcePureAttributeId)
+                .Select(diagnostic => diagnostic.GetMessage())
+                .ToArray();
+            var ps0002Messages = diagnostics
+                .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .Select(diagnostic => diagnostic.GetMessage())
+                .ToArray();
 
-            var expectedGetName = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 19, 7, 23).WithArguments("get_Name");
-            var expectedGetAge = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 19, 8, 22).WithArguments("get_Age");
-            var originalExpected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
-                       .WithSpan(16, 19, 16, 29)
-                       .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, originalExpected, expectedGetName, expectedGetAge);
+            Assert.That(ps0004Messages, Has.Length.EqualTo(2));
+            Assert.That(ps0004Messages, Has.Some.Contains("get_Name"));
+            Assert.That(ps0004Messages, Has.Some.Contains("get_Age"));
+            Assert.That(ps0002Messages, Has.Length.EqualTo(1));
+            Assert.That(ps0002Messages[0], Does.Contain("'" + methodName + "'"));
+            Assert.That(diagnostics, Has.Length.EqualTo(3));
         }
     }
 }
