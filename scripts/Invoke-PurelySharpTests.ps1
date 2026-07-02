@@ -248,6 +248,8 @@ function Resolve-PurelySharpTestProjects
     $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
     foreach ($fixture in @(
         'CorpusReportTests',
+        'EffectSummaryToolTests',
+        'ExceptionSummaryCatalogValidationTests',
         'FuzzToolTests',
         'RoslynConstructCoverageTests',
         'RoslynShapeManifestCoverageTests'))

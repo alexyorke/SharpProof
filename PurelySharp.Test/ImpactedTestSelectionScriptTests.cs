@@ -58,6 +58,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_UsesToolingLaneForLinkedEffectSummaryFixture()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Test/EffectSummaryToolTests.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("EffectSummaryToolTests"));
+            Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/EffectSummaryToolTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("EffectSummaryToolTests"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_FallsBackForSharedTestInfrastructure()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(

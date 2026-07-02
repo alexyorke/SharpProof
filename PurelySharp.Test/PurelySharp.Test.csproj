@@ -41,4 +41,11 @@
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="EffectSummaryToolTests.cs" />
+    <Compile Remove="EffectSummaryToolTests.Helpers.cs" />
+    <Compile Remove="ExceptionSummaryCatalogValidationTests.cs" />
+    <Compile Remove="ExceptionSummaryCatalogValidationTests.Helpers.cs" />
+  </ItemGroup>
+
 </Project>
