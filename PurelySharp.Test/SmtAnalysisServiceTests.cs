@@ -1795,6 +1795,53 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_ConditionalSelectedReferenceNullBranchImplication_BypassesSolver()
+        {
+            var guard = new SmtVariable("conditional_selected_ref_guard_" + Guid.NewGuid().ToString("N"), SmtValueKind.Bool);
+            var first = new SmtVariable("conditional_selected_ref_first_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var second = new SmtVariable("conditional_selected_ref_second_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var resultReference = new SmtVariable("conditional_selected_ref_result_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var resultIsNonNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, resultReference, new SmtNullConstant());
+            var firstIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, first, new SmtNullConstant());
+            var secondIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, second, new SmtNullConstant());
+            var selectedReference = new SmtConditionalFormula(guard, first, second, SmtValueKind.Reference);
+            var selectedIsNull = new SmtConditionalFormula(guard, firstIsNull, secondIsNull, SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, resultReference, selectedReference),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, resultReference, new SmtNullConstant()),
+                    selectedIsNull),
+            };
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, guard),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Or,
+                        resultIsNonNull,
+                        firstIsNull)),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    guard,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Or,
+                        resultIsNonNull,
+                        secondIsNull)));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality()
         {
             var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);

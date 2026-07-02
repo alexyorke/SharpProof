@@ -1572,6 +1572,33 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            private bool TryGetDirectKnownBooleanValue(SmtFormula formula, out bool value)
+            {
+                formula = NormalizeAliases(formula);
+                var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
+                if (_exactBooleans.TryGetValue(canonical, out var exactValue))
+                {
+                    value = exactValue ^ isNegatedFromCanonical;
+                    return true;
+                }
+
+                if (formula is SmtBooleanConstant booleanConstant)
+                {
+                    value = booleanConstant.Value;
+                    return true;
+                }
+
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
+                    TryGetDirectKnownBooleanValue(negated.Operand, out var operandValue))
+                {
+                    value = !operandValue;
+                    return true;
+                }
+
+                value = false;
+                return false;
+            }
+
             private static bool CanRelateBooleanTerm(SmtFormula formula)
             {
                 if (formula.Kind != SmtValueKind.Bool)
@@ -1785,6 +1812,14 @@ namespace PurelySharp.Symbolic.Smt
                     _conditionalBranchEvaluationDepth >= MaxConditionalBranchEvaluationDepth)
                 {
                     return false;
+                }
+
+                if (TryGetDirectKnownBooleanValue(condition, out var conditionValue))
+                {
+                    return TryEvaluateBoolean(
+                        conditionValue ? whenTrue : whenFalse,
+                        out value,
+                        conditionalBranchDepth + 1);
                 }
 
                 _conditionalBranchEvaluationDepth++;
