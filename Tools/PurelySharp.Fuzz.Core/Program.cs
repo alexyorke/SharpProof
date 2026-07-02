@@ -222,6 +222,32 @@ public static class FuzzRunner
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
+    private static readonly Lazy<ImmutableArray<MetadataReference>> MetadataReferences =
+        new(CreateMetadataReferences);
+
+    private static readonly CSharpCompilationOptions SafeCompilationOptions =
+        CreateCompilationOptions(allowUnsafe: false);
+
+    private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
+        CreateCompilationOptions(allowUnsafe: true);
+
+    private static readonly AnalyzerOptions SharedAnalyzerOptions =
+        new(
+            ImmutableArray<AdditionalText>.Empty,
+            new FixedAnalyzerConfigOptionsProvider(
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true")));
+
+    private static readonly ImmutableArray<DiagnosticAnalyzer> SharedAnalyzers =
+        ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer());
+
+    private static readonly CompilationWithAnalyzersOptions SharedCompilationWithAnalyzersOptions =
+        new(
+            SharedAnalyzerOptions,
+            onAnalyzerException: null,
+            concurrentAnalysis: true,
+            logAnalyzerExecutionTime: false,
+            reportSuppressedDiagnostics: false);
+
     private static readonly Regex GeneratedTypeNameRegex =
         new(@"\bI?FuzzCase\d+_[A-Za-z0-9_]+(?:Value)?\b", RegexOptions.Compiled);
 
@@ -306,7 +332,7 @@ public static class FuzzRunner
             var cases = Enumerable.Range(startIndex, batchSize)
                 .Select(createCase)
                 .ToImmutableArray();
-            var analyses = await AnalyzeCasesAsync(cases, options.RepeatAnalyzer, options.Parallelism, cancellationToken);
+            var analyses = await AnalyzeCasesCoreAsync(cases, options.RepeatAnalyzer, options.Parallelism, cancellationToken);
 
             foreach (var analysis in analyses)
             {
@@ -355,7 +381,18 @@ public static class FuzzRunner
         return summary;
     }
 
-    private static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesAsync(
+    public static Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesAsync(
+        IEnumerable<FuzzCase> fuzzCases,
+        bool repeatAnalyzer = true,
+        int? parallelism = null,
+        CancellationToken cancellationToken = default)
+    {
+        var cases = fuzzCases.ToImmutableArray();
+        var degreeOfParallelism = parallelism is > 0 ? parallelism.Value : DefaultAnalysisParallelism();
+        return AnalyzeCasesCoreAsync(cases, repeatAnalyzer, degreeOfParallelism, cancellationToken);
+    }
+
+    private static async Task<ImmutableArray<FuzzCaseAnalysis>> AnalyzeCasesCoreAsync(
         ImmutableArray<FuzzCase> fuzzCases,
         bool repeatAnalyzer,
         int parallelism,
@@ -463,18 +500,9 @@ public static class FuzzRunner
     {
         try
         {
-            var options = new AnalyzerOptions(
-                ImmutableArray<AdditionalText>.Empty,
-                new FixedAnalyzerConfigOptionsProvider(
-                    ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true")));
             var compilationWithAnalyzers = compilation.WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
-                new CompilationWithAnalyzersOptions(
-                    options,
-                    onAnalyzerException: null,
-                    concurrentAnalysis: true,
-                    logAnalyzerExecutionTime: false,
-                    reportSuppressedDiagnostics: false));
+                SharedAnalyzers,
+                SharedCompilationWithAnalyzersOptions);
 
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken);
             return new AnalyzerRunResult(diagnostics, ImmutableArray<string>.Empty);
@@ -694,13 +722,28 @@ public static class FuzzRunner
             assemblyName,
             new[] { syntaxTree },
             GetMetadataReferences(),
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                allowUnsafe: allowUnsafe,
-                nullableContextOptions: NullableContextOptions.Enable));
+            allowUnsafe ? UnsafeCompilationOptions : SafeCompilationOptions);
     }
 
     private static ImmutableArray<MetadataReference> GetMetadataReferences()
+    {
+        return MetadataReferences.Value;
+    }
+
+    private static int DefaultAnalysisParallelism()
+    {
+        return Math.Max(1, Math.Min(Environment.ProcessorCount, 4));
+    }
+
+    private static CSharpCompilationOptions CreateCompilationOptions(bool allowUnsafe)
+    {
+        return new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary,
+            allowUnsafe: allowUnsafe,
+            nullableContextOptions: NullableContextOptions.Enable);
+    }
+
+    private static ImmutableArray<MetadataReference> CreateMetadataReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))

@@ -7,6 +7,8 @@ namespace PurelySharp.Test;
 
 internal static class ToolingFuzzAnalysisCache
 {
+    private static readonly int AnalysisParallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, 8));
+
     private static readonly Lazy<Task<ImmutableDictionary<string, FuzzCaseAnalysis>>> RegistryEntryAnalyses =
         new(CreateRegistryEntryAnalysesAsync);
 
@@ -18,11 +20,13 @@ internal static class ToolingFuzzAnalysisCache
     private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> CreateRegistryEntryAnalysesAsync()
     {
         var generator = new FuzzCaseGenerator(20260614);
-        var analyses = await Task.WhenAll(
-            FuzzCaseGenerator.RegistryEntries.Select(
-                (entry, index) => FuzzRunner.AnalyzeCaseAsync(
-                    generator.GenerateForRegistryEntry(entry, index),
-                    repeatAnalyzer: false)));
+        var cases = FuzzCaseGenerator.RegistryEntries
+            .Select((entry, index) => generator.GenerateForRegistryEntry(entry, index))
+            .ToImmutableArray();
+        var analyses = await FuzzRunner.AnalyzeCasesAsync(
+            cases,
+            repeatAnalyzer: false,
+            parallelism: AnalysisParallelism);
 
         return FuzzCaseGenerator.RegistryEntries
             .Zip(analyses, static (entry, analysis) => new KeyValuePair<string, FuzzCaseAnalysis>(entry.Id, analysis))
