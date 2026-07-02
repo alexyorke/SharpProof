@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using System.IO;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -31,8 +32,14 @@ namespace PurelySharp.Test
         private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferences =
             new Lazy<ImmutableArray<MetadataReference>>(CreateMinimalFrameworkReferences);
 
+        private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferencesWithEnforcePure =
+            new Lazy<ImmutableArray<MetadataReference>>(CreateMinimalFrameworkReferencesWithEnforcePure);
+
         private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
             new Lazy<MetadataReference>(() => MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+
+        private static readonly ConcurrentDictionary<string, AnalyzerOptions> AnalyzerOptionsWithoutAdditionalFilesCache =
+            new ConcurrentDictionary<string, AnalyzerOptions>(StringComparer.Ordinal);
 
         private static readonly AnalyzerOptions EmptyAnalyzerOptions =
             new AnalyzerOptions(
@@ -86,7 +93,7 @@ namespace PurelySharp.Test
                 PreviewParseOptions,
                 path: sourcePath ?? string.Empty);
             var references = frameworkReferences.HasValue
-                ? frameworkReferences.Value.Add(EnforcePureAttributeReference.Value)
+                ? EnsureEnforcePureAttributeReference(frameworkReferences.Value)
                 : TrustedPlatformReferencesWithEnforcePure.Value;
             if (additionalMetadataReferences.HasValue)
             {
@@ -136,6 +143,13 @@ namespace PurelySharp.Test
                 analyzerGlobalOptions.Count == 0)
             {
                 return EmptyAnalyzerOptions;
+            }
+
+            if (analyzerAdditionalFiles.Length == 0)
+            {
+                return AnalyzerOptionsWithoutAdditionalFilesCache.GetOrAdd(
+                    CreateGlobalOptionsCacheKey(analyzerGlobalOptions),
+                    static cacheKey => CreateAnalyzerOptionsWithoutAdditionalFiles(cacheKey));
             }
 
             return new AnalyzerOptions(
@@ -294,6 +308,63 @@ public static class ConditionHost
             }
 
             return references.Values.ToImmutableArray();
+        }
+
+        private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferencesWithEnforcePure()
+        {
+            return MinimalFrameworkReferences.Value.Add(EnforcePureAttributeReference.Value);
+        }
+
+        private static ImmutableArray<MetadataReference> EnsureEnforcePureAttributeReference(ImmutableArray<MetadataReference> references)
+        {
+            if (references == MinimalFrameworkReferences.Value)
+            {
+                return MinimalFrameworkReferencesWithEnforcePure.Value;
+            }
+
+            var enforcePurePath = EnforcePureAttributeReference.Value.Display;
+            foreach (var reference in references)
+            {
+                if (string.Equals(reference.Display, enforcePurePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return references;
+                }
+            }
+
+            return references.Add(EnforcePureAttributeReference.Value);
+        }
+
+        private static string CreateGlobalOptionsCacheKey(ImmutableDictionary<string, string> analyzerGlobalOptions)
+        {
+            return string.Join(
+                "\n",
+                analyzerGlobalOptions
+                    .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                    .Select(static pair => pair.Key + "=" + pair.Value));
+        }
+
+        private static AnalyzerOptions CreateAnalyzerOptionsWithoutAdditionalFiles(string cacheKey)
+        {
+            if (string.IsNullOrEmpty(cacheKey))
+            {
+                return EmptyAnalyzerOptions;
+            }
+
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+            foreach (var line in cacheKey.Split('\n'))
+            {
+                var separatorIndex = line.IndexOf('=');
+                if (separatorIndex <= 0)
+                {
+                    continue;
+                }
+
+                builder[line[..separatorIndex]] = line[(separatorIndex + 1)..];
+            }
+
+            return new AnalyzerOptions(
+                ImmutableArray<AdditionalText>.Empty,
+                new TestAnalyzerConfigOptionsProvider(builder.ToImmutable()));
         }
 
         internal sealed class InMemoryAdditionalText : AdditionalText
