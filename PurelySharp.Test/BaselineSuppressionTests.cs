@@ -2,12 +2,9 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 
@@ -154,67 +151,14 @@ public class TestClass
             string? sourcePath = null,
             string? baselinePath = null)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            return await AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                path: sourcePath ?? Path.Combine("src", "ProductionCode.cs"));
-            var references = GetTrustedPlatformReferences()
-                .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-
-            var compilation = CSharpCompilation.Create(
-                "BaselineSuppressionTests",
-                new[] { syntaxTree },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-            var analyzerOptions = new AnalyzerOptions(
-                ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(baselinePath ?? "PurelySharp.Baseline.json", baseline)));
-
-            var compilationWithAnalyzers = compilation.WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
-                new CompilationWithAnalyzersOptions(
-                    analyzerOptions,
-                    onAnalyzerException: null,
-                    concurrentAnalysis: false,
-                    logAnalyzerExecutionTime: false,
-                    reportSuppressedDiagnostics: false));
-
-            return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-        }
-
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-        {
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            {
-                return ImmutableArray.Create<MetadataReference>(
-                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-            }
-
-            return trustedPlatformAssemblies
-                .Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path))
-                .Cast<MetadataReference>()
-                .ToImmutableArray();
-        }
-
-        private sealed class InMemoryAdditionalText : AdditionalText
-        {
-            private readonly string _text;
-
-            public InMemoryAdditionalText(string path, string text)
-            {
-                Path = path;
-                _text = text;
-            }
-
-            public override string Path { get; }
-
-            public override SourceText GetText(CancellationToken cancellationToken = default)
-            {
-                return SourceText.From(_text);
-            }
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        baselinePath ?? "PurelySharp.Baseline.json",
+                        baseline)),
+                sourcePath: sourcePath ?? Path.Combine("src", "ProductionCode.cs"),
+                autoEnableEffectSummaryJsonForAdditionalFiles: false);
         }
     }
 }

@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
@@ -344,43 +342,10 @@ public class TestClass
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(string source, bool allowUnsafe)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var references = GetTrustedPlatformReferences()
-                .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-
-            var compilation = CSharpCompilation.Create(
-                "PuritySoundnessStressTests",
-                new[] { syntaxTree },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
-
-            var compilationWithAnalyzers = compilation.WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
-                new CompilationWithAnalyzersOptions(
-                    new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
-                    onAnalyzerException: null,
-                    concurrentAnalysis: false,
-                    logAnalyzerExecutionTime: false,
-                    reportSuppressedDiagnostics: false));
-
-            return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-        }
-
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-        {
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            {
-                return ImmutableArray.Create<MetadataReference>(
-                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-            }
-
-            return trustedPlatformAssemblies
-                .Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path))
-                .Cast<MetadataReference>()
-                .ToImmutableArray();
+            return await AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
+                allowUnsafe: allowUnsafe,
+                compilationName: "PuritySoundnessStressTests");
         }
     }
 }

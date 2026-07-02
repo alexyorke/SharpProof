@@ -30,15 +30,20 @@ namespace PurelySharp.Test
             string source,
             ImmutableDictionary<string, string>? globalOptions = null,
             bool allowUnsafe = false,
-            ImmutableArray<AdditionalText>? additionalFiles = null)
+            ImmutableArray<AdditionalText>? additionalFiles = null,
+            string? sourcePath = null,
+            bool autoEnableEffectSummaryJsonForAdditionalFiles = true,
+            string compilationName = "AnalyzerTestHost")
         {
             return await GetDiagnosticsAsync(
                 source,
                 globalOptions,
                 allowUnsafe,
                 additionalFiles,
+                sourcePath,
+                autoEnableEffectSummaryJsonForAdditionalFiles,
                 additionalMetadataReferences: null,
-                compilationName: "AnalyzerTestHost");
+                compilationName: compilationName);
         }
 
         public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
@@ -46,10 +51,15 @@ namespace PurelySharp.Test
             ImmutableDictionary<string, string>? globalOptions,
             bool allowUnsafe,
             ImmutableArray<AdditionalText>? additionalFiles,
+            string? sourcePath,
+            bool autoEnableEffectSummaryJsonForAdditionalFiles,
             ImmutableArray<MetadataReference>? additionalMetadataReferences,
             string compilationName)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                path: sourcePath ?? string.Empty);
             var references = GetTrustedPlatformReferences()
                 .Add(EnforcePureAttributeReference.Value);
             if (additionalMetadataReferences.HasValue)
@@ -63,14 +73,17 @@ namespace PurelySharp.Test
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
 
-            var analyzerOptions = CreateAnalyzerOptions(globalOptions, additionalFiles);
+            var analyzerOptions = CreateAnalyzerOptions(
+                globalOptions,
+                additionalFiles,
+                autoEnableEffectSummaryJsonForAdditionalFiles);
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
-                    concurrentAnalysis: false,
+                    concurrentAnalysis: true,
                     logAnalyzerExecutionTime: false,
                     reportSuppressedDiagnostics: false));
 
@@ -79,11 +92,13 @@ namespace PurelySharp.Test
 
         public static AnalyzerOptions CreateAnalyzerOptions(
             ImmutableDictionary<string, string>? globalOptions = null,
-            ImmutableArray<AdditionalText>? additionalFiles = null)
+            ImmutableArray<AdditionalText>? additionalFiles = null,
+            bool autoEnableEffectSummaryJsonForAdditionalFiles = true)
         {
             var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
             var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-            if (analyzerAdditionalFiles.Length > 0 &&
+            if (autoEnableEffectSummaryJsonForAdditionalFiles &&
+                analyzerAdditionalFiles.Length > 0 &&
                 !analyzerGlobalOptions.ContainsKey("purelysharp_enable_effect_summary_json"))
             {
                 analyzerGlobalOptions = analyzerGlobalOptions.Add(

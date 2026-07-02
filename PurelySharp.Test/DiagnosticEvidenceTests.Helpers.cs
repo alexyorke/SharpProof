@@ -258,12 +258,14 @@ public class TestClass
             ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
         {
             return await AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                globalOptions,
-                allowUnsafe,
-                additionalFiles,
-                additionalMetadataReferences,
-                "DiagnosticEvidenceTests");
+                source: source,
+                globalOptions: globalOptions,
+                allowUnsafe: allowUnsafe,
+                additionalFiles: additionalFiles,
+                sourcePath: null,
+                autoEnableEffectSummaryJsonForAdditionalFiles: true,
+                additionalMetadataReferences: additionalMetadataReferences,
+                compilationName: "DiagnosticEvidenceTests");
         }
 
         private static AnalyzerOptions CreateGeneratedPurityAnalyzerOptions()
