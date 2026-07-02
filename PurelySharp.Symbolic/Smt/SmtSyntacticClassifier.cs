@@ -2029,6 +2029,18 @@ namespace PurelySharp.Symbolic.Smt
                     _referenceNullStates[term] = isNull;
                 }
 
+                if (term is SmtConditionalFormula { Kind: SmtValueKind.Reference } conditional &&
+                    TryEvaluateBoolean(conditional.Condition, out var conditionValue))
+                {
+                    var selectedBranch = conditionValue ? conditional.WhenTrue : conditional.WhenFalse;
+                    var selectedBranchFact = new SmtBinaryFormula(
+                        isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                        selectedBranch,
+                        new SmtNullConstant());
+                    TryAddReferenceNullFact(selectedBranchFact, out var branchContradiction);
+                    hasContradiction |= branchContradiction;
+                }
+
                 return true;
             }
 
