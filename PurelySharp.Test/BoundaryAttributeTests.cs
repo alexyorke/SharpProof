@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,6 +15,15 @@ namespace PurelySharp.Test
     [TestFixture]
     public class BoundaryAttributeTests
     {
+        private static readonly CSharpParseOptions PreviewParseOptions =
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        private static readonly Lazy<ImmutableArray<MetadataReference>> Net80ReferencePackReferences =
+            new(CreateNet80ReferencePackReferences);
+
+        private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
+            new(() => MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+
         [Test]
         public async Task PureExternal_Method_IsTrustedAtCallSite()
         {
@@ -543,11 +553,27 @@ public class TestClass
                 TestCode = source
             };
 
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+            verifier.TestState.AdditionalReferences.Add(EnforcePureAttributeReference.Value);
             return verifier;
         }
 
         private static MetadataReference CreateBoundaryReference(string assemblyName, string source)
+        {
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { CSharpSyntaxTree.ParseText(source, PreviewParseOptions) },
+                Net80ReferencePackReferences.Value.Add(EnforcePureAttributeReference.Value),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
+
+            stream.Position = 0;
+            return MetadataReference.CreateFromImage(stream.ToArray());
+        }
+
+        private static ImmutableArray<MetadataReference> CreateNet80ReferencePackReferences()
         {
             var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
             Assert.That(runtimeDirectory, Is.Not.Null.And.Not.Empty);
@@ -561,23 +587,10 @@ public class TestClass
                 .FirstOrDefault();
             Assert.That(net8ReferenceDirectory, Is.Not.Null.And.Not.Empty);
 
-            var references = Directory.GetFiles(net8ReferenceDirectory!, "*.dll")
+            return Directory.GetFiles(net8ReferenceDirectory!, "*.dll")
                 .Select(path => MetadataReference.CreateFromFile(path))
                 .Cast<MetadataReference>()
-                .Append(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-
-            var compilation = CSharpCompilation.Create(
-                assemblyName,
-                new[] { CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)) },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-            using var stream = new MemoryStream();
-            var result = compilation.Emit(stream);
-            Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
-
-            stream.Position = 0;
-            return MetadataReference.CreateFromImage(stream.ToArray());
+                .ToImmutableArray();
         }
     }
 }
