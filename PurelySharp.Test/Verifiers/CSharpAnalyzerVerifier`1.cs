@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
 using System.Threading;
 using System.Threading.Tasks;
-using PurelySharp.Analyzer;
 
 namespace PurelySharp.Test
 {
@@ -31,12 +30,9 @@ namespace PurelySharp.Test
                 TestCode = source,
             };
 
-
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharpAnalyzer).Assembly.Location));
-
-
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.PureAttribute).Assembly.Location));
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.AnalyzerReference);
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.EnforcePureAttributeReference);
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.PureAttributeReference);
 
             test.ExpectedDiagnostics.AddRange(expected);
             return test.RunAsync(CancellationToken.None);

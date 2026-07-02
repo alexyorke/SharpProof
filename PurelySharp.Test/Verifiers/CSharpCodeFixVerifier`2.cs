@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
-using PurelySharp.Analyzer;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -75,9 +74,9 @@ namespace PurelySharp.Test
 
         private static void AddPurelySharpReferences(Test test)
         {
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharpAnalyzer).Assembly.Location));
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-            test.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.PureAttribute).Assembly.Location));
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.AnalyzerReference);
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.EnforcePureAttributeReference);
+            test.TestState.AdditionalReferences.Add(PurelySharpVerifierReferences.PureAttributeReference);
         }
     }
 }
