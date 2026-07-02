@@ -25,18 +25,10 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return leftNumber;",
-                "leftNumber == rightNumber");
-            AssertConditionProven(
-                source,
-                "return leftNumber;",
-                "flag");
-            AssertConditionProven(
-                source,
-                "return leftNumber;",
-                "leftObject == rightObject");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return leftNumber;", "leftNumber == rightNumber");
+            AssertConditionProven(session, "return leftNumber;", "flag");
+            AssertConditionProven(session, "return leftNumber;", "leftObject == rightObject");
         }
 
         [Test]
@@ -58,14 +50,9 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return rightNumber;",
-                "leftNumber == rightNumber");
-            AssertConditionProven(
-                source,
-                "return rightNumber;",
-                "leftObject == rightObject");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return rightNumber;", "leftNumber == rightNumber");
+            AssertConditionProven(session, "return rightNumber;", "leftObject == rightObject");
         }
 
         [Test]
@@ -85,10 +72,8 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return second;",
-                "second != otherSecond");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return second;", "second != otherSecond");
         }
 
         [Test]
@@ -116,10 +101,8 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return x;",
-                "x == y");
+            using var session = CreateSession(source);
+            AssertConditionUnknown(session, "return x;", "x == y");
         }
 
         [Test]
@@ -139,10 +122,8 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "(left ?? right).HasValue && (left ?? right).Value == 5");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value == 5");
         }
 
         [Test]
@@ -162,10 +143,8 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "(left ?? right).HasValue && (left ?? right).Value");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value");
         }
 
         [Test]
@@ -195,14 +174,9 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return left.Count;",
-                "left != null && left.Count > 0");
-            AssertConditionProven(
-                source,
-                "return right.Count;",
-                "right != null && right.Count > 0");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return left.Count;", "left != null && left.Count > 0");
+            AssertConditionProven(session, "return right.Count;", "right != null && right.Count > 0");
         }
 
         [Test]
@@ -232,14 +206,9 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return left.Count;",
-                "left.Count > 0");
-            AssertConditionProven(
-                source,
-                "return right.Count;",
-                "right.Count > 0");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return left.Count;", "left.Count > 0");
+            AssertConditionProven(session, "return right.Count;", "right.Count > 0");
         }
 
         [Test]
@@ -269,54 +238,38 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return left.Count;",
-                "left.Count == 3");
-            AssertConditionProven(
-                source,
-                "return right.Count;",
-                "right.Count == 3");
+            using var session = CreateSession(source);
+            AssertConditionProven(session, "return left.Count;", "left.Count == 3");
+            AssertConditionProven(session, "return right.Count;", "right.Count == 3");
         }
 
-        private static void AssertConditionProven(string source, string sourceLine, string condition)
+        private static void AssertConditionProven(SymbolicSourceQueryTestSession session, string sourceLine, string condition)
         {
-            var proof = ProveCondition(source, sourceLine, condition);
+            var proof = ProveCondition(session, sourceLine, condition);
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }
 
-        private static void AssertConditionUnknown(string source, string sourceLine, string condition)
+        private static void AssertConditionUnknown(SymbolicSourceQueryTestSession session, string sourceLine, string condition)
         {
-            var proof = ProveCondition(source, sourceLine, condition);
+            var proof = ProveCondition(session, sourceLine, condition);
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
         }
 
-        private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
+        private static SymbolicSourceQueryTestSession CreateSession(string source)
         {
-            return new SymbolicSourceQueryService().ProveConditionAtSource(
-                source,
-                "ExpressionSmtTranslationTests.cs",
-                FindLine(source, sourceLine),
-                20,
-                condition,
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
-                AnalyzerTestHost.GetTrustedPlatformReferences());
+            return new SymbolicSourceQueryTestSession(source, "ExpressionSmtTranslationTests.cs");
         }
 
-        private static int FindLine(string source, string text)
+        private static SymbolicConditionProofResult ProveCondition(
+            SymbolicSourceQueryTestSession session,
+            string sourceLine,
+            string condition)
         {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (lines[index].Contains(text, StringComparison.Ordinal))
-                {
-                    return index + 1;
-                }
-            }
-
-            throw new InvalidOperationException("Text was not found in source.");
+            return session.ProveAtMarker(
+                (session.FindLine(sourceLine), 20, 0),
+                condition);
         }
     }
 }

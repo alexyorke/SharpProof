@@ -3383,7 +3383,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
+                var jsonAndCompact = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3393,7 +3393,7 @@ public class TestClass
                 Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
 
-                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
+                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3403,7 +3403,7 @@ public class TestClass
                 Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
 
-                var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
+                var negativeMaxPoints = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3414,7 +3414,7 @@ public class TestClass
                 Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
                 Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
 
-                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
+                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3423,7 +3423,7 @@ public class TestClass
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var postLineWithoutLineMode = await SymbolicCliTestHost.RunAsync(
+                var postLineWithoutLineMode = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3432,7 +3432,7 @@ public class TestClass
                 Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(postLineWithoutLineMode.StandardError, Does.Contain("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
                     sourcePath,
                     "--position",
