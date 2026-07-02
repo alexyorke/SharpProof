@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,6 +16,8 @@ namespace PurelySharp.Analyzer.Engine
 {
     internal static class ExecutionVisibility
     {
+        private static readonly ConditionalWeakTable<SemanticModel, ConditionTruthCache> s_conditionTruthCache = new();
+
         public static IEnumerable<IOperation> VisibleDescendants(IOperation rootOperation)
         {
             foreach (var operation in rootOperation.DescendantsAndSelf())
@@ -114,11 +118,11 @@ namespace PurelySharp.Analyzer.Engine
                         binaryExpression.Right.Span.Contains(syntaxNode.SpanStart))
                     {
                         if (IsReferenceKnownNonNullAt(
-                            binaryExpression.Left,
-                            binaryExpression,
-                            semanticModel,
-                            cancellationToken,
-                            smtAnalysis))
+                                binaryExpression.Left,
+                                binaryExpression,
+                                semanticModel,
+                                cancellationToken,
+                                smtAnalysis))
                         {
                             return true;
                         }
@@ -161,7 +165,6 @@ namespace PurelySharp.Analyzer.Engine
             {
                 return true;
             }
-
             return false;
         }
 
@@ -746,12 +749,12 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+            return EvaluateKnownConditionTruthAtSite(
                 expression,
+                site,
                 semanticModel,
                 cancellationToken,
-                smtAnalysis,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == false;
+                smtAnalysis) == false;
         }
 
         private static bool IsConditionAlwaysTrueAt(
@@ -761,12 +764,41 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+            return EvaluateKnownConditionTruthAtSite(
+                expression,
+                site,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis) == true;
+        }
+
+        private static bool? EvaluateKnownConditionTruthAtSite(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            var key = new ConditionTruthCacheKey(
+                expression.SpanStart,
+                expression.Span.Length,
+                site.SpanStart,
+                site.Span.Length,
+                smtAnalysis);
+            var cache = s_conditionTruthCache.GetOrCreateValue(semanticModel);
+            if (cache.Values.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var truth = SymbolicReachabilityService.EvaluateKnownConditionTruth(
                 expression,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken)) == true;
+                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken));
+            cache.Values.TryAdd(key, truth);
+            return truth;
         }
 
         public static bool IsConditionAlwaysTrue(
@@ -840,6 +872,61 @@ namespace PurelySharp.Analyzer.Engine
                 SpecialType.System_UInt32 or
                 SpecialType.System_Int64 or
                 SpecialType.System_UInt64;
+        }
+
+        private sealed class ConditionTruthCache
+        {
+            public ConcurrentDictionary<ConditionTruthCacheKey, bool?> Values { get; } = new();
+        }
+
+        private readonly struct ConditionTruthCacheKey : IEquatable<ConditionTruthCacheKey>
+        {
+            public ConditionTruthCacheKey(
+                int expressionStart,
+                int expressionLength,
+                int siteStart,
+                int siteLength,
+                SmtAnalysisService? smtAnalysis)
+            {
+                ExpressionStart = expressionStart;
+                ExpressionLength = expressionLength;
+                SiteStart = siteStart;
+                SiteLength = siteLength;
+                SmtAnalysis = smtAnalysis;
+            }
+
+            public int ExpressionStart { get; }
+            public int ExpressionLength { get; }
+            public int SiteStart { get; }
+            public int SiteLength { get; }
+            public SmtAnalysisService? SmtAnalysis { get; }
+
+            public bool Equals(ConditionTruthCacheKey other)
+            {
+                return ExpressionStart == other.ExpressionStart &&
+                    ExpressionLength == other.ExpressionLength &&
+                    SiteStart == other.SiteStart &&
+                    SiteLength == other.SiteLength &&
+                    ReferenceEquals(SmtAnalysis, other.SmtAnalysis);
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is ConditionTruthCacheKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = ExpressionStart;
+                    hash = (hash * 397) ^ ExpressionLength;
+                    hash = (hash * 397) ^ SiteStart;
+                    hash = (hash * 397) ^ SiteLength;
+                    hash = (hash * 397) ^ RuntimeHelpers.GetHashCode(SmtAnalysis);
+                    return hash;
+                }
+            }
         }
 
     }
