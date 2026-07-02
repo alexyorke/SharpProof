@@ -11,14 +11,33 @@ namespace PurelySharp.Test
 {
     internal static class AnalyzerTestHost
     {
+        private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
+
+        private static readonly CSharpCompilationOptions DefaultCompilationOptions =
+            new(OutputKind.DynamicallyLinkedLibrary);
+
+        private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
+            DefaultCompilationOptions.WithAllowUnsafe(true);
+
+        private static readonly ImmutableArray<DiagnosticAnalyzer> AnalyzerInstance =
+            ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer());
+
         private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
             new Lazy<ImmutableArray<MetadataReference>>(CreateTrustedPlatformReferences);
+
+        private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferencesWithEnforcePure =
+            new Lazy<ImmutableArray<MetadataReference>>(CreateTrustedPlatformReferencesWithEnforcePure);
 
         private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferences =
             new Lazy<ImmutableArray<MetadataReference>>(CreateMinimalFrameworkReferences);
 
         private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
             new Lazy<MetadataReference>(() => MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+
+        private static readonly AnalyzerOptions EmptyAnalyzerOptions =
+            new AnalyzerOptions(
+                ImmutableArray<AdditionalText>.Empty,
+                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
         internal readonly record struct ConditionContext(
             SemanticModel SemanticModel,
@@ -64,10 +83,11 @@ namespace PurelySharp.Test
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
-                new CSharpParseOptions(LanguageVersion.Preview),
+                PreviewParseOptions,
                 path: sourcePath ?? string.Empty);
-            var references = (frameworkReferences ?? GetTrustedPlatformReferences())
-                .Add(EnforcePureAttributeReference.Value);
+            var references = frameworkReferences.HasValue
+                ? frameworkReferences.Value.Add(EnforcePureAttributeReference.Value)
+                : TrustedPlatformReferencesWithEnforcePure.Value;
             if (additionalMetadataReferences.HasValue)
             {
                 references = references.AddRange(additionalMetadataReferences.Value);
@@ -77,7 +97,7 @@ namespace PurelySharp.Test
                 compilationName,
                 new[] { syntaxTree },
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
+                allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions);
 
             var analyzerOptions = CreateAnalyzerOptions(
                 globalOptions,
@@ -85,7 +105,7 @@ namespace PurelySharp.Test
                 autoEnableEffectSummaryJsonForAdditionalFiles);
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
+                AnalyzerInstance,
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
@@ -110,6 +130,12 @@ namespace PurelySharp.Test
                 analyzerGlobalOptions = analyzerGlobalOptions.Add(
                     "purelysharp_enable_effect_summary_json",
                     "true");
+            }
+
+            if (analyzerAdditionalFiles.Length == 0 &&
+                analyzerGlobalOptions.Count == 0)
+            {
+                return EmptyAnalyzerOptions;
             }
 
             return new AnalyzerOptions(
@@ -145,12 +171,12 @@ public static class ConditionHost
 }
 """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
                 new[] { syntaxTree },
                 GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                DefaultCompilationOptions);
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var returnExpression = syntaxTree.GetRoot()
@@ -183,12 +209,12 @@ public static class ConditionHost
 }
 """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
                 new[] { syntaxTree },
                 GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                DefaultCompilationOptions);
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var variables = syntaxTree.GetRoot()
@@ -225,6 +251,17 @@ public static class ConditionHost
                 .Select(path => MetadataReference.CreateFromFile(path))
                 .Cast<MetadataReference>()
                 .ToImmutableArray();
+        }
+
+        private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferencesWithEnforcePure()
+        {
+            var references = TrustedPlatformReferences.Value;
+            if (references.IsDefault)
+            {
+                references = ImmutableArray<MetadataReference>.Empty;
+            }
+
+            return references.Add(EnforcePureAttributeReference.Value);
         }
 
         private static ImmutableArray<MetadataReference> CreateMinimalFrameworkReferences()
