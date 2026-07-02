@@ -3113,7 +3113,7 @@ namespace PurelySharp.Symbolic.Smt
             switch (kind)
             {
                 case SyntaxKind.EqualsExpression:
-                    if (AreComparable(left, right))
+                    if (SymbolicFactFactory.CanCompareSmtValues(left, right))
                     {
                         formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
                         return true;
@@ -3121,7 +3121,7 @@ namespace PurelySharp.Symbolic.Smt
 
                     return false;
                 case SyntaxKind.NotEqualsExpression:
-                    if (AreComparable(left, right))
+                    if (SymbolicFactFactory.CanCompareSmtValues(left, right))
                     {
                         formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, right);
                         return true;
@@ -3155,17 +3155,6 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = new SmtBinaryFormula(comparison, left, right);
             return true;
-        }
-
-        private static bool AreComparable(SmtFormula left, SmtFormula right)
-        {
-            if (left.Kind == right.Kind)
-            {
-                return true;
-            }
-
-            return (left is SmtNullConstant && right.Kind == SmtValueKind.Reference) ||
-                (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
         }
 
         private static ISet<string>? AddNonZeroDivisorFacts(

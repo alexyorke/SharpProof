@@ -959,7 +959,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (!TryTranslateValue(assignment.Right, semanticModel, cancellationToken, out var assignedValue, getSymbolVersion) ||
                 assignedValue == null ||
-                !AreComparable(targetFormula, assignedValue))
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, assignedValue))
             {
                 targetFormula = null!;
                 return false;
@@ -1744,7 +1744,7 @@ namespace PurelySharp.Symbolic.Smt
             localValue = null;
             if (!TryCreateDesignationFormula(designation, semanticModel, getSymbolVersion, out var designationValue) ||
                 designationValue == null ||
-                !AreComparable(designationValue, matchedValue))
+                !SymbolicFactFactory.CanCompareSmtValues(designationValue, matchedValue))
             {
                 return;
             }
@@ -2020,7 +2020,7 @@ namespace PurelySharp.Symbolic.Smt
             if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&
-                AreComparable(valueFormula, constantValue))
+                SymbolicFactFactory.CanCompareSmtValues(valueFormula, constantValue))
             {
                 formula = new SmtBinaryFormula(
                     SmtBinaryOperator.And,
@@ -2179,7 +2179,7 @@ namespace PurelySharp.Symbolic.Smt
             if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&
-                AreComparable(value, constantValue))
+                SymbolicFactFactory.CanCompareSmtValues(value, constantValue))
             {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, constantValue);
                 return true;

@@ -2993,8 +2993,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private static string GetVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion)
         {
-            var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
-            var name = symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+            var name = SymbolicFactFactory.GetSmtVariableName(symbol);
             var version = getSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;
             return version > 0
                 ? name + "@v" + version.ToString(CultureInfo.InvariantCulture)

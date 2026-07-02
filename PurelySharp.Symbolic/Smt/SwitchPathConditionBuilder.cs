@@ -290,7 +290,7 @@ namespace PurelySharp.Symbolic.Smt
                     out var caseValue,
                     getSymbolVersion) &&
                 caseValue != null &&
-                AreComparableSmtValues(governingValue, caseValue))
+                SymbolicFactFactory.CanCompareSmtValues(governingValue, caseValue))
             {
                 formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue);
                 return true;
@@ -344,7 +344,7 @@ namespace PurelySharp.Symbolic.Smt
                     out var caseValue,
                     getSymbolVersion) &&
                 caseValue != null &&
-                AreComparableSmtValues(governingValue, caseValue))
+                SymbolicFactFactory.CanCompareSmtValues(governingValue, caseValue))
             {
                 domainFacts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue));
                 return TryCreateConjunction(domainFacts, out formula);
@@ -2282,11 +2282,5 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
-        private static bool AreComparableSmtValues(SmtFormula left, SmtFormula right)
-        {
-            return left.Kind == right.Kind ||
-                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
-                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
-        }
     }
 }
