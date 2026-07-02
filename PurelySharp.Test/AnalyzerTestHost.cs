@@ -89,7 +89,7 @@ namespace PurelySharp.Test
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
-                    concurrentAnalysis: true,
+                    concurrentAnalysis: false,
                     logAnalyzerExecutionTime: false,
                     reportSuppressedDiagnostics: false));
 
