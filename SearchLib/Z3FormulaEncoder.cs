@@ -980,6 +980,9 @@ namespace SearchLib.Smt
 
                 isBoundary = _pattern[_position + 1] == 'b';
                 _position += 2;
+                // Word-boundary assertions are modeled well enough to prove contradictions, but SAT
+                // still needs a concrete .NET witness before it can become a reachability proof.
+                _isExact = false;
                 return true;
             }
 

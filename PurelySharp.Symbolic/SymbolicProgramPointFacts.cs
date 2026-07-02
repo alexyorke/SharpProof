@@ -2802,7 +2802,7 @@ namespace PurelySharp.Symbolic
             var hiddenSymbols = GetLocalsDeclaredInside(survivingBranch, semanticModel, cancellationToken);
             foreach (var branchFact in branchFacts)
             {
-                if (hiddenSymbols.Any(symbol => ReferencesSmtVariable(branchFact, GetSmtVariableName(symbol))))
+                if (hiddenSymbols.Any(symbol => ReferencesSmtVariable(branchFact, SymbolicFactFactory.GetSmtVariableName(symbol))))
                 {
                     continue;
                 }
@@ -6645,7 +6645,7 @@ namespace PurelySharp.Symbolic
                 _ => null
             };
 
-            return SymbolicFactFactory.TryCreateStringContentFormula(GetSmtVariableName(symbol), type, out formula);
+            return SymbolicFactFactory.TryCreateStringContentFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
         }
 
         private static bool TryCreateStringContentFormulaForReference(
@@ -6687,7 +6687,7 @@ namespace PurelySharp.Symbolic
                         assignedSymbol,
                         out var valueFormula) &&
                     valueFormula != null &&
-                    CanCompareSmtValues(targetFormula, valueFormula))
+                    SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
                 {
                     facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
                 }
@@ -6715,7 +6715,7 @@ namespace PurelySharp.Symbolic
             }
 
             formula = new SmtVariable(
-                GetSmtVariableName(arraySymbol) + "[" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]",
+                SymbolicFactFactory.GetSmtVariableName(arraySymbol) + "[" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]",
                 elementKind);
             return true;
         }
@@ -6749,7 +6749,7 @@ namespace PurelySharp.Symbolic
                     assignedSymbol: null,
                     out var valueFormula) ||
                 valueFormula == null ||
-                !CanCompareSmtValues(targetFormula, valueFormula))
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
             {
                 return;
             }
@@ -6899,7 +6899,7 @@ namespace PurelySharp.Symbolic
                         getSymbolVersion: null,
                         inlineDepth: 0) ||
                     valueFormula == null ||
-                    !CanCompareSmtValues(targetFormula, valueFormula))
+                    !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
                 {
                     continue;
                 }
@@ -7011,7 +7011,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var variableName = GetSmtVariableName(tupleSymbol) + "." + elementName;
+            var variableName = SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName;
             if (elementType.SpecialType == SpecialType.System_Boolean)
             {
                 formula = new SmtVariable(variableName, SmtValueKind.Bool);
@@ -7070,7 +7070,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName + ".String", SmtValueKind.String);
+            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName + ".String", SmtValueKind.String);
             return true;
         }
 
@@ -7085,7 +7085,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
+            var elementFormula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
             return SymbolicFactFactory.TryCreateBuiltInLengthFormula(
                 SymbolicFactFactory.GetReferenceFormulaName(elementFormula),
                 elementType,
@@ -7107,7 +7107,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
+            var elementFormula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
             return SymbolicFactFactory.TryCreateArrayDimensionLengthFormulaForReference(
                 elementFormula,
                 arrayType,
@@ -7414,7 +7414,7 @@ namespace PurelySharp.Symbolic
                     out var valueFormula,
                     pathFacts) ||
                 valueFormula == null ||
-                !CanCompareSmtValues(targetFormula, valueFormula))
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
             {
                 return false;
             }
@@ -7470,7 +7470,7 @@ namespace PurelySharp.Symbolic
         {
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                !CanCompareSmtValues(targetFormula, valueFormula))
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
             {
                 return false;
             }
@@ -7521,7 +7521,7 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken,
                         out var whenNotNullValue) &&
-                    CanCompareSmtValues(targetValue, whenNotNullValue))
+                    SymbolicFactFactory.CanCompareSmtValues(targetValue, whenNotNullValue))
                 {
                     facts.Add(new SmtBinaryFormula(
                         SmtBinaryOperator.Or,
@@ -7667,7 +7667,7 @@ namespace PurelySharp.Symbolic
                 facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetHasValue, parts.HasValue));
 
                 if (parts.Value != null &&
-                    CanCompareSmtValues(targetValue, parts.Value))
+                    SymbolicFactFactory.CanCompareSmtValues(targetValue, parts.Value))
                 {
                     facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
                 }
@@ -7682,7 +7682,7 @@ namespace PurelySharp.Symbolic
             {
                 facts.Add(targetHasValue);
 
-                if (CanCompareSmtValues(targetValue, wrappedValueFormula))
+                if (SymbolicFactFactory.CanCompareSmtValues(targetValue, wrappedValueFormula))
                 {
                     facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, wrappedValueFormula));
                 }
@@ -7730,7 +7730,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
+            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
             return true;
         }
 
@@ -7743,7 +7743,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(GetSmtVariableName(symbol) + ".Value", kind);
+            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".Value", kind);
             return true;
         }
 
@@ -8005,7 +8005,7 @@ namespace PurelySharp.Symbolic
             return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
                 targetFormula,
                 previousValue,
-                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)),
+                ReferencesSmtVariable(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
                 ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken),
                 assignment.Kind(),
                 rightValue,
@@ -8027,7 +8027,7 @@ namespace PurelySharp.Symbolic
             return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
                 targetFormula,
                 previousValue,
-                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)),
+                ReferencesSmtVariable(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
                 delta,
                 out fact);
         }
@@ -8312,7 +8312,7 @@ namespace PurelySharp.Symbolic
             }
 
             return SymbolicFactFactory.TryCreateArrayDimensionLengthFormula(
-                GetSmtVariableName(symbol),
+                SymbolicFactFactory.GetSmtVariableName(symbol),
                 arrayType,
                 dimension,
                 out formula);
@@ -8327,7 +8327,7 @@ namespace PurelySharp.Symbolic
                 _ => null
             };
 
-            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(GetSmtVariableName(symbol), type, out formula);
+            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
         }
 
         private static bool TryCreateBuiltInLengthFormulaForReference(
@@ -8369,7 +8369,7 @@ namespace PurelySharp.Symbolic
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
         {
             return SymbolicFactFactory.TryCreateSymbolVariableFormula(
-                GetSmtVariableName(symbol),
+                SymbolicFactFactory.GetSmtVariableName(symbol),
                 SymbolicFactFactory.GetTrackedSymbolType(symbol),
                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 IsReferenceLikeType,
@@ -8396,23 +8396,9 @@ namespace PurelySharp.Symbolic
             return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
         }
 
-        private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
-        {
-            return left.Kind == right.Kind ||
-                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
-                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
-        }
-
-        private static string GetSmtVariableName(ISymbol symbol)
-        {
-            var firstLocation = symbol.Locations.FirstOrDefault();
-            var start = firstLocation?.SourceSpan.Start ?? 0;
-            return symbol.Name + "#" + start.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-
         private static void RemoveFactsReferencingSymbol(List<SmtFormula> facts, ISymbol symbol)
         {
-            var variablePrefix = GetSmtVariableName(symbol);
+            var variablePrefix = SymbolicFactFactory.GetSmtVariableName(symbol);
             for (var index = facts.Count - 1; index >= 0; index--)
             {
                 if (ReferencesSmtVariable(facts[index], variablePrefix))

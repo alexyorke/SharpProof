@@ -114,7 +114,9 @@ namespace SearchLib.Smt
 
                 if (!ReferenceEquals(preparedCombinedConditions, combinedConditions))
                 {
-                    return (pathFeasibility, IsSatisfiableRaw(preparedCombinedConditions, timeout));
+                    return (pathFeasibility, AdjustForApproximation(
+                        IsSatisfiableRaw(preparedCombinedConditions, timeout),
+                        ContainsApproximateRegex(combinedConditions)));
                 }
 
                 solver.Push();

@@ -13,6 +13,7 @@ namespace PurelySharp.Symbolic.Smt
 {
     public sealed class SmtAnalysisService : IDisposable
     {
+        private const int PreNormalizationFormulaDepthLimit = 1024;
         private const int SharedQueryCacheEntryLimit = 4096;
         private static readonly ConcurrentDictionary<string, PurityProofResult> s_sharedQueryCache = new(StringComparer.Ordinal);
         private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
@@ -85,6 +86,14 @@ namespace PurelySharp.Symbolic.Smt
                 return Unknown("smt_unavailable");
             }
 
+            if (!IsWithinFormulaDepthBudget(
+                    query.PathConditions,
+                    query.Hazard.TriggerCondition,
+                    PreNormalizationFormulaDepthLimit))
+            {
+                return Unknown("smt_expression_budget_exceeded");
+            }
+
             var pathConditions = NormalizePathConditions(query.PathConditions);
             if (TryClassifySyntactically(query, pathConditions, out var syntacticResult))
             {
@@ -96,7 +105,10 @@ namespace PurelySharp.Symbolic.Smt
                 return Unknown("smt_path_condition_budget_exceeded");
             }
 
-            if (CountFormulaNodes(pathConditions) + CountFormulaNodes(query.Hazard.TriggerCondition) > Options.MaxExpressionNodes)
+            if (!IsWithinFormulaNodeBudget(
+                    pathConditions,
+                    query.Hazard.TriggerCondition,
+                    Options.MaxExpressionNodes))
             {
                 return Unknown("smt_expression_budget_exceeded");
             }
@@ -299,35 +311,170 @@ namespace PurelySharp.Symbolic.Smt
         {
             return SmtSyntacticClassifier.TryClassify(query, pathConditions, out result);
         }
-        private static int CountFormulaNodes(IEnumerable<SmtFormula> formulas)
+        private static bool IsWithinFormulaNodeBudget(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula triggerCondition,
+            int maxNodes)
         {
-            var count = 0;
-            foreach (var formula in formulas)
+            var remaining = maxNodes;
+            foreach (var formula in pathConditions)
             {
-                count += CountFormulaNodes(formula);
+                if (!TryConsumeFormulaNodeBudget(formula, ref remaining))
+                {
+                    return false;
+                }
             }
 
-            return count;
+            return TryConsumeFormulaNodeBudget(triggerCondition, ref remaining);
         }
 
-        private static int CountFormulaNodes(SmtFormula formula)
+        private static bool IsWithinFormulaDepthBudget(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula triggerCondition,
+            int maxDepth)
         {
-            return formula switch
+            foreach (var formula in pathConditions)
             {
-                SmtUnaryFormula unary => 1 + CountFormulaNodes(unary.Operand),
-                SmtBinaryFormula binary => 1 + CountFormulaNodes(binary.Left) + CountFormulaNodes(binary.Right),
-                SmtIntegerUnaryTerm unary => 1 + CountFormulaNodes(unary.Operand),
-                SmtIntegerBinaryTerm binary => 1 + CountFormulaNodes(binary.Left) + CountFormulaNodes(binary.Right),
-                SmtStringLengthTerm stringLength => 1 + CountFormulaNodes(stringLength.Value),
-                SmtStringConcatTerm stringConcat => 1 + CountFormulaNodes(stringConcat.Left) + CountFormulaNodes(stringConcat.Right),
-                SmtStringContainsFormula stringContains => 1 + CountFormulaNodes(stringContains.Value) + CountFormulaNodes(stringContains.Search),
-                SmtStringStartsWithFormula stringStartsWith => 1 + CountFormulaNodes(stringStartsWith.Value) + CountFormulaNodes(stringStartsWith.Prefix),
-                SmtStringEndsWithFormula stringEndsWith => 1 + CountFormulaNodes(stringEndsWith.Value) + CountFormulaNodes(stringEndsWith.Suffix),
-                SmtRegexMatchFormula regexMatch => 1 + CountFormulaNodes(regexMatch.Value) + Math.Max(1, regexMatch.Pattern.Length / 8),
-                SmtRuntimeTypeTestFormula runtimeTypeTest => 1 + CountFormulaNodes(runtimeTypeTest.Value),
-                SmtConditionalFormula conditional => 1 + CountFormulaNodes(conditional.Condition) + CountFormulaNodes(conditional.WhenTrue) + CountFormulaNodes(conditional.WhenFalse),
-                _ => 1,
-            };
+                if (!IsWithinFormulaDepthBudget(formula, maxDepth))
+                {
+                    return false;
+                }
+            }
+
+            return IsWithinFormulaDepthBudget(triggerCondition, maxDepth);
+        }
+
+        private static bool IsWithinFormulaDepthBudget(SmtFormula root, int maxDepth)
+        {
+            var stack = new Stack<(SmtFormula Formula, int Depth)>();
+            stack.Push((root, 1));
+            while (stack.Count != 0)
+            {
+                var (formula, depth) = stack.Pop();
+                if (depth > maxDepth)
+                {
+                    return false;
+                }
+
+                var childDepth = depth + 1;
+                switch (formula)
+                {
+                    case SmtUnaryFormula unary:
+                        stack.Push((unary.Operand, childDepth));
+                        break;
+                    case SmtBinaryFormula binary:
+                        stack.Push((binary.Left, childDepth));
+                        stack.Push((binary.Right, childDepth));
+                        break;
+                    case SmtIntegerUnaryTerm unary:
+                        stack.Push((unary.Operand, childDepth));
+                        break;
+                    case SmtIntegerBinaryTerm binary:
+                        stack.Push((binary.Left, childDepth));
+                        stack.Push((binary.Right, childDepth));
+                        break;
+                    case SmtStringLengthTerm stringLength:
+                        stack.Push((stringLength.Value, childDepth));
+                        break;
+                    case SmtStringConcatTerm stringConcat:
+                        stack.Push((stringConcat.Left, childDepth));
+                        stack.Push((stringConcat.Right, childDepth));
+                        break;
+                    case SmtStringContainsFormula stringContains:
+                        stack.Push((stringContains.Value, childDepth));
+                        stack.Push((stringContains.Search, childDepth));
+                        break;
+                    case SmtStringStartsWithFormula stringStartsWith:
+                        stack.Push((stringStartsWith.Value, childDepth));
+                        stack.Push((stringStartsWith.Prefix, childDepth));
+                        break;
+                    case SmtStringEndsWithFormula stringEndsWith:
+                        stack.Push((stringEndsWith.Value, childDepth));
+                        stack.Push((stringEndsWith.Suffix, childDepth));
+                        break;
+                    case SmtRegexMatchFormula regexMatch:
+                        stack.Push((regexMatch.Value, childDepth));
+                        break;
+                    case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                        stack.Push((runtimeTypeTest.Value, childDepth));
+                        break;
+                    case SmtConditionalFormula conditional:
+                        stack.Push((conditional.Condition, childDepth));
+                        stack.Push((conditional.WhenTrue, childDepth));
+                        stack.Push((conditional.WhenFalse, childDepth));
+                        break;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining)
+        {
+            var stack = new Stack<SmtFormula>();
+            stack.Push(root);
+            while (stack.Count != 0)
+            {
+                var formula = stack.Pop();
+                var weight = formula is SmtRegexMatchFormula regexMatch
+                    ? 1 + Math.Max(1, regexMatch.Pattern.Length / 8)
+                    : 1;
+                remaining -= weight;
+                if (remaining < 0)
+                {
+                    return false;
+                }
+
+                switch (formula)
+                {
+                    case SmtUnaryFormula unary:
+                        stack.Push(unary.Operand);
+                        break;
+                    case SmtBinaryFormula binary:
+                        stack.Push(binary.Left);
+                        stack.Push(binary.Right);
+                        break;
+                    case SmtIntegerUnaryTerm unary:
+                        stack.Push(unary.Operand);
+                        break;
+                    case SmtIntegerBinaryTerm binary:
+                        stack.Push(binary.Left);
+                        stack.Push(binary.Right);
+                        break;
+                    case SmtStringLengthTerm stringLength:
+                        stack.Push(stringLength.Value);
+                        break;
+                    case SmtStringConcatTerm stringConcat:
+                        stack.Push(stringConcat.Left);
+                        stack.Push(stringConcat.Right);
+                        break;
+                    case SmtStringContainsFormula stringContains:
+                        stack.Push(stringContains.Value);
+                        stack.Push(stringContains.Search);
+                        break;
+                    case SmtStringStartsWithFormula stringStartsWith:
+                        stack.Push(stringStartsWith.Value);
+                        stack.Push(stringStartsWith.Prefix);
+                        break;
+                    case SmtStringEndsWithFormula stringEndsWith:
+                        stack.Push(stringEndsWith.Value);
+                        stack.Push(stringEndsWith.Suffix);
+                        break;
+                    case SmtRegexMatchFormula regexFormula:
+                        stack.Push(regexFormula.Value);
+                        break;
+                    case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                        stack.Push(runtimeTypeTest.Value);
+                        break;
+                    case SmtConditionalFormula conditional:
+                        stack.Push(conditional.Condition);
+                        stack.Push(conditional.WhenTrue);
+                        stack.Push(conditional.WhenFalse);
+                        break;
+                }
+            }
+
+            return true;
         }
     }
 }

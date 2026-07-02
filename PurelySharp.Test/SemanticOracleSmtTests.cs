@@ -7596,14 +7596,14 @@ public class TestClass
         }
 
         [Test]
-        public void ExecutionVisibility_WordBoundaryRegexImpliesStringLength()
+        public void ExecutionVisibility_WordBoundaryRegexLengthImplicationRemainsConservative()
         {
             Assert.That(
                 IsConditionAlwaysFalse(
                     "string text",
                     @"Regex.IsMatch(text, @""\A\bAB\B?\z"") && text.Length != 2",
                     "using System.Text.RegularExpressions;"),
-                Is.True);
+                Is.False);
         }
 
         [Test]

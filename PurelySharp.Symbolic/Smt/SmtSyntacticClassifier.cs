@@ -8,7 +8,8 @@ using SearchLib.Smt;
 namespace PurelySharp.Symbolic.Smt
 {
     internal static class SmtSyntacticClassifier
-    {        public static bool TryClassify(
+    {
+        public static bool TryClassify(
             PurityProofQuery query,
             ImmutableArray<SmtFormula> pathConditions,
             out PurityProofResult result)
@@ -609,7 +610,10 @@ namespace PurelySharp.Symbolic.Smt
         private sealed class SyntacticFactSet
         {
             private const int MaxAffineExpansionDepth = 8;
+            private const int MaxBooleanEvaluationDepth = 64;
+            private const int MaxBooleanFactInferenceDepth = 16;
             private const int MaxConditionalBranchEvaluationDepth = 4;
+            private const int MaxFormulaReferenceDepth = 256;
 
             private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
             private readonly Dictionary<SmtFormula, string> _exactStrings = new();
@@ -618,6 +622,9 @@ namespace PurelySharp.Symbolic.Smt
             private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
             private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
             private readonly Dictionary<SmtFormula, BooleanEquivalenceParent> _booleanEquivalences = new();
+            private int _booleanEvaluationDepth;
+            private int _booleanFactInferenceDepth;
+            private int _conditionalBranchEvaluationDepth;
 
             public SyntacticFactSet()
             {
@@ -632,6 +639,8 @@ namespace PurelySharp.Symbolic.Smt
                 _exactBooleans = new Dictionary<SmtFormula, bool>(source._exactBooleans);
                 _aliases = new Dictionary<SmtFormula, SmtFormula>(source._aliases);
                 _booleanEquivalences = new Dictionary<SmtFormula, BooleanEquivalenceParent>(source._booleanEquivalences);
+                _booleanEvaluationDepth = source._booleanEvaluationDepth;
+                _conditionalBranchEvaluationDepth = source._conditionalBranchEvaluationDepth;
             }
 
             public static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
@@ -1176,111 +1185,125 @@ namespace PurelySharp.Symbolic.Smt
                 out bool value,
                 int conditionalBranchDepth)
             {
-                formula = NormalizeAliases(formula);
-                var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
-                if (!canonical.Equals(formula))
+                if (_booleanEvaluationDepth >= MaxBooleanEvaluationDepth)
                 {
-                    if (_exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
+                    value = false;
+                    return false;
+                }
+
+                _booleanEvaluationDepth++;
+                try
+                {
+                    formula = NormalizeAliases(formula);
+                    var canonical = FindBooleanCanonical(formula, out var isNegatedFromCanonical);
+                    if (!canonical.Equals(formula))
                     {
-                        value = canonicalExactValue ^ isNegatedFromCanonical;
+                        if (_exactBooleans.TryGetValue(canonical, out var canonicalExactValue))
+                        {
+                            value = canonicalExactValue ^ isNegatedFromCanonical;
+                            return true;
+                        }
+
+                        if (TryEvaluateBoolean(canonical, out var canonicalValue, conditionalBranchDepth))
+                        {
+                            value = canonicalValue ^ isNegatedFromCanonical;
+                            return true;
+                        }
+                    }
+
+                    if (_exactBooleans.TryGetValue(formula, out var exactValue))
+                    {
+                        value = exactValue;
                         return true;
                     }
 
-                    if (TryEvaluateBoolean(canonical, out var canonicalValue, conditionalBranchDepth))
+                    switch (formula)
                     {
-                        value = canonicalValue ^ isNegatedFromCanonical;
-                        return true;
-                    }
-                }
-
-                if (_exactBooleans.TryGetValue(formula, out var exactValue))
-                {
-                    value = exactValue;
-                    return true;
-                }
-
-                switch (formula)
-                {
-                    case SmtBooleanConstant booleanConstant:
-                        value = booleanConstant.Value;
-                        return true;
-                    case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated
-                        when TryEvaluateBoolean(negated.Operand, out var operandValue, conditionalBranchDepth):
-                        value = !operandValue;
-                        return true;
-                    case SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary:
-                        {
-                            var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
-                            var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
-                            if (hasLeft && !left || hasRight && !right)
+                        case SmtBooleanConstant booleanConstant:
+                            value = booleanConstant.Value;
+                            return true;
+                        case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated
+                            when TryEvaluateBoolean(negated.Operand, out var operandValue, conditionalBranchDepth):
+                            value = !operandValue;
+                            return true;
+                        case SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary:
                             {
-                                value = false;
-                                return true;
+                                var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
+                                var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
+                                if (hasLeft && !left || hasRight && !right)
+                                {
+                                    value = false;
+                                    return true;
+                                }
+
+                                if (hasLeft && hasRight)
+                                {
+                                    value = left && right;
+                                    return true;
+                                }
+
+                                break;
+                            }
+                        case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } binary:
+                            {
+                                var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
+                                var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
+                                if (hasLeft && left || hasRight && right)
+                                {
+                                    value = true;
+                                    return true;
+                                }
+
+                                if (hasLeft && hasRight)
+                                {
+                                    value = left || right;
+                                    return true;
+                                }
+
+                                break;
+                            }
+                        case SmtBinaryFormula binary:
+                            return TryEvaluateComparison(binary, out value, conditionalBranchDepth);
+                        case SmtConditionalFormula conditional
+                            when conditional.Kind == SmtValueKind.Bool:
+                            if (TryEvaluateBoolean(conditional.Condition, out var conditionValue, conditionalBranchDepth))
+                            {
+                                return TryEvaluateBoolean(
+                                    conditionValue ? conditional.WhenTrue : conditional.WhenFalse,
+                                    out value,
+                                    conditionalBranchDepth);
                             }
 
-                            if (hasLeft && hasRight)
-                            {
-                                value = left && right;
-                                return true;
-                            }
-
-                            break;
-                        }
-                    case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } binary:
-                        {
-                            var hasLeft = TryEvaluateBoolean(binary.Left, out var left, conditionalBranchDepth);
-                            var hasRight = TryEvaluateBoolean(binary.Right, out var right, conditionalBranchDepth);
-                            if (hasLeft && left || hasRight && right)
-                            {
-                                value = true;
-                                return true;
-                            }
-
-                            if (hasLeft && hasRight)
-                            {
-                                value = left || right;
-                                return true;
-                            }
-
-                            break;
-                        }
-                    case SmtBinaryFormula binary:
-                        return TryEvaluateComparison(binary, out value, conditionalBranchDepth);
-                    case SmtConditionalFormula conditional
-                        when conditional.Kind == SmtValueKind.Bool:
-                        if (TryEvaluateBoolean(conditional.Condition, out var conditionValue, conditionalBranchDepth))
-                        {
-                            return TryEvaluateBoolean(
-                                conditionValue ? conditional.WhenTrue : conditional.WhenFalse,
+                            return TryEvaluateConditionalBranches(
+                                conditional.Condition,
+                                conditional.WhenTrue,
+                                conditional.WhenFalse,
                                 out value,
                                 conditionalBranchDepth);
-                        }
+                        case SmtStringContainsFormula contains
+                            when TryGetKnownString(contains.Value, out var containsValue) &&
+                                 TryGetKnownString(contains.Search, out var containsSearch):
+                            value = containsValue.Contains(containsSearch, StringComparison.Ordinal);
+                            return true;
+                        case SmtStringStartsWithFormula startsWith
+                            when TryGetKnownString(startsWith.Value, out var startsWithValue) &&
+                                 TryGetKnownString(startsWith.Prefix, out var prefix):
+                            value = startsWithValue.StartsWith(prefix, StringComparison.Ordinal);
+                            return true;
+                        case SmtStringEndsWithFormula endsWith
+                            when TryGetKnownString(endsWith.Value, out var endsWithValue) &&
+                                 TryGetKnownString(endsWith.Suffix, out var suffix):
+                            value = endsWithValue.EndsWith(suffix, StringComparison.Ordinal);
+                            return true;
+                    }
 
-                        return TryEvaluateConditionalBranches(
-                            conditional.Condition,
-                            conditional.WhenTrue,
-                            conditional.WhenFalse,
-                            out value,
-                            conditionalBranchDepth);
-                    case SmtStringContainsFormula contains
-                        when TryGetKnownString(contains.Value, out var containsValue) &&
-                             TryGetKnownString(contains.Search, out var containsSearch):
-                        value = containsValue.Contains(containsSearch, StringComparison.Ordinal);
-                        return true;
-                    case SmtStringStartsWithFormula startsWith
-                        when TryGetKnownString(startsWith.Value, out var startsWithValue) &&
-                             TryGetKnownString(startsWith.Prefix, out var prefix):
-                        value = startsWithValue.StartsWith(prefix, StringComparison.Ordinal);
-                        return true;
-                    case SmtStringEndsWithFormula endsWith
-                        when TryGetKnownString(endsWith.Value, out var endsWithValue) &&
-                             TryGetKnownString(endsWith.Suffix, out var suffix):
-                        value = endsWithValue.EndsWith(suffix, StringComparison.Ordinal);
-                        return true;
+                    value = false;
+                    return false;
                 }
-
-                value = false;
-                return false;
+                finally
+                {
+                    _booleanEvaluationDepth--;
+                }
             }
 
             private bool TryAddBooleanFact(SmtFormula formula, out bool hasContradiction)
@@ -1289,6 +1312,27 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             private bool TryAddBooleanFact(
+                SmtFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                if (_booleanFactInferenceDepth >= MaxBooleanFactInferenceDepth)
+                {
+                    return AddExactBooleanWithoutInference(formula, value, out hasContradiction);
+                }
+
+                _booleanFactInferenceDepth++;
+                try
+                {
+                    return TryAddBooleanFactCore(formula, value, out hasContradiction);
+                }
+                finally
+                {
+                    _booleanFactInferenceDepth--;
+                }
+            }
+
+            private bool TryAddBooleanFactCore(
                 SmtFormula formula,
                 bool value,
                 out bool hasContradiction)
@@ -1450,6 +1494,28 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 _exactBooleans[canonical] = canonicalValue;
+                return true;
+            }
+
+            private bool AddExactBooleanWithoutInference(
+                SmtFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (formula is SmtBooleanConstant booleanConstant)
+                {
+                    hasContradiction = booleanConstant.Value != value;
+                    return hasContradiction;
+                }
+
+                if (_exactBooleans.TryGetValue(formula, out var existing) &&
+                    existing != value)
+                {
+                    hasContradiction = true;
+                }
+
+                _exactBooleans[formula] = value;
                 return true;
             }
 
@@ -1710,53 +1776,62 @@ namespace PurelySharp.Symbolic.Smt
                 int conditionalBranchDepth)
             {
                 value = false;
-                if (conditionalBranchDepth >= MaxConditionalBranchEvaluationDepth)
+                if (conditionalBranchDepth >= MaxConditionalBranchEvaluationDepth ||
+                    _conditionalBranchEvaluationDepth >= MaxConditionalBranchEvaluationDepth)
                 {
                     return false;
                 }
 
-                var trueKnown = TryEvaluateBranchFormula(
-                    condition,
-                    assumptionValue: true,
-                    whenTrue,
-                    conditionalBranchDepth + 1,
-                    out var trueReachable,
-                    out var trueValue);
-                var falseKnown = TryEvaluateBranchFormula(
-                    condition,
-                    assumptionValue: false,
-                    whenFalse,
-                    conditionalBranchDepth + 1,
-                    out var falseReachable,
-                    out var falseValue);
-
-                if (!trueReachable && !falseReachable)
+                _conditionalBranchEvaluationDepth++;
+                try
                 {
-                    value = false;
-                    return true;
-                }
+                    var trueKnown = TryEvaluateBranchFormula(
+                        condition,
+                        assumptionValue: true,
+                        whenTrue,
+                        conditionalBranchDepth + 1,
+                        out var trueReachable,
+                        out var trueValue);
+                    var falseKnown = TryEvaluateBranchFormula(
+                        condition,
+                        assumptionValue: false,
+                        whenFalse,
+                        conditionalBranchDepth + 1,
+                        out var falseReachable,
+                        out var falseValue);
 
-                if (trueReachable && !trueKnown ||
-                    falseReachable && !falseKnown)
-                {
+                    if (!trueReachable && !falseReachable)
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    if (trueReachable && !trueKnown ||
+                        falseReachable && !falseKnown)
+                    {
+                        return false;
+                    }
+
+                    if ((!trueReachable || trueValue) &&
+                        (!falseReachable || falseValue))
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if ((!trueReachable || !trueValue) &&
+                        (!falseReachable || !falseValue))
+                    {
+                        value = false;
+                        return true;
+                    }
+
                     return false;
                 }
-
-                if ((!trueReachable || trueValue) &&
-                    (!falseReachable || falseValue))
+                finally
                 {
-                    value = true;
-                    return true;
+                    _conditionalBranchEvaluationDepth--;
                 }
-
-                if ((!trueReachable || !trueValue) &&
-                    (!falseReachable || !falseValue))
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
             }
 
             private bool TryEvaluateBranchFormula(
@@ -2243,33 +2318,52 @@ namespace PurelySharp.Symbolic.Smt
 
             private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate)
             {
+                return ReferencesFormula(formula, candidate, new HashSet<SmtFormula>(), depth: 0);
+            }
+
+            private static bool ReferencesFormula(
+                SmtFormula formula,
+                SmtFormula candidate,
+                HashSet<SmtFormula> visiting,
+                int depth)
+            {
+                if (depth > MaxFormulaReferenceDepth)
+                {
+                    return true;
+                }
+
                 if (formula.Equals(candidate))
                 {
                     return true;
                 }
 
+                if (!visiting.Add(formula))
+                {
+                    return false;
+                }
+
                 return formula switch
                 {
-                    SmtUnaryFormula unary => ReferencesFormula(unary.Operand, candidate),
-                    SmtBinaryFormula binary => ReferencesFormula(binary.Left, candidate) ||
-                        ReferencesFormula(binary.Right, candidate),
-                    SmtIntegerUnaryTerm unary => ReferencesFormula(unary.Operand, candidate),
-                    SmtIntegerBinaryTerm binary => ReferencesFormula(binary.Left, candidate) ||
-                        ReferencesFormula(binary.Right, candidate),
-                    SmtStringLengthTerm stringLength => ReferencesFormula(stringLength.Value, candidate),
-                    SmtStringConcatTerm stringConcat => ReferencesFormula(stringConcat.Left, candidate) ||
-                        ReferencesFormula(stringConcat.Right, candidate),
-                    SmtStringContainsFormula stringContains => ReferencesFormula(stringContains.Value, candidate) ||
-                        ReferencesFormula(stringContains.Search, candidate),
-                    SmtStringStartsWithFormula stringStartsWith => ReferencesFormula(stringStartsWith.Value, candidate) ||
-                        ReferencesFormula(stringStartsWith.Prefix, candidate),
-                    SmtStringEndsWithFormula stringEndsWith => ReferencesFormula(stringEndsWith.Value, candidate) ||
-                        ReferencesFormula(stringEndsWith.Suffix, candidate),
-                    SmtRegexMatchFormula regexMatch => ReferencesFormula(regexMatch.Value, candidate),
-                    SmtRuntimeTypeTestFormula runtimeTypeTest => ReferencesFormula(runtimeTypeTest.Value, candidate),
-                    SmtConditionalFormula conditional => ReferencesFormula(conditional.Condition, candidate) ||
-                        ReferencesFormula(conditional.WhenTrue, candidate) ||
-                        ReferencesFormula(conditional.WhenFalse, candidate),
+                    SmtUnaryFormula unary => ReferencesFormula(unary.Operand, candidate, visiting, depth + 1),
+                    SmtBinaryFormula binary => ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
+                    SmtIntegerUnaryTerm unary => ReferencesFormula(unary.Operand, candidate, visiting, depth + 1),
+                    SmtIntegerBinaryTerm binary => ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
+                    SmtStringLengthTerm stringLength => ReferencesFormula(stringLength.Value, candidate, visiting, depth + 1),
+                    SmtStringConcatTerm stringConcat => ReferencesFormula(stringConcat.Left, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(stringConcat.Right, candidate, visiting, depth + 1),
+                    SmtStringContainsFormula stringContains => ReferencesFormula(stringContains.Value, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(stringContains.Search, candidate, visiting, depth + 1),
+                    SmtStringStartsWithFormula stringStartsWith => ReferencesFormula(stringStartsWith.Value, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(stringStartsWith.Prefix, candidate, visiting, depth + 1),
+                    SmtStringEndsWithFormula stringEndsWith => ReferencesFormula(stringEndsWith.Value, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(stringEndsWith.Suffix, candidate, visiting, depth + 1),
+                    SmtRegexMatchFormula regexMatch => ReferencesFormula(regexMatch.Value, candidate, visiting, depth + 1),
+                    SmtRuntimeTypeTestFormula runtimeTypeTest => ReferencesFormula(runtimeTypeTest.Value, candidate, visiting, depth + 1),
+                    SmtConditionalFormula conditional => ReferencesFormula(conditional.Condition, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(conditional.WhenTrue, candidate, visiting, depth + 1) ||
+                        ReferencesFormula(conditional.WhenFalse, candidate, visiting, depth + 1),
                     _ => false,
                 };
             }

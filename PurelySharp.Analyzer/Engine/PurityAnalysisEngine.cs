@@ -842,7 +842,7 @@ namespace PurelySharp.Analyzer.Engine
                     return PathConditions;
                 }
 
-                var variablePrefix = GetSmtSymbolVariablePrefix(symbol);
+                var variablePrefix = SymbolicFactFactory.GetSmtVariableName(symbol);
                 var builder = ImmutableArray.CreateBuilder<SmtFormula>(PathConditions.Length);
                 foreach (var condition in PathConditions)
                 {
@@ -855,12 +855,6 @@ namespace PurelySharp.Analyzer.Engine
                 return builder.Count == PathConditions.Length
                     ? PathConditions
                     : builder.ToImmutable();
-            }
-
-            private static string GetSmtSymbolVariablePrefix(ISymbol symbol)
-            {
-                var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
-                return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
             }
 
             private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
@@ -2769,8 +2763,7 @@ namespace PurelySharp.Analyzer.Engine
 
         private static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)
         {
-            var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
-            var name = symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+            var name = SymbolicFactFactory.GetSmtVariableName(symbol);
             var version = getSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;
             return version > 0
                 ? name + "@v" + version.ToString(CultureInfo.InvariantCulture)
@@ -4157,7 +4150,7 @@ namespace PurelySharp.Analyzer.Engine
                     out var valueFormula,
                     valueState.GetSmtSymbolVersion) &&
                 valueFormula != null &&
-                CanCompareSmtValues(targetFormula, valueFormula))
+                SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
             {
                 var assignedFact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
@@ -4387,13 +4380,6 @@ namespace PurelySharp.Analyzer.Engine
         private static ExpressionSyntax UnwrapSmtFactExpression(ExpressionSyntax expression)
         {
             return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        }
-
-        private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
-        {
-            return left.Kind == right.Kind ||
-                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
-                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
         }
 
         private static PurityAnalysisState ApplyWrittenLocalStateUpdates(

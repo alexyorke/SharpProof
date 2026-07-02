@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -21,6 +22,20 @@ namespace PurelySharp.Symbolic
             }
 
             return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
+        }
+
+        public static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
+        {
+            return left.Kind == right.Kind ||
+                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
+                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
+        }
+
+        public static string GetSmtVariableName(ISymbol symbol)
+        {
+            var firstLocation = symbol.Locations.FirstOrDefault();
+            var start = firstLocation?.SourceSpan.Start ?? 0;
+            return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
         }
 
         public static bool TryCreateReferenceBackedLengthFact(

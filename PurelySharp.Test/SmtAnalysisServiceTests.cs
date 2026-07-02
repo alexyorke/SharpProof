@@ -450,6 +450,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_DeepPathFormulaOverBudget_ReturnsBeforeNormalization()
+        {
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(50),
+                TimeSpan.FromMilliseconds(500),
+                maxPathConditions: 4,
+                maxExpressionNodes: 128));
+
+            var result = service.Classify(CreateQuery(
+                new[] { CreateNestedNegation(depth: 4096) },
+                new SmtBooleanConstant(true)));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);
@@ -1792,6 +1812,17 @@ namespace PurelySharp.Test
                     PurityHazardKind.ImpureCallReachability,
                     triggerCondition,
                     PurityEffectVisibility.CallerVisible));
+        }
+
+        private static SmtFormula CreateNestedNegation(int depth)
+        {
+            SmtFormula formula = new SmtBooleanConstant(true);
+            for (var index = 0; index < depth; index++)
+            {
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
+            }
+
+            return formula;
         }
     }
 }

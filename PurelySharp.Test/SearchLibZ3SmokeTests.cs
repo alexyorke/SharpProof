@@ -980,7 +980,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_WordBoundaryRegexSatisfiableResult_IsSatisfiable()
+        public void SmtSolver_WordBoundaryRegexSatisfiableResult_IsUnknown()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -993,7 +993,7 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
         }
 
         [Test]
@@ -1014,7 +1014,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_NonWordBoundaryBetweenWordsIsSatisfiable()
+        public void SmtSolver_NonWordBoundaryBetweenWordsIsUnknown()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -1027,7 +1027,7 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
         }
 
         [Test]
@@ -1282,7 +1282,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_WordBoundaryRegexConclusionDoesNotBecomeProof()
+        public void SmtSolver_WordBoundaryRegexConclusionRemainsUnknown()
         {
             using var solver = new SmtSolver();
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -1297,7 +1297,7 @@ namespace PurelySharp.Test
                 textIsBoundaryA,
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
         }
 
         [Test]
