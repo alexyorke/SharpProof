@@ -14,6 +14,44 @@ namespace PurelySharp.Test
     [TestFixture]
     public class FuzzToolTests
     {
+        private static readonly ImmutableDictionary<string, ShapeRegistryEntry> RegistryEntriesById =
+            FuzzCaseGenerator.RegistryEntries.ToImmutableDictionary(entry => entry.Id, StringComparer.Ordinal);
+
+        private static readonly ImmutableArray<FamilyExpectation> ExpandedCoverageExpectations = ImmutableArray.Create(
+            new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
+            new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
+            new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
+            new FamilyExpectation("ConservativeDeclarationPattern", "DeclarationPattern"),
+            new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
+            new FamilyExpectation("ConservativeConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
+            new FamilyExpectation("ConservativeTuple", "Tuple"),
+            new FamilyExpectation("ConservativeRecursivePattern", "RecursivePattern"),
+            new FamilyExpectation("ConservativeSpreadCollectionExpression", "Spread"),
+            new FamilyExpectation("ConservativeYieldReturn", "YieldReturn"),
+            new FamilyExpectation("ConservativeAnonymousFunction", "AnonymousFunction"),
+            new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
+            new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
+            new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
+            new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
+            new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation"),
+            new FamilyExpectation("ImpureOwnershipEscapeChain", "ObjectCreation", "PropertyReference", "Return"));
+
+        private static readonly ImmutableArray<string> ExceptionCoverageFamilies = ImmutableArray.Create(
+            "ExceptionDirectThrowInvalidOperation",
+            "ExceptionGuardedThrowArgumentNull",
+            "ExceptionThrowExpressionFormatException",
+            "ExceptionDefiniteDivideByZero",
+            "ExceptionDefiniteNullReference",
+            "ExceptionUsingDisposeThrows",
+            "ExceptionInvokedLocalFunctionThrow",
+            "ExceptionInvokedLambdaThrow");
+
+        private static readonly ImmutableArray<(string Family, bool ExpectPs0002, bool ExpectPs0010)> ExceptionNegativeExpectations = ImmutableArray.Create(
+            (Family: "ExceptionCaughtInternalThrow", ExpectPs0002: true, ExpectPs0010: false),
+            (Family: "ExceptionDeadBranchThrow", ExpectPs0002: false, ExpectPs0010: false),
+            (Family: "ExceptionGuardedSafeDivideByZeroExcluded", ExpectPs0002: false, ExpectPs0010: false),
+            (Family: "ExceptionGuardedNullDereferenceExcluded", ExpectPs0002: false, ExpectPs0010: false));
+
         [Test]
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
         {
@@ -187,51 +225,11 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task ExpandedCoverageFamilies_Compile_AndEmitExpectedOperationKinds()
         {
-            var expectedOperationKinds = new[]
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
+
+            foreach (var expectation in ExpandedCoverageExpectations)
             {
-                new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
-                new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
-                new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
-                new FamilyExpectation("ConservativeDeclarationPattern", "DeclarationPattern"),
-                new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
-                new FamilyExpectation("ConservativeConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
-                new FamilyExpectation("ConservativeTuple", "Tuple"),
-                new FamilyExpectation("ConservativeRecursivePattern", "RecursivePattern"),
-                new FamilyExpectation("ConservativeSpreadCollectionExpression", "Spread"),
-                new FamilyExpectation("ConservativeYieldReturn", "YieldReturn"),
-                new FamilyExpectation("ConservativeAnonymousFunction", "AnonymousFunction"),
-                new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
-                new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
-                new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
-                new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
-                new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation"),
-                new FamilyExpectation("ImpureOwnershipEscapeChain", "ObjectCreation", "PropertyReference", "Return")
-            };
-
-            var generator = new FuzzCaseGenerator(20260614);
-            var generatedCasesByFamily = expectedOperationKinds.ToDictionary(
-                expectation => expectation.Family,
-                _ => (FuzzCase?)null,
-                StringComparer.Ordinal);
-
-            for (var index = 0; index < 8000 && generatedCasesByFamily.Values.Any(fuzzCase => fuzzCase is null); index++)
-            {
-                var fuzzCase = generator.Next(index);
-                if (generatedCasesByFamily.ContainsKey(fuzzCase.Family) && generatedCasesByFamily[fuzzCase.Family] is null)
-                {
-                    generatedCasesByFamily[fuzzCase.Family] = fuzzCase;
-                }
-            }
-
-            Assert.That(generatedCasesByFamily.Values.All(fuzzCase => fuzzCase is not null), Is.True);
-
-            foreach (var expectation in expectedOperationKinds)
-            {
-                var fuzzCase = generatedCasesByFamily[expectation.Family];
-                Assert.That(fuzzCase, Is.Not.Null, expectation.Family);
-
-                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase!);
-
+                var analysis = analyses[expectation.Family];
                 Assert.That(analysis.CompilationErrors, Is.Empty, expectation.Family);
                 foreach (var operationKind in expectation.OperationKinds)
                 {
@@ -246,10 +244,7 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task PureOwnershipCoverageFamily_RemainsDiagnosticFree()
         {
-            var generator = new FuzzCaseGenerator(20260614);
-            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "PureNestedOwnershipChain");
-            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
-            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+            var analysis = (await AnalyzeCachedRegistryFamiliesAsync())["PureNestedOwnershipChain"];
 
             Assert.That(analysis.CompilationErrors, Is.Empty);
             Assert.That(analysis.Findings, Is.Empty);
@@ -264,10 +259,7 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task ImpureOwnershipCoverageFamily_EmitsPs0002()
         {
-            var generator = new FuzzCaseGenerator(20260614);
-            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "ImpureOwnershipEscapeChain");
-            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
-            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+            var analysis = (await AnalyzeCachedRegistryFamiliesAsync())["ImpureOwnershipEscapeChain"];
 
             Assert.That(analysis.CompilationErrors, Is.Empty);
             Assert.That(analysis.Findings, Is.Empty);
@@ -279,25 +271,12 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task ExceptionCoverageFamilies_EmitPs0002_And_Ps0010()
         {
-            var families = new[]
-            {
-                "ExceptionDirectThrowInvalidOperation",
-                "ExceptionGuardedThrowArgumentNull",
-                "ExceptionThrowExpressionFormatException",
-                "ExceptionDefiniteDivideByZero",
-                "ExceptionDefiniteNullReference",
-                "ExceptionUsingDisposeThrows",
-                "ExceptionInvokedLocalFunctionThrow",
-                "ExceptionInvokedLambdaThrow"
-            };
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
 
-            var generator = new FuzzCaseGenerator(20260614);
-
-            foreach (var family in families)
+            foreach (var family in ExceptionCoverageFamilies)
             {
-                var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == family);
-                var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
-                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+                var registryEntry = RegistryEntriesById[family];
+                var analysis = analyses[family];
                 var purityDiagnostics = analysis.Diagnostics
                     .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
                     .ToArray();
@@ -352,21 +331,11 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task ExceptionNegativeCoverageFamilies_RespectNoEscapeExpectations()
         {
-            var expectations = new[]
-            {
-                (Family: "ExceptionCaughtInternalThrow", ExpectPs0002: true, ExpectPs0010: false),
-                (Family: "ExceptionDeadBranchThrow", ExpectPs0002: false, ExpectPs0010: false),
-                (Family: "ExceptionGuardedSafeDivideByZeroExcluded", ExpectPs0002: false, ExpectPs0010: false),
-                (Family: "ExceptionGuardedNullDereferenceExcluded", ExpectPs0002: false, ExpectPs0010: false)
-            };
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
 
-            var generator = new FuzzCaseGenerator(20260614);
-
-            foreach (var expectation in expectations)
+            foreach (var expectation in ExceptionNegativeExpectations)
             {
-                var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == expectation.Family);
-                var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
-                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+                var analysis = analyses[expectation.Family];
                 var purityDiagnostics = analysis.Diagnostics
                     .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
                     .ToArray();
@@ -390,10 +359,7 @@ public class KnownImpureConsoleCase
         [Test]
         public async Task ExceptionCoverageFamily_DiagnosticSignatures_PreserveExceptionEdgesProperty_WhenPresent()
         {
-            var generator = new FuzzCaseGenerator(20260614);
-            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "ExceptionInvokedLocalFunctionThrow");
-            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
-            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+            var analysis = (await AnalyzeCachedRegistryFamiliesAsync())["ExceptionInvokedLocalFunctionThrow"];
             var exceptionDiagnostics = analysis.Diagnostics
                 .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId)
                 .ToArray();
@@ -406,7 +372,7 @@ public class KnownImpureConsoleCase
             Assert.That(analysis.CompilationErrors, Is.Empty);
             AssertRequiredProperties(
                 exceptionDiagnostics,
-                fuzzCase.Family,
+                "ExceptionInvokedLocalFunctionThrow",
                 PurelySharpDiagnostics.ExceptionTypesProperty,
                 PurelySharpDiagnostics.ExceptionCategoriesProperty,
                 PurelySharpDiagnostics.ExceptionSourcesProperty);
@@ -535,6 +501,11 @@ public class FuzzExceptionEdgesReportCase
             return propertyNames.All(propertyName =>
                 diagnostic.Properties.TryGetValue(propertyName, out var value) &&
                 !string.IsNullOrWhiteSpace(value));
+        }
+
+        private static Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeCachedRegistryFamiliesAsync()
+        {
+            return ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
         }
 
         private static string CreateOutputDirectory()

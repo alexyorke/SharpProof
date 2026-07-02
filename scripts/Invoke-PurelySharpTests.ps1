@@ -221,6 +221,7 @@ function Resolve-PurelySharpTestProjects
         [string]$RequestedLane,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string]$Filter
     )
 
