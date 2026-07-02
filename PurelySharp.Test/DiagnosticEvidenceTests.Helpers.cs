@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
@@ -309,6 +310,17 @@ public class TestClass
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         }
 
+        private static GeneratedPurityProbeContext CreateGeneratedPurityProbeContext(string source)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CreateGeneratedPurityProbeCompilation(syntaxTree);
+            return new GeneratedPurityProbeContext(
+                syntaxTree,
+                compilation,
+                compilation.GetSemanticModel(syntaxTree),
+                syntaxTree.GetRoot());
+        }
+
         private static object CreateGeneratedPurityCatalog(AnalyzerOptions analyzerOptions)
         {
             return GeneratedPurityCatalogFromOptionsMethod.Invoke(
@@ -345,6 +357,75 @@ public class TestClass
                 GetGeneratedPurityCatalog(analyzerOptions),
                 args)!;
             return new GeneratedPurityResolution(matched, ExtractGeneratedPurityClassification(args[2]));
+        }
+
+        private static GeneratedPurityResolution ResolveGeneratedPurityByExpressionText(
+            GeneratedPurityProbeContext probe,
+            string expressionText,
+            AnalyzerOptions? analyzerOptions = null)
+        {
+            var objectCreations = probe.Root
+                .DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Where(node => node.ToString() == expressionText)
+                .ToArray();
+            if (objectCreations.Length > 0)
+            {
+                var symbol = objectCreations
+                    .Select(node => (IMethodSymbol)probe.SemanticModel.GetSymbolInfo(node).Symbol!)
+                    .Select(static symbol => symbol.OriginalDefinition)
+                    .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
+                    .Single();
+                return ResolveGeneratedPurity(symbol, probe.Compilation, analyzerOptions);
+            }
+
+            var invocations = probe.Root
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node => node.ToString() == expressionText)
+                .ToArray();
+            if (invocations.Length > 0)
+            {
+                var symbol = invocations
+                    .Select(node => (IMethodSymbol)probe.SemanticModel.GetSymbolInfo(node).Symbol!)
+                    .Select(static symbol => symbol.OriginalDefinition)
+                    .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
+                    .Single();
+                return ResolveGeneratedPurity(symbol, probe.Compilation, analyzerOptions);
+            }
+
+            var memberAccesses = probe.Root
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node => node.ToString() == expressionText)
+                .ToArray();
+            if (memberAccesses.Length > 0)
+            {
+                var symbols = memberAccesses
+                    .Select(node => probe.SemanticModel.GetSymbolInfo(node).Symbol)
+                    .Where(static symbol => symbol != null)
+                    .Distinct(SymbolEqualityComparer.Default)
+                    .ToArray();
+                return symbols.Single() switch
+                {
+                    IPropertySymbol { GetMethod: not null } property => ResolveGeneratedPurity(property.GetMethod, probe.Compilation, analyzerOptions),
+                    IFieldSymbol field => ResolveGeneratedPurity(field, probe.Compilation, analyzerOptions),
+                    IMethodSymbol method => ResolveGeneratedPurity(method, probe.Compilation, analyzerOptions),
+                    _ => throw new InvalidOperationException("Unsupported generated purity symbol for expression: " + expressionText),
+                };
+            }
+
+            throw new InvalidOperationException("Could not resolve generated purity expression: " + expressionText);
+        }
+
+        private static GeneratedPurityResolution[] ResolveGeneratedPurityByExpressionTexts(
+            GeneratedPurityProbeContext probe,
+            AnalyzerOptions? analyzerOptions = null,
+            params string[] expressionTexts)
+        {
+            return expressionTexts
+                .Select(expressionText => ResolveGeneratedPurityByExpressionText(probe, expressionText, analyzerOptions))
+                .ToArray();
         }
 
         private static PropertyInfo? FindGeneratedPurityClassificationProperty()
@@ -390,6 +471,12 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences();
 
         private readonly record struct GeneratedPurityResolution(bool Matched, string? Classification);
+
+        private readonly record struct GeneratedPurityProbeContext(
+            SyntaxTree SyntaxTree,
+            Compilation Compilation,
+            SemanticModel SemanticModel,
+            SyntaxNode Root);
 
         private static MetadataOnlyAssemblyFixture CreateMetadataOnlyAssemblyFixture(
             string assemblyName,
