@@ -576,6 +576,11 @@ namespace PurelySharp.Symbolic.Smt
                 return value;
             }
 
+            if (facts.TryClassifyBooleanFromFacts(formula, out value))
+            {
+                return value;
+            }
+
             foreach (var pathConjunct in pathConjuncts)
             {
                 if (pathConjunct.Equals(formula))
@@ -1931,6 +1936,11 @@ namespace PurelySharp.Symbolic.Smt
 
                 value = false;
                 return false;
+            }
+
+            public bool TryClassifyBooleanFromFacts(SmtFormula formula, out bool value)
+            {
+                return TryClassifyBooleanFromFacts(formula, out value, conditionalBranchDepth: 0);
             }
 
             private bool TryEvaluateBooleanEquivalenceComparison(SmtBinaryFormula binary, out bool value)
