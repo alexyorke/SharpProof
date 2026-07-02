@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,6 +16,31 @@ namespace PurelySharp.Test
 {
     public partial class DiagnosticEvidenceTests
     {
+        private static readonly MetadataReference EnforcePureAttributeReference =
+            MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location);
+
+        private static readonly ImmutableArray<MetadataReference> GeneratedPurityProbeReferences =
+            AnalyzerTestHost.GetTrustedPlatformReferences().Add(EnforcePureAttributeReference);
+
+        private static readonly Type GeneratedPurityCatalogType =
+            typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+
+        private static readonly MethodInfo GeneratedPurityCatalogFromOptionsMethod =
+            GeneratedPurityCatalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+
+        private static readonly MethodInfo GeneratedPurityCatalogTryGetPurityMethod =
+            GeneratedPurityCatalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+
+        private static readonly MethodInfo GeneratedPurityCatalogTryGetFieldPurityMethod =
+            GeneratedPurityCatalogType.GetMethod("TryGetFieldPurity", BindingFlags.Public | BindingFlags.Instance)!;
+
+        private static readonly Lazy<object> DefaultGeneratedPurityCatalog = new(
+            () => CreateGeneratedPurityCatalog(CreateGeneratedPurityAnalyzerOptions()),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        private static readonly PropertyInfo? GeneratedPurityClassificationProperty =
+            FindGeneratedPurityClassificationProperty();
+
         private static IEnumerable<TestCaseData> GetThreadingSemanticRuleCases()
         {
             yield return new TestCaseData(
@@ -273,6 +300,68 @@ public class TestClass
             return CreateAnalyzerOptions();
         }
 
+        private static CSharpCompilation CreateGeneratedPurityProbeCompilation(SyntaxTree syntaxTree)
+        {
+            return CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GeneratedPurityProbeReferences,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        }
+
+        private static object CreateGeneratedPurityCatalog(AnalyzerOptions analyzerOptions)
+        {
+            return GeneratedPurityCatalogFromOptionsMethod.Invoke(
+                null,
+                new object[] { analyzerOptions, CancellationToken.None })!;
+        }
+
+        private static object GetGeneratedPurityCatalog(AnalyzerOptions? analyzerOptions = null)
+        {
+            return analyzerOptions is null
+                ? DefaultGeneratedPurityCatalog.Value
+                : CreateGeneratedPurityCatalog(analyzerOptions);
+        }
+
+        private static GeneratedPurityResolution ResolveGeneratedPurity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation,
+            AnalyzerOptions? analyzerOptions = null)
+        {
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)GeneratedPurityCatalogTryGetPurityMethod.Invoke(
+                GetGeneratedPurityCatalog(analyzerOptions),
+                args)!;
+            return new GeneratedPurityResolution(matched, ExtractGeneratedPurityClassification(args[2]));
+        }
+
+        private static GeneratedPurityResolution ResolveGeneratedPurity(
+            IFieldSymbol fieldSymbol,
+            Compilation compilation,
+            AnalyzerOptions? analyzerOptions = null)
+        {
+            var args = new object?[] { fieldSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)GeneratedPurityCatalogTryGetFieldPurityMethod.Invoke(
+                GetGeneratedPurityCatalog(analyzerOptions),
+                args)!;
+            return new GeneratedPurityResolution(matched, ExtractGeneratedPurityClassification(args[2]));
+        }
+
+        private static PropertyInfo? FindGeneratedPurityClassificationProperty()
+        {
+            var purityEntryParameter = GeneratedPurityCatalogTryGetPurityMethod.GetParameters()[2].ParameterType;
+            return purityEntryParameter.IsByRef
+                ? purityEntryParameter.GetElementType()?.GetProperty("Classification")
+                : purityEntryParameter.GetProperty("Classification");
+        }
+
+        private static string? ExtractGeneratedPurityClassification(object? purityEntry)
+        {
+            return purityEntry is null
+                ? null
+                : (string?)GeneratedPurityClassificationProperty?.GetValue(purityEntry);
+        }
+
         private static ImmutableArray<AdditionalText> CreateSyntheticGeneratedPurityAdditionalFiles(
             string assemblyPath,
             params (string FileName, string ActualMethodLookupSymbol, string DisplaySymbol, string Classification, string CategoriesJson)[] entries)
@@ -299,6 +388,8 @@ public class TestClass
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>
             AnalyzerTestHost.GetTrustedPlatformReferences();
+
+        private readonly record struct GeneratedPurityResolution(bool Matched, string? Classification);
 
         private static MetadataOnlyAssemblyFixture CreateMetadataOnlyAssemblyFixture(
             string assemblyName,
