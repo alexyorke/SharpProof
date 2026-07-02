@@ -2223,8 +2223,8 @@ public class TestClass
             Assert.That(result.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(5000));
             Assert.That(result.SmtDiagnostics.MaxPathConditions, Is.EqualTo(192));
             Assert.That(result.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(2048));
-            Assert.That(result.SmtDiagnostics.ExecutedQueryCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(result.SmtDiagnostics.CacheEntryCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(result.SmtDiagnostics.ExecutedQueryCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(result.SmtDiagnostics.CacheEntryCount, Is.GreaterThanOrEqualTo(1));
         }
 
         [Test]

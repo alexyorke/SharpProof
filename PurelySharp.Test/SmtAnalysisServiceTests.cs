@@ -21,6 +21,13 @@ namespace PurelySharp.Test
             Assert.That(options.MethodBudget, Is.EqualTo(TimeSpan.FromMilliseconds(15000)));
             Assert.That(options.MaxPathConditions, Is.EqualTo(512));
             Assert.That(options.MaxExpressionNodes, Is.EqualTo(8192));
+            Assert.That(options.UseSharedResultCache, Is.True);
+        }
+
+        [Test]
+        public void DefaultPreset_EnablesSharedResultCache()
+        {
+            Assert.That(SmtAnalysisOptions.Default.UseSharedResultCache, Is.True);
         }
 
         [Test]

@@ -23,21 +23,24 @@ namespace PurelySharp.Symbolic.Smt
                         TimeSpan.FromMilliseconds(750),
                         TimeSpan.FromMilliseconds(5000),
                         maxPathConditions: 192,
-                        maxExpressionNodes: 2048);
+                        maxExpressionNodes: 2048,
+                        useSharedResultCache: true);
                 case SmtAnalysisMode.Deep:
                     return new SmtAnalysisOptions(
                         SmtAnalysisMode.Deep,
                         TimeSpan.FromMilliseconds(2000),
                         TimeSpan.FromMilliseconds(15000),
                         maxPathConditions: 512,
-                        maxExpressionNodes: 8192);
+                        maxExpressionNodes: 8192,
+                        useSharedResultCache: true);
                 default:
                     return new SmtAnalysisOptions(
                         SmtAnalysisMode.Bounded,
                         TimeSpan.FromMilliseconds(750),
                         TimeSpan.FromMilliseconds(5000),
                         maxPathConditions: 192,
-                        maxExpressionNodes: 2048);
+                        maxExpressionNodes: 2048,
+                        useSharedResultCache: true);
             }
         }
 
