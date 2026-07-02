@@ -62,6 +62,9 @@ param(
     [switch]$Profile,
 
     [Parameter()]
+    [switch]$NoExit,
+
+    [Parameter()]
     [ValidateRange(1, 200)]
     [int]$Top = 30,
 
@@ -83,6 +86,18 @@ $ErrorActionPreference = 'Stop'
 if ($Json -and -not $ListOnly)
 {
     throw '-Json is only supported with -ListOnly because normal mode streams test output.'
+}
+
+function Complete-ImpactedSelector
+{
+    param([int]$Code)
+
+    if ($NoExit)
+    {
+        return
+    }
+
+    exit $Code
 }
 
 function Convert-ToRepoPath
@@ -1085,7 +1100,8 @@ try
             Write-Host 'No changed files detected. No impacted tests to run.'
         }
 
-        exit 0
+        Complete-ImpactedSelector 0
+        return
     }
 
     $testClasses = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
@@ -1305,7 +1321,8 @@ try
     if ($Json)
     {
         $recommendation | ConvertTo-Json -Depth 4
-        exit 0
+        Complete-ImpactedSelector 0
+        return
     }
 
     Write-Host 'Changed files considered:'
@@ -1407,7 +1424,8 @@ try
             Write-Host 'Would run the partial filter because -ForcePartial was set.'
         }
 
-        exit 0
+        Complete-ImpactedSelector 0
+        return
     }
 
     $wrapperPath = Join-Path $PSScriptRoot 'Invoke-PurelySharpTests.ps1'
@@ -1422,27 +1440,31 @@ try
     if ($FailFast) { $wrapperParams.FailFast = $true }
     if ($Workers -gt 0) { $wrapperParams.Workers = $Workers }
     if ($Profile) { $wrapperParams.Profile = $true }
+    if ($testLane -ne 'All') { $wrapperParams.TestLane = $testLane }
 
     if ($requiresFull -and -not $ForcePartial)
     {
         Write-Host ''
         Write-Host 'Running full suite because impact selection is unsafe for these changes.'
         & $wrapperPath @wrapperParams @DotnetTestArgs
-        exit $LASTEXITCODE
+        Complete-ImpactedSelector $LASTEXITCODE
+        return
     }
 
     if ([string]::IsNullOrWhiteSpace($filter))
     {
         Write-Host ''
         Write-Host 'No test-impacting changes detected. Skipping test run.'
-        exit 0
+        Complete-ImpactedSelector 0
+        return
     }
 
     $wrapperParams.Filter = $filter
     Write-Host ''
     Write-Host "Running impacted tests with filter: $filter"
     & $wrapperPath @wrapperParams @DotnetTestArgs
-    exit $LASTEXITCODE
+    Complete-ImpactedSelector $LASTEXITCODE
+    return
 }
 finally
 {

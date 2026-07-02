@@ -11,6 +11,18 @@ namespace PurelySharp.Test
     [TestFixture]
     public sealed class ImpactedTestSelectionScriptTests
     {
+        private static readonly Lazy<ImpactedTestSelectionJsonSession> JsonSession =
+            new(() => ImpactedTestSelectionJsonSession.Start(FindRepositoryRoot()));
+
+        [OneTimeTearDown]
+        public async Task TearDownJsonSessionAsync()
+        {
+            if (JsonSession.IsValueCreated)
+            {
+                await JsonSession.Value.DisposeAsync();
+            }
+        }
+
         [Test]
         public async Task ListOnlyJson_SelectsOwningFixtureForChangedTestFile()
         {
@@ -514,69 +526,7 @@ namespace PurelySharp.Test
 
         private static async Task<JsonDocument> RunImpactedSelectorJsonAsync(int workers, params string[] changedFiles)
         {
-            var repositoryRoot = FindRepositoryRoot();
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = FindPowerShellExecutable(),
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-
-            startInfo.ArgumentList.Add("-NoLogo");
-            startInfo.ArgumentList.Add("-NoProfile");
-            if (OperatingSystem.IsWindows())
-            {
-                startInfo.ArgumentList.Add("-ExecutionPolicy");
-                startInfo.ArgumentList.Add("Bypass");
-            }
-
-            startInfo.ArgumentList.Add("-File");
-            startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Invoke-PurelySharpImpactedTests.ps1"));
-            startInfo.ArgumentList.Add("-ListOnly");
-            startInfo.ArgumentList.Add("-Json");
-            if (workers > 0)
-            {
-                startInfo.ArgumentList.Add("-Workers");
-                startInfo.ArgumentList.Add(workers.ToString());
-            }
-
-            startInfo.ArgumentList.Add("-ChangedFile");
-            foreach (var changedFile in changedFiles)
-            {
-                startInfo.ArgumentList.Add(changedFile);
-            }
-
-            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start impacted test selector.");
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-            try
-            {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
-            }
-            catch (TimeoutException)
-            {
-                process.Kill(entireProcessTree: true);
-                throw;
-            }
-
-            var output = await outputTask;
-            var error = await errorTask;
-            if (process.ExitCode != 0)
-            {
-                throw new AssertionException(string.Join(
-                    Environment.NewLine,
-                    "Impacted test selector failed.",
-                    "Exit code: " + process.ExitCode,
-                    "stdout:",
-                    output,
-                    "stderr:",
-                    error));
-            }
-
-            Assert.That(error, Is.Empty);
-            return JsonDocument.Parse(output);
+            return await JsonSession.Value.InvokeJsonAsync(workers, changedFiles);
         }
 
         private static async Task<string> RunImpactedSelectorTextAsync(bool explain, params string[] changedFiles)
@@ -708,7 +658,7 @@ namespace PurelySharp.Test
             throw new InvalidOperationException("Could not find repository root.");
         }
 
-        private static string FindPowerShellExecutable()
+        internal static string FindPowerShellExecutable()
         {
             var candidates = OperatingSystem.IsWindows()
                 ? new[] { "pwsh.exe", "pwsh", "powershell.exe", "powershell" }
