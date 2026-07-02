@@ -381,14 +381,9 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
-                "ElementAccessInRangeHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var root = syntaxTree.GetRoot();
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessInRangeHost");
             var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
             var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
@@ -474,14 +469,9 @@ public class TestClass
         return values;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
-                "ElementAccessRangeInRangeHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var root = syntaxTree.GetRoot();
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessRangeInRangeHost");
             var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
             var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
@@ -518,14 +508,9 @@ public class TestClass
         return values[2..1];
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
-                "ElementAccessInvalidRangeHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var root = syntaxTree.GetRoot();
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessInvalidRangeHost");
             var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
             Assert.That(
@@ -738,7 +723,7 @@ public class TestClass
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             return (compilation.GetSemanticModel(syntaxTree), syntaxTree.GetRoot());
@@ -2027,7 +2012,7 @@ public class TestClass
             var compilation = CSharpCompilation.Create(
                 "SymbolicProgramPointAnalysisHost",
                 new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var statement = syntaxTree.GetRoot()
@@ -13238,7 +13223,7 @@ public class TestClass
             var compilation = CSharpCompilation.Create(
                 "StatementReachabilityHost",
                 new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var statement = syntaxTree.GetRoot()
@@ -13258,7 +13243,7 @@ public class TestClass
             var compilation = CSharpCompilation.Create(
                 "ProgramPointFactHost",
                 new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var statement = syntaxTree.GetRoot()
@@ -13276,7 +13261,7 @@ public class TestClass
             var compilation = CSharpCompilation.Create(
                 "CompletedLoopFactHost",
                 new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var loopStatement = syntaxTree.GetRoot()
