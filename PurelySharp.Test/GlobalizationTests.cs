@@ -1,11 +1,10 @@
-using Microsoft.CodeAnalysis.Testing;
+using System;
+using System.Linq;
 using NUnit.Framework;
 using System.Globalization;
 using System.Threading.Tasks;
 using PurelySharp.Analyzer;
 using PurelySharp.Attributes;
-using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
-    PurelySharp.Analyzer.PurelySharpAnalyzer>;
 
 #nullable enable
 
@@ -37,7 +36,7 @@ public class TestClass
         return invariant.Name;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -60,7 +59,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -81,7 +80,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -101,7 +100,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -123,7 +122,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -145,7 +144,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -166,7 +165,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -188,7 +187,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -210,7 +209,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -231,7 +230,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -251,7 +250,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -272,7 +271,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -293,7 +292,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -315,7 +314,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -337,7 +336,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -358,7 +357,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -379,7 +378,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -400,7 +399,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -421,7 +420,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -443,7 +442,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -465,7 +464,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -485,7 +484,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -506,7 +505,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -527,7 +526,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -548,7 +547,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -569,7 +568,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -590,7 +589,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -612,7 +611,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -634,7 +633,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -655,7 +654,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -676,7 +675,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -697,7 +696,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -719,7 +718,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -741,7 +740,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -762,7 +761,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -784,7 +783,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -806,7 +805,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -835,7 +834,7 @@ public class TestClass
 
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -855,7 +854,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -875,7 +874,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -896,7 +895,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -916,7 +915,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -936,7 +935,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -956,7 +955,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -976,7 +975,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -996,7 +995,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1016,7 +1015,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1036,7 +1035,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1056,7 +1055,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1076,7 +1075,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1096,7 +1095,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1116,7 +1115,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1136,7 +1135,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1156,7 +1155,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1176,7 +1175,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1196,7 +1195,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1216,7 +1215,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1236,7 +1235,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1256,7 +1255,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1276,7 +1275,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1296,7 +1295,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1316,7 +1315,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1336,7 +1335,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1356,7 +1355,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1376,7 +1375,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1396,7 +1395,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1416,7 +1415,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1436,7 +1435,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1457,7 +1456,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1477,7 +1476,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1497,7 +1496,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1517,7 +1516,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1537,7 +1536,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1557,7 +1556,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1577,7 +1576,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1598,7 +1597,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1618,7 +1617,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1639,7 +1638,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1659,7 +1658,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1680,7 +1679,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1700,7 +1699,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1720,7 +1719,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1765,7 +1764,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1785,7 +1784,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1830,7 +1829,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1850,7 +1849,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1870,7 +1869,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1890,7 +1889,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1910,7 +1909,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1930,7 +1929,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1976,7 +1975,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1996,7 +1995,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2016,7 +2015,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2036,7 +2035,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2056,7 +2055,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2076,7 +2075,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2096,7 +2095,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2116,7 +2115,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2136,7 +2135,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2156,7 +2155,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2176,7 +2175,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2196,7 +2195,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2216,7 +2215,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2236,7 +2235,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2256,7 +2255,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2314,7 +2313,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2334,7 +2333,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2354,7 +2353,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2375,7 +2374,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2395,7 +2394,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2416,7 +2415,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2436,7 +2435,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2456,7 +2455,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2477,7 +2476,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2497,7 +2496,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2517,7 +2516,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2538,7 +2537,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2558,7 +2557,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2578,7 +2577,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2599,7 +2598,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2619,7 +2618,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2639,7 +2638,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2660,7 +2659,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2680,7 +2679,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2701,7 +2700,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2721,7 +2720,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2743,7 +2742,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2766,7 +2765,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2788,7 +2787,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2808,7 +2807,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2829,7 +2828,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2850,7 +2849,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2871,7 +2870,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2893,7 +2892,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2915,7 +2914,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2936,7 +2935,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2957,7 +2956,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2979,7 +2978,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3001,7 +3000,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3021,7 +3020,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3041,7 +3040,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3061,7 +3060,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3081,7 +3080,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3101,7 +3100,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3121,7 +3120,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3141,7 +3140,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3162,7 +3161,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3183,7 +3182,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3205,7 +3204,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3227,7 +3226,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3248,7 +3247,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3268,7 +3267,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3289,7 +3288,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3310,7 +3309,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3331,7 +3330,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3352,7 +3351,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3372,7 +3371,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3393,7 +3392,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3415,7 +3414,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3436,7 +3435,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3456,7 +3455,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3477,7 +3476,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3498,7 +3497,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3519,7 +3518,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3541,7 +3540,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3563,7 +3562,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3583,7 +3582,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3604,7 +3603,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3625,7 +3624,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3646,7 +3645,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3668,7 +3667,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3688,7 +3687,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3709,7 +3708,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3731,7 +3730,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3753,7 +3752,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3775,7 +3774,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3795,7 +3794,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3815,7 +3814,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3835,7 +3834,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3855,7 +3854,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3875,7 +3874,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3896,7 +3895,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3917,7 +3916,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3938,7 +3937,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3960,7 +3959,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -3982,7 +3981,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4003,7 +4002,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4024,7 +4023,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4046,7 +4045,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4068,7 +4067,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4088,7 +4087,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4108,7 +4107,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4128,7 +4127,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4149,7 +4148,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4170,7 +4169,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4192,7 +4191,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4214,7 +4213,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4235,7 +4234,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4255,7 +4254,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4276,7 +4275,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4297,7 +4296,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4319,7 +4318,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4341,7 +4340,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4362,7 +4361,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4382,7 +4381,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4403,7 +4402,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4424,7 +4423,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4445,7 +4444,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4466,7 +4465,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4486,7 +4485,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4507,7 +4506,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4529,7 +4528,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4550,7 +4549,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4572,7 +4571,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4592,7 +4591,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4614,7 +4613,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4634,7 +4633,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4654,7 +4653,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4674,7 +4673,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4694,7 +4693,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4715,7 +4714,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4736,7 +4735,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4757,7 +4756,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4779,7 +4778,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4801,7 +4800,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4821,7 +4820,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4842,7 +4841,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4863,7 +4862,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4884,7 +4883,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4906,7 +4905,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4926,7 +4925,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4947,7 +4946,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
         }
 
         [Test]
@@ -4969,7 +4968,51 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertGlobalizationDiagnosticsAsync(test);
+        }
+
+        private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
+        {
+            var (source, expectedSpanText) = StripPs0002Markup(markedSource);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+
+            if (expectedSpanText == null)
+            {
+                Assert.That(purityDiagnostics, Is.Empty);
+                Assert.That(diagnostics, Is.Empty);
+                return;
+            }
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+
+            var diagnostic = purityDiagnostics[0];
+            var actualSpanText = source.Substring(
+                diagnostic.Location.SourceSpan.Start,
+                diagnostic.Location.SourceSpan.Length);
+            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
+        }
+
+        private static (string Source, string? ExpectedSpanText) StripPs0002Markup(string markedSource)
+        {
+            const string prefix = "{|PS0002:";
+            const string suffix = "|}";
+            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return (markedSource, null);
+            }
+
+            var contentStart = start + prefix.Length;
+            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThanOrEqualTo(0), "Expected PS0002 markup end.");
+
+            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
+            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
+            return (source, expectedSpanText);
         }
     }
 }
