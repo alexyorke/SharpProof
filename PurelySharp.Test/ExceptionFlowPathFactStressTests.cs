@@ -3730,6 +3730,7 @@ public class TestClass
                     .Add("purelysharp_report_exceptions", reportExceptions ? "true" : "false")
                     .Add("purelysharp_checked_exceptions", checkedExceptions ? "true" : "false"),
                 allowUnsafe: false,
+                frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 compilationName: "ExceptionFlowPathFactStressTests");
         }
     }

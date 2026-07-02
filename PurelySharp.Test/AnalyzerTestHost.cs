@@ -36,6 +36,7 @@ namespace PurelySharp.Test
             ImmutableArray<AdditionalText>? additionalFiles = null,
             string? sourcePath = null,
             bool autoEnableEffectSummaryJsonForAdditionalFiles = true,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
             string compilationName = "AnalyzerTestHost")
         {
             return await GetDiagnosticsAsync(
@@ -45,6 +46,7 @@ namespace PurelySharp.Test
                 additionalFiles,
                 sourcePath,
                 autoEnableEffectSummaryJsonForAdditionalFiles,
+                frameworkReferences,
                 additionalMetadataReferences: null,
                 compilationName: compilationName);
         }
@@ -56,14 +58,15 @@ namespace PurelySharp.Test
             ImmutableArray<AdditionalText>? additionalFiles,
             string? sourcePath,
             bool autoEnableEffectSummaryJsonForAdditionalFiles,
-            ImmutableArray<MetadataReference>? additionalMetadataReferences,
-            string compilationName)
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
+            string compilationName = "AnalyzerTestHost")
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
                 new CSharpParseOptions(LanguageVersion.Preview),
                 path: sourcePath ?? string.Empty);
-            var references = GetTrustedPlatformReferences()
+            var references = (frameworkReferences ?? GetTrustedPlatformReferences())
                 .Add(EnforcePureAttributeReference.Value);
             if (additionalMetadataReferences.HasValue)
             {
