@@ -18,6 +18,10 @@ param(
     [string]$Filter = '',
 
     [Parameter()]
+    [ValidateSet('All', 'Main', 'Tooling')]
+    [string]$TestLane = 'All',
+
+    [Parameter()]
     [string]$ResultsDirectory = '',
 
     [Parameter()]
@@ -123,6 +127,7 @@ function Get-PurelySharpTestWorkerProcesses
         if ($process.Name -eq 'testhost.exe' -or
             $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('PurelySharp.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('PurelySharp.ToolingTest', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('VBCSCompiler.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0)
         {
@@ -186,6 +191,7 @@ function Stop-NewPurelySharpTestWorkerProcesses
             [string]::IsNullOrWhiteSpace($commandLine) -or
             $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('PurelySharp.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('PurelySharp.ToolingTest', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('testhost.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('Microsoft.TestPlatform', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
             $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
@@ -205,6 +211,83 @@ function Stop-NewPurelySharpTestWorkerProcesses
         Wait-Process -Id $stoppedProcessIds.ToArray() -Timeout 5 -ErrorAction SilentlyContinue
         Write-Host "Stopped $stoppedCount orphaned test worker process(es)."
     }
+}
+
+function Resolve-PurelySharpTestProjects
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('All', 'Main', 'Tooling')]
+        [string]$RequestedLane,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Filter
+    )
+
+    $mainProject = [ordered]@{
+        Name = 'Main'
+        ProjectPath = 'PurelySharp.Test\PurelySharp.Test.csproj'
+    }
+    $toolingProject = [ordered]@{
+        Name = 'Tooling'
+        ProjectPath = 'PurelySharp.ToolingTest\PurelySharp.ToolingTest.csproj'
+    }
+
+    switch ($RequestedLane)
+    {
+        'Main' { return @($mainProject) }
+        'Tooling' { return @($toolingProject) }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Filter))
+    {
+        return @($mainProject, $toolingProject)
+    }
+
+    $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'CorpusReportTests',
+        'FuzzToolTests',
+        'RoslynConstructCoverageTests',
+        'RoslynShapeManifestCoverageTests'))
+    {
+        [void]$toolingFixtures.Add($fixture)
+    }
+
+    $matchedFixtures = @([regex]::Matches($Filter, 'PurelySharp\.Test\.([A-Za-z_][A-Za-z0-9_]*)') |
+        ForEach-Object { $_.Groups[1].Value } |
+        Sort-Object -Unique)
+
+    if ($matchedFixtures.Count -eq 0)
+    {
+        return @($mainProject, $toolingProject)
+    }
+
+    $hasToolingFixture = $false
+    $hasMainFixture = $false
+    foreach ($fixture in $matchedFixtures)
+    {
+        if ($toolingFixtures.Contains($fixture))
+        {
+            $hasToolingFixture = $true
+        }
+        else
+        {
+            $hasMainFixture = $true
+        }
+    }
+
+    if ($hasToolingFixture -and -not $hasMainFixture)
+    {
+        return @($toolingProject)
+    }
+
+    if ($hasMainFixture -and -not $hasToolingFixture)
+    {
+        return @($mainProject)
+    }
+
+    return @($mainProject, $toolingProject)
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -273,69 +356,87 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
     New-Item -ItemType Directory -Path $effectiveResultsDirectory -Force | Out-Null
 }
 
-$testArgs = New-Object System.Collections.Generic.List[string]
-$testArgs.Add('test')
-$testArgs.Add('PurelySharp.Test\PurelySharp.Test.csproj')
-$testArgs.Add('--configuration')
-$testArgs.Add($Configuration)
-$testArgs.Add('--verbosity')
-$testArgs.Add('minimal')
-$testArgs.Add('/nodeReuse:false')
-$testArgs.Add('-p:UseSharedCompilation=false')
-
-if ($useGeneratedRunSettings)
-{
-    $testArgs.Add('--settings')
-    $testArgs.Add($settingsPath)
-}
-
-if ($NoBuild)
-{
-    $testArgs.Add('--no-build')
-}
-
-if (-not [string]::IsNullOrWhiteSpace($Filter))
-{
-    $testArgs.Add('--filter')
-    $testArgs.Add($Filter)
-}
-
-if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
-{
-    $testArgs.Add('--results-directory')
-    $testArgs.Add($effectiveResultsDirectory)
-}
-
-if ($Profile)
-{
-    $testArgs.Add('--logger')
-    $testArgs.Add('trx;LogFileName=profile.trx')
-}
-
-foreach ($argument in $DotnetTestArgs)
-{
-    $testArgs.Add($argument)
-}
+$selectedProjects = @(Resolve-PurelySharpTestProjects -RequestedLane $TestLane -Filter $Filter)
 
 Push-Location $repoRoot
 $exitCode = 0
 try
 {
-    & (Join-Path $PSScriptRoot 'Invoke-PurelySharpDotnet.ps1') -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @testArgs
-    $exitCode = $LASTEXITCODE
-
-    if ($Profile)
+    $projectCount = $selectedProjects.Count
+    foreach ($project in $selectedProjects)
     {
-        $trxPath = Join-Path $effectiveResultsDirectory 'profile.trx'
-        if (Test-Path -LiteralPath $trxPath)
+        $projectResultsDirectory = $effectiveResultsDirectory
+        if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory) -and $projectCount -gt 1)
         {
-            Write-Host ''
-            Write-Host "Slowest test cases from $trxPath"
-            Write-SlowestTestsFromTrx -TrxPath $trxPath -Top $Top
+            $projectResultsDirectory = Join-Path $effectiveResultsDirectory $project.Name
+            New-Item -ItemType Directory -Path $projectResultsDirectory -Force | Out-Null
         }
-        else
+
+        $testArgs = New-Object System.Collections.Generic.List[string]
+        $testArgs.Add('test')
+        $testArgs.Add([string]$project.ProjectPath)
+        $testArgs.Add('--configuration')
+        $testArgs.Add($Configuration)
+        $testArgs.Add('--verbosity')
+        $testArgs.Add('minimal')
+        $testArgs.Add('/nodeReuse:false')
+        $testArgs.Add('-p:UseSharedCompilation=false')
+
+        if ($useGeneratedRunSettings)
         {
-            Write-Warning "TRX profile was requested, but no profile.trx file was produced in $effectiveResultsDirectory."
+            $testArgs.Add('--settings')
+            $testArgs.Add($settingsPath)
+        }
+
+        if ($NoBuild)
+        {
+            $testArgs.Add('--no-build')
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($Filter))
+        {
+            $testArgs.Add('--filter')
+            $testArgs.Add($Filter)
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($projectResultsDirectory))
+        {
+            $testArgs.Add('--results-directory')
+            $testArgs.Add($projectResultsDirectory)
+        }
+
+        if ($Profile)
+        {
+            $testArgs.Add('--logger')
+            $testArgs.Add('trx;LogFileName=profile.trx')
+        }
+
+        foreach ($argument in $DotnetTestArgs)
+        {
+            $testArgs.Add($argument)
+        }
+
+        & (Join-Path $PSScriptRoot 'Invoke-PurelySharpDotnet.ps1') -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @testArgs
+        $projectExitCode = $LASTEXITCODE
+        if ($projectExitCode -ne 0)
+        {
+            $exitCode = $projectExitCode
+            break
+        }
+
+        if ($Profile)
+        {
+            $trxPath = Join-Path $projectResultsDirectory 'profile.trx'
+            if (Test-Path -LiteralPath $trxPath)
+            {
+                Write-Host ''
+                Write-Host "Slowest test cases from $trxPath ($($project.Name))"
+                Write-SlowestTestsFromTrx -TrxPath $trxPath -Top $Top
+            }
+            else
+            {
+                Write-Warning "TRX profile was requested, but no profile.trx file was produced in $projectResultsDirectory."
+            }
         }
     }
 }

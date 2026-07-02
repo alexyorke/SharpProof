@@ -39,6 +39,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PurelySharp.Fuzz.Core", "To
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PurelySharp.CorpusReport.Core", "Tools\PurelySharp.CorpusReport.Core\PurelySharp.CorpusReport.Core.csproj", "{B64F4757-7E59-42AE-A0CF-5442554A563C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PurelySharp.ToolingTest", "PurelySharp.ToolingTest\PurelySharp.ToolingTest.csproj", "{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -253,6 +255,18 @@ Global
 		{B64F4757-7E59-42AE-A0CF-5442554A563C}.Release|x64.Build.0 = Release|Any CPU
 		{B64F4757-7E59-42AE-A0CF-5442554A563C}.Release|x86.ActiveCfg = Release|Any CPU
 		{B64F4757-7E59-42AE-A0CF-5442554A563C}.Release|x86.Build.0 = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|x64.Build.0 = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Debug|x86.Build.0 = Debug|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|x64.ActiveCfg = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|x64.Build.0 = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|x86.ActiveCfg = Release|Any CPU
+		{CC9ABD5C-647E-4AF4-8998-63EF0A046CD0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

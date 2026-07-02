@@ -30,6 +30,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_SelectsOwningFixtureForChangedToolingTestFile()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.ToolingTest/FuzzToolTests.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("FuzzToolTests"));
+            Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.ToolingTest/FuzzToolTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("FuzzToolTests"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_FallsBackForSharedTestInfrastructure()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(
@@ -349,6 +365,23 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("AnalyzerPackagingTests"));
             Assert.That(command, Does.Contain("-Workers 20"));
             Assert.That(command, Does.Contain("-Filter"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_UsesToolingLaneForFuzzCoreChange()
+        {
+            const string changedFile = "Tools/PurelySharp.Fuzz.Core/Program.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var command = root.GetProperty("suggestedCommand").GetString();
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(fixtures, Does.Contain("FuzzToolTests"));
+            Assert.That(fixtures, Does.Contain("RoslynShapeManifestCoverageTests"));
+            Assert.That(command, Does.Contain("-TestLane Tooling"));
         }
 
         [Test]

@@ -123,8 +123,8 @@ $script:Modules = @(
     [ordered]@{ name = 'Shared'; sourceRoots = @('Shared/'); allowedProjectReferences = @() },
     [ordered]@{ name = 'Packaging'; sourceRoots = @('PurelySharp.Package/'); allowedProjectReferences = @('PurelySharp.CodeFixes') },
     [ordered]@{ name = 'VSIX'; sourceRoots = @('PurelySharp.Vsix/', 'Tools/VsixHarness/'); allowedProjectReferences = @('PurelySharp.CodeFixes', 'PurelySharp.Analyzer', 'PurelySharp.Symbolic') },
-    [ordered]@{ name = 'Tools'; sourceRoots = @('Tools/PurelySharp.CorpusReport/', 'Tools/PurelySharp.EffectSummary/', 'Tools/PurelySharp.Fuzz/', 'Tools/PurelySharp.SymbolicCli/'); allowedProjectReferences = @('PurelySharp.Analyzer', 'PurelySharp.Attributes', 'PurelySharp.Symbolic') },
-    [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('PurelySharp.Test/'); allowedProjectReferences = @('PurelySharp.CodeFixes', 'PurelySharp.Attributes', 'PurelySharp.Analyzer', 'PurelySharp.Symbolic', 'SearchLib', 'PurelySharp.CorpusReport', 'PurelySharp.Fuzz', 'PurelySharp.SymbolicCli') }
+    [ordered]@{ name = 'Tools'; sourceRoots = @('Tools/PurelySharp.CorpusReport.Core/', 'Tools/PurelySharp.CorpusReport/', 'Tools/PurelySharp.EffectSummary/', 'Tools/PurelySharp.Fuzz.Core/', 'Tools/PurelySharp.Fuzz/', 'Tools/PurelySharp.SymbolicCli/'); allowedProjectReferences = @('PurelySharp.Analyzer', 'PurelySharp.Attributes', 'PurelySharp.Symbolic', 'PurelySharp.CorpusReport.Core', 'PurelySharp.Fuzz.Core') },
+    [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('PurelySharp.Test/', 'PurelySharp.ToolingTest/'); allowedProjectReferences = @('PurelySharp.CodeFixes', 'PurelySharp.Attributes', 'PurelySharp.Analyzer', 'PurelySharp.Symbolic', 'SearchLib', 'PurelySharp.CorpusReport.Core', 'PurelySharp.Fuzz.Core', 'PurelySharp.SymbolicCli') }
 )
 $script:IgnoredTypeTokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
 foreach ($token in @('Program', 'Options', 'Builder', 'Factory', 'Helper', 'Helpers', 'Extensions', 'Constants'))
@@ -165,9 +165,19 @@ try
         }
     }
 
-    $testFiles = @(Get-ChildItem -Path (Join-Path $script:RepoRoot 'PurelySharp.Test') -Recurse -Filter '*.cs' |
-        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
-        Sort-Object FullName)
+    $testFiles = @(
+        foreach ($testRoot in @('PurelySharp.Test', 'PurelySharp.ToolingTest'))
+        {
+            $rootPath = Join-Path $script:RepoRoot $testRoot
+            if (-not (Test-Path -LiteralPath $rootPath))
+            {
+                continue
+            }
+
+            Get-ChildItem -Path $rootPath -Recurse -Filter '*.cs' |
+                Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+        }
+    ) | Sort-Object FullName
 
     $testFileEntries = foreach ($testFile in $testFiles)
     {
@@ -198,7 +208,7 @@ try
             $_.FullName -notmatch '[\\/](bin|obj)[\\/]' -and
             (Convert-ToRepoPath $_.FullName) -notmatch '(^|/)\.[^/]+/' -and
             (Convert-ToRepoPath $_.FullName) -notmatch '^PurelySharp\.(Demo|Smoke\.Net472)/' -and
-            (Convert-ToRepoPath $_.FullName) -notmatch '^PurelySharp\.Test/'
+            (Convert-ToRepoPath $_.FullName) -notmatch '^PurelySharp\.(Test|ToolingTest)/'
         } |
         Sort-Object FullName)
 

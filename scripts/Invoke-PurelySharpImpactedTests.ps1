@@ -777,13 +777,13 @@ function Add-PathMappedTests
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic CLI query surface change' $before $Set
             break
         }
-        '^Tools/PurelySharp\.Fuzz/' {
+        '^Tools/PurelySharp\.Fuzz(\.Core)?/' {
             Add-TestClasses $Set @('FuzzToolTests', 'RoslynShapeManifestCoverageTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Fuzz tool change' $before $Set
             break
         }
-        '^Tools/PurelySharp\.CorpusReport/' {
-            Add-TestClasses $Set @('RoslynConstructCoverageTests', 'RoslynShapeManifestCoverageTests')
+        '^Tools/PurelySharp\.CorpusReport(\.Core)?/' {
+            Add-TestClasses $Set @('CorpusReportTests', 'RoslynConstructCoverageTests', 'RoslynShapeManifestCoverageTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Corpus report tool change' $before $Set
             break
         }
@@ -904,6 +904,56 @@ function Join-TestFilter
         ForEach-Object { "FullyQualifiedName~PurelySharp.Test.$_" }) -join '|'
 }
 
+function Get-TestLaneForFixtures
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$ClassNames
+    )
+
+    if ($ClassNames.Count -eq 0)
+    {
+        return 'All'
+    }
+
+    $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'CorpusReportTests',
+        'FuzzToolTests',
+        'RoslynConstructCoverageTests',
+        'RoslynShapeManifestCoverageTests'))
+    {
+        [void]$toolingFixtures.Add($fixture)
+    }
+
+    $hasToolingFixture = $false
+    $hasMainFixture = $false
+    foreach ($className in $ClassNames)
+    {
+        if ($toolingFixtures.Contains($className))
+        {
+            $hasToolingFixture = $true
+        }
+        else
+        {
+            $hasMainFixture = $true
+        }
+    }
+
+    if ($hasToolingFixture -and -not $hasMainFixture)
+    {
+        return 'Tooling'
+    }
+
+    if ($hasMainFixture -and -not $hasToolingFixture)
+    {
+        return 'Main'
+    }
+
+    return 'All'
+}
+
 function Format-TestWrapperCommand
 {
     param(
@@ -912,6 +962,9 @@ function Format-TestWrapperCommand
         [string]$SuggestedAction,
 
         [string]$Filter,
+
+        [ValidateSet('All', 'Main', 'Tooling')]
+        [string]$TestLane,
 
         [string]$Configuration,
 
@@ -939,6 +992,12 @@ function Format-TestWrapperCommand
     $parts.Add('.\scripts\Invoke-PurelySharpTests.ps1')
     $parts.Add('-Configuration')
     $parts.Add($Configuration)
+
+    if ($TestLane -ne 'All')
+    {
+        $parts.Add('-TestLane')
+        $parts.Add($TestLane)
+    }
 
     if ($NoBuild)
     {
@@ -1085,13 +1144,13 @@ try
             continue
         }
 
-        if ($path -match '^PurelySharp\.Test/(Verifiers/|AnalyzerTestHost\.cs|AssemblyInfo\.cs|PurelySharp\.Test\.csproj)')
+        if ($path -match '^PurelySharp\.(Test|ToolingTest)/(Verifiers/|AnalyzerTestHost\.cs|AssemblyInfo\.cs|PurelySharp\.(Test|ToolingTest)\.csproj)')
         {
             Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path changes shared test infrastructure"
             continue
         }
 
-        if ($path -match '^PurelySharp\.Test/.*\.cs$')
+        if ($path -match '^PurelySharp\.(Test|ToolingTest)/.*\.cs$')
         {
             $className = Get-TestClassFromFile $path
             if ($path -match '(Throw|Hazard)')
@@ -1196,6 +1255,7 @@ try
     $filter = if ($classNames.Count -gt 0) { Join-TestFilter $classNames } else { '' }
     $filterTooLong = $filter.Length -gt 7000
     $requiresFull = $fullReasons.Count -gt 0 -or $filterTooLong
+    $testLane = if ($requiresFull) { 'All' } else { Get-TestLaneForFixtures $classNames }
     $suggestedAction = if ($requiresFull -and -not $ForcePartial)
     {
         'RunFullSuite'
@@ -1216,6 +1276,7 @@ try
     $suggestedCommand = Format-TestWrapperCommand `
         -SuggestedAction $suggestedAction `
         -Filter $filter `
+        -TestLane $testLane `
         -Configuration $Configuration `
         -NoBuild ([bool]$NoBuild) `
         -FailFast ([bool]$FailFast) `
@@ -1230,6 +1291,7 @@ try
         ignoredFiles = @($ignoredFiles)
         selectedTestFixtures = @($classNames)
         testFilter = $filter
+        testLane = $testLane
         requiresFullSuite = $requiresFull
         fullSuiteFallbackReasons = @($fullReasons)
         selectionEvidence = @($selectionEvidence.ToArray())

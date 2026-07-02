@@ -83,21 +83,26 @@
                     {
                         "name":  "Tools",
                         "sourceRoots":  [
+                                            "Tools/PurelySharp.CorpusReport.Core/",
                                             "Tools/PurelySharp.CorpusReport/",
                                             "Tools/PurelySharp.EffectSummary/",
+                                            "Tools/PurelySharp.Fuzz.Core/",
                                             "Tools/PurelySharp.Fuzz/",
                                             "Tools/PurelySharp.SymbolicCli/"
                                         ],
                         "allowedProjectReferences":  [
                                                          "PurelySharp.Analyzer",
                                                          "PurelySharp.Attributes",
-                                                         "PurelySharp.Symbolic"
+                                                         "PurelySharp.Symbolic",
+                                                         "PurelySharp.CorpusReport.Core",
+                                                         "PurelySharp.Fuzz.Core"
                                                      ]
                     },
                     {
                         "name":  "TestInfrastructure",
                         "sourceRoots":  [
-                                            "PurelySharp.Test/"
+                                            "PurelySharp.Test/",
+                                            "PurelySharp.ToolingTest/"
                                         ],
                         "allowedProjectReferences":  [
                                                          "PurelySharp.CodeFixes",
@@ -105,8 +110,8 @@
                                                          "PurelySharp.Analyzer",
                                                          "PurelySharp.Symbolic",
                                                          "SearchLib",
-                                                         "PurelySharp.CorpusReport",
-                                                         "PurelySharp.Fuzz",
+                                                         "PurelySharp.CorpusReport.Core",
+                                                         "PurelySharp.Fuzz.Core",
                                                          "PurelySharp.SymbolicCli"
                                                      ]
                     }
@@ -129,7 +134,7 @@
                                 "path":  "PurelySharp.Analyzer/PurelySharpAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  216,
+                                "fixtureCount":  212,
                                 "tokens":  [
                                                "PurelySharpAnalyzer"
                                            ]
@@ -215,11 +220,19 @@
                                                    "PurelySharp.Analyzer",
                                                    "PurelySharp.Attributes",
                                                    "PurelySharp.CodeFixes",
-                                                   "PurelySharp.CorpusReport",
-                                                   "PurelySharp.Fuzz",
                                                    "PurelySharp.Symbolic",
-                                                   "PurelySharp.SymbolicCli",
                                                    "SearchLib"
+                                               ]
+                     },
+                     {
+                         "name":  "PurelySharp.ToolingTest",
+                         "path":  "PurelySharp.ToolingTest/PurelySharp.ToolingTest.csproj",
+                         "module":  "TestInfrastructure",
+                         "projectReferences":  [
+                                                   "PurelySharp.Analyzer",
+                                                   "PurelySharp.Attributes",
+                                                   "PurelySharp.CorpusReport.Core",
+                                                   "PurelySharp.Fuzz.Core"
                                                ]
                      },
                      {
@@ -241,11 +254,19 @@
                                                ]
                      },
                      {
+                         "name":  "PurelySharp.CorpusReport.Core",
+                         "path":  "Tools/PurelySharp.CorpusReport.Core/PurelySharp.CorpusReport.Core.csproj",
+                         "module":  "Tools",
+                         "projectReferences":  [
+
+                                               ]
+                     },
+                     {
                          "name":  "PurelySharp.CorpusReport",
                          "path":  "Tools/PurelySharp.CorpusReport/PurelySharp.CorpusReport.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-
+                                                   "PurelySharp.CorpusReport.Core"
                                                ]
                      },
                      {
@@ -257,12 +278,20 @@
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Fuzz",
-                         "path":  "Tools/PurelySharp.Fuzz/PurelySharp.Fuzz.csproj",
+                         "name":  "PurelySharp.Fuzz.Core",
+                         "path":  "Tools/PurelySharp.Fuzz.Core/PurelySharp.Fuzz.Core.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
                                                    "PurelySharp.Analyzer",
                                                    "PurelySharp.Attributes"
+                                               ]
+                     },
+                     {
+                         "name":  "PurelySharp.Fuzz",
+                         "path":  "Tools/PurelySharp.Fuzz/PurelySharp.Fuzz.csproj",
+                         "module":  "Tools",
+                         "projectReferences":  [
+                                                   "PurelySharp.Fuzz.Core"
                                                ]
                      },
                      {
@@ -477,7 +506,7 @@
                          },
                          {
                              "name":  "CorpusReportTests",
-                             "path":  "PurelySharp.Test/CorpusReportTests.cs"
+                             "path":  "PurelySharp.ToolingTest/CorpusReportTests.cs"
                          },
                          {
                              "name":  "CryptographyTests",
@@ -685,7 +714,7 @@
                          },
                          {
                              "name":  "FuzzToolTests",
-                             "path":  "PurelySharp.Test/FuzzToolTests.cs"
+                             "path":  "PurelySharp.ToolingTest/FuzzToolTests.cs"
                          },
                          {
                              "name":  "GarbageCollectionTests",
@@ -1061,11 +1090,11 @@
                          },
                          {
                              "name":  "RoslynConstructCoverageTests",
-                             "path":  "PurelySharp.Test/RoslynConstructCoverageTests.cs"
+                             "path":  "PurelySharp.ToolingTest/RoslynConstructCoverageTests.cs"
                          },
                          {
                              "name":  "RoslynShapeManifestCoverageTests",
-                             "path":  "PurelySharp.Test/RoslynShapeManifestCoverageTests.cs"
+                             "path":  "PurelySharp.ToolingTest/RoslynShapeManifestCoverageTests.cs"
                          },
                          {
                              "name":  "RuntimeVersioningTests",
@@ -1845,17 +1874,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/LocalFunctionOperationPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "LocalFunctionOperationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "LocalFunctionOperationPurityRule"
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/LockStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2132,17 +2150,6 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/VariableDeclarationGroupPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "VariableDeclarationGroupPurityRule"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "PurelySharp.Analyzer/Engine/Rules/WithOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2307,7 +2314,7 @@
                             "declaredTypes":  [
                                                   "PurelySharpAnalyzer"
                                               ],
-                            "referencingFixtureCount":  216,
+                            "referencingFixtureCount":  212,
                             "referencedTokens":  [
                                                      "PurelySharpAnalyzer"
                                                  ]
@@ -2351,7 +2358,7 @@
                             "declaredTypes":  [
                                                   "EnforcePureAttribute"
                                               ],
-                            "referencingFixtureCount":  27,
+                            "referencingFixtureCount":  23,
                             "referencedTokens":  [
                                                      "EnforcePureAttribute"
                                                  ]
@@ -2491,7 +2498,7 @@
                                                   "SmtAnalysisMode",
                                                   "SmtAnalysisOptions"
                                               ],
-                            "referencingFixtureCount":  16,
+                            "referencingFixtureCount":  15,
                             "referencedTokens":  [
                                                      "SmtAnalysisMode",
                                                      "SmtAnalysisOptions"
@@ -2503,7 +2510,7 @@
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
                                               ],
-                            "referencingFixtureCount":  16,
+                            "referencingFixtureCount":  15,
                             "referencedTokens":  [
                                                      "SmtAnalysisService"
                                                  ]
@@ -2983,7 +2990,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.CorpusReport/CorpusReportModels.cs",
+                            "path":  "Tools/PurelySharp.CorpusReport.Core/CorpusReportModels.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "CorpusReportSummary",
@@ -2997,18 +3004,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.CorpusReport/Program.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "CorpusReportOptions"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
-                            "path":  "Tools/PurelySharp.CorpusReport/SarifCorpusReport.cs",
+                            "path":  "Tools/PurelySharp.CorpusReport.Core/SarifCorpusReport.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SarifCorpusInput",
@@ -3019,6 +3015,17 @@
                             "referencedTokens":  [
                                                      "SarifCorpusInput",
                                                      "SarifCorpusReport"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/PurelySharp.CorpusReport/Program.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "CorpusReportOptions"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -3115,7 +3122,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz/Program.cs",
+                            "path":  "Tools/PurelySharp.Fuzz.Core/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "AnalyzerRunResult",
@@ -3142,7 +3149,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz/RoslynShapeManifest.cs",
+                            "path":  "Tools/PurelySharp.Fuzz.Core/RoslynShapeManifest.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "AnalyzerActionSurfaceDecision",
@@ -3159,7 +3166,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz/ShapeRegistryEntry.cs",
+                            "path":  "Tools/PurelySharp.Fuzz.Core/ShapeRegistryEntry.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "FuzzExpectation",
@@ -3402,17 +3409,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/LocalFunctionOperationPurityRule.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "RoslynConstructCoverageTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "LocalFunctionOperationPurityRule"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -3544,15 +3540,12 @@
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
                                                                  "AttributeResolutionTests",
-                                                                 "BaselineSuppressionTests",
                                                                  "BoundaryAttributeTests",
                                                                  "CachingTests",
                                                                  "CalculatorTests",
                                                                  "CodeDomProviderTests",
                                                                  "CryptographyTests",
                                                                  "DiagnosticEvidenceTests",
-                                                                 "ExceptionFlowPathFactStressTests",
-                                                                 "ExceptionFlowPropagationRegressionTests",
                                                                  "ExceptionSummaryCatalogValidationTests",
                                                                  "FrameworkCommonOperationsTests",
                                                                  "GuardHelpersTests",
@@ -3560,7 +3553,6 @@
                                                                  "PrimaryConstructorTests",
                                                                  "Ps0004ConfigurationTests",
                                                                  "PureAsyncTests",
-                                                                 "PuritySoundnessStressTests",
                                                                  "RecordStructTests",
                                                                  "RecordTests",
                                                                  "RefFieldsAndScopedRefTests",
@@ -3573,7 +3565,7 @@
                                     "tokens":  [
                                                    "EnforcePureAttribute"
                                                ],
-                                    "fixtureCount":  27
+                                    "fixtureCount":  23
                                 },
                                 {
                                     "path":  "PurelySharp.Attributes/PureAttribute.cs",
@@ -3675,7 +3667,6 @@
                                                                  "ArchitectureReductionTests",
                                                                  "ElementAccessSmtTests",
                                                                  "ExpressionAtomSmtTests",
-                                                                 "ExpressionSmtTranslationTests",
                                                                  "ForeachSmtInvariantTests",
                                                                  "LoopExitSmtInvariantTests",
                                                                  "PathFactExpressionReachabilityTests",
@@ -3692,7 +3683,7 @@
                                                    "SmtAnalysisMode",
                                                    "SmtAnalysisOptions"
                                                ],
-                                    "fixtureCount":  16
+                                    "fixtureCount":  15
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
@@ -3702,7 +3693,6 @@
                                                                  "ArchitectureReductionTests",
                                                                  "ElementAccessSmtTests",
                                                                  "ExpressionAtomSmtTests",
-                                                                 "ExpressionSmtTranslationTests",
                                                                  "ForeachSmtInvariantTests",
                                                                  "LoopExitSmtInvariantTests",
                                                                  "PathFactExpressionReachabilityTests",
@@ -3718,7 +3708,7 @@
                                     "tokens":  [
                                                    "SmtAnalysisService"
                                                ],
-                                    "fixtureCount":  16
+                                    "fixtureCount":  15
                                 },
                                 {
                                     "path":  "PurelySharp.Symbolic/SymbolicInvariantService.cs",
@@ -3978,7 +3968,7 @@
                                     "fixtureCount":  8
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.CorpusReport/CorpusReportModels.cs",
+                                    "path":  "Tools/PurelySharp.CorpusReport.Core/CorpusReportModels.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
@@ -3991,7 +3981,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.CorpusReport/SarifCorpusReport.cs",
+                                    "path":  "Tools/PurelySharp.CorpusReport.Core/SarifCorpusReport.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
@@ -4015,7 +4005,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz/Program.cs",
+                                    "path":  "Tools/PurelySharp.Fuzz.Core/Program.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
@@ -4032,7 +4022,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz/RoslynShapeManifest.cs",
+                                    "path":  "Tools/PurelySharp.Fuzz.Core/RoslynShapeManifest.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
@@ -4046,7 +4036,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz/ShapeRegistryEntry.cs",
+                                    "path":  "Tools/PurelySharp.Fuzz.Core/ShapeRegistryEntry.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests"
