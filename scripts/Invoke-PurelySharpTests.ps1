@@ -300,21 +300,29 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $testRunStartedAt = Get-Date
 $initialTestWorkerIds = @(Get-PurelySharpTestWorkerProcesses -RepoRoot $repoRoot | ForEach-Object { [int]$_.ProcessId })
 $settingsPath = ''
-$useGeneratedRunSettings = $Workers -gt 0 -or $FailFast
+$effectiveWorkers = if ($PSBoundParameters.ContainsKey('Workers'))
+{
+    $Workers
+}
+else
+{
+    [Math]::Max(1, [Math]::Min([Environment]::ProcessorCount, 20))
+}
+$useGeneratedRunSettings = $effectiveWorkers -gt 0 -or $FailFast
 if ($useGeneratedRunSettings)
 {
     $settingsPath = Join-Path ([System.IO.Path]::GetTempPath()) ('purelysharp-test-' + [guid]::NewGuid().ToString('N') + '.runsettings')
 
     $runConfigurationLines = New-Object System.Collections.Generic.List[string]
-    if ($Workers -gt 0)
+    if ($effectiveWorkers -gt 0)
     {
-        $runConfigurationLines.Add("    <MaxCpuCount>$Workers</MaxCpuCount>")
+        $runConfigurationLines.Add("    <MaxCpuCount>$effectiveWorkers</MaxCpuCount>")
     }
 
     $nunitLines = New-Object System.Collections.Generic.List[string]
-    if ($Workers -gt 0)
+    if ($effectiveWorkers -gt 0)
     {
-        $nunitLines.Add("    <NumberOfTestWorkers>$Workers</NumberOfTestWorkers>")
+        $nunitLines.Add("    <NumberOfTestWorkers>$effectiveWorkers</NumberOfTestWorkers>")
     }
 
     if ($FailFast)
