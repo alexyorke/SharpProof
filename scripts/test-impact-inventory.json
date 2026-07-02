@@ -134,7 +134,7 @@
                                 "path":  "PurelySharp.Analyzer/PurelySharpAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  212,
+                                "fixtureCount":  208,
                                 "tokens":  [
                                                "PurelySharpAnalyzer"
                                            ]
@@ -143,7 +143,7 @@
                                 "path":  "PurelySharp.Analyzer/PurelySharpDiagnostics.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  97,
+                                "fixtureCount":  99,
                                 "tokens":  [
                                                "PurelySharpDiagnostics"
                                            ]
@@ -219,7 +219,6 @@
                          "projectReferences":  [
                                                    "PurelySharp.Analyzer",
                                                    "PurelySharp.Attributes",
-                                                   "PurelySharp.CodeFixes",
                                                    "PurelySharp.Symbolic",
                                                    "SearchLib"
                                                ]
@@ -231,8 +230,10 @@
                          "projectReferences":  [
                                                    "PurelySharp.Analyzer",
                                                    "PurelySharp.Attributes",
+                                                   "PurelySharp.CodeFixes",
                                                    "PurelySharp.CorpusReport.Core",
-                                                   "PurelySharp.Fuzz.Core"
+                                                   "PurelySharp.Fuzz.Core",
+                                                   "PurelySharp.Symbolic"
                                                ]
                      },
                      {
@@ -1206,11 +1207,11 @@
                          },
                          {
                              "name":  "SymbolicRuntimeHazardQueryTests",
-                             "path":  "PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs"
+                             "path":  "PurelySharp.ToolingTest/SymbolicRuntimeHazardQueryTests.cs"
                          },
                          {
                              "name":  "SymbolicSourceQueryLineTests",
-                             "path":  "PurelySharp.Test/SymbolicSourceQueryLineTests.cs"
+                             "path":  "PurelySharp.ToolingTest/SymbolicSourceQueryLineTests.cs"
                          },
                          {
                              "name":  "ThrowExpressionTests",
@@ -1459,6 +1460,8 @@
                             "path":  "PurelySharp.Analyzer/Engine/ExecutionVisibility.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
+                                                  "ConditionTruthCache",
+                                                  "ConditionTruthCacheKey",
                                                   "ExecutionVisibility"
                                               ],
                             "referencingFixtureCount":  4,
@@ -2314,7 +2317,7 @@
                             "declaredTypes":  [
                                                   "PurelySharpAnalyzer"
                                               ],
-                            "referencingFixtureCount":  212,
+                            "referencingFixtureCount":  208,
                             "referencedTokens":  [
                                                      "PurelySharpAnalyzer"
                                                  ]
@@ -2325,7 +2328,7 @@
                             "declaredTypes":  [
                                                   "PurelySharpDiagnostics"
                                               ],
-                            "referencingFixtureCount":  97,
+                            "referencingFixtureCount":  99,
                             "referencedTokens":  [
                                                      "PurelySharpDiagnostics"
                                                  ]
@@ -3178,7 +3181,8 @@
                             "referencedTokens":  [
                                                      "FuzzExpectation",
                                                      "Ps0002ExpectationKind",
-                                                     "Ps0010ExpectationKind"
+                                                     "Ps0010ExpectationKind",
+                                                     "ShapeRegistryEntry"
                                                  ]
                         },
                         {
@@ -4044,7 +4048,8 @@
                                     "tokens":  [
                                                    "FuzzExpectation",
                                                    "Ps0002ExpectationKind",
-                                                   "Ps0010ExpectationKind"
+                                                   "Ps0010ExpectationKind",
+                                                   "ShapeRegistryEntry"
                                                ],
                                     "fixtureCount":  1
                                 },

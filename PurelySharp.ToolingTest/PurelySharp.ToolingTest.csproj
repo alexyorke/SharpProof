@@ -25,6 +25,7 @@
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj" />
     <ProjectReference Include="..\PurelySharp.CodeFixes\PurelySharp.CodeFixes.csproj" />
+    <ProjectReference Include="..\PurelySharp.Symbolic\PurelySharp.Symbolic.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.CorpusReport.Core\PurelySharp.CorpusReport.Core.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.Fuzz.Core\PurelySharp.Fuzz.Core.csproj" />
   </ItemGroup>

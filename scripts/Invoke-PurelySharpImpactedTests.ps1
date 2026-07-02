@@ -942,7 +942,9 @@ function Get-TestLaneForFixtures
         'ImpactedTestSelectionScriptTests',
         'PurelySharpCodeFixTests',
         'RoslynConstructCoverageTests',
-        'RoslynShapeManifestCoverageTests'))
+        'RoslynShapeManifestCoverageTests',
+        'SymbolicRuntimeHazardQueryTests',
+        'SymbolicSourceQueryLineTests'))
     {
         [void]$toolingFixtures.Add($fixture)
     }
