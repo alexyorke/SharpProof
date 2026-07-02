@@ -1013,11 +1013,8 @@ function Format-TestWrapperCommand
     $parts.Add('-Configuration')
     $parts.Add($Configuration)
 
-    if ($TestLane -ne 'All')
-    {
-        $parts.Add('-TestLane')
-        $parts.Add($TestLane)
-    }
+    $parts.Add('-TestLane')
+    $parts.Add($TestLane)
 
     if ($NoBuild)
     {
@@ -1445,7 +1442,7 @@ try
     if ($FailFast) { $wrapperParams.FailFast = $true }
     if ($Workers -gt 0) { $wrapperParams.Workers = $Workers }
     if ($Profile) { $wrapperParams.Profile = $true }
-    if ($testLane -ne 'All') { $wrapperParams.TestLane = $testLane }
+    $wrapperParams.TestLane = $testLane
 
     if ($requiresFull -and -not $ForcePartial)
     {

@@ -366,6 +366,7 @@ namespace PurelySharp.Test
             using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
             var root = recommendation.RootElement;
             var evidence = GetEvidenceEntry(root, changedFile, "full-suite-fallback");
+            var command = root.GetProperty("suggestedCommand").GetString();
 
             Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
@@ -375,6 +376,7 @@ namespace PurelySharp.Test
             Assert.That(
                 GetStringArray(evidence, "fullSuiteFallbackReasons"),
                 Does.Contain(changedFile + " is high-fanout analyzer core"));
+            Assert.That(command, Does.Contain("-TestLane All"));
         }
 
         [Test]

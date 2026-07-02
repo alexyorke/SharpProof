@@ -25,9 +25,13 @@ jobs:
       - name: Build solution
         run: dotnet build PurelySharp.sln --configuration Release --no-restore
 
-      - name: Test
+      - name: Test main lane
         shell: pwsh
-        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild
+        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Main
+
+      - name: Test tooling lane
+        shell: pwsh
+        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
 
       - name: Build VSIX project
         run: |

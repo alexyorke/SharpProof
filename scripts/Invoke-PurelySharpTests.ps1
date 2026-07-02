@@ -19,7 +19,7 @@ param(
 
     [Parameter()]
     [ValidateSet('All', 'Main', 'Tooling')]
-    [string]$TestLane = 'All',
+    [string]$TestLane = 'Main',
 
     [Parameter()]
     [string]$ResultsDirectory = '',
@@ -370,7 +370,20 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
     New-Item -ItemType Directory -Path $effectiveResultsDirectory -Force | Out-Null
 }
 
-$selectedProjects = @(Resolve-PurelySharpTestProjects -RequestedLane $TestLane -Filter $Filter)
+$requestedLane = if ($PSBoundParameters.ContainsKey('TestLane'))
+{
+    $TestLane
+}
+elseif ([string]::IsNullOrWhiteSpace($Filter))
+{
+    'Main'
+}
+else
+{
+    'All'
+}
+
+$selectedProjects = @(Resolve-PurelySharpTestProjects -RequestedLane $requestedLane -Filter $Filter)
 
 Push-Location $repoRoot
 $exitCode = 0

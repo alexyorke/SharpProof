@@ -348,17 +348,22 @@ expected Windows Job Object:
 ```powershell
 .\scripts\Invoke-PurelySharpDotnet.ps1 build PurelySharp.sln --configuration Release
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
-For red-suite loops, the test wrapper can stop after the first NUnit failure.
-It can also emit a TRX slow-test profile, override worker counts explicitly,
-and bound hung runs:
+The default lane is `Main` so local loops skip the slower tooling and packaging
+fixtures unless you opt into `-TestLane Tooling` or `-TestLane All`. For
+red-suite loops, the test wrapper can stop after the first NUnit failure. It
+can also emit a TRX slow-test profile, override worker counts explicitly, and
+bound hung runs:
 
 ```powershell
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -FailFast
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Profile -Top 30
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Workers 8
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TimeoutSeconds 900
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
 For local iteration, the impacted-test wrapper can derive a VSTest filter from
