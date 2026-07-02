@@ -447,7 +447,7 @@ namespace PurelySharp.Symbolic
         {
             trigger = null!;
             if (candidate.Kind != SymbolicRuntimeHazardKind.DirectThrow ||
-                !TryGetThrowExpression(candidate.Site, out var thrownExpression) ||
+                !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression) ||
                 !TryTranslateNullCondition(thrownExpression, semanticModel, cancellationToken, out var nullTrigger))
             {
                 return false;
@@ -456,22 +456,6 @@ namespace PurelySharp.Symbolic
             trigger = nullTrigger;
             return nullTrigger is SmtBooleanConstant { Value: true } ||
                 SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, nullTrigger, smtAnalysis);
-        }
-
-        private static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)
-        {
-            switch (throwNode)
-            {
-                case ThrowStatementSyntax { Expression: { } statementExpression }:
-                    expression = statementExpression;
-                    return true;
-                case ThrowExpressionSyntax throwExpression:
-                    expression = throwExpression.Expression;
-                    return true;
-                default:
-                    expression = null!;
-                    return false;
-            }
         }
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(

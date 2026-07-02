@@ -334,14 +334,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var expression = throwNode switch
-            {
-                ThrowStatementSyntax { Expression: { } statementExpression } => statementExpression,
-                ThrowExpressionSyntax throwExpression => throwExpression.Expression,
-                _ => null
-            };
-
-            return expression != null &&
+            return SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression) &&
                 IsDefinitelyNullExpression(expression, throwNode, semanticModel, cancellationToken, smtAnalysis);
         }
 

@@ -82,20 +82,29 @@ namespace PurelySharp.Symbolic
                 string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, System.StringComparison.Ordinal);
         }
 
+        internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)
+        {
+            switch (throwNode)
+            {
+                case ThrowStatementSyntax { Expression: { } statementExpression }:
+                    expression = statementExpression;
+                    return true;
+                case ThrowExpressionSyntax throwExpression:
+                    expression = throwExpression.Expression;
+                    return true;
+                default:
+                    expression = null!;
+                    return false;
+            }
+        }
+
         internal static ITypeSymbol? GetThrownExceptionType(
             SyntaxNode throwNode,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             bool stopAtUntypedCatch)
         {
-            ExpressionSyntax? exceptionExpression = throwNode switch
-            {
-                ThrowStatementSyntax statement => statement.Expression,
-                ThrowExpressionSyntax expression => expression.Expression,
-                _ => null
-            };
-
-            if (exceptionExpression == null)
+            if (!TryGetThrowExpression(throwNode, out var exceptionExpression))
             {
                 return GetRethrownExceptionType(throwNode, semanticModel, cancellationToken, stopAtUntypedCatch);
             }

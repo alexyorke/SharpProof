@@ -14416,6 +14416,45 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_RethrowUntypedCatchInsideTypedCatch_ReportsUnknownExceptionType()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        try
+        {
+            try
+            {
+                Dangerous();
+            }
+            catch
+            {
+                throw;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void Dangerous()
+    {
+    }
+}",
+                ReportExceptionsOptions());
+
+            var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("rethrow"));
+        }
+
+        [Test]
         public async Task Ps0010_ConstantIntegerDivideByZero_ReportsDivideByZeroException()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
