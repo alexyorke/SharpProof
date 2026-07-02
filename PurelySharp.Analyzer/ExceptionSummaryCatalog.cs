@@ -37,6 +37,8 @@ namespace PurelySharp.Analyzer
             new ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, string?> RuntimeImplementationAssemblyPathCache =
             new ConcurrentDictionary<string, string?>(StringComparer.Ordinal);
+        private static readonly ConcurrentDictionary<string, string> RuntimeImplementationAssemblyPathByAssemblyNameCache =
+            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
 
         private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
@@ -1139,6 +1141,14 @@ namespace PurelySharp.Analyzer
             }
 
             var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
+            if (!string.IsNullOrWhiteSpace(assemblyName) &&
+                RuntimeImplementationAssemblyPathByAssemblyNameCache.TryGetValue(assemblyName!, out var cachedAssemblyPath) &&
+                File.Exists(cachedAssemblyPath) &&
+                TryResolveMethodIdentityFromPath(methodSymbol, cachedAssemblyPath, out _))
+            {
+                return cachedAssemblyPath;
+            }
+
             if (!string.IsNullOrWhiteSpace(assemblyName))
             {
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -1153,6 +1163,7 @@ namespace PurelySharp.Analyzer
                         File.Exists(location) &&
                         TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
                     {
+                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = location;
                         return location;
                     }
                 }
@@ -1170,6 +1181,11 @@ namespace PurelySharp.Analyzer
 
                 if (TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
                 {
+                    if (!string.IsNullOrWhiteSpace(assemblyName))
+                    {
+                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = location;
+                    }
+
                     return location;
                 }
             }
@@ -1183,6 +1199,11 @@ namespace PurelySharp.Analyzer
 
                 if (TryResolveMethodIdentityFromPath(methodSymbol, trustedPlatformAssemblyPath, out _))
                 {
+                    if (!string.IsNullOrWhiteSpace(assemblyName))
+                    {
+                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = trustedPlatformAssemblyPath;
+                    }
+
                     return trustedPlatformAssemblyPath;
                 }
             }

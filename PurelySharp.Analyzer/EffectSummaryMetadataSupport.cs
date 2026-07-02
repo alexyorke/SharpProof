@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -296,7 +297,15 @@ namespace PurelySharp.Analyzer
 
     internal static class RuntimeMetadataAssemblyLocator
     {
+        private static readonly Lazy<ImmutableArray<string>> TrustedPlatformAssemblyPaths =
+            new Lazy<ImmutableArray<string>>(CreateTrustedPlatformAssemblyPaths, LazyThreadSafetyMode.ExecutionAndPublication);
+
         public static IEnumerable<string> GetTrustedPlatformAssemblyPaths()
+        {
+            return TrustedPlatformAssemblyPaths.Value;
+        }
+
+        private static ImmutableArray<string> CreateTrustedPlatformAssemblyPaths()
         {
             var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
             if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -305,22 +314,25 @@ namespace PurelySharp.Analyzer
                 return trustedPlatformAssembliesValue
                     .Split(Path.PathSeparator)
                     .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
-                    .Distinct(StringComparer.OrdinalIgnoreCase);
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToImmutableArray();
             }
 
             var coreAssemblyLocation = typeof(object).Assembly.Location;
             if (string.IsNullOrWhiteSpace(coreAssemblyLocation))
             {
-                return Array.Empty<string>();
+                return ImmutableArray<string>.Empty;
             }
 
             var runtimeDirectory = Path.GetDirectoryName(coreAssemblyLocation);
             if (string.IsNullOrWhiteSpace(runtimeDirectory) || !Directory.Exists(runtimeDirectory))
             {
-                return Array.Empty<string>();
+                return ImmutableArray<string>.Empty;
             }
 
-            return Directory.EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+            return Directory
+                .EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly)
+                .ToImmutableArray();
         }
     }
 }
