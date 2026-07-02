@@ -5,6 +5,7 @@ using NUnit.Framework;
 
 namespace PurelySharp.Test;
 
+[NonParallelizable]
 public sealed class StringCultureBehaviorTests
 {
     [Test]

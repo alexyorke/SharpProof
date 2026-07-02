@@ -5,6 +5,7 @@ using SearchLib.Purity;
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [NonParallelizable]
     public class SearchLibRoslynLoweringTests
     {
         [Test]

@@ -5,6 +5,7 @@ using SearchLib.Smt;
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [NonParallelizable]
     public class SearchLibPurityProofTests
     {
         [Test]

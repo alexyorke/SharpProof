@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [NonParallelizable]
     public class SearchLibZ3SmokeTests
     {
         [Test]

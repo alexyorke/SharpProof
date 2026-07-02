@@ -7,6 +7,7 @@ using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [NonParallelizable]
     public class SearchLibBackedPurityFlowTests
     {
         [Test]
