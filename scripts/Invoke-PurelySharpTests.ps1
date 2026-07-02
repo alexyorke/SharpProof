@@ -251,6 +251,7 @@ function Resolve-PurelySharpTestProjects
         'EffectSummaryToolTests',
         'ExceptionSummaryCatalogValidationTests',
         'FuzzToolTests',
+        'PurelySharpCodeFixTests',
         'RoslynConstructCoverageTests',
         'RoslynShapeManifestCoverageTests'))
     {

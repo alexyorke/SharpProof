@@ -21,11 +21,6 @@
     <PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeRefactoring.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Analyzer.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.CodeFix.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.CodeRefactoring.Testing.NUnit" Version="1.1.2" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.CodeDom" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
@@ -33,8 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PurelySharp.CodeFixes\PurelySharp.CodeFixes.csproj" />
-    
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj" />
     <ProjectReference Include="..\PurelySharp.Symbolic\PurelySharp.Symbolic.csproj" />
@@ -46,6 +39,9 @@
     <Compile Remove="EffectSummaryToolTests.Helpers.cs" />
     <Compile Remove="ExceptionSummaryCatalogValidationTests.cs" />
     <Compile Remove="ExceptionSummaryCatalogValidationTests.Helpers.cs" />
+    <Compile Remove="PurelySharpCodeFixTests.cs" />
+    <Compile Remove="Verifiers\CSharpCodeFixVerifier`2.cs" />
+    <Compile Remove="Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
   </ItemGroup>
 
 </Project>

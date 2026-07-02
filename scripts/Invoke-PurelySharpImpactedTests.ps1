@@ -938,6 +938,7 @@ function Get-TestLaneForFixtures
         'EffectSummaryToolTests',
         'ExceptionSummaryCatalogValidationTests',
         'FuzzToolTests',
+        'PurelySharpCodeFixTests',
         'RoslynConstructCoverageTests',
         'RoslynShapeManifestCoverageTests'))
     {

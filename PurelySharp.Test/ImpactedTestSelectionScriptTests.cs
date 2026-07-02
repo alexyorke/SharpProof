@@ -422,10 +422,27 @@ namespace PurelySharp.Test
 
             Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
             Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
             Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("CodeFixes"));
             Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
             Assert.That(GetStringArray(evidence, "tokens"), Does.Contain("PurelySharpCodeFixProvider"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_UsesToolingLaneForLinkedCodeFixFixture()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Test/PurelySharpCodeFixTests.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("PurelySharpCodeFixTests"));
+            Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/PurelySharpCodeFixTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("PurelySharpCodeFixTests"));
         }
 
         [Test]
