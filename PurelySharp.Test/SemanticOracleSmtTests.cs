@@ -6756,16 +6756,19 @@ public class TestClass
         return result;
     }
 }";
+            var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
             var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
                 source,
                 "ConditionalExpressionNullResultImpliesSelectedBranchNull.cs",
                 FindLine(source, "return result;"),
                 16,
                 "(!flag || result != null || first == null) && (flag || result != null || second == null)",
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                smtAnalysis,
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -6785,16 +6788,19 @@ public class TestClass
         return text;
     }
 }";
+            var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
             var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
                 source,
                 "ConditionalAccessMemberNullFacts.cs",
                 FindLine(source, "return text;"),
                 16,
                 "text != null || holder == null || holder.Text == null",
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                smtAnalysis,
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(0));
         }
 
         [Test]

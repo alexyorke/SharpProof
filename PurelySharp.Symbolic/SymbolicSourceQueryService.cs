@@ -1236,7 +1236,7 @@ namespace PurelySharp.Symbolic
                 compilation,
                 line,
                 column,
-                smtAnalysis,
+                smtAnalysis: null,
                 cancellationToken);
             return ProveCondition(
                 query.SemanticModel,
@@ -1384,6 +1384,15 @@ namespace PurelySharp.Symbolic
                 smtAnalysis);
             if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
             {
+                if (string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal))
+                {
+                    return new SymbolicConditionProofResult(
+                        conditionText,
+                        SymbolicTruthValue.Unreachable,
+                        trueProof.Reason,
+                        conditionFormula);
+                }
+
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenTrue,
@@ -1397,11 +1406,35 @@ namespace PurelySharp.Symbolic
                 smtAnalysis);
             if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
             {
+                if (string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal))
+                {
+                    return new SymbolicConditionProofResult(
+                        conditionText,
+                        SymbolicTruthValue.Unreachable,
+                        falseProof.Reason,
+                        conditionFormula);
+                }
+
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
                     falseProof.Reason,
                     conditionFormula);
+            }
+
+            if (analysis.Reachability == SymbolicReachability.NotChecked)
+            {
+                var reachabilityProof = SymbolicReachabilityService.ClassifyPathFeasibility(
+                    analysis.PathConditions,
+                    smtAnalysis);
+                if (reachabilityProof.PathFeasibility == Feasibility.Unsatisfiable)
+                {
+                    return new SymbolicConditionProofResult(
+                        conditionText,
+                        SymbolicTruthValue.Unreachable,
+                        reachabilityProof.Reason,
+                        conditionFormula);
+                }
             }
 
             return new SymbolicConditionProofResult(
