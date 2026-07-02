@@ -87,7 +87,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new ReturnStatementPurityRule(),
 				
 				// Misc
-				new LocalFunctionOperationPurityRule(),
 				new WithOperationPurityRule()
 			);
 		}
