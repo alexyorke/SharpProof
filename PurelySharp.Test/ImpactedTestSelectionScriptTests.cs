@@ -74,6 +74,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_UsesToolingLaneForLinkedPackagingFixture()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Test/AnalyzerPackagingTests.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("AnalyzerPackagingTests"));
+            Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/AnalyzerPackagingTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("AnalyzerPackagingTests"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_FallsBackForSharedTestInfrastructure()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(
@@ -443,6 +459,22 @@ namespace PurelySharp.Test
             Assert.That(
                 GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/PurelySharpCodeFixTests.cs", "changed-test-file"), "selectedTestFixtures"),
                 Does.Contain("PurelySharpCodeFixTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_UsesToolingLaneForLinkedImpactedSelectionFixture()
+        {
+            using var recommendation = await RunImpactedSelectorJsonAsync(
+                "PurelySharp.Test/ImpactedTestSelectionScriptTests.cs");
+            var root = recommendation.RootElement;
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("ImpactedTestSelectionScriptTests"));
+            Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/ImpactedTestSelectionScriptTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("ImpactedTestSelectionScriptTests"));
         }
 
         [Test]

@@ -31,12 +31,15 @@
 
   <ItemGroup>
     <Compile Include="..\PurelySharp.Test\AnalyzerTestHost.cs" Link="Imported\AnalyzerTestHost.cs" />
+    <Compile Include="..\PurelySharp.Test\AnalyzerPackagingTests.cs" Link="Imported\AnalyzerPackagingTests.cs" />
     <Compile Include="..\PurelySharp.Test\PurelySharpCodeFixTests.cs" Link="Imported\PurelySharpCodeFixTests.cs" />
     <Compile Include="..\PurelySharp.Test\EffectSummaryToolTests.cs" Link="Imported\EffectSummaryToolTests.cs" />
     <Compile Include="..\PurelySharp.Test\EffectSummaryToolTests.Helpers.cs" Link="Imported\EffectSummaryToolTests.Helpers.cs" />
     <Compile Include="..\PurelySharp.Test\ExceptionSummaryCatalogValidationTests.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.cs" />
     <Compile Include="..\PurelySharp.Test\ExceptionSummaryCatalogValidationTests.Helpers.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.Helpers.cs" />
     <Compile Include="..\PurelySharp.Test\GeneratedPurityTestSupport.cs" Link="Imported\GeneratedPurityTestSupport.cs" />
+    <Compile Include="..\PurelySharp.Test\ImpactedTestSelectionJsonSession.cs" Link="Imported\ImpactedTestSelectionJsonSession.cs" />
+    <Compile Include="..\PurelySharp.Test\ImpactedTestSelectionScriptTests.cs" Link="Imported\ImpactedTestSelectionScriptTests.cs" />
     <Compile Include="..\PurelySharp.Test\Verifiers\CSharpCodeFixVerifier`2.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2.cs" />
     <Compile Include="..\PurelySharp.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
     <Compile Include="..\PurelySharp.Test\Verifiers\CSharpVerifierHelper.cs" Link="Imported\Verifiers\CSharpVerifierHelper.cs" />

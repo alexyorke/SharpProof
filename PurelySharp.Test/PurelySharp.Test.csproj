@@ -39,6 +39,9 @@
     <Compile Remove="EffectSummaryToolTests.Helpers.cs" />
     <Compile Remove="ExceptionSummaryCatalogValidationTests.cs" />
     <Compile Remove="ExceptionSummaryCatalogValidationTests.Helpers.cs" />
+    <Compile Remove="AnalyzerPackagingTests.cs" />
+    <Compile Remove="ImpactedTestSelectionJsonSession.cs" />
+    <Compile Remove="ImpactedTestSelectionScriptTests.cs" />
     <Compile Remove="PurelySharpCodeFixTests.cs" />
     <Compile Remove="Verifiers\CSharpCodeFixVerifier`2.cs" />
     <Compile Remove="Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
