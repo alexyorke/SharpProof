@@ -69,6 +69,10 @@ param(
     [ValidateRange(0, 1048576)]
     [int]$MemoryLimitMb = 0,
 
+    [Parameter()]
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$DotnetTestArgs
 )
@@ -921,7 +925,9 @@ function Format-TestWrapperCommand
 
         [int]$Top,
 
-        [int]$MemoryLimitMb
+        [int]$MemoryLimitMb,
+
+        [int]$TimeoutSeconds
     )
 
     if ($SuggestedAction -eq 'Skip')
@@ -965,6 +971,12 @@ function Format-TestWrapperCommand
     {
         $parts.Add('-MemoryLimitMb')
         $parts.Add([string]$MemoryLimitMb)
+    }
+
+    if ($TimeoutSeconds -gt 0)
+    {
+        $parts.Add('-TimeoutSeconds')
+        $parts.Add([string]$TimeoutSeconds)
     }
 
     if ($SuggestedAction -ne 'RunFullSuite' -and -not [string]::IsNullOrWhiteSpace($Filter))
@@ -1210,7 +1222,8 @@ try
         -Workers $Workers `
         -Profile ([bool]$Profile) `
         -Top $Top `
-        -MemoryLimitMb $MemoryLimitMb
+        -MemoryLimitMb $MemoryLimitMb `
+        -TimeoutSeconds $TimeoutSeconds
 
     $recommendation = [ordered]@{
         changedFiles = @($changedFiles)
@@ -1339,6 +1352,7 @@ try
     $wrapperParams = @{
         Configuration = $Configuration
         MemoryLimitMb = $MemoryLimitMb
+        TimeoutSeconds = $TimeoutSeconds
         Top = $Top
     }
 

@@ -351,12 +351,14 @@ expected Windows Job Object:
 ```
 
 For red-suite loops, the test wrapper can stop after the first NUnit failure.
-It can also emit a TRX slow-test profile and test bounded worker counts:
+It can also emit a TRX slow-test profile, override worker counts explicitly,
+and bound hung runs:
 
 ```powershell
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -FailFast
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Profile -Top 30
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Workers 8
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TimeoutSeconds 900
 ```
 
 For local iteration, the impacted-test wrapper can derive a VSTest filter from
@@ -372,6 +374,7 @@ checked-in generated inventory in `scripts/test-impact-inventory.json`:
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild
 .\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild -ForcePartial
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -TimeoutSeconds 900
 ```
 
 Use `-ChangedFile <path>` with `-ListOnly` to preview the mapping for a
