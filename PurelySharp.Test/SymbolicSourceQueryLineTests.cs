@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
@@ -1957,7 +1956,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -2037,7 +2036,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -2101,7 +2100,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -2169,7 +2168,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -2275,7 +2274,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start-line",
@@ -2339,7 +2338,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -2458,7 +2457,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -2513,7 +2512,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start-line",
@@ -2672,7 +2671,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -2742,7 +2741,7 @@ public class TestClass
             try
             {
                 var firstReturnLine = FindLine(source, "return value + 1;");
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -2830,7 +2829,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -2893,7 +2892,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -2928,7 +2927,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -2973,7 +2972,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3049,7 +3048,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var compactResult = await RunSymbolicCliAsync(
+                var compactResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3073,7 +3072,7 @@ public class TestClass
                 Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
                 Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
 
-                var fullJsonResult = await RunSymbolicCliAsync(
+                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3092,7 +3091,7 @@ public class TestClass
                 Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
                 Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(), Is.EqualTo("direct_throw"));
 
-                var textResult = await RunSymbolicCliAsync(
+                var textResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3139,7 +3138,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var compactResult = await RunSymbolicCliAsync(
+                var compactResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3161,7 +3160,7 @@ public class TestClass
                 Assert.That(compactHazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
                 Assert.That(compactHazard.GetProperty("operationText").GetString(), Does.Contain("/ divisor"));
 
-                var fullJsonResult = await RunSymbolicCliAsync(
+                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3204,7 +3203,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3243,7 +3242,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3284,7 +3283,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3314,7 +3313,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var statusWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                var statusWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3325,7 +3324,7 @@ public class TestClass
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var exceptionTypeWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                var exceptionTypeWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3336,7 +3335,7 @@ public class TestClass
                 Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-exception-type"));
                 Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var categoryWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                var categoryWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3347,7 +3346,7 @@ public class TestClass
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var failOnHazardWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                var failOnHazardWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3357,7 +3356,7 @@ public class TestClass
                 Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--fail-on-hazard"));
                 Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var nonProvenStatusWithoutCandidates = await RunSymbolicCliAsync(
+                var nonProvenStatusWithoutCandidates = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3384,7 +3383,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var jsonAndCompact = await RunSymbolicCliAsync(
+                var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3394,7 +3393,7 @@ public class TestClass
                 Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
 
-                var maxLinesWithoutCompact = await RunSymbolicCliAsync(
+                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3404,7 +3403,7 @@ public class TestClass
                 Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
 
-                var negativeMaxPoints = await RunSymbolicCliAsync(
+                var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3415,7 +3414,7 @@ public class TestClass
                 Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
                 Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
 
-                var lineExpressionsWithoutLineMode = await RunSymbolicCliAsync(
+                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3424,7 +3423,7 @@ public class TestClass
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var postLineWithoutLineMode = await RunSymbolicCliAsync(
+                var postLineWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3433,7 +3432,7 @@ public class TestClass
                 Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(postLineWithoutLineMode.StandardError, Does.Contain("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var maxHazardsWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3506,106 +3505,6 @@ public class TestClass
                 {
                     new SymbolicConditionProofResult(condition, truthValue, "synthetic"),
                 });
-        }
-
-        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSymbolicCliAsync(params string[] arguments)
-        {
-            var repositoryRoot = FindRepositoryRoot();
-            var cliAssemblyPath = FindSymbolicCliAssemblyPath(repositoryRoot);
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            startInfo.ArgumentList.Add(cliAssemblyPath);
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
-            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start symbolic CLI.");
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-            try
-            {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(90));
-            }
-            catch (TimeoutException)
-            {
-                process.Kill(entireProcessTree: true);
-                throw;
-            }
-
-            return (process.ExitCode, await outputTask, await errorTask);
-        }
-
-        private static string FindSymbolicCliAssemblyPath(string repositoryRoot)
-        {
-            var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
-            var configurations = new[]
-            {
-                FindBuildConfiguration(),
-                "Release",
-                "Debug",
-            }
-            .Where(static configuration => !string.IsNullOrWhiteSpace(configuration))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var configuration in configurations)
-            {
-                var candidate = Path.Combine(
-                    repositoryRoot,
-                    "Tools",
-                    "PurelySharp.SymbolicCli",
-                    "bin",
-                    configuration,
-                    targetFramework,
-                    "PurelySharp.SymbolicCli.dll");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-
-            throw new FileNotFoundException(
-                "Could not find built PurelySharp.SymbolicCli.dll. Build PurelySharp.Test first so its test dependency builds the CLI once.",
-                Path.Combine(repositoryRoot, "Tools", "PurelySharp.SymbolicCli"));
-        }
-
-        private static string FindBuildConfiguration()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase))
-                {
-                    return directory.Name;
-                }
-
-                directory = directory.Parent;
-            }
-
-            return "Debug";
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (File.Exists(Path.Combine(directory.FullName, "PurelySharp.sln")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new InvalidOperationException("Could not find repository root.");
         }
 
         private static int FindBlankLine(string source)

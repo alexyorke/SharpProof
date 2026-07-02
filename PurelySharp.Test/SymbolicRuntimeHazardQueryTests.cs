@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -3397,7 +3396,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -3438,7 +3437,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await RunSymbolicCliAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -3531,104 +3530,5 @@ public class TestClass
             return position;
         }
 
-        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSymbolicCliAsync(params string[] arguments)
-        {
-            var repositoryRoot = FindRepositoryRoot();
-            var cliAssemblyPath = FindSymbolicCliAssemblyPath(repositoryRoot);
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            startInfo.ArgumentList.Add(cliAssemblyPath);
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
-            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start symbolic CLI.");
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-            try
-            {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(90));
-            }
-            catch (TimeoutException)
-            {
-                process.Kill(entireProcessTree: true);
-                throw;
-            }
-
-            return (process.ExitCode, await outputTask, await errorTask);
-        }
-
-        private static string FindSymbolicCliAssemblyPath(string repositoryRoot)
-        {
-            var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
-            var configurations = new[]
-            {
-                FindBuildConfiguration(),
-                "Release",
-                "Debug",
-            }
-            .Where(static configuration => !string.IsNullOrWhiteSpace(configuration))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var configuration in configurations)
-            {
-                var candidate = Path.Combine(
-                    repositoryRoot,
-                    "Tools",
-                    "PurelySharp.SymbolicCli",
-                    "bin",
-                    configuration,
-                    targetFramework,
-                    "PurelySharp.SymbolicCli.dll");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-
-            throw new FileNotFoundException(
-                "Could not find built PurelySharp.SymbolicCli.dll. Build PurelySharp.Test first so its test dependency builds the CLI once.",
-                Path.Combine(repositoryRoot, "Tools", "PurelySharp.SymbolicCli"));
-        }
-
-        private static string FindBuildConfiguration()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase))
-                {
-                    return directory.Name;
-                }
-
-                directory = directory.Parent;
-            }
-
-            return "Debug";
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (File.Exists(Path.Combine(directory.FullName, "PurelySharp.sln")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new InvalidOperationException("Could not find repository root.");
-        }
     }
 }

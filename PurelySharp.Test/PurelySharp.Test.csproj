@@ -41,7 +41,6 @@
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.CorpusReport\PurelySharp.CorpusReport.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.Fuzz\PurelySharp.Fuzz.csproj" />
-    <ProjectReference Include="..\Tools\PurelySharp.SymbolicCli\PurelySharp.SymbolicCli.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
