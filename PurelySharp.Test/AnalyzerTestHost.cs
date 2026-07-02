@@ -116,7 +116,7 @@ namespace PurelySharp.Test
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
-                    concurrentAnalysis: false,
+                    concurrentAnalysis: true,
                     logAnalyzerExecutionTime: false,
                     reportSuppressedDiagnostics: false));
 
