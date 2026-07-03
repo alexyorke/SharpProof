@@ -2584,6 +2584,12 @@ namespace PurelySharp.Analyzer.Engine
             if (!addedBranchAssumptions)
             {
                 nextPathConditionsBuilder.Add(edgeFormula);
+                nextPathState = AddSymbolicConditionToState(
+                    nextPathState,
+                    edgeFormula,
+                    expressionSyntax,
+                    "analyzer.branch.edge",
+                    "analyzer.branch.edge");
             }
 
             var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
@@ -4547,19 +4553,31 @@ namespace PurelySharp.Analyzer.Engine
             string provenance,
             string evidenceKey)
         {
-            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                AddSymbolicConditionToState(
+                    currentState.PathState,
+                    formula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey));
+        }
+
+        private static SymbolicState AddSymbolicConditionToState(
+            SymbolicState state,
+            SmtFormula formula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey)
+        {
+            return SymbolicSmtFormulaLowerer.TryLowerCondition(
                     formula,
                     sourceNode,
                     provenance,
                     evidenceKey,
-                    out var condition))
-            {
-                return currentState;
-            }
-
-            return currentState.WithPathConditionsAndState(
-                currentState.PathConditions,
-                currentState.PathState.AddPathCondition(condition));
+                    out var condition)
+                ? state.AddPathCondition(condition)
+                : state;
         }
 
         private delegate bool LowerAssignedSymbolicTerm(

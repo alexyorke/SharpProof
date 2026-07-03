@@ -682,6 +682,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("public SymbolicState PathState { get; }"));
             Assert.That(source, Does.Contain("WithPathConditionsAndState("));
             Assert.That(source, Does.Contain("TryCreateReferenceNullPathState("));
+            Assert.That(source, Does.Contain("\"analyzer.branch.edge\""));
             Assert.That(branchStateIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyBranchIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(branchStateIndex, Is.LessThan(legacyBranchIndex));
