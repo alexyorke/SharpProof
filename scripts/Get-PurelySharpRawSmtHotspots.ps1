@@ -6,7 +6,8 @@ Reports raw SMT migration hotspots.
 This is a read-only migration inventory. Analyzer hotspots are intentionally
 narrower than a generic text search: using SmtAnalysisService or
 SmtAnalysisOptions is not a hotspot. Symbolic public surfaces identify current
-API debt where backend SmtFormula types still leak through the public .NET API.
+API debt where backend SmtFormula types or legacy formula-shaped result
+metadata still leak through the public .NET API.
 #>
 [CmdletBinding()]
 param(
@@ -144,11 +145,67 @@ function Get-SymbolicPublicFormulaSurfaces
     return @($surfaces)
 }
 
+function Get-SymbolicCompatibilitySurfaces
+{
+    $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic') -Recurse -Filter '*.cs' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/' -and
+                $repoPath -notmatch '^PurelySharp\.Symbolic/Ir/'
+        } |
+        Sort-Object FullName
+
+    $patterns = @(
+        [pscustomobject]@{
+            category = 'formula-metadata'
+            regex = '\b(HasSmtFormula|FormulaKind|FormulaText)\b'
+        },
+        [pscustomobject]@{
+            category = 'merged-invariant'
+            regex = '\bMergedInvariant\b'
+        },
+        [pscustomobject]@{
+            category = 'path-conditions'
+            regex = '\bPathConditions\b'
+        }
+    )
+
+    $surfaces = @()
+    foreach ($file in $files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            if ($line.IndexOf('public', [System.StringComparison]::Ordinal) -lt 0)
+            {
+                continue
+            }
+
+            foreach ($pattern in $patterns)
+            {
+                if ($line -match $pattern.regex)
+                {
+                    $surfaces += [pscustomobject]@{
+                        path = Convert-ToRepoPath $file.FullName
+                        line = $lineNumber
+                        category = $pattern.category
+                        text = $line.Trim()
+                    }
+                }
+            }
+        }
+    }
+
+    return @($surfaces)
+}
+
 Push-Location $repoRoot
 try
 {
     $analyzer = Get-AnalyzerHotspots
     $publicFormulaSurfaces = Get-SymbolicPublicFormulaSurfaces
+    $compatibilitySurfaces = Get-SymbolicCompatibilitySurfaces
 
     $report = [ordered]@{
         schemaVersion = 1
@@ -158,6 +215,8 @@ try
         hotspots = @($analyzer.hotspots)
         symbolicPublicFormulaSurfaceCount = $publicFormulaSurfaces.Count
         symbolicPublicFormulaSurfaces = @($publicFormulaSurfaces)
+        symbolicCompatibilitySurfaceCount = $compatibilitySurfaces.Count
+        symbolicCompatibilitySurfaces = @($compatibilitySurfaces)
     }
 
     if ($Json)
@@ -168,9 +227,11 @@ try
 
     "Analyzer raw SMT hotspots: $($report.hotspotCount) files"
     "Symbolic public SmtFormula surfaces: $($report.symbolicPublicFormulaSurfaceCount) lines"
+    "Symbolic formula-shaped compatibility surfaces: $($report.symbolicCompatibilitySurfaceCount) lines"
     ''
     $analyzer.hotspots | Format-Table -AutoSize | Out-String
     $publicFormulaSurfaces | Format-Table -AutoSize | Out-String
+    $compatibilitySurfaces | Format-Table -AutoSize | Out-String
 }
 finally
 {

@@ -390,6 +390,7 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
             Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.GreaterThan(0));
         }
 
         [Test]
@@ -411,6 +412,36 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New public symbolic API surfaces must expose fact/proof DTOs instead of SmtFormula.");
+        }
+
+        [Test]
+        public async Task SymbolicCompatibilitySurface_IsLimitedToApprovedMigrationFiles()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            using var document = await RunPowerShellJsonScriptAsync(
+                repositoryRoot,
+                "Get-PurelySharpRawSmtHotspots.ps1");
+            var root = document.RootElement;
+            var surfaces = root.GetProperty("symbolicCompatibilitySurfaces")
+                .EnumerateArray()
+                .ToArray();
+            var unexpectedPaths = surfaces
+                .Select(static surface => surface.GetProperty("path").GetString() ?? string.Empty)
+                .Distinct(StringComparer.Ordinal)
+                .Where(path => !ApprovedSymbolicCompatibilitySurfaceFiles.Contains(path, StringComparer.Ordinal))
+                .ToArray();
+            var categories = surfaces
+                .Select(static surface => surface.GetProperty("category").GetString() ?? string.Empty)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(
+                unexpectedPaths,
+                Is.Empty,
+                "New formula-shaped compatibility surfaces must expose SymbolicFactInfo, SymbolicInvariantInfo, or SymbolicProofInfo instead.");
+            Assert.That(categories, Does.Contain("formula-metadata"));
+            Assert.That(categories, Does.Contain("merged-invariant"));
+            Assert.That(categories, Does.Contain("path-conditions"));
         }
 
         [Test]
@@ -739,6 +770,16 @@ namespace PurelySharp.Test
             "PurelySharp.Symbolic/SymbolicProofService.cs",
             "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
             "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+            "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+        };
+
+        private static readonly string[] ApprovedSymbolicCompatibilitySurfaceFiles =
+        {
+            "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
+            "PurelySharp.Symbolic/SymbolicInvariantService.cs",
+            "PurelySharp.Symbolic/SymbolicProofService.cs",
+            "PurelySharp.Symbolic/SymbolicQueryApi.cs",
+            "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs",
             "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
         };
 
