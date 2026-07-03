@@ -456,7 +456,8 @@ namespace PurelySharp.Symbolic
                 span.EndLine,
                 span.EndColumn,
                 SymbolicProgramPointMetadata.GetContainingMethodName(node),
-                SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()));
+                SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()),
+                symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState));
         }
 
         private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(

@@ -656,7 +656,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
                 SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
+                symbolicFacts: SymbolicFactInfo.FromState(query.Analysis.PathState));
         }
 
         public SymbolicLineQueryResult QuerySyntaxTreeLine(
@@ -731,7 +732,8 @@ namespace PurelySharp.Symbolic
                         nodeSourceSpan.EndLine,
                         nodeSourceSpan.EndColumn,
                         SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
+                        symbolicFacts: SymbolicFactInfo.FromState(query.Analysis.PathState));
                 })
                 .ToArray();
 
@@ -831,7 +833,8 @@ namespace PurelySharp.Symbolic
                 column,
                 position,
                 requestedPositionDistance,
-                ContainsProgramPointPosition(node, position));
+                ContainsProgramPointPosition(node, position),
+                symbolicFacts: SymbolicFactInfo.FromState(query.Analysis.PathState));
         }
 
         public SymbolicSpanQueryResult QuerySyntaxTreeSpan(
@@ -906,7 +909,8 @@ namespace PurelySharp.Symbolic
                         nodeSourceSpan.EndLine,
                         nodeSourceSpan.EndColumn,
                         SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+                        SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
+                        symbolicFacts: SymbolicFactInfo.FromState(query.Analysis.PathState));
                 })
                 .ToArray();
             var startLineColumn = SymbolicSourceLocation.GetLineAndColumn(
@@ -1067,7 +1071,8 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
                 SymbolicProgramPointMetadata.GetContainingMethodName(query.Node),
-                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+                SymbolicProgramPointMetadata.GetProgramPointKind(query.Node),
+                symbolicFacts: SymbolicFactInfo.FromState(query.Analysis.PathState));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -6998,7 +7003,8 @@ namespace PurelySharp.Symbolic
             int? requestedColumn = null,
             int? requestedPosition = null,
             int? requestedPositionDistance = null,
-            bool? containsRequestedPosition = null)
+            bool? containsRequestedPosition = null,
+            IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null)
         {
             FilePath = filePath;
             Line = line;
@@ -7020,6 +7026,7 @@ namespace PurelySharp.Symbolic
             MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
             ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             Facts = facts ?? Array.Empty<string>();
+            SymbolicFacts = symbolicFacts ?? Array.Empty<SymbolicFactInfo>();
             MergedInvariantText = mergedInvariantText ??
                 (pathConditions == null
                     ? FormatMergedInvariantText(Facts)
@@ -7077,6 +7084,8 @@ namespace PurelySharp.Symbolic
         public string ProgramPointKind { get; }
 
         public IReadOnlyList<string> Facts { get; }
+
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
 
         public string MergedInvariantText { get; }
 
@@ -7393,6 +7402,8 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions;
 
         public IReadOnlyList<string> Facts => Analysis.Facts;
+
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts => SymbolicFactInfo.FromState(Analysis.PathState);
 
         public SmtFormula MergedInvariant => Analysis.MergedInvariant;
 

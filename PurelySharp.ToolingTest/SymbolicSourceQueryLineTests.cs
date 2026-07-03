@@ -79,6 +79,10 @@ public class TestClass
                 SymbolicQueryTarget.Node()));
             Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
             Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(nodeResult.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
+            Assert.That(
+                nodeResult.ProgramPoints.Single().SymbolicFacts.Select(static fact => fact.Kind),
+                Has.Some.EqualTo("SymbolicRelationAtom"));
 
             var sourcePath = Path.Combine(Path.GetTempPath(), "PurelySharp.SymbolicQueryApi." + Guid.NewGuid().ToString("N") + ".cs");
             try
@@ -207,6 +211,10 @@ public class TestClass
             Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
             Assert.That(returnPoint.PathConditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
             Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.PathConditions.Count));
+            Assert.That(returnPoint.SymbolicFacts, Is.Not.Empty);
+            Assert.That(returnPoint.SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
+            Assert.That(returnPoint.SymbolicFacts.Single().Text, Does.Contain("GreaterThan"));
+            Assert.That(returnPoint.SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
             Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
             Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
             Assert.That(returnPoint.PathConditions.All(condition => condition.HasSmtFormula), Is.True);

@@ -154,6 +154,44 @@ namespace PurelySharp.Symbolic
                 fact.EvidenceKey);
         }
 
+        internal static IReadOnlyList<SymbolicFactInfo> FromState(SymbolicState state)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            var facts = new List<SymbolicFactInfo>(state.Facts.Length + state.PathConditions.Length);
+            foreach (var fact in state.Facts)
+            {
+                facts.Add(FromFact(fact));
+            }
+
+            foreach (var condition in state.PathConditions)
+            {
+                AddConditionFacts(facts, condition);
+            }
+
+            return facts;
+        }
+
+        private static void AddConditionFacts(ICollection<SymbolicFactInfo> facts, SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    facts.Add(FromFact(factCondition.Fact));
+                    break;
+                case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
+                    facts.Add(FromFact(factCondition.Fact.Negate()));
+                    break;
+                case SymbolicBinaryCondition binaryCondition:
+                    AddConditionFacts(facts, binaryCondition.Left);
+                    AddConditionFacts(facts, binaryCondition.Right);
+                    break;
+            }
+        }
+
         private static string FormatFactText(SymbolicFact fact)
         {
             var text = fact.Atom.ToString() ?? string.Empty;
