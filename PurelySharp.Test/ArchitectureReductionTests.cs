@@ -387,7 +387,7 @@ namespace PurelySharp.Test
 
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
             Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
-            Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.EqualTo(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
             Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(0));
             Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(0));
@@ -922,12 +922,7 @@ namespace PurelySharp.Test
             return JsonDocument.Parse(output);
         }
 
-        private static readonly string[] ApprovedAnalyzerRawSmtHotspots =
-        {
-            "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
-            "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
-            "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
-        };
+        private static readonly string[] ApprovedAnalyzerRawSmtHotspots = Array.Empty<string>();
 
         private static readonly string[] ApprovedSymbolicPublicFormulaSurfaceFiles = Array.Empty<string>();
 

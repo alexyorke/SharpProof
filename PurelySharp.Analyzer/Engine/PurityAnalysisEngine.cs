@@ -2508,7 +2508,7 @@ namespace PurelySharp.Analyzer.Engine
             {
                 branchFormula = operationFormula;
             }
-            else if (CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula, currentState.GetSmtSymbolVersion) &&
+            else if (CSharpSmtFormulaTranslator.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula, currentState.GetSmtSymbolVersion) &&
                      syntaxFormula != null)
             {
                 branchFormula = syntaxFormula;
@@ -4253,7 +4253,7 @@ namespace PurelySharp.Analyzer.Engine
 
             var nextState = currentState;
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) &&
-                CSharpConditionToFormula.TryTranslateValue(
+                CSharpSmtFormulaTranslator.TryTranslateValue(
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
@@ -4329,7 +4329,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula) &&
-                CSharpConditionToFormula.TryTranslateStringValue(
+                CSharpSmtFormulaTranslator.TryTranslateStringValue(
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
@@ -4351,7 +4351,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (targetFormula is { Kind: SmtValueKind.Reference } &&
-                CSharpConditionToFormula.TryCreateAsExpressionAssignmentFacts(
+                CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
                     valueExpression,
                     targetFormula,
                     semanticModel,
@@ -4388,7 +4388,7 @@ namespace PurelySharp.Analyzer.Engine
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
                 SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
-                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
@@ -4601,7 +4601,7 @@ namespace PurelySharp.Analyzer.Engine
                     semanticModel,
                     CancellationToken.None,
                     (expression, model, token) =>
-                        CSharpConditionToFormula.TryTranslateStringValue(
+                        CSharpSmtFormulaTranslator.TryTranslateStringValue(
                             expression,
                             model,
                             token,
@@ -4664,7 +4664,7 @@ namespace PurelySharp.Analyzer.Engine
             Func<ISymbol, int> getSymbolVersion,
             out SmtFormula formula)
         {
-            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                 valueExpression,
                 semanticModel,
                 cancellationToken,

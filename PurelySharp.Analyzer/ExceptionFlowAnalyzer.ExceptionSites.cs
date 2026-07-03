@@ -458,7 +458,7 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateNullableHasValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(
                     memberAccess.Expression,
                     semanticModel,
                     cancellationToken,
@@ -477,9 +477,9 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (!TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken, out var smtOperator, out var minValue, out var maxValue) ||
-                !CSharpConditionToFormula.TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftFormula, getSymbolVersion: null) ||
+                !CSharpSmtFormulaTranslator.TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftFormula, getSymbolVersion: null) ||
                 leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpConditionToFormula.TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightFormula, getSymbolVersion: null) ||
+                !CSharpSmtFormulaTranslator.TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightFormula, getSymbolVersion: null) ||
                 rightFormula is not { Kind: SmtValueKind.Int })
             {
                 return false;
@@ -501,7 +501,7 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) &&
-                CSharpConditionToFormula.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) &&
+                CSharpSmtFormulaTranslator.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) &&
                 operandFormula is { Kind: SmtValueKind.Int })
             {
                 var resultFormula = SmtFormulaFactory.CreateIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
@@ -550,7 +550,7 @@ namespace PurelySharp.Analyzer
                     out var smtOperator,
                     out var minValue,
                     out var maxValue) ||
-                !CSharpConditionToFormula.TryTranslateValue(operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
+                !CSharpSmtFormulaTranslator.TryTranslateValue(operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
                 operandFormula is not { Kind: SmtValueKind.Int })
             {
                 return false;
@@ -575,7 +575,7 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (!TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
-                !CSharpConditionToFormula.TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
+                !CSharpSmtFormulaTranslator.TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
                 operandFormula is not { Kind: SmtValueKind.Int })
             {
                 return false;
@@ -907,7 +907,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1099,7 +1099,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1126,7 +1126,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1245,7 +1245,7 @@ namespace PurelySharp.Analyzer
                     out var receiverExpression,
                     out var startExpression,
                     out var lengthExpression) ||
-                !CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                !CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                     receiverExpression,
                     semanticModel,
                     cancellationToken,
@@ -1263,7 +1263,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            inRangeFormula = CSharpConditionToFormula.CreateSubsequenceInRangeFormula(
+            inRangeFormula = CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula(
                 receiverLengthFormula,
                 startFormula,
                 sliceLengthFormula,
@@ -1356,7 +1356,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,

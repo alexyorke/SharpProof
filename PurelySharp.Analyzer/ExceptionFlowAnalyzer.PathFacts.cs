@@ -1330,7 +1330,7 @@ namespace PurelySharp.Analyzer
             foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolMutatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
-                    !CSharpConditionToFormula.TryTranslateValue(
+                    !CSharpSmtFormulaTranslator.TryTranslateValue(
                         sizeExpression,
                         semanticModel,
                         cancellationToken,
@@ -1444,7 +1444,7 @@ namespace PurelySharp.Analyzer
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpConditionToFormula.TryTranslateValue(
+                CSharpSmtFormulaTranslator.TryTranslateValue(
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1492,7 +1492,7 @@ namespace PurelySharp.Analyzer
 
             if (TryCreateStringContentFormula(targetSymbol, out var targetStringFormula) &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpConditionToFormula.TryTranslateStringValue(
+                CSharpSmtFormulaTranslator.TryTranslateStringValue(
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1513,7 +1513,7 @@ namespace PurelySharp.Analyzer
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
                 SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1564,7 +1564,7 @@ namespace PurelySharp.Analyzer
                 return;
             }
 
-            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
+            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1613,7 +1613,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1701,7 +1701,7 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 (expression, dimension, model, token) =>
-                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
                         expression,
                         dimension,
                         model,
@@ -1730,7 +1730,7 @@ namespace PurelySharp.Analyzer
                     semanticModel,
                     cancellationToken,
                     (expression, model, token) =>
-                        CSharpConditionToFormula.TryTranslateStringValue(
+                        CSharpSmtFormulaTranslator.TryTranslateStringValue(
                             expression,
                             model,
                             token,
@@ -1776,7 +1776,7 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 (expression, dimension, model, token) =>
-                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
                         expression,
                         dimension,
                         model,
@@ -1856,7 +1856,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -1954,7 +1954,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                 valueExpression,
                 semanticModel,
                 cancellationToken,
@@ -2060,7 +2060,7 @@ namespace PurelySharp.Analyzer
         {
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     assignment.Right,
                     semanticModel,
                     cancellationToken,
@@ -2330,7 +2330,7 @@ namespace PurelySharp.Analyzer
             out SmtFormula? factFormula)
         {
             factFormula = null;
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
