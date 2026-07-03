@@ -317,7 +317,9 @@ namespace PurelySharp.Test
                 "AssignmentPurityRule.cs"));
 
             Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForLocal("));
+            Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForTerm("));
             Assert.That(engineSource, Does.Contain("SymbolicBorrowAtom borrow"));
+            Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(localTerm, currentState)"));
             Assert.That(assignmentSource, Does.Contain("HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable)"));
         }
 

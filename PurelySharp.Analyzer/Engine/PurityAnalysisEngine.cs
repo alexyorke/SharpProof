@@ -5098,6 +5098,24 @@ namespace PurelySharp.Analyzer.Engine
             SymbolicBorrowKind? borrowKind = null)
         {
             var localTerm = CreateSymbolicReferenceTerm(localSymbol, currentState);
+            return HasSymbolicBorrowFactForTerm(
+                localTerm,
+                currentState,
+                borrowKind,
+                new HashSet<SymbolicTerm>());
+        }
+
+        private static bool HasSymbolicBorrowFactForTerm(
+            SymbolicTerm localTerm,
+            PurityAnalysisState currentState,
+            SymbolicBorrowKind? borrowKind,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (!visitedTerms.Add(localTerm))
+            {
+                return false;
+            }
+
             foreach (var fact in currentState.PathState.Facts)
             {
                 if (!fact.Polarity ||
@@ -5109,8 +5127,12 @@ namespace PurelySharp.Analyzer.Engine
                     continue;
                 }
 
-                if (fact.Symbol == null ||
-                    SymbolEqualityComparer.Default.Equals(fact.Symbol, localSymbol))
+                return true;
+            }
+
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(localTerm, currentState))
+            {
+                if (HasSymbolicBorrowFactForTerm(aliasTerm, currentState, borrowKind, visitedTerms))
                 {
                     return true;
                 }
