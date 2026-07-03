@@ -4312,12 +4312,15 @@ namespace PurelySharp.Analyzer.Engine
             {
                 var assignedFact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
-                nextState = AddAssignedValueSymbolicFact(
+                nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
                     targetFormula,
                     valueExpression,
                     valueState,
-                    semanticModel);
+                    semanticModel,
+                    SymbolicIrLowerer.TryLowerTerm,
+                    "analyzer.assignment",
+                    "analyzer.assignment.value");
             }
 
             if (TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
@@ -4330,6 +4333,15 @@ namespace PurelySharp.Analyzer.Engine
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
+                nextState = AddAssignedSymbolicEqualityFact(
+                    nextState,
+                    targetLengthFormula,
+                    valueExpression,
+                    valueState,
+                    semanticModel,
+                    TryLowerAssignedLengthTerm,
+                    "analyzer.assignment.length",
+                    "analyzer.assignment.length");
             }
 
             if (TryCreateReferenceBackedLengthFact(
@@ -4363,6 +4375,15 @@ namespace PurelySharp.Analyzer.Engine
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
+                nextState = AddAssignedSymbolicEqualityFact(
+                    nextState,
+                    targetStringFormula,
+                    valueExpression,
+                    valueState,
+                    semanticModel,
+                    SymbolicIrLowerer.TryLowerStringTerm,
+                    "analyzer.assignment.string",
+                    "analyzer.assignment.string");
             }
 
             if (targetFormula is { Kind: SmtValueKind.Reference } &&
@@ -4410,15 +4431,18 @@ namespace PurelySharp.Analyzer.Engine
             return nextState;
         }
 
-        private static PurityAnalysisState AddAssignedValueSymbolicFact(
+        private static PurityAnalysisState AddAssignedSymbolicEqualityFact(
             PurityAnalysisState currentState,
             SmtFormula targetFormula,
             ExpressionSyntax valueExpression,
             PurityAnalysisState valueState,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            LowerAssignedSymbolicTerm lowerValueTerm,
+            string provenance,
+            string evidenceKey)
         {
             if (!TryCreateSymbolicTerm(targetFormula, out var targetTerm) ||
-                !SymbolicIrLowerer.TryLowerTerm(
+                !lowerValueTerm(
                     valueExpression,
                     new SymbolicLoweringContext(
                         semanticModel,
@@ -4436,11 +4460,35 @@ namespace PurelySharp.Analyzer.Engine
                     targetTerm,
                     valueTerm),
                 valueExpression,
-                "analyzer.assignment",
-                evidenceKey: "analyzer.assignment.value");
+                provenance,
+                evidenceKey: evidenceKey);
             return currentState.WithPathConditionsAndState(
                 currentState.PathConditions,
                 currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
+        }
+
+        private delegate bool LowerAssignedSymbolicTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term);
+
+        private static bool TryLowerAssignedLengthTerm(
+            ExpressionSyntax valueExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm))
+            {
+                if (valueTerm.Kind == SmtValueKind.String ||
+                    valueTerm.Kind == SmtValueKind.Reference)
+                {
+                    term = new SymbolicLengthTerm(valueTerm);
+                    return true;
+                }
+            }
+
+            term = null!;
+            return false;
         }
 
         private static bool TryCreateSymbolicTerm(SmtFormula formula, out SymbolicTerm term)

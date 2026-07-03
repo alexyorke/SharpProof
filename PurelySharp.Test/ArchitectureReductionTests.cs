@@ -737,13 +737,17 @@ namespace PurelySharp.Test
                 "Engine",
                 "PurityAnalysisEngine.cs"));
             var rawFactIndex = source.IndexOf("CreateAssignedValueFact(targetFormula, valueFormula)", StringComparison.Ordinal);
-            var symbolicFactIndex = source.IndexOf("AddAssignedValueSymbolicFact(", StringComparison.Ordinal);
+            var symbolicFactIndex = source.IndexOf("AddAssignedSymbolicEqualityFact(", StringComparison.Ordinal);
 
             Assert.That(rawFactIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(symbolicFactIndex, Is.GreaterThan(rawFactIndex));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerTerm("));
+            Assert.That(source, Does.Contain("TryLowerAssignedLengthTerm"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerStringTerm"));
             Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
             Assert.That(source, Does.Contain("\"analyzer.assignment.value\""));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.length\""));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.string\""));
         }
 
         [Test]
