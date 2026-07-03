@@ -57,6 +57,40 @@ namespace PurelySharp.Symbolic.Ir
         DirectThrow,
     }
 
+    internal enum SymbolicBorrowKind
+    {
+        Shared,
+        Mutable,
+    }
+
+    internal enum SymbolicEscapeKind
+    {
+        Unknown,
+        Return,
+        Argument,
+        Field,
+        Property,
+        DelegateCapture,
+        CollectionElement,
+        RefAlias,
+    }
+
+    internal enum SymbolicDisposalState
+    {
+        NotDisposed,
+        Disposed,
+        MaybeDisposed,
+    }
+
+    internal enum SymbolicResourceLifetimeState
+    {
+        Owned,
+        Borrowed,
+        Escaped,
+        Returned,
+        Released,
+    }
+
     internal abstract record SymbolicTerm(SmtValueKind Kind);
 
     internal sealed record SymbolicBooleanConstantTerm(bool Value) : SymbolicTerm(SmtValueKind.Bool);
@@ -114,7 +148,24 @@ namespace PurelySharp.Symbolic.Ir
 
     internal sealed record SymbolicOwnershipAtom(SymbolicTerm Value, bool Escaped) : SymbolicAtom;
 
+    internal sealed record SymbolicAliasAtom(SymbolicTerm Source, SymbolicTerm Target, bool MayAlias) : SymbolicAtom;
+
+    internal sealed record SymbolicBorrowAtom(
+        SymbolicTerm Owner,
+        SymbolicTerm Borrow,
+        SymbolicBorrowKind Kind) : SymbolicAtom;
+
+    internal sealed record SymbolicEscapeAtom(SymbolicTerm Value, SymbolicEscapeKind Kind) : SymbolicAtom;
+
+    internal sealed record SymbolicReturnedOwnershipAtom(SymbolicTerm Value) : SymbolicAtom;
+
     internal sealed record SymbolicMutationAtom(SymbolicTerm Target, bool CallerVisible) : SymbolicAtom;
+
+    internal sealed record SymbolicDisposalAtom(SymbolicTerm Resource, SymbolicDisposalState State) : SymbolicAtom;
+
+    internal sealed record SymbolicResourceLifetimeAtom(
+        SymbolicTerm Resource,
+        SymbolicResourceLifetimeState State) : SymbolicAtom;
 
     internal sealed record SymbolicTypeTestAtom(SymbolicTerm Value, string TypeKey) : SymbolicAtom;
 

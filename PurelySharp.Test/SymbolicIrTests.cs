@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
@@ -557,6 +558,56 @@ namespace PurelySharp.Test
 
             Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
             Assert.That(formula, Is.EqualTo(new SmtBooleanConstant(true)));
+        }
+
+        [Test]
+        public void Encoder_OwnershipResourceAtomsStayConservativeUntilProofSemanticsExist()
+        {
+            var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
+            var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
+            var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
+            var source = SyntaxFactory.ParseExpression("resource");
+            var atoms = new SymbolicAtom[]
+            {
+                new SymbolicFreshnessAtom(owner),
+                new SymbolicOwnershipAtom(owner, Escaped: false),
+                new SymbolicAliasAtom(owner, alias, MayAlias: true),
+                new SymbolicBorrowAtom(owner, alias, SymbolicBorrowKind.Shared),
+                new SymbolicEscapeAtom(owner, SymbolicEscapeKind.Return),
+                new SymbolicReturnedOwnershipAtom(owner),
+                new SymbolicMutationAtom(owner, CallerVisible: false),
+                new SymbolicDisposalAtom(resource, SymbolicDisposalState.Disposed),
+                new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned),
+            };
+
+            foreach (var atom in atoms)
+            {
+                var condition = new SymbolicFactCondition(SymbolicFact.Exact(atom, source, "test.ownership-resource"));
+
+                Assert.That(
+                    SymbolicIrFormulaEncoder.TryEncode(condition, out _),
+                    Is.False,
+                    atom.GetType().Name + " should not be encoded optimistically.");
+            }
+        }
+
+        [Test]
+        public void SymbolicFactInfo_ProjectsOwnershipResourceFactsWithoutSolverTypes()
+        {
+            var resource = new SymbolicVariableTerm("resource#1", SmtValueKind.Reference);
+            var fact = SymbolicFact.Exact(
+                new SymbolicDisposalAtom(resource, SymbolicDisposalState.Disposed),
+                SyntaxFactory.ParseExpression("resource.Dispose()"),
+                "test.disposal",
+                evidenceKey: "evidence.resource.disposed");
+
+            var info = SymbolicFactInfo.FromFact(fact);
+
+            Assert.That(info.Kind, Is.EqualTo(nameof(SymbolicDisposalAtom)));
+            Assert.That(info.Text, Does.Contain(nameof(SymbolicDisposalState.Disposed)));
+            Assert.That(info.Text, Does.Not.Contain(nameof(SmtFormula)));
+            Assert.That(info.Provenance, Is.EqualTo("test.disposal"));
+            Assert.That(info.EvidenceKey, Is.EqualTo("evidence.resource.disposed"));
         }
 
         [Test]
