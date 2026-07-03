@@ -1659,6 +1659,10 @@ namespace PurelySharp.Symbolic
                 syntaxTree,
                 query.Node.Span,
                 cancellationToken);
+            var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);
+            var invariant = SymbolicInvariantResult.FromPathConditions(
+                query.Analysis.PathConditions,
+                mergedInvariantText);
             return new SymbolicSourceQueryResult(
                 syntaxTree.FilePath,
                 line,
@@ -1671,8 +1675,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
                 smtDiagnostics,
-                SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
-                query.Analysis.PathConditions,
+                mergedInvariantText,
+                invariant,
                 query.Node.Span.End,
                 nodeSourceSpan.StartLine,
                 nodeSourceSpan.StartColumn,
@@ -7236,7 +7240,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
             SymbolicSmtDiagnostics? smtDiagnostics = null,
             string? mergedInvariantText = null,
-            IReadOnlyList<SmtFormula>? pathConditions = null,
+            SymbolicInvariantResult? invariant = null,
             int? nodeSpanEnd = null,
             int? nodeStartLine = null,
             int? nodeStartColumn = null,
@@ -7272,16 +7276,13 @@ namespace PurelySharp.Symbolic
             ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             Facts = facts ?? Array.Empty<string>();
             SymbolicFacts = symbolicFacts ?? Array.Empty<SymbolicFactInfo>();
-            MergedInvariantText = mergedInvariantText ??
-                (pathConditions == null
-                    ? FormatMergedInvariantText(Facts)
-                    : SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions));
-            Invariant = pathConditions == null
+            MergedInvariantText = mergedInvariantText ?? invariant?.MergedInvariantText ?? FormatMergedInvariantText(Facts);
+            Invariant = invariant == null
                 ? SymbolicInvariantResult.FromFacts(
                     Facts,
                     MergedInvariantText,
                     SymbolicInvariantMergeKind.Conjunction)
-                : SymbolicInvariantResult.FromPathConditions(pathConditions, MergedInvariantText);
+                : invariant;
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             ConditionProofs = AttachProgramPointMetadata(conditionProofs ?? Array.Empty<SymbolicConditionProofResult>());

@@ -567,10 +567,18 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicSourceQueryService.cs"));
+            var queryApiSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicQueryApi.cs"));
+            var combinedSource = source + "\n" + queryApiSource;
 
             Assert.That(source, Does.Contain("private static SymbolicSourceQueryResult CreateSourceQueryResult("));
             Assert.That(source.Split("new SymbolicSourceQueryResult(", StringSplitOptions.None).Length - 1, Is.EqualTo(1));
             Assert.That(source, Does.Contain("SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions)"));
+            Assert.That(combinedSource.Split("new SymbolicSourceQueryResult(", StringSplitOptions.None).Length - 1, Is.EqualTo(2));
+            Assert.That(combinedSource.Split("SymbolicInvariantResult.FromPathConditions(", StringSplitOptions.None).Length - 1, Is.GreaterThanOrEqualTo(2));
+            Assert.That(combinedSource, Does.Not.Contain("IReadOnlyList<SmtFormula>? pathConditions = null"));
             Assert.That(source, Does.Contain("SymbolicFactInfo.FromState(query.Analysis.PathState)"));
         }
 

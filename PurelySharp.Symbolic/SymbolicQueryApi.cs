@@ -436,6 +436,10 @@ namespace PurelySharp.Symbolic
                 options.ImpliedConditions,
                 options.SmtAnalysis,
                 cancellationToken);
+            var mergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(analysis.PathConditions);
+            var invariant = SymbolicInvariantResult.FromPathConditions(
+                analysis.PathConditions,
+                mergedInvariantText);
             return new SymbolicSourceQueryResult(
                 node.SyntaxTree.FilePath,
                 linePosition.Line,
@@ -448,8 +452,8 @@ namespace PurelySharp.Symbolic
                 analysis.ReachabilityReason,
                 proofs,
                 SymbolicSmtDiagnostics.FromService(options.SmtAnalysis),
-                SymbolicInvariantService.FormatMergedInvariant(analysis.PathConditions),
-                analysis.PathConditions,
+                mergedInvariantText,
+                invariant,
                 node.Span.End,
                 span.StartLine,
                 span.StartColumn,
