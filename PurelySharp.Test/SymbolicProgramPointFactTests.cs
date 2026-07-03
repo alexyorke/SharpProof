@@ -804,6 +804,182 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_SwitchStatementNotNullWhenGuardProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        switch (value)
+        {
+            case var candidate when Guard.IsPresent(candidate):
+                return value.Length;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_SwitchExpressionNotNullWhenGuardProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        return value switch
+        {
+            var candidate when Guard.IsPresent(candidate) => value.Length,
+            _ => 0,
+        };
+    }
+}";
+
+            var marker = FindMarker(source, "value.Length");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_SwitchStatementMemberNotNullWhenGuardProvesMemberNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    public string? Value { get; private set; }
+
+    [MemberNotNullWhen(true, nameof(Value))]
+    private bool HasValue()
+    {
+        return Value is not null;
+    }
+
+    public int TestMethod()
+    {
+        switch (this)
+        {
+            case _ when HasValue():
+                return Value.Length;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return Value.Length;");
+            var proof = ProveAtMarker(source, marker, "Value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_SwitchStatementPropertyPatternNotNullWhenGuardSubstitutesBinding()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public sealed class Box
+{
+    public string? Value { get; init; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Value: var candidate } when Guard.IsPresent(candidate):
+                return box.Value.Length;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return box.Value.Length;");
+            var proof = ProveAtMarker(source, marker, "box.Value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_SwitchExpressionListPatternNotNullWhenGuardSubstitutesBinding()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string?[] values)
+    {
+        return values switch
+        {
+            [var first] when Guard.IsPresent(first) => values[0].Length,
+            _ => 0,
+        };
+    }
+}";
+
+            var marker = FindMarker(source, "values[0].Length");
+            var proof = ProveAtMarker(source, marker, "values[0] != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_NotNullWhenFalseNegatedBranchProvesArgumentNonNull()
         {
             const string source = @"

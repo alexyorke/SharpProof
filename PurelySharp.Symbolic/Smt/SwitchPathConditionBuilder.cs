@@ -1223,12 +1223,37 @@ namespace PurelySharp.Symbolic.Smt
 
             if (whenClause != null)
             {
+                var bindingFacts = new List<SmtFormula>();
+                CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                    governingValue,
+                    governingType,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    bindingFacts,
+                    getSymbolVersion);
+
                 CSharpConditionToFormula.TryCollectDomainFacts(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
                     conditions,
                     getSymbolVersion);
+
+                var branchAssumptions = new List<SmtFormula>();
+                if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+                        whenClause.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        branchAssumptions,
+                        getSymbolVersion))
+                {
+                    foreach (var branchAssumption in branchAssumptions)
+                    {
+                        conditions.Add(SubstitutePatternBindingFacts(branchAssumption, bindingFacts));
+                    }
+                }
 
                 if (CSharpConditionToFormula.TryTranslate(
                     whenClause.Condition,
