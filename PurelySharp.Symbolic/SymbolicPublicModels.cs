@@ -175,6 +175,41 @@ namespace PurelySharp.Symbolic
             return facts;
         }
 
+        internal static IReadOnlyList<SymbolicFactInfo> Distinct(IEnumerable<SymbolicFactInfo> facts)
+        {
+            if (facts == null)
+            {
+                throw new ArgumentNullException(nameof(facts));
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var distinct = new List<SymbolicFactInfo>();
+            foreach (var fact in facts)
+            {
+                if (fact == null)
+                {
+                    continue;
+                }
+
+                var key = string.Join(
+                    "\u001f",
+                    fact.Kind,
+                    fact.Text,
+                    fact.Provenance,
+                    fact.Confidence,
+                    fact.SourceSpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    fact.SourceSpanLength.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    fact.SymbolKey ?? string.Empty,
+                    fact.EvidenceKey ?? string.Empty);
+                if (seen.Add(key))
+                {
+                    distinct.Add(fact);
+                }
+            }
+
+            return distinct;
+        }
+
         private static void AddConditionFacts(ICollection<SymbolicFactInfo> facts, SymbolicCondition condition)
         {
             switch (condition)

@@ -223,6 +223,13 @@ public class TestClass
             Assert.That(returnPoint.SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
             Assert.That(returnPoint.SymbolicFacts.Single().Text, Does.Contain("GreaterThan"));
             Assert.That(returnPoint.SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
+            Assert.That(returnPoint.InvariantInfo.MergedText, Is.EqualTo(returnPoint.MergedInvariantText));
+            Assert.That(returnPoint.InvariantInfo.Facts, Is.EquivalentTo(returnPoint.SymbolicFacts));
+            Assert.That(returnPoint.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.SymbolicFacts, Is.Not.Empty);
+            Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
+            Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
             Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
             Assert.That(returnPoint.PathConditions.All(condition => condition.HasSmtFormula), Is.True);
@@ -1646,6 +1653,10 @@ public class TestClass
             Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
             Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
             Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.SymbolicFacts, Is.Not.Empty);
+            Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
+            Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(invariantResult.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
             Assert.That(invariantResult.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
             Assert.That(invariantResult.InvariantQuery.MaybeFacts, Has.Count.LessThanOrEqualTo(1));

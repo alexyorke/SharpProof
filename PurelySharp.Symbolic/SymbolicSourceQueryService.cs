@@ -1701,6 +1701,11 @@ namespace PurelySharp.Symbolic
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
             Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(ProgramPoints);
+            SymbolicFacts = SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts));
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariantText,
+                SymbolicFacts,
+                ConditionProofs.Select(static proof => proof.Proof).ToArray());
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
                 MergedInvariant,
@@ -1728,6 +1733,10 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicInvariantResult MergedInvariant { get; }
+
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
 
         public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
@@ -1814,6 +1823,11 @@ namespace PurelySharp.Symbolic
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
             Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(ProgramPoints);
+            SymbolicFacts = SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts));
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariantText,
+                SymbolicFacts,
+                ConditionProofs.Select(static proof => proof.Proof).ToArray());
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
                 MergedInvariant,
@@ -1857,6 +1871,10 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicInvariantResult MergedInvariant { get; }
+
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
 
         public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
@@ -1930,6 +1948,11 @@ namespace PurelySharp.Symbolic
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(programPoints);
             Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
+            SymbolicFacts = SymbolicFactInfo.Distinct(programPoints.SelectMany(static point => point.SymbolicFacts));
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariantText,
+                SymbolicFacts,
+                ConditionProofs.Select(static proof => proof.Proof).ToArray());
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
                 MergedInvariant,
@@ -1963,6 +1986,10 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicInvariantResult MergedInvariant { get; }
+
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
 
         public SymbolicReachabilitySummary Reachability { get; }
 
@@ -7166,6 +7193,10 @@ namespace PurelySharp.Symbolic
             ReachabilityReason = reachabilityReason;
             ConditionProofs = AttachProgramPointMetadata(conditionProofs ?? Array.Empty<SymbolicConditionProofResult>());
             ProofOutcomes = SymbolicProofOutcomeSummary.FromProofs(ConditionProofs);
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariantText,
+                SymbolicFacts,
+                ConditionProofs.Select(static proof => proof.Proof).ToArray());
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = SymbolicInvariantQueryView.FromPoint(this);
         }
@@ -7215,6 +7246,8 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicInvariantResult Invariant { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
 
         public IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
 
