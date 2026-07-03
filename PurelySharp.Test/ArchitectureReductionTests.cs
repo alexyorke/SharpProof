@@ -114,14 +114,12 @@ namespace PurelySharp.Test
                 "Engine",
                 "Rules",
                 "FieldReferencePurityRule.cs"));
-            var helperIndex = source.IndexOf("internal static class OwnedFreshMutableObjectClassifier", StringComparison.Ordinal);
 
-            Assert.That(helperIndex, Is.GreaterThan(0));
-            var ruleSource = source.Substring(0, helperIndex);
-            Assert.That(ruleSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference("));
-            Assert.That(ruleSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference("));
-            Assert.That(ruleSource, Does.Not.Contain("private static bool IsOwnedFreshMutableObjectReference("));
-            Assert.That(ruleSource, Does.Not.Contain("private static bool HasStableFreshMutableObjectValue("));
+            Assert.That(source, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference("));
+            Assert.That(source, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference("));
+            Assert.That(source, Does.Not.Contain("internal static class OwnedFreshMutableObjectClassifier"));
+            Assert.That(source, Does.Not.Contain("private static bool IsOwnedFreshMutableObjectReference("));
+            Assert.That(source, Does.Not.Contain("private static bool HasStableFreshMutableObjectValue("));
         }
 
         [Test]
@@ -140,6 +138,25 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Not.Contain("private static bool IsOwnedFreshMutableReadonlyFieldReference("));
             Assert.That(source, Does.Not.Contain("private static bool HasStableFreshMutableObjectValue("));
             Assert.That(source, Does.Not.Contain("private static bool ConstructorStoresParameterInStableMember("));
+        }
+
+        [Test]
+        public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "OwnedFreshMutableObjectClassifier.cs"));
+
+            Assert.That(source, Does.Contain("internal static class OwnedFreshMutableObjectClassifier"));
+            Assert.That(source, Does.Contain("internal static bool IsOwnedFreshMutableObjectReference("));
+            Assert.That(source, Does.Contain("internal static bool IsOwnedFreshMutableReadonlyFieldReference("));
+            Assert.That(source, Does.Contain("RuleAnalysisHelper.IsFreshMutableEscapingReferenceType("));
+            Assert.That(source, Does.Not.Contain("nameof(FieldReferencePurityRule)"));
+            Assert.That(source, Does.Not.Contain("nameof(AssignmentPurityRule)"));
         }
 
         [Test]
