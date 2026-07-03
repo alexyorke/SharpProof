@@ -2411,6 +2411,15 @@ namespace PurelySharp.Analyzer.Engine
                     thenSummary.FallthroughReleasedStates.AddRange(elseSummary.FallthroughReleasedStates));
             }
 
+            if (statement is SwitchStatementSyntax switchStatement)
+            {
+                return AnalyzeSwitchResourceReleaseStatement(
+                    switchStatement,
+                    initiallyReleased,
+                    resourceSymbol,
+                    semanticModel);
+            }
+
             if (statement is TryStatementSyntax { Finally.Block: { } finallyBlock } &&
                 FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
             {
@@ -2424,6 +2433,40 @@ namespace PurelySharp.Analyzer.Engine
             return new ResourceReleasePathSummary(
                 true,
                 ImmutableArray.Create(released));
+        }
+
+        private static ResourceReleasePathSummary AnalyzeSwitchResourceReleaseStatement(
+            SwitchStatementSyntax switchStatement,
+            bool initiallyReleased,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            var allTerminalPathsReleased = true;
+            var fallthroughStates = ImmutableArray.CreateBuilder<bool>();
+            var hasDefault = false;
+
+            foreach (var section in switchStatement.Sections)
+            {
+                hasDefault |= section.Labels.OfType<DefaultSwitchLabelSyntax>().Any();
+                var summary = AnalyzeResourceReleaseStatements(
+                    section.Statements.ToArray(),
+                    initiallyReleased,
+                    endIsTerminal: false,
+                    resourceSymbol,
+                    semanticModel);
+
+                allTerminalPathsReleased &= summary.AllTerminalPathsReleased;
+                fallthroughStates.AddRange(summary.FallthroughReleasedStates);
+            }
+
+            if (!hasDefault)
+            {
+                fallthroughStates.Add(initiallyReleased);
+            }
+
+            return new ResourceReleasePathSummary(
+                allTerminalPathsReleased,
+                fallthroughStates.ToImmutable());
         }
 
         private static IReadOnlyList<StatementSyntax> GetStatementList(StatementSyntax statement)
@@ -5640,7 +5683,7 @@ namespace PurelySharp.Analyzer.Engine
             return HasDisposedResourceFactForTermBefore(
                 term,
                 currentState,
-                observationSyntax.SpanStart,
+                observationSyntax,
                 new HashSet<SymbolicTerm>());
         }
 
@@ -5850,6 +5893,7 @@ namespace PurelySharp.Analyzer.Engine
                     memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
                     semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } disposedSymbol ||
                     !relatedSymbols.Contains(disposedSymbol) ||
+                    !IsPriorDisposalSpanOnCompatiblePath(invocation.SpanStart, useSyntax) ||
                     IsStaleRelatedLocalDisposal(
                         resourceSymbol,
                         disposedSymbol,
@@ -6038,7 +6082,7 @@ namespace PurelySharp.Analyzer.Engine
         private static bool HasDisposedResourceFactForTermBefore(
             SymbolicTerm resourceTerm,
             PurityAnalysisState currentState,
-            int observationSpanStart,
+            SyntaxNode observationSyntax,
             HashSet<SymbolicTerm> visitedTerms)
         {
             if (!visitedTerms.Add(resourceTerm))
@@ -6050,7 +6094,7 @@ namespace PurelySharp.Analyzer.Engine
             {
                 if (fact.Polarity &&
                     fact.Confidence == SymbolicFactConfidence.Exact &&
-                    fact.SourceSpan.Start < observationSpanStart &&
+                    IsPriorDisposalFactOnCompatiblePath(fact, observationSyntax) &&
                     fact.Atom is SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal &&
                     Equals(disposal.Resource, resourceTerm))
                 {
@@ -6063,7 +6107,7 @@ namespace PurelySharp.Analyzer.Engine
                 if (HasDisposedResourceFactForTermBefore(
                         aliasTerm,
                         currentState,
-                        observationSpanStart,
+                        observationSyntax,
                         visitedTerms))
                 {
                     return true;
@@ -6071,6 +6115,38 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return false;
+        }
+
+        private static bool IsPriorDisposalFactOnCompatiblePath(
+            SymbolicFact fact,
+            SyntaxNode observationSyntax)
+        {
+            return IsPriorDisposalSpanOnCompatiblePath(fact.SourceSpan.Start, observationSyntax);
+        }
+
+        private static bool IsPriorDisposalSpanOnCompatiblePath(
+            int sourceSpanStart,
+            SyntaxNode observationSyntax)
+        {
+            if (sourceSpanStart >= observationSyntax.SpanStart)
+            {
+                return false;
+            }
+
+            var observationSection = observationSyntax.FirstAncestorOrSelf<SwitchSectionSyntax>();
+            if (observationSection == null)
+            {
+                return true;
+            }
+
+            var containingSwitch = observationSection.FirstAncestorOrSelf<SwitchStatementSyntax>();
+            if (containingSwitch == null ||
+                !containingSwitch.Span.Contains(sourceSpanStart))
+            {
+                return true;
+            }
+
+            return observationSection.Span.Contains(sourceSpanStart);
         }
 
         private static SymbolicVariableTerm CreateSymbolicReferenceTerm(ISymbol symbol, PurityAnalysisState currentState)

@@ -548,6 +548,110 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task SwitchDisposeAllArms_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int mode)
+    {
+        var resource = new PureDisposable();
+        switch (mode)
+        {
+            case 0:
+                resource.Dispose();
+                break;
+            default:
+                resource.Dispose();
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchDisposeMissingDefault_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(int mode)
+    {
+        var resource = new PureDisposable();
+        switch (mode)
+        {
+            case 0:
+                resource.Dispose();
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchReturnOrDisposeAllArms_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod(int mode)
+    {
+        var resource = new PureDisposable();
+        switch (mode)
+        {
+            case 0:
+                return resource;
+            default:
+                resource.Dispose();
+                return new PureDisposable();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FinallyDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
         {
             var test = @"
