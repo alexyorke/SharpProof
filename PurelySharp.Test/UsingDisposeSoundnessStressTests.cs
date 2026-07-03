@@ -652,6 +652,102 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task WhileDisposeOnly_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(bool dispose)
+    {
+        var resource = new PureDisposable();
+        while (dispose)
+        {
+            resource.Dispose();
+            break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ForDisposeOnly_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(bool dispose)
+    {
+        var resource = new PureDisposable();
+        for (; dispose; )
+        {
+            resource.Dispose();
+            break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DoWhileDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool repeat)
+    {
+        var resource = new PureDisposable();
+        do
+        {
+            resource.Dispose();
+        }
+        while (repeat);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FinallyDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
         {
             var test = @"

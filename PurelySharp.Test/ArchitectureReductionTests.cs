@@ -607,6 +607,8 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("AnalyzeSwitchResourceReleaseStatement("));
             Assert.That(engineSource, Does.Contain("DefaultSwitchLabelSyntax"));
             Assert.That(engineSource, Does.Contain("fallthroughStates.Add(initiallyReleased)"));
+            Assert.That(engineSource, Does.Contain("WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax"));
+            Assert.That(engineSource, Does.Contain("statement is DoStatementSyntax doStatement"));
             Assert.That(engineSource, Does.Contain("HasDisposedResourceFactBefore("));
             Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTermBefore("));
             Assert.That(engineSource, Does.Contain("IsPriorDisposalFactOnCompatiblePath("));

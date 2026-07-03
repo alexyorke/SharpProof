@@ -2420,6 +2420,23 @@ namespace PurelySharp.Analyzer.Engine
                     semanticModel);
             }
 
+            if (statement is WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax)
+            {
+                return new ResourceReleasePathSummary(
+                    true,
+                    ImmutableArray.Create(initiallyReleased));
+            }
+
+            if (statement is DoStatementSyntax doStatement)
+            {
+                return AnalyzeResourceReleaseStatements(
+                    GetStatementList(doStatement.Statement),
+                    initiallyReleased,
+                    endIsTerminal: false,
+                    resourceSymbol,
+                    semanticModel);
+            }
+
             if (statement is TryStatementSyntax { Finally.Block: { } finallyBlock } &&
                 FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
             {
