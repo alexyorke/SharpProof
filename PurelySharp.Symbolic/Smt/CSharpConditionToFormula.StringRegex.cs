@@ -492,27 +492,45 @@ namespace PurelySharp.Symbolic.Smt
             expression = UnwrapExpression(expression);
             if (expression is not InvocationExpressionSyntax invocationExpression ||
                 semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
-                !IsSupportedOrdinalStringIndexOfInvocation(invocationOperation, semanticModel, cancellationToken) ||
                 invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
                 invocationOperation.Arguments.Length < 1 ||
                 invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax searchExpression ||
-                !TryTranslateStringPredicateArgument(
-                    searchExpression,
-                    invocationOperation.Arguments[0].Parameter?.Type,
-                    semanticModel,
-                    cancellationToken,
-                    getSymbolVersion,
-                    inlineDepth,
-                    out var searchFormula) ||
-                searchFormula == null ||
                 !TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiverFormula, getSymbolVersion, inlineDepth) ||
                 receiverFormula == null)
             {
                 return false;
             }
 
-            formula = new SmtStringContainsFormula(receiverFormula, searchFormula);
-            return true;
+            if (IsSupportedOrdinalStringIndexOfInvocation(invocationOperation, semanticModel, cancellationToken))
+            {
+                if (!TryTranslateStringPredicateArgument(
+                        searchExpression,
+                        invocationOperation.Arguments[0].Parameter?.Type,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        inlineDepth,
+                        out var searchFormula) ||
+                    searchFormula == null)
+                {
+                    return false;
+                }
+
+                formula = new SmtStringContainsFormula(receiverFormula, searchFormula);
+                return true;
+            }
+
+            if (IsSupportedOrdinalIgnoreCaseStringIndexOfInvocation(invocationOperation, semanticModel, cancellationToken) &&
+                TryGetConstantStringPredicateArgument(searchExpression, invocationOperation.Arguments[0].Parameter?.Type, semanticModel, cancellationToken, out var constantSearch))
+            {
+                formula = new SmtRegexMatchFormula(
+                    receiverFormula,
+                    Regex.Escape(constantSearch),
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                return true;
+            }
+
+            return false;
         }
 
         private static bool IsSupportedOrdinalStringIndexOfInvocation(
@@ -548,6 +566,28 @@ namespace PurelySharp.Symbolic.Smt
                 firstParameter.Type.SpecialType == SpecialType.System_String &&
                 IsStringComparisonParameter(method.Parameters[1]) &&
                 HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+        }
+
+        private static bool IsSupportedOrdinalIgnoreCaseStringIndexOfInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "IndexOf" ||
+                method.ReturnType.SpecialType != SpecialType.System_Int32 ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.IsStatic ||
+                method.Parameters.Length != 2 ||
+                invocationOperation.Arguments.Length < 2 ||
+                !IsStringComparisonParameter(method.Parameters[1]) ||
+                !HasOrdinalIgnoreCaseStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            var firstParameter = method.Parameters[0];
+            return firstParameter.Type.SpecialType is SpecialType.System_Char or SpecialType.System_String;
         }
 
         private static bool TryClassifyStringIndexOfComparison(
@@ -1025,6 +1065,27 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool HasOrdinalIgnoreCaseStringComparison(
+            ImmutableArray<IArgumentOperation> arguments,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var argument in arguments)
+            {
+                var parameterType = argument.Parameter?.Type;
+                if (parameterType == null ||
+                    parameterType.ToDisplayString() != "System.StringComparison")
+                {
+                    continue;
+                }
+
+                return TryGetIntegralConstantValue(argument.Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var comparison) &&
+                    comparison == (int)StringComparison.OrdinalIgnoreCase;
+            }
+
+            return false;
+        }
+
         private static bool IsStringParameter(IParameterSymbol parameter)
         {
             return parameter.Type.SpecialType == SpecialType.System_String;
@@ -1055,6 +1116,41 @@ namespace PurelySharp.Symbolic.Smt
             return IsStringEmptyMemberAccess(expression, semanticModel, cancellationToken)
                 ? string.Empty
                 : null;
+        }
+
+        private static bool TryGetConstantStringPredicateArgument(
+            ExpressionSyntax argumentExpression,
+            ITypeSymbol? parameterType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string value)
+        {
+            value = string.Empty;
+            if (parameterType?.SpecialType == SpecialType.System_String)
+            {
+                var stringValue = TryGetConstantString(argumentExpression, semanticModel, cancellationToken);
+                if (stringValue == null)
+                {
+                    return false;
+                }
+
+                value = stringValue;
+                return true;
+            }
+
+            if (parameterType?.SpecialType != SpecialType.System_Char)
+            {
+                return false;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(argumentExpression, cancellationToken);
+            if (constantValue is not { HasValue: true, Value: char character })
+            {
+                return false;
+            }
+
+            value = character.ToString();
+            return true;
         }
 
         private static bool IsStringExpression(

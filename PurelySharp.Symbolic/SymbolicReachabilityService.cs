@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,6 +12,8 @@ namespace PurelySharp.Symbolic
 {
     public static class SymbolicReachabilityService
     {
+        private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache> s_structuralPathConditionCache = new();
+
         public static bool IsSatisfiable(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
@@ -371,12 +375,22 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             bool includeCurrentStatementCompletionFacts)
         {
-            var pathConditions = CollectAncestorReachabilityConditions(
+            var key = new PathConditionCacheKey(
+                site.SpanStart,
+                site.Span.Length,
+                site.RawKind,
+                includeCurrentStatementCompletionFacts);
+            var cache = s_structuralPathConditionCache.GetOrCreateValue(semanticModel);
+            if (!cache.Values.TryGetValue(key, out var cached))
+            {
+                cached = BuildStructuralPathConditionSnapshot(
                     site,
                     semanticModel,
-                    cancellationToken)
-                .ToList();
-            AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
+                    cancellationToken);
+                cache.Values.TryAdd(key, cached);
+            }
+
+            var pathConditions = cached.ToList();
             pathConditions.AddRange(CollectPriorAssignmentFacts(
                 site,
                 semanticModel,
@@ -580,6 +594,70 @@ namespace PurelySharp.Symbolic
                     getSymbolVersion))
             {
                 pathConditions.Add(aliasFact);
+            }
+        }
+
+        private static ImmutableArray<SmtFormula> BuildStructuralPathConditionSnapshot(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var pathConditions = CollectAncestorReachabilityConditions(
+                    site,
+                    semanticModel,
+                    cancellationToken)
+                .ToList();
+            AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
+            return pathConditions.ToImmutableArray();
+        }
+
+        private sealed class StructuralPathConditionCache
+        {
+            public ConcurrentDictionary<PathConditionCacheKey, ImmutableArray<SmtFormula>> Values { get; } = new();
+        }
+
+        private readonly struct PathConditionCacheKey : IEquatable<PathConditionCacheKey>
+        {
+            public PathConditionCacheKey(
+                int siteStart,
+                int siteLength,
+                int siteRawKind,
+                bool includeCurrentStatementCompletionFacts)
+            {
+                SiteStart = siteStart;
+                SiteLength = siteLength;
+                SiteRawKind = siteRawKind;
+                IncludeCurrentStatementCompletionFacts = includeCurrentStatementCompletionFacts;
+            }
+
+            public int SiteStart { get; }
+            public int SiteLength { get; }
+            public int SiteRawKind { get; }
+            public bool IncludeCurrentStatementCompletionFacts { get; }
+
+            public bool Equals(PathConditionCacheKey other)
+            {
+                return SiteStart == other.SiteStart &&
+                    SiteLength == other.SiteLength &&
+                    SiteRawKind == other.SiteRawKind &&
+                    IncludeCurrentStatementCompletionFacts == other.IncludeCurrentStatementCompletionFacts;
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is PathConditionCacheKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = SiteStart;
+                    hash = (hash * 397) ^ SiteLength;
+                    hash = (hash * 397) ^ SiteRawKind;
+                    hash = (hash * 397) ^ (IncludeCurrentStatementCompletionFacts ? 1 : 0);
+                    return hash;
+                }
             }
         }
     }
