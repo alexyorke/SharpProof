@@ -370,6 +370,40 @@ namespace PurelySharp.Symbolic
                 out trigger);
         }
 
+        private static bool TryCreateCheckedEqualityOverflowTrigger(
+            SyntaxNode site,
+            ExpressionSyntax expression,
+            long overflowingValue,
+            string provenance,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardTrigger trigger)
+        {
+            trigger = default;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
+                value.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            var overflowCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    value,
+                    new SymbolicIntegerConstantTerm(overflowingValue)),
+                expression,
+                provenance + ".operand"));
+
+            return TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                value,
+                overflowCondition,
+                site,
+                provenance,
+                out trigger);
+        }
+
         private static bool TryCreateNullDereferenceTrigger(
             ExpressionSyntax receiver,
             SemanticModel semanticModel,

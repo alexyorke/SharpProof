@@ -481,7 +481,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var overflowTrigger)
                 ? overflowTrigger
-                : CreateUnknownTrigger(unaryExpression, "checked_integral_overflow");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(unaryExpression, "checked_integral_overflow"));
 
             candidate = new RuntimeHazardCandidate(
                 unaryExpression,
@@ -527,6 +527,7 @@ namespace PurelySharp.Symbolic
             }
 
             var trigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
+                updateExpression,
                 operand,
                 smtOperator,
                 minValue,
@@ -535,7 +536,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var overflowTrigger)
                 ? overflowTrigger
-                : CreateUnknownTrigger(updateExpression, "checked_integral_overflow");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(updateExpression, "checked_integral_overflow"));
 
             candidate = new RuntimeHazardCandidate(
                 updateExpression,
@@ -716,7 +717,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var overflowTrigger)
                 ? overflowTrigger
-                : CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow"));
 
             candidate = new RuntimeHazardCandidate(
                 castExpression,
@@ -1454,9 +1455,21 @@ namespace PurelySharp.Symbolic
             long maxValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
+            if (TryCreateCheckedEqualityOverflowTrigger(
+                    unaryExpression,
+                    unaryExpression.Operand,
+                    minValue,
+                    "ir.runtime-hazard.checked-integral.unary-minus-overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     unaryExpression.Operand,
                     semanticModel,
@@ -1469,20 +1482,36 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
-            trigger = CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue));
             return true;
         }
 
         private static bool TryCreateCheckedIntegralUpdateOverflowTrigger(
+            ExpressionSyntax site,
             ExpressionSyntax operand,
             SmtIntegerBinaryOperator smtOperator,
             long minValue,
             long maxValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
+            var overflowingOperand = smtOperator == SmtIntegerBinaryOperator.Add ? maxValue : minValue;
+            if (TryCreateCheckedEqualityOverflowTrigger(
+                    site,
+                    operand,
+                    overflowingOperand,
+                    smtOperator == SmtIntegerBinaryOperator.Add
+                        ? "ir.runtime-hazard.checked-integral.increment-overflow"
+                        : "ir.runtime-hazard.checked-integral.decrement-overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     operand,
                     semanticModel,
@@ -1495,7 +1524,7 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
-            trigger = CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue));
             return true;
         }
 
@@ -1557,9 +1586,9 @@ namespace PurelySharp.Symbolic
             long maxValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             if (TryCreateCheckedIntegralOutOfRangeTrigger(
                     castExpression.Expression,
                     minValue,
@@ -1569,7 +1598,7 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var irTrigger))
             {
-                trigger = irTrigger.Condition;
+                trigger = irTrigger;
                 return true;
             }
 
@@ -1584,7 +1613,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            trigger = CreateIntegralOutOfRangeFormula(operandFormula, minValue, maxValue);
+            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(operandFormula, minValue, maxValue));
             return true;
         }
 
