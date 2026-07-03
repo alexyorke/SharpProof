@@ -155,6 +155,72 @@ public class TestClass
                 "System.IndexOutOfRangeException",
                 "definite_index_out_of_range")
                 .SetName("Ps0011_AuthoringRuntimeHazards_ReportIndexOutOfRangeWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public int NegativeStackAllocLength(int length)
+    {
+        if (length < 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}",
+                "stackalloc int[length]",
+                "System.OverflowException",
+                "definite_negative_stackalloc_length")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportNegativeStackAllocLengthWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int CountIndexOutOfRange(List<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}",
+                "values[0]",
+                "System.ArgumentOutOfRangeException",
+                "definite_count_index_out_of_range")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportCountIndexOutOfRangeWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+public class TestClass
+{
+    public int SwitchExpressionNoMatch(int value)
+    {
+        if (value > 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0
+            };
+        }
+
+        return 0;
+    }
+}",
+                "value switch",
+                "System.Runtime.CompilerServices.SwitchExpressionException",
+                "definite_switch_expression_no_match")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportSwitchExpressionNoMatchWithoutEnforcePure");
         }
 
         private static IEnumerable<TestCaseData> GuardedSafeOrUnknownRuntimeHazardCases()
@@ -299,6 +365,63 @@ public class TestClass
     }
 }")
                 .SetName("Ps0011_AuthoringRuntimeHazards_SuppressUnknownIndexOutOfRange");
+
+            yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public int GuardedNegativeStackAllocLength(int length)
+    {
+        if (length >= 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressGuardedNegativeStackAllocLength");
+
+            yield return new TestCaseData(
+                @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int GuardedCountIndexOutOfRange(IReadOnlyList<int> values, int index)
+    {
+        if (index >= 0 && index < values.Count)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressGuardedCountIndexOutOfRange");
+
+            yield return new TestCaseData(
+                @"
+public class TestClass
+{
+    public int GuardedSwitchExpressionNoMatch(int value)
+    {
+        if (value <= 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0
+            };
+        }
+
+        return 0;
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressGuardedSwitchExpressionNoMatch");
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAuthoringHazardDiagnosticsAsync(string source)

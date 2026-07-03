@@ -38,6 +38,45 @@ public static class RegexCache
     public static Regex MutableAb = new Regex(@""\AAB\z"");
 }";
 
+        private const string InstanceRegexCacheSource = @"
+using System.Text.RegularExpressions;
+
+public sealed class RegexBox
+{
+    public readonly Regex Ab = new Regex(@""\AAB\z"");
+
+    public readonly Regex SinglelineAny = new Regex(@""\A.\z"", RegexOptions.Singleline);
+
+    public readonly Regex MultilineAb = new Regex(@""\AAB\z"", RegexOptions.Multiline);
+
+    public Regex MutableAb = new Regex(@""\AAB\z"");
+}
+
+public sealed class GeneratedRegexBox
+{
+    public readonly Regex Ab = RegexFactories.Ab();
+}
+
+public sealed class ConstructorAssignedRegexBox
+{
+    public readonly Regex Ab;
+
+    public ConstructorAssignedRegexBox()
+    {
+        Ab = new Regex(@""\AAB\z"");
+    }
+}
+
+public static class StaticCtorRegexCache
+{
+    public static readonly Regex Ab = new Regex(@""\AAB\z"");
+
+    static StaticCtorRegexCache()
+    {
+        Ab = new Regex(@""\ACD\z"");
+    }
+}";
+
         private const string SourcePredicateSource = @"
 public static class SourcePredicates
 {
@@ -7116,6 +7155,22 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_DecimalPositiveContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("decimal value", "value > 0m && value <= 0m"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DecimalReversedPositiveContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("decimal value", "0m < value && value <= 0m"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_DecimalFractionalRangeRemainsConservative()
         {
             Assert.That(
@@ -7853,6 +7908,105 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_InstanceReadonlyRegexLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    @"box.Ab.IsMatch(text) && text != ""AB""",
+                    InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceReadonlyRegexMatchSuccessImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    "box.Ab.Match(text).Success && text.Length != 2",
+                    InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceReadonlyRegexMatchesCountImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    "box.Ab.Matches(text).Count > 0 && text.Length != 2",
+                    InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceReadonlyRegexSinglelineOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    @"!box.SinglelineAny.IsMatch(text) && text == ""\n""",
+                    InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceReadonlyRegexMultilineOptionStartAtZeroContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    @"box.MultilineAb.IsMatch(text, 0) && text != ""AB""",
+                    InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceReadonlyGeneratedRegexFieldContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "GeneratedRegexBox box, string text",
+                    @"box.Ab.IsMatch(text) && text != ""AB""",
+                    GeneratedRegexFactorySource + InstanceRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_MutableInstanceRegexFieldRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "RegexBox box, string text",
+                    @"box.MutableAb.IsMatch(text) && text != ""AB""",
+                    InstanceRegexCacheSource),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ConstructorAssignedReadonlyRegexFieldRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "ConstructorAssignedRegexBox box, string text",
+                    @"box.Ab.IsMatch(text) && text != ""AB""",
+                    InstanceRegexCacheSource),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticReadonlyRegexAssignedInStaticConstructorRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"StaticCtorRegexCache.Ab.IsMatch(text) && text != ""AB""",
+                    InstanceRegexCacheSource),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_InstanceRegexStartAtZeroContradictsStringEquality()
         {
             Assert.That(
@@ -7927,6 +8081,28 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"!new Regex(@""\A.\z"", RegexOptions.Singleline).IsMatch(text) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceMultilineRegexOptionStartAtZeroContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\AAB\z"", RegexOptions.Multiline).IsMatch(text, 0) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticMultilineRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Multiline) && text != ""AB""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }
@@ -8398,6 +8574,16 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StringPrefixSubstringEqualityContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.Substring(0, 3) == \"PRE\" && text == \"ALT\""),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringIsNullOrWhiteSpaceContradictsNonWhitespaceLiteral()
         {
             Assert.That(
@@ -8512,6 +8698,390 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositive(value) && value > 10", SourcePredicateSource),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegatePredicateDirectCallContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = x => x > 0;
+        if (predicate(value) && value <= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegatePredicateInvokeCallContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        Predicate<string> predicate = value => value != null;
+        if (predicate.Invoke(text) && text == null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegatePredicateBlockBodyContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = x => { return x == 42; };
+        if (predicate(value) && value != 42)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateMultiParameterPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value, int upperBound)
+    {
+        Func<int, int, bool> predicate = (candidate, limit) => candidate >= 0 && candidate < limit;
+        if (predicate(value, upperBound) && (value < 0 || value >= upperBound))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateTypedLambdaPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = (int x) => x >= 10;
+        if (predicate(value) && value < 10)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateAnonymousMethodPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        Predicate<string> predicate = delegate (string value) { return value != null && value.Length > 0; };
+        if (predicate(text) && (text == null || text.Length <= 0))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateStaticMethodGroupPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable("using System;" + SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = SourcePredicates.IsPositive;
+        if (predicate(value) && value <= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateStaticMethodGroupMultiParameterPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable("using System;" + SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        Func<int[], int, bool> predicate = SourcePredicates.IsValidIndex;
+        if (predicate(values, index) && (values == null || index < 0 || index >= values.Length))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateStaticMethodGroupStringPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable("using System;" + SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        Predicate<string> predicate = SourcePredicates.HasText;
+        if (predicate.Invoke(text) && (text == null || text.Length <= 0))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateStaticLocalFunctionMethodGroupContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        static bool IsPositive(int x) => x > 0;
+        Func<int, bool> predicate = IsPositive;
+        if (predicate(value) && value <= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateCapturedLocalFunctionMethodGroupRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value, int minimum)
+    {
+        bool IsPositive(int x) => x > minimum;
+        Func<int, bool> predicate = IsPositive;
+        if (predicate(value) && value <= minimum)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateInstanceMethodGroupRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable("using System;" + SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        Func<bool> predicate = box.HasTextMethod;
+        if (predicate() && (box.Value == null || box.Value.Length <= 0))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegateRepeatedUseRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = x => x > 0;
+        if (predicate(value) && predicate(value + 1) && value <= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalDelegatePredicateCaptureRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value, int minimum)
+    {
+        Func<int, bool> predicate = x => x > minimum;
+        if (predicate(value) && value <= minimum)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ReassignedLocalDelegatePredicateRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = x => x > 0;
+        predicate = x => x < 0;
+        if (predicate(value) && value >= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_EscapedLocalDelegatePredicateRemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        Func<int, bool> predicate = x => x > 0;
+        Consume(predicate);
+        if (predicate(value) && value <= 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private static void Consume(Func<int, bool> predicate)
+    {
+    }
+}",
+                    "return 1;"),
                 Is.False);
         }
 
@@ -10788,6 +11358,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_StringPrefixSubstringContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (text.Substring(0, 3) == ""PRE"" && text == ""ALT"")
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_StringIndexOfOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -12005,6 +12602,26 @@ public class TestClass
     public decimal TestMethod(decimal value, decimal divisor)
     {
         if (divisor != 0m)
+        {
+            return value / divisor;
+        }
+
+        return 0m;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_DecimalPositiveGuardSuppressesDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public decimal TestMethod(decimal value, decimal divisor)
+    {
+        if (divisor > 0m)
         {
             return value / divisor;
         }

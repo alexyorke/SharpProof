@@ -861,6 +861,18 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateDecimalZeroComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var decimalZeroComparison,
+                        getSymbolVersion) &&
+                    decimalZeroComparison != null)
+                {
+                    formula = decimalZeroComparison;
+                    return true;
+                }
+
                 if (IsTupleEqualityComparison(binaryExpression, semanticModel, cancellationToken))
                 {
                     return TryTranslateTupleEqualityComparison(
@@ -1758,8 +1770,10 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null;
-            if (!binaryExpression.IsKind(SyntaxKind.EqualsExpression) &&
-                !binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))
+            if (!TryGetDecimalZeroComparisonOperator(
+                    binaryExpression.Kind(),
+                    swappedOperands: false,
+                    out var operatorKind))
             {
                 return false;
             }
@@ -1771,24 +1785,57 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out var value,
                     getSymbolVersion) &&
-                !TryCreateDecimalZeroComparisonOperands(
-                    binaryExpression.Right,
-                    binaryExpression.Left,
-                    semanticModel,
-                    cancellationToken,
-                    out value,
-                    getSymbolVersion))
+                (!TryGetDecimalZeroComparisonOperator(
+                     binaryExpression.Kind(),
+                     swappedOperands: true,
+                     out operatorKind) ||
+                 !TryCreateDecimalZeroComparisonOperands(
+                     binaryExpression.Right,
+                     binaryExpression.Left,
+                     semanticModel,
+                     cancellationToken,
+                     out value,
+                     getSymbolVersion)))
             {
                 return false;
             }
 
             formula = new SmtBinaryFormula(
-                binaryExpression.IsKind(SyntaxKind.EqualsExpression)
-                    ? SmtBinaryOperator.Equal
-                    : SmtBinaryOperator.NotEqual,
+                operatorKind,
                 value,
                 new SmtIntegerConstant(0));
             return true;
+        }
+
+        private static bool TryGetDecimalZeroComparisonOperator(
+            SyntaxKind syntaxKind,
+            bool swappedOperands,
+            out SmtBinaryOperator operatorKind)
+        {
+            operatorKind = default;
+            switch (syntaxKind)
+            {
+                case SyntaxKind.EqualsExpression:
+                    operatorKind = SmtBinaryOperator.Equal;
+                    return true;
+                case SyntaxKind.NotEqualsExpression:
+                    operatorKind = SmtBinaryOperator.NotEqual;
+                    return true;
+                case SyntaxKind.LessThanExpression:
+                    operatorKind = swappedOperands ? SmtBinaryOperator.GreaterThan : SmtBinaryOperator.LessThan;
+                    return true;
+                case SyntaxKind.LessThanOrEqualExpression:
+                    operatorKind = swappedOperands ? SmtBinaryOperator.GreaterThanOrEqual : SmtBinaryOperator.LessThanOrEqual;
+                    return true;
+                case SyntaxKind.GreaterThanExpression:
+                    operatorKind = swappedOperands ? SmtBinaryOperator.LessThan : SmtBinaryOperator.GreaterThan;
+                    return true;
+                case SyntaxKind.GreaterThanOrEqualExpression:
+                    operatorKind = swappedOperands ? SmtBinaryOperator.LessThanOrEqual : SmtBinaryOperator.GreaterThanOrEqual;
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static bool TryCreateDecimalZeroComparisonOperands(

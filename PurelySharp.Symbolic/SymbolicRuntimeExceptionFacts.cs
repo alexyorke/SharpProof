@@ -20,6 +20,7 @@ namespace PurelySharp.Symbolic
             internal const string ArrayTypeMismatchException = "System.ArrayTypeMismatchException";
             internal const string IndexOutOfRangeException = "System.IndexOutOfRangeException";
             internal const string ArgumentOutOfRangeException = "System.ArgumentOutOfRangeException";
+            internal const string SwitchExpressionException = "System.Runtime.CompilerServices.SwitchExpressionException";
         }
 
         internal static class ExceptionCategories
@@ -32,6 +33,7 @@ namespace PurelySharp.Symbolic
             internal const string DefiniteDivideByZero = "definite_divide_by_zero";
             internal const string DefiniteCheckedIntegralOverflow = "definite_checked_integral_overflow";
             internal const string DefiniteNegativeArrayLength = "definite_negative_array_length";
+            internal const string DefiniteNegativeStackAllocLength = "definite_negative_stackalloc_length";
             internal const string DefiniteNullDereference = "definite_null_dereference";
             internal const string DefiniteAwaitNull = "definite_await_null";
             internal const string DefiniteLockNull = "definite_lock_null";
@@ -41,6 +43,8 @@ namespace PurelySharp.Symbolic
             internal const string DefiniteArrayTypeMismatch = "definite_array_type_mismatch";
             internal const string DefiniteIndexOutOfRange = "definite_index_out_of_range";
             internal const string DefiniteRangeOutOfRange = "definite_range_out_of_range";
+            internal const string DefiniteCountIndexOutOfRange = "definite_count_index_out_of_range";
+            internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
         }
 
         internal static class ExceptionSources
@@ -50,6 +54,7 @@ namespace PurelySharp.Symbolic
             internal const string CheckedOperator = "checked_operator";
             internal const string CheckedConversion = "checked_conversion";
             internal const string ArrayLength = "array_length";
+            internal const string StackAllocLength = "stackalloc_length";
             internal const string NullReceiver = "null_receiver";
             internal const string AwaitExpression = "await_expression";
             internal const string LockReceiver = "lock_receiver";
@@ -59,6 +64,8 @@ namespace PurelySharp.Symbolic
             internal const string ArrayIndex = "array_index";
             internal const string SpanSlice = "span_slice";
             internal const string RangeSlice = "range_slice";
+            internal const string CountIndex = "count_index";
+            internal const string SwitchExpression = "switch_expression";
         }
 
         internal static bool IsKnownEvidenceCategory(string category)
@@ -73,13 +80,16 @@ namespace PurelySharp.Symbolic
                 string.Equals(category, ExceptionCategories.DefiniteLockNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteThrowNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNegativeArrayLength, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteNegativeStackAllocLength, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNullableValueWithoutValue, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteUnboxNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteInvalidCast, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteCheckedIntegralOverflow, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteArrayTypeMismatch, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, System.StringComparison.Ordinal) ||
-                string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, System.StringComparison.Ordinal);
+                string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteSwitchExpressionNoMatch, System.StringComparison.Ordinal);
         }
 
         internal static bool TryGetThrowExpression(SyntaxNode throwNode, out ExpressionSyntax expression)

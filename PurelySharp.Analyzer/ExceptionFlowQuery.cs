@@ -235,6 +235,35 @@ namespace PurelySharp.Analyzer
                         ExceptionSources.ArrayLength));
             }
 
+            foreach (var negativeStackAllocLengthHazard in CollectProvenNegativeStackAllocLengthHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                var stackAllocNode = FindHazardSiteNode(methodNode, negativeStackAllocLengthHazard);
+                if (IsInStaticallyUnreachableBranch(stackAllocNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(stackAllocNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
+                if (IsCaughtWithinMethod(stackAllocNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    stackAllocNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        ExceptionTypes.OverflowException,
+                        ExceptionCategories.DefiniteNegativeStackAllocLength,
+                        ExceptionSources.StackAllocLength));
+            }
+
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
@@ -486,6 +515,132 @@ namespace PurelySharp.Analyzer
                         ExceptionCategories.DefiniteRangeOutOfRange,
                         argumentOutOfRangeNode is InvocationExpressionSyntax ? ExceptionSources.SpanSlice : ExceptionSources.RangeSlice));
             }
+
+            foreach (var countIndexHazard in CollectProvenCountIndexOutOfRangeHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                var countIndexNode = FindHazardSiteNode(methodNode, countIndexHazard);
+                if (IsInStaticallyUnreachableBranch(countIndexNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(countIndexNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentOutOfRangeException);
+                if (IsCaughtWithinMethod(countIndexNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    countIndexNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        ExceptionTypes.ArgumentOutOfRangeException,
+                        ExceptionCategories.DefiniteCountIndexOutOfRange,
+                        ExceptionSources.CountIndex));
+            }
+
+            foreach (var switchNoMatchHazard in CollectProvenSwitchExpressionNoMatchHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                var switchExpressionNode = FindHazardSiteNode(methodNode, switchNoMatchHazard);
+                if (IsInStaticallyUnreachableBranch(switchExpressionNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(switchExpressionNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.SwitchExpressionException);
+                if (IsCaughtWithinMethod(switchExpressionNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    switchExpressionNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        ExceptionTypes.SwitchExpressionException,
+                        ExceptionCategories.DefiniteSwitchExpressionNoMatch,
+                        ExceptionSources.SwitchExpression));
+            }
+        }
+
+        private static IEnumerable<SymbolicRuntimeHazard> CollectProvenNegativeStackAllocLengthHazards(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                methodNode,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                new SymbolicRuntimeHazardQueryOptions(
+                    kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
+
+            return result.Hazards.Where(static hazard =>
+                hazard.Kind == SymbolicRuntimeHazardKind.NegativeStackAllocLength &&
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+        }
+
+        private static IEnumerable<SymbolicRuntimeHazard> CollectProvenCountIndexOutOfRangeHazards(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                methodNode,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                new SymbolicRuntimeHazardQueryOptions(
+                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            return result.Hazards.Where(static hazard =>
+                hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven &&
+                string.Equals(
+                    hazard.Category,
+                    ExceptionCategories.DefiniteCountIndexOutOfRange,
+                    StringComparison.Ordinal));
+        }
+
+        private static IEnumerable<SymbolicRuntimeHazard> CollectProvenSwitchExpressionNoMatchHazards(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                methodNode,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                new SymbolicRuntimeHazardQueryOptions(
+                    kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
+
+            return result.Hazards.Where(static hazard =>
+                hazard.Kind == SymbolicRuntimeHazardKind.SwitchExpressionNoMatch &&
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+        }
+
+        private static SyntaxNode FindHazardSiteNode(SyntaxNode methodNode, SymbolicRuntimeHazard hazard)
+        {
+            return methodNode.DescendantNodesAndSelf()
+                .FirstOrDefault(node => node.Span.Start == hazard.SpanStart && node.Span.End == hazard.SpanEnd)
+                ?? methodNode;
         }
 
         private static IEnumerable<ExceptionCandidate> CollectSourceCalleeExceptions(

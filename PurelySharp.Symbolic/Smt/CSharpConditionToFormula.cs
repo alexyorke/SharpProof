@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Symbolic.Ir;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Smt
@@ -248,6 +249,16 @@ namespace PurelySharp.Symbolic.Smt
             if (constantValue.HasValue && constantValue.Value is bool booleanValue)
             {
                 formula = new SmtBooleanConstant(booleanValue);
+                return true;
+            }
+
+            if (TryTranslateUsingSymbolicIr(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion))
+            {
                 return true;
             }
 
@@ -571,6 +582,28 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateUsingSymbolicIr(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            var context = new SymbolicLoweringContext(
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion);
+            if (!SymbolicIrLowerer.TryLowerCondition(expression, context, out var condition) ||
+                !SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded))
+            {
+                return false;
+            }
+
+            formula = encoded;
+            return true;
         }
 
         private static bool TryTranslateConditionalBooleanExpression(
@@ -3344,6 +3377,17 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (TryCreatePrefixSubstringComparisonFormula(
+                    binaryExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (!TryTranslateStringValue(binaryExpression.Left, semanticModel, cancellationToken, out var left, getSymbolVersion, inlineDepth) ||
                 left == null ||
                 !TryTranslateStringValue(binaryExpression.Right, semanticModel, cancellationToken, out var right, getSymbolVersion, inlineDepth) ||
@@ -3365,6 +3409,91 @@ namespace PurelySharp.Symbolic.Smt
             formula = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
                 ? equality
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, equality);
+            return true;
+        }
+
+        private static bool TryCreatePrefixSubstringComparisonFormula(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (TryGetPrefixSubstringComparisonParts(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverExpression,
+                    out var prefix) ||
+                TryGetPrefixSubstringComparisonParts(
+                    binaryExpression.Right,
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out receiverExpression,
+                    out prefix))
+            {
+                if (!TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiverFormula, getSymbolVersion, inlineDepth) ||
+                    receiverFormula == null ||
+                    !TryCreateStringNonNullFormula(receiverExpression, semanticModel, cancellationToken, out var receiverNonNull, getSymbolVersion, inlineDepth) ||
+                    receiverNonNull == null)
+                {
+                    return false;
+                }
+
+                var prefixMatch = new SmtStringStartsWithFormula(receiverFormula, new SmtStringConstant(prefix));
+                SmtFormula predicate = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
+                    ? prefixMatch
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, prefixMatch);
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, receiverNonNull, predicate);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetPrefixSubstringComparisonParts(
+            ExpressionSyntax substringExpression,
+            ExpressionSyntax prefixExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax receiverExpression,
+            out string prefix)
+        {
+            receiverExpression = null!;
+            prefix = string.Empty;
+            var constantPrefix = TryGetConstantString(prefixExpression, semanticModel, cancellationToken);
+            if (constantPrefix == null)
+            {
+                return false;
+            }
+
+            substringExpression = UnwrapExpression(substringExpression);
+            if (substringExpression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod is not
+                {
+                    IsStatic: false,
+                    Name: "Substring",
+                    ContainingType.SpecialType: SpecialType.System_String
+                } ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiver ||
+                invocationOperation.Arguments.Length != 2 ||
+                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax startExpression ||
+                invocationOperation.Arguments[1].Value.Syntax is not ExpressionSyntax lengthExpression ||
+                !TryGetIntegralConstantValue(startExpression, semanticModel, cancellationToken, out var start) ||
+                start != 0 ||
+                !TryGetIntegralConstantValue(lengthExpression, semanticModel, cancellationToken, out var length) ||
+                length != constantPrefix.Length)
+            {
+                return false;
+            }
+
+            receiverExpression = receiver;
+            prefix = constantPrefix;
             return true;
         }
 

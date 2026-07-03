@@ -78,6 +78,27 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIr_KeepsSmtConstructionBehindEncoderBoundary()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var irDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic", "Ir");
+            var offenders = Directory.GetFiles(irDirectory, "*.cs", SearchOption.AllDirectories)
+                .Where(static path => !path.EndsWith("SymbolicIrFormulaEncoder.cs", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(static file =>
+                    file.Source.Contains("new Smt", StringComparison.Ordinal) ||
+                    file.Source.Contains(": SmtFormula", StringComparison.Ordinal))
+                .Select(static file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
         public void RuntimeExceptionEvidenceFacts_AcceptsAllSharedCategories()
         {
             var rejectedCategories = typeof(SymbolicRuntimeExceptionFacts.ExceptionCategories)

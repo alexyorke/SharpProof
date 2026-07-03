@@ -1253,7 +1253,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.NegativeStackAllocLength,
                 trigger,
                 ExceptionTypes.OverflowException,
-                "definite_negative_stackalloc_length");
+                ExceptionCategories.DefiniteNegativeStackAllocLength);
             return true;
         }
 
@@ -2019,7 +2019,7 @@ namespace PurelySharp.Symbolic
             {
                 kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
                 exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
-                category = "definite_count_index_out_of_range";
+                category = ExceptionCategories.DefiniteCountIndexOutOfRange;
                 return true;
             }
 

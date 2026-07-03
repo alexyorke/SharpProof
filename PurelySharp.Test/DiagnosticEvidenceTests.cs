@@ -12976,6 +12976,114 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_RuntimeHazardModeAll_ReportsCountIndexSummaryAndSiteEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(List<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}",
+                RuntimeHazardAllOptions());
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_count_index_out_of_range"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_count_index_out_of_range:count_index"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_count_index_out_of_range"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_count_index_out_of_range:count_index"));
+        }
+
+        [Test]
+        public async Task Ps0010_RuntimeHazardModeAll_ReportsSwitchNoMatchSummaryAndSiteEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value switch
+            {
+                < 0 => -1,
+                0 => 0
+            };
+        }
+
+        return 0;
+    }
+}",
+                RuntimeHazardAllOptions());
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_switch_expression_no_match"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException=definite_switch_expression_no_match:switch_expression"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_switch_expression_no_match"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException=definite_switch_expression_no_match:switch_expression"));
+        }
+
+        [Test]
+        public async Task Ps0010_RuntimeHazardModeAll_ReportsNegativeStackAllocSummaryAndSiteEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        if (length < 0)
+        {
+            Span<int> span = stackalloc int[length];
+            return span.Length;
+        }
+
+        return 0;
+    }
+}",
+                RuntimeHazardAllOptions());
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_negative_stackalloc_length"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_negative_stackalloc_length:stackalloc_length"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_negative_stackalloc_length"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_negative_stackalloc_length:stackalloc_length"));
+        }
+
+        [Test]
         public async Task Ps0011_RuntimeHazardModeSites_UsesPathFactsToSuppressGuardedHazard()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

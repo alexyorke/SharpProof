@@ -22,8 +22,37 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (inlineDepth >= MaxSourcePredicateInlineDepth ||
-                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+            if (inlineDepth >= MaxSourcePredicateInlineDepth)
+            {
+                return false;
+            }
+
+            return TryTranslateSourceMethodBooleanInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                TryTranslateLocalDelegateBooleanInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
+        }
+
+        private static bool TryTranslateSourceMethodBooleanInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
                 !CanInlineSourceBooleanPredicate(invocationOperation.TargetMethod) ||
                 !TryGetReturnedBooleanFormula(
                     invocationOperation.TargetMethod,
@@ -45,6 +74,449 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = SubstituteVariables(returnedFormula, substitutions);
             return true;
+        }
+
+        private static bool TryTranslateLocalDelegateBooleanInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.MethodKind != MethodKind.DelegateInvoke ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean ||
+                invocationOperation.TargetMethod.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+                !TryGetLocalDelegateReceiver(invocationExpression, semanticModel, cancellationToken, out var delegateLocal) ||
+                delegateLocal.Type.TypeKind != TypeKind.Delegate ||
+                !TryGetLocalDelegateInitializer(
+                    delegateLocal,
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var initializer))
+            {
+                return false;
+            }
+
+            if (initializer is AnonymousFunctionExpressionSyntax lambdaExpression)
+            {
+                if (!LambdaBodyReferencesOnlyParameters(lambdaExpression, semanticModel, cancellationToken) ||
+                    !TryTranslateLambdaBooleanBody(
+                        lambdaExpression,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth + 1,
+                        out var returnedFormula) ||
+                    returnedFormula is not { Kind: SmtValueKind.Bool } ||
+                    !TryCreateLambdaPredicateSubstitutions(
+                        lambdaExpression,
+                        invocationOperation,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        inlineDepth,
+                        out var substitutions))
+                {
+                    return false;
+                }
+
+                formula = SubstituteVariables(returnedFormula, substitutions);
+                return true;
+            }
+
+            return TryTranslateLocalDelegateMethodGroupInvocation(
+                initializer,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryGetLocalDelegateReceiver(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ILocalSymbol localSymbol)
+        {
+            localSymbol = null!;
+            ExpressionSyntax? receiver = invocationExpression.Expression switch
+            {
+                IdentifierNameSyntax identifierName => identifierName,
+                MemberAccessExpressionSyntax
+                {
+                    Name.Identifier.ValueText: "Invoke",
+                    Expression: { } memberReceiver
+                } => memberReceiver,
+                _ => null
+            };
+
+            if (receiver == null)
+            {
+                return false;
+            }
+
+            if (semanticModel.GetSymbolInfo(UnwrapExpression(receiver), cancellationToken).Symbol is not ILocalSymbol local)
+            {
+                return false;
+            }
+
+            localSymbol = (ILocalSymbol)local.OriginalDefinition;
+            return true;
+        }
+
+        private static bool TryGetLocalDelegateInitializer(
+            ILocalSymbol delegateLocal,
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax initializer)
+        {
+            initializer = null!;
+            if (delegateLocal.DeclaringSyntaxReferences.Length != 1 ||
+                delegateLocal.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializerExpression
+                } declarator ||
+                declarator.Parent?.Parent is not LocalDeclarationStatementSyntax declarationStatement ||
+                invocationExpression.FirstAncestorOrSelf<StatementSyntax>() is not { } invocationStatement ||
+                declarationStatement.Parent is not BlockSyntax declarationBlock ||
+                !ReferenceEquals(declarationBlock, invocationStatement.Parent))
+            {
+                return false;
+            }
+
+            var declarationIndex = declarationBlock.Statements.IndexOf(declarationStatement);
+            var invocationIndex = declarationBlock.Statements.IndexOf(invocationStatement);
+            if (declarationIndex < 0 ||
+                invocationIndex <= declarationIndex ||
+                CountLocalIdentifierReferences(invocationStatement, delegateLocal, semanticModel, cancellationToken) != 1)
+            {
+                return false;
+            }
+
+            for (var index = declarationIndex + 1; index < invocationIndex; index++)
+            {
+                if (CountLocalIdentifierReferences(declarationBlock.Statements[index], delegateLocal, semanticModel, cancellationToken) != 0)
+                {
+                    return false;
+                }
+            }
+
+            initializer = initializerExpression;
+            return true;
+        }
+
+        private static bool TryTranslateLocalDelegateMethodGroupInvocation(
+            ExpressionSyntax initializer,
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryGetStaticSourceBooleanMethodGroup(initializer, semanticModel, cancellationToken, out var methodSymbol) ||
+                !TryGetReturnedBooleanFormula(
+                    methodSymbol,
+                    semanticModel.Compilation,
+                    cancellationToken,
+                    inlineDepth + 1,
+                    out var returnedFormula) ||
+                returnedFormula is not { Kind: SmtValueKind.Bool } ||
+                !TryCreateMethodGroupPredicateSubstitutions(
+                    methodSymbol,
+                    invocationOperation,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    inlineDepth,
+                    out var substitutions))
+            {
+                return false;
+            }
+
+            formula = SubstituteVariables(returnedFormula, substitutions);
+            return true;
+        }
+
+        private static bool TryGetStaticSourceBooleanMethodGroup(
+            ExpressionSyntax initializer,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IMethodSymbol methodSymbol)
+        {
+            methodSymbol = null!;
+            var symbolInfo = semanticModel.GetSymbolInfo(initializer, cancellationToken);
+            var symbol = symbolInfo.Symbol ?? (symbolInfo.CandidateSymbols.Length == 1 ? symbolInfo.CandidateSymbols[0] : null);
+            if (symbol is not IMethodSymbol candidate ||
+                !candidate.IsStatic ||
+                !CanInlineSourceBooleanPredicate(candidate))
+            {
+                return false;
+            }
+
+            methodSymbol = candidate.OriginalDefinition;
+            return true;
+        }
+
+        private static int CountLocalIdentifierReferences(
+            SyntaxNode node,
+            ILocalSymbol localSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var count = 0;
+            foreach (var identifier in node.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+            {
+                if (IsSameSymbol(semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol, localSymbol))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool LambdaBodyReferencesOnlyParameters(
+            AnonymousFunctionExpressionSyntax lambdaExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var allowedParameters = GetLambdaParameterSymbols(lambdaExpression, semanticModel, cancellationToken)
+                .ToImmutableHashSet<ISymbol>(SymbolEqualityComparer.Default);
+            if (allowedParameters.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var identifier in GetLambdaBodyNode(lambdaExpression)?.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>() ?? Enumerable.Empty<IdentifierNameSyntax>())
+            {
+                var symbol = semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
+                if (symbol == null ||
+                    (!allowedParameters.Contains(symbol) &&
+                     !IsAllowedLambdaParameterMemberAccess(identifier, allowedParameters, semanticModel, cancellationToken)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsAllowedLambdaParameterMemberAccess(
+            IdentifierNameSyntax identifier,
+            ImmutableHashSet<ISymbol> allowedParameters,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (identifier.Parent is not MemberAccessExpressionSyntax memberAccess ||
+                !ReferenceEquals(memberAccess.Name, identifier))
+            {
+                return false;
+            }
+
+            var receiverSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(memberAccess.Expression), cancellationToken).Symbol;
+            return receiverSymbol != null && allowedParameters.Contains(receiverSymbol);
+        }
+
+        private static bool TryTranslateLambdaBooleanBody(
+            AnonymousFunctionExpressionSyntax lambdaExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            return lambdaExpression switch
+            {
+                SimpleLambdaExpressionSyntax { ExpressionBody: { } expressionBody } => TryTranslate(
+                    expressionBody,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth),
+                ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } expressionBody } => TryTranslate(
+                    expressionBody,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth),
+                SimpleLambdaExpressionSyntax { Block: { } block } => TryTranslateReturnedBooleanBlock(
+                    block,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula),
+                ParenthesizedLambdaExpressionSyntax { Block: { } block } => TryTranslateReturnedBooleanBlock(
+                    block,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula),
+                AnonymousMethodExpressionSyntax { Block: { } block } => TryTranslateReturnedBooleanBlock(
+                    block,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula),
+                _ => false
+            };
+        }
+
+        private static bool TryCreateLambdaPredicateSubstitutions(
+            AnonymousFunctionExpressionSyntax lambdaExpression,
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            out IReadOnlyList<SmtVariableSubstitution> substitutions)
+        {
+            var parameters = GetLambdaParameterSymbols(lambdaExpression, semanticModel, cancellationToken).ToArray();
+            if (parameters.Length == 0 || parameters.Length != invocationOperation.Arguments.Length)
+            {
+                substitutions = Array.Empty<SmtVariableSubstitution>();
+                return false;
+            }
+
+            var builder = new List<SmtVariableSubstitution>(parameters.Length);
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var parameter = parameters[index];
+                var argument = invocationOperation.Arguments[index];
+                if (!TryGetValueKind(parameter.Type, out var parameterKind) ||
+                    argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
+                    !TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
+                    argumentFormula == null ||
+                    argumentFormula.Kind != parameterKind)
+                {
+                    substitutions = Array.Empty<SmtVariableSubstitution>();
+                    return false;
+                }
+
+                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
+                builder.Add(new SmtVariableSubstitution(
+                    formalVariable.Name,
+                    formalVariable.Name + ".",
+                    GetFormulaMemberName(formalVariable) + ".",
+                    argumentFormula));
+
+                if (parameter.Type.SpecialType == SpecialType.System_String &&
+                    TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
+                    argumentStringFormula != null)
+                {
+                    var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
+                    builder.Add(new SmtVariableSubstitution(
+                        formalStringVariable.Name,
+                        formalStringVariable.Name + ".",
+                        GetFormulaMemberName(formalStringVariable) + ".",
+                        argumentStringFormula));
+                }
+            }
+
+            substitutions = builder;
+            return true;
+        }
+
+        private static bool TryCreateMethodGroupPredicateSubstitutions(
+            IMethodSymbol methodSymbol,
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            out IReadOnlyList<SmtVariableSubstitution> substitutions)
+        {
+            var parameters = methodSymbol.Parameters;
+            if (parameters.Length == 0 || parameters.Length != invocationOperation.Arguments.Length)
+            {
+                substitutions = Array.Empty<SmtVariableSubstitution>();
+                return false;
+            }
+
+            var builder = new List<SmtVariableSubstitution>(parameters.Length);
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var parameter = parameters[index];
+                var argument = invocationOperation.Arguments[index];
+                if (!TryGetValueKind(parameter.Type, out var parameterKind) ||
+                    argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
+                    !TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
+                    argumentFormula == null ||
+                    argumentFormula.Kind != parameterKind)
+                {
+                    substitutions = Array.Empty<SmtVariableSubstitution>();
+                    return false;
+                }
+
+                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
+                builder.Add(new SmtVariableSubstitution(
+                    formalVariable.Name,
+                    formalVariable.Name + ".",
+                    GetFormulaMemberName(formalVariable) + ".",
+                    argumentFormula));
+
+                if (parameter.Type.SpecialType == SpecialType.System_String &&
+                    TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
+                    argumentStringFormula != null)
+                {
+                    var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
+                    builder.Add(new SmtVariableSubstitution(
+                        formalStringVariable.Name,
+                        formalStringVariable.Name + ".",
+                        GetFormulaMemberName(formalStringVariable) + ".",
+                        argumentStringFormula));
+                }
+            }
+
+            substitutions = builder;
+            return true;
+        }
+
+        private static IEnumerable<IParameterSymbol> GetLambdaParameterSymbols(
+            AnonymousFunctionExpressionSyntax lambdaExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var parameter in GetLambdaParameters(lambdaExpression))
+            {
+                if (semanticModel.GetDeclaredSymbol(parameter, cancellationToken) is IParameterSymbol parameterSymbol)
+                {
+                    yield return parameterSymbol.OriginalDefinition;
+                }
+            }
+        }
+
+        private static IEnumerable<ParameterSyntax> GetLambdaParameters(AnonymousFunctionExpressionSyntax lambdaExpression)
+        {
+            return lambdaExpression switch
+            {
+                SimpleLambdaExpressionSyntax simpleLambda => new[] { simpleLambda.Parameter },
+                ParenthesizedLambdaExpressionSyntax parenthesizedLambda => parenthesizedLambda.ParameterList.Parameters,
+                AnonymousMethodExpressionSyntax { ParameterList: { } parameterList } => parameterList.Parameters,
+                _ => Enumerable.Empty<ParameterSyntax>()
+            };
+        }
+
+        private static SyntaxNode? GetLambdaBodyNode(AnonymousFunctionExpressionSyntax lambdaExpression)
+        {
+            return lambdaExpression switch
+            {
+                SimpleLambdaExpressionSyntax { ExpressionBody: { } expressionBody } => expressionBody,
+                ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } expressionBody } => expressionBody,
+                SimpleLambdaExpressionSyntax { Block: { } block } => block,
+                ParenthesizedLambdaExpressionSyntax { Block: { } block } => block,
+                AnonymousMethodExpressionSyntax { Block: { } block } => block,
+                _ => null
+            };
         }
 
         private static bool TryTranslateKnownStringBooleanInvocation(
@@ -1035,7 +1507,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (TryGetRegexPatternFromStaticReadonlyField(receiver, semanticModel, cancellationToken, out pattern, out options))
+            if (TryGetRegexPatternFromReadonlyField(receiver, semanticModel, cancellationToken, out pattern, out options))
             {
                 return true;
             }
@@ -1067,7 +1539,7 @@ namespace PurelySharp.Symbolic.Smt
                 TryGetRegexPatternFromGeneratedRegexFactory(expression, semanticModel, cancellationToken, out pattern, out options);
         }
 
-        private static bool TryGetRegexPatternFromStaticReadonlyField(
+        private static bool TryGetRegexPatternFromReadonlyField(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -1078,7 +1550,6 @@ namespace PurelySharp.Symbolic.Smt
             options = RegexOptions.None;
             var symbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol;
             if (symbol is not IFieldSymbol fieldSymbol ||
-                !fieldSymbol.IsStatic ||
                 !fieldSymbol.IsReadOnly ||
                 fieldSymbol.Type is not INamedTypeSymbol fieldType ||
                 !IsRegexType(fieldType) ||
@@ -1091,12 +1562,57 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (HasRegexFieldConstructorAssignment(fieldSymbol, semanticModel.Compilation, cancellationToken))
+            {
+                return false;
+            }
+
+            var initializerSemanticModel = initializer.SyntaxTree == semanticModel.SyntaxTree
+                ? semanticModel
+                : semanticModel.Compilation.GetSemanticModel(initializer.SyntaxTree);
+
             return TryGetRegexPatternFromCreationOrGeneratedFactory(
                 initializer,
-                semanticModel,
+                initializerSemanticModel,
                 cancellationToken,
                 out pattern,
                 out options);
+        }
+
+        private static bool HasRegexFieldConstructorAssignment(
+            IFieldSymbol fieldSymbol,
+            Compilation compilation,
+            CancellationToken cancellationToken)
+        {
+            if (fieldSymbol.ContainingType == null)
+            {
+                return false;
+            }
+
+            foreach (var syntaxReference in fieldSymbol.ContainingType.DeclaringSyntaxReferences)
+            {
+                if (syntaxReference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax typeDeclaration)
+                {
+                    continue;
+                }
+
+                foreach (var constructor in typeDeclaration.Members.OfType<ConstructorDeclarationSyntax>())
+                {
+                    var isStaticConstructor = constructor.Modifiers.Any(SyntaxKind.StaticKeyword);
+                    if (isStaticConstructor != fieldSymbol.IsStatic)
+                    {
+                        continue;
+                    }
+
+                    var constructorSemanticModel = compilation.GetSemanticModel(constructor.SyntaxTree);
+                    if (ContainsRegexSymbolWrite(constructor, fieldSymbol, constructorSemanticModel, cancellationToken))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static bool TryGetRegexPatternFromObjectCreation(
@@ -1445,6 +1961,7 @@ namespace PurelySharp.Symbolic.Smt
                 RegexOptions.Compiled |
                 RegexOptions.CultureInvariant |
                 RegexOptions.Singleline |
+                RegexOptions.Multiline |
                 RegexOptions.IgnorePatternWhitespace;
 
             return (options & ~supportedOptions) == 0;
