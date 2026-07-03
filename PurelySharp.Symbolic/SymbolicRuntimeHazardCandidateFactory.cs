@@ -1329,12 +1329,17 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            trigger = smtOperator == SmtIntegerBinaryOperator.Divide
+            trigger = IsSignedDivisionOverflowOperator(smtOperator)
                 ? Conjoin(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
                 : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
             return true;
+        }
+
+        private static bool IsSignedDivisionOverflowOperator(SmtIntegerBinaryOperator smtOperator)
+        {
+            return smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder;
         }
 
         private static bool TryCreateCheckedIntegralUnaryOverflowTrigger(
@@ -1417,7 +1422,7 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            trigger = smtOperator == SmtIntegerBinaryOperator.Divide
+            trigger = IsSignedDivisionOverflowOperator(smtOperator)
                 ? Conjoin(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
@@ -1464,26 +1469,28 @@ namespace PurelySharp.Symbolic
             if (!TryGetCheckedIntegralRange(binaryExpression, semanticModel, cancellationToken, out minValue, out maxValue) ||
                 semanticModel.GetOperation(binaryExpression, cancellationToken) is not IBinaryOperation
                 {
-                    IsChecked: true,
                     OperatorMethod: null
-                })
+                } operation)
             {
                 return false;
             }
 
             switch (binaryExpression.Kind())
             {
-                case SyntaxKind.AddExpression:
+                case SyntaxKind.AddExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Add;
                     return true;
-                case SyntaxKind.SubtractExpression:
+                case SyntaxKind.SubtractExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Subtract;
                     return true;
-                case SyntaxKind.MultiplyExpression:
+                case SyntaxKind.MultiplyExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Multiply;
                     return true;
                 case SyntaxKind.DivideExpression when minValue < 0:
                     smtOperator = SmtIntegerBinaryOperator.Divide;
+                    return true;
+                case SyntaxKind.ModuloExpression when minValue < 0:
+                    smtOperator = SmtIntegerBinaryOperator.Remainder;
                     return true;
                 default:
                     return false;
@@ -1565,7 +1572,6 @@ namespace PurelySharp.Symbolic
 
             if (semanticModel.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation
                 {
-                    IsChecked: true,
                     OperatorMethod: null
                 } operation)
             {
@@ -1580,17 +1586,20 @@ namespace PurelySharp.Symbolic
 
             switch (assignment.Kind())
             {
-                case SyntaxKind.AddAssignmentExpression:
+                case SyntaxKind.AddAssignmentExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Add;
                     return true;
-                case SyntaxKind.SubtractAssignmentExpression:
+                case SyntaxKind.SubtractAssignmentExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Subtract;
                     return true;
-                case SyntaxKind.MultiplyAssignmentExpression:
+                case SyntaxKind.MultiplyAssignmentExpression when operation.IsChecked:
                     smtOperator = SmtIntegerBinaryOperator.Multiply;
                     return true;
                 case SyntaxKind.DivideAssignmentExpression when minValue < 0:
                     smtOperator = SmtIntegerBinaryOperator.Divide;
+                    return true;
+                case SyntaxKind.ModuloAssignmentExpression when minValue < 0:
+                    smtOperator = SmtIntegerBinaryOperator.Remainder;
                     return true;
                 default:
                     return false;
