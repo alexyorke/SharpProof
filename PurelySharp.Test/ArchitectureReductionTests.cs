@@ -125,6 +125,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AssignmentRule_DelegatesFreshOwnershipClassification()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "AssignmentPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference("));
+            Assert.That(source, Does.Not.Contain("private static bool IsOwnedFreshMutableObjectReference("));
+            Assert.That(source, Does.Not.Contain("private static bool IsOwnedFreshMutableReadonlyFieldReference("));
+            Assert.That(source, Does.Not.Contain("private static bool HasStableFreshMutableObjectValue("));
+            Assert.That(source, Does.Not.Contain("private static bool ConstructorStoresParameterInStableMember("));
+        }
+
+        [Test]
         public void RuntimeHazardTriggers_CreateIrPreconditionTriggersBeforeFormulaProjection()
         {
             var repositoryRoot = FindRepositoryRoot();
