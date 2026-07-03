@@ -4368,6 +4368,12 @@ namespace PurelySharp.Analyzer.Engine
                     out var lowerBoundLengthFact))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(lowerBoundLengthFact));
+                nextState = AddSymbolicConditionFromFormula(
+                    nextState,
+                    lowerBoundLengthFact,
+                    valueExpression,
+                    "analyzer.assignment.collection_length",
+                    "analyzer.assignment.collection_length");
             }
 
             if (TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula) &&
@@ -4402,6 +4408,12 @@ namespace PurelySharp.Analyzer.Engine
                     valueState.GetSmtSymbolVersion))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.AddRange(asExpressionFacts));
+                nextState = AddSymbolicConditionsFromFormulas(
+                    nextState,
+                    asExpressionFacts,
+                    valueExpression,
+                    "analyzer.assignment.as_expression",
+                    "analyzer.assignment.as_expression");
             }
 
             if (TryCreateReferenceBackedStringContentFact(
@@ -4436,8 +4448,14 @@ namespace PurelySharp.Analyzer.Engine
                     SmtBinaryOperator.NotEqual,
                     targetReferenceFormula,
                     new SmtNullConstant());
-                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetNonNullFormula, valueNonNullFormula)));
+                var stringNonNullFact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetNonNullFormula, valueNonNullFormula);
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringNonNullFact));
+                nextState = AddSymbolicConditionFromFormula(
+                    nextState,
+                    stringNonNullFact,
+                    valueExpression,
+                    "analyzer.assignment.string_nonnull",
+                    "analyzer.assignment.string_nonnull");
             }
 
             return nextState;
@@ -4499,6 +4517,49 @@ namespace PurelySharp.Analyzer.Engine
             return currentState.WithPathConditionsAndState(
                 currentState.PathConditions,
                 currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
+        }
+
+        private static PurityAnalysisState AddSymbolicConditionsFromFormulas(
+            PurityAnalysisState currentState,
+            ImmutableArray<SmtFormula> formulas,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey)
+        {
+            var nextState = currentState;
+            foreach (var formula in formulas)
+            {
+                nextState = AddSymbolicConditionFromFormula(
+                    nextState,
+                    formula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey);
+            }
+
+            return nextState;
+        }
+
+        private static PurityAnalysisState AddSymbolicConditionFromFormula(
+            PurityAnalysisState currentState,
+            SmtFormula formula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey)
+        {
+            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    formula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var condition))
+            {
+                return currentState;
+            }
+
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                currentState.PathState.AddPathCondition(condition));
         }
 
         private delegate bool LowerAssignedSymbolicTerm(

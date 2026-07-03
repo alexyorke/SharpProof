@@ -32,6 +32,16 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        internal static bool TryLowerCondition(
+            SmtFormula formula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey,
+            out SymbolicCondition condition)
+        {
+            return TryLowerConditionCore(formula, sourceNode, provenance, evidenceKey, out condition);
+        }
+
         internal static bool TryLowerTerm(SmtFormula formula, out SymbolicTerm term)
         {
             return TryLowerTerm(formula, sourceNode: null, provenance: null, evidenceKey: null, out term);
@@ -107,7 +117,7 @@ namespace PurelySharp.Symbolic.Ir
                 case SmtConditionalFormula conditional:
                     if (sourceNode != null &&
                         provenance != null &&
-                        TryLowerCondition(conditional.Condition, sourceNode, provenance, evidenceKey, out var condition) &&
+                        TryLowerConditionCore(conditional.Condition, sourceNode, provenance, evidenceKey, out var condition) &&
                         TryLowerTerm(conditional.WhenTrue, sourceNode, provenance, evidenceKey, out var whenTrue) &&
                         TryLowerTerm(conditional.WhenFalse, sourceNode, provenance, evidenceKey, out var whenFalse) &&
                         whenTrue.Kind == whenFalse.Kind &&
@@ -162,7 +172,7 @@ namespace PurelySharp.Symbolic.Ir
             return new SymbolicVariableTerm(variable.Name, variable.Kind);
         }
 
-        private static bool TryLowerCondition(
+        private static bool TryLowerConditionCore(
             SmtFormula formula,
             SyntaxNode sourceNode,
             string provenance,
@@ -175,7 +185,7 @@ namespace PurelySharp.Symbolic.Ir
                     condition = new SymbolicConstantCondition(boolean.Value);
                     return true;
                 case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } not:
-                    if (TryLowerCondition(not.Operand, sourceNode, provenance, evidenceKey, out var operand))
+                    if (TryLowerConditionCore(not.Operand, sourceNode, provenance, evidenceKey, out var operand))
                     {
                         condition = new SymbolicNotCondition(operand);
                         return true;
@@ -183,8 +193,8 @@ namespace PurelySharp.Symbolic.Ir
 
                     break;
                 case SmtBinaryFormula { Operator: SmtBinaryOperator.And } and:
-                    if (TryLowerCondition(and.Left, sourceNode, provenance, evidenceKey, out var leftAnd) &&
-                        TryLowerCondition(and.Right, sourceNode, provenance, evidenceKey, out var rightAnd))
+                    if (TryLowerConditionCore(and.Left, sourceNode, provenance, evidenceKey, out var leftAnd) &&
+                        TryLowerConditionCore(and.Right, sourceNode, provenance, evidenceKey, out var rightAnd))
                     {
                         condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, leftAnd, rightAnd);
                         return true;
@@ -192,8 +202,8 @@ namespace PurelySharp.Symbolic.Ir
 
                     break;
                 case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } or:
-                    if (TryLowerCondition(or.Left, sourceNode, provenance, evidenceKey, out var leftOr) &&
-                        TryLowerCondition(or.Right, sourceNode, provenance, evidenceKey, out var rightOr))
+                    if (TryLowerConditionCore(or.Left, sourceNode, provenance, evidenceKey, out var leftOr) &&
+                        TryLowerConditionCore(or.Right, sourceNode, provenance, evidenceKey, out var rightOr))
                     {
                         condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, leftOr, rightOr);
                         return true;
@@ -201,6 +211,16 @@ namespace PurelySharp.Symbolic.Ir
 
                     break;
                 case SmtBinaryFormula relation:
+                    if (TryLowerBooleanRelationCondition(
+                            relation,
+                            sourceNode,
+                            provenance,
+                            evidenceKey,
+                            out condition))
+                    {
+                        return true;
+                    }
+
                     if (TryGetSymbolicRelationOperator(relation.Operator, out var relationOperator) &&
                         TryLowerTerm(relation.Left, sourceNode, provenance, evidenceKey, out var left) &&
                         TryLowerTerm(relation.Right, sourceNode, provenance, evidenceKey, out var right) &&
@@ -208,6 +228,78 @@ namespace PurelySharp.Symbolic.Ir
                     {
                         condition = new SymbolicFactCondition(SymbolicFact.Exact(
                             new SymbolicRelationAtom(relationOperator, left, right),
+                            sourceNode,
+                            provenance,
+                            evidenceKey: evidenceKey));
+                        return true;
+                    }
+
+                    break;
+                case SmtStringContainsFormula contains:
+                    if (TryLowerStringPredicate(
+                            SymbolicStringPredicateKind.Contains,
+                            contains.Value,
+                            contains.Search,
+                            sourceNode,
+                            provenance,
+                            evidenceKey,
+                            out condition))
+                    {
+                        return true;
+                    }
+
+                    break;
+                case SmtStringStartsWithFormula startsWith:
+                    if (TryLowerStringPredicate(
+                            SymbolicStringPredicateKind.StartsWith,
+                            startsWith.Value,
+                            startsWith.Prefix,
+                            sourceNode,
+                            provenance,
+                            evidenceKey,
+                            out condition))
+                    {
+                        return true;
+                    }
+
+                    break;
+                case SmtStringEndsWithFormula endsWith:
+                    if (TryLowerStringPredicate(
+                            SymbolicStringPredicateKind.EndsWith,
+                            endsWith.Value,
+                            endsWith.Suffix,
+                            sourceNode,
+                            provenance,
+                            evidenceKey,
+                            out condition))
+                    {
+                        return true;
+                    }
+
+                    break;
+                case SmtRegexMatchFormula regex:
+                    if (TryLowerTerm(regex.Value, sourceNode, provenance, evidenceKey, out var regexValue) &&
+                        regexValue.Kind == SmtValueKind.String)
+                    {
+                        condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                            new SymbolicStringPredicateAtom(
+                                SymbolicStringPredicateKind.RegexMatch,
+                                regexValue,
+                                new SymbolicStringConstantTerm(regex.Pattern),
+                                regex.Options),
+                            sourceNode,
+                            provenance,
+                            evidenceKey: evidenceKey));
+                        return true;
+                    }
+
+                    break;
+                case SmtRuntimeTypeTestFormula typeTest:
+                    if (TryLowerTerm(typeTest.Value, sourceNode, provenance, evidenceKey, out var value) &&
+                        value.Kind == SmtValueKind.Reference)
+                    {
+                        condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                            new SymbolicTypeTestAtom(value, typeTest.TypeKey),
                             sourceNode,
                             provenance,
                             evidenceKey: evidenceKey));
@@ -228,6 +320,69 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     break;
+            }
+
+            condition = null!;
+            return false;
+        }
+
+        private static bool TryLowerBooleanRelationCondition(
+            SmtBinaryFormula relation,
+            SyntaxNode sourceNode,
+            string provenance,
+            string? evidenceKey,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (relation.Operator is not SmtBinaryOperator.Equal and not SmtBinaryOperator.NotEqual ||
+                relation.Left.Kind != SmtValueKind.Bool ||
+                relation.Right.Kind != SmtValueKind.Bool ||
+                !TryLowerConditionCore(relation.Left, sourceNode, provenance, evidenceKey, out var left) ||
+                !TryLowerConditionCore(relation.Right, sourceNode, provenance, evidenceKey, out var right))
+            {
+                return false;
+            }
+
+            var leftAndRight = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
+            var notLeftAndNotRight = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                new SymbolicNotCondition(left),
+                new SymbolicNotCondition(right));
+            var equality = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                leftAndRight,
+                notLeftAndNotRight);
+
+            if (relation.Operator == SmtBinaryOperator.Equal)
+            {
+                condition = equality;
+                return true;
+            }
+
+            condition = new SymbolicNotCondition(equality);
+            return true;
+        }
+
+        private static bool TryLowerStringPredicate(
+            SymbolicStringPredicateKind predicate,
+            SmtFormula valueFormula,
+            SmtFormula argumentFormula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string? evidenceKey,
+            out SymbolicCondition condition)
+        {
+            if (TryLowerTerm(valueFormula, sourceNode, provenance, evidenceKey, out var value) &&
+                TryLowerTerm(argumentFormula, sourceNode, provenance, evidenceKey, out var argument) &&
+                value.Kind == SmtValueKind.String &&
+                argument.Kind == SmtValueKind.String)
+            {
+                condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicStringPredicateAtom(predicate, value, argument),
+                    sourceNode,
+                    provenance,
+                    evidenceKey: evidenceKey));
+                return true;
             }
 
             condition = null!;
