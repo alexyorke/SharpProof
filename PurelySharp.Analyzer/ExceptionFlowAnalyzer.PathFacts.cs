@@ -599,7 +599,10 @@ namespace PurelySharp.Analyzer
         {
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
+            return SymbolicPathConditionsAreSatisfiable(
+                pathConditions,
+                useNode,
+                smtAnalysis);
         }
 
         internal static bool IsMethodCallCandidatePathReachable(
@@ -630,7 +633,10 @@ namespace PurelySharp.Analyzer
                     pathConditions);
             }
 
-            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
+            return SymbolicPathConditionsAreSatisfiable(
+                pathConditions,
+                candidate.CallSite,
+                smtAnalysis);
         }
 
         internal static List<SmtFormula> CollectExceptionSitePathConditions(
@@ -680,6 +686,40 @@ namespace PurelySharp.Analyzer
                 factCondition,
                 smtAnalysis);
             return implication.Info.Status == SymbolicProofStatus.ProvenTrue;
+        }
+
+        private static bool SymbolicPathConditionsAreSatisfiable(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SyntaxNode sourceNode,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (TryClassifySymbolicPathFeasibility(
+                    pathConditions,
+                    sourceNode,
+                    smtAnalysis,
+                    out var status))
+            {
+                return status != SymbolicProofStatus.Unreachable;
+            }
+
+            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
+        }
+
+        private static bool TryClassifySymbolicPathFeasibility(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SyntaxNode sourceNode,
+            SmtAnalysisService smtAnalysis,
+            out SymbolicProofStatus status)
+        {
+            status = SymbolicProofStatus.Unknown;
+            if (!TryCreateSymbolicPathState(pathConditions, sourceNode, out var pathState))
+            {
+                return false;
+            }
+
+            var feasibility = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
+            status = feasibility.Info.Status;
+            return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
         }
 
         private static bool TryCreateSymbolicPathState(
@@ -749,7 +789,7 @@ namespace PurelySharp.Analyzer
                 finallyBlock,
                 semanticModel,
                 cancellationToken);
-            if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
+            if (!SymbolicPathConditionsAreSatisfiable(pathConditions, site, smtAnalysis))
             {
                 return false;
             }
@@ -762,7 +802,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 AddPriorStatementFacts(statement, semanticModel, cancellationToken, pathConditions);
-                if (!SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis))
+                if (!SymbolicPathConditionsAreSatisfiable(pathConditions, statement, smtAnalysis))
                 {
                     return false;
                 }
@@ -810,7 +850,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockConditions);
-                if (!SymbolicReachabilityService.IsSatisfiable(blockConditions, smtAnalysis))
+                if (!SymbolicPathConditionsAreSatisfiable(blockConditions, statement, smtAnalysis))
                 {
                     return false;
                 }
@@ -837,7 +877,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var trueReachable = SymbolicReachabilityService.IsSatisfiable(trueConditions, smtAnalysis);
+            var trueReachable = SymbolicPathConditionsAreSatisfiable(trueConditions, ifStatement.Condition, smtAnalysis);
             var trueExits = !trueReachable ||
                 StatementExitIsProven(ifStatement.Statement, trueConditions, semanticModel, cancellationToken, smtAnalysis);
 
@@ -864,7 +904,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var falseReachable = SymbolicReachabilityService.IsSatisfiable(falseConditions, smtAnalysis);
+            var falseReachable = SymbolicPathConditionsAreSatisfiable(falseConditions, ifStatement.Condition, smtAnalysis);
             var falseExits = !falseReachable ||
                 StatementExitIsProven(elseStatement, falseConditions, semanticModel, cancellationToken, smtAnalysis);
 
