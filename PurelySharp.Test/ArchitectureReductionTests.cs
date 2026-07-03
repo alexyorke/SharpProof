@@ -531,11 +531,11 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicSourceQueryService.cs"));
 
-            Assert.That(source, Does.Not.Contain("public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
-            Assert.That(source, Does.Not.Contain("public SmtFormula MergedInvariant => Analysis.MergedInvariant"));
+            Assert.That(source, Does.Not.Contain("IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
+            Assert.That(source, Does.Not.Contain("SmtFormula MergedInvariant => Analysis.MergedInvariant"));
             Assert.That(source, Does.Not.Contain("HasSmtFormula"));
-            Assert.That(source, Does.Contain("internal IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
-            Assert.That(source, Does.Contain("internal SmtFormula MergedInvariant => Analysis.MergedInvariant"));
+            Assert.That(source, Does.Contain("public IReadOnlyList<string> Facts => Analysis.Facts"));
+            Assert.That(source, Does.Contain("public IReadOnlyList<SymbolicFactInfo> SymbolicFacts => SymbolicFactInfo.FromState(Analysis.PathState)"));
         }
 
         [Test]
