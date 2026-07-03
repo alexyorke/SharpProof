@@ -573,6 +573,35 @@ namespace PurelySharp.Analyzer
                         ExceptionCategories.DefiniteSwitchExpressionNoMatch,
                         ExceptionSources.SwitchExpression));
             }
+
+            foreach (var symbolicHazard in CollectProvenAnalyzerOnlySymbolicHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                var hazardNode = FindHazardSiteNode(methodNode, symbolicHazard);
+                if (IsInStaticallyUnreachableBranch(hazardNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(hazardNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(symbolicHazard.ExceptionType);
+                if (IsCaughtWithinMethod(hazardNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    hazardNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        symbolicHazard.ExceptionType,
+                        symbolicHazard.Category,
+                        GetAnalyzerOnlySymbolicHazardSource(symbolicHazard.Category)));
+            }
         }
 
         private static IEnumerable<SymbolicRuntimeHazard> CollectProvenNegativeStackAllocLengthHazards(
@@ -634,6 +663,56 @@ namespace PurelySharp.Analyzer
             return result.Hazards.Where(static hazard =>
                 hazard.Kind == SymbolicRuntimeHazardKind.SwitchExpressionNoMatch &&
                 hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+        }
+
+        private static IEnumerable<SymbolicRuntimeHazard> CollectProvenAnalyzerOnlySymbolicHazards(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+                methodNode,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                new SymbolicRuntimeHazardQueryOptions(
+                    kinds: new[]
+                    {
+                        SymbolicRuntimeHazardKind.IndexOutOfRange,
+                        SymbolicRuntimeHazardKind.NullDereference,
+                    }));
+
+            return result.Hazards.Where(static hazard =>
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven &&
+                IsAnalyzerOnlySymbolicHazardCategory(hazard.Category));
+        }
+
+        private static bool IsAnalyzerOnlySymbolicHazardCategory(string category)
+        {
+            return string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteWithNull, StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal);
+        }
+
+        private static string GetAnalyzerOnlySymbolicHazardSource(string category)
+        {
+            if (string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, StringComparison.Ordinal))
+            {
+                return ExceptionSources.ArrayGetValue;
+            }
+
+            if (string.Equals(category, ExceptionCategories.DefiniteWithNull, StringComparison.Ordinal))
+            {
+                return ExceptionSources.WithExpression;
+            }
+
+            if (string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, StringComparison.Ordinal))
+            {
+                return ExceptionSources.DeconstructionReceiver;
+            }
+
+            return ExceptionSources.NullReceiver;
         }
 
         private static SyntaxNode FindHazardSiteNode(SyntaxNode methodNode, SymbolicRuntimeHazard hazard)

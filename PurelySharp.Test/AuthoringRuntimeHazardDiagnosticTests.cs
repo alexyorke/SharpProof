@@ -221,6 +221,65 @@ public class TestClass
                 "System.Runtime.CompilerServices.SwitchExpressionException",
                 "definite_switch_expression_no_match")
                 .SetName("Ps0011_AuthoringRuntimeHazards_ReportSwitchExpressionNoMatchWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+public class TestClass
+{
+    public int ArrayGetValueOutOfRange()
+    {
+        int[] values = new int[0];
+        return (int)values.GetValue(0)!;
+    }
+}",
+                "values.GetValue(0)",
+                "System.IndexOutOfRangeException",
+                "definite_array_get_value_index_out_of_range")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportArrayGetValueOutOfRangeWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+public record Person(int Value);
+
+public class TestClass
+{
+    public int WithNullReceiver()
+    {
+        Person person = null!;
+        return (person with { Value = 1 }).Value;
+    }
+}",
+                "person with",
+                "System.NullReferenceException",
+                "definite_with_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportWithNullReceiverWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
+public sealed class Pair
+{
+    public void Deconstruct(out int left, out int right)
+    {
+        left = 0;
+        right = 0;
+    }
+}
+
+public class TestClass
+{
+    public int DeconstructionNullReceiver()
+    {
+        Pair pair = null!;
+        int left;
+        int right;
+        (left, right) = pair;
+        return left + right;
+    }
+}",
+                "(left, right) = pair",
+                "System.NullReferenceException",
+                "definite_deconstruction_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportDeconstructionNullReceiverWithoutEnforcePure");
         }
 
         private static IEnumerable<TestCaseData> GuardedSafeOrUnknownRuntimeHazardCases()

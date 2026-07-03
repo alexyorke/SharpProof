@@ -31,10 +31,14 @@ namespace PurelySharp.Symbolic
             internal const string EffectSummary = "effect_summary";
             internal const string DefiniteThrowNull = "definite_throw_null";
             internal const string DefiniteDivideByZero = "definite_divide_by_zero";
+            internal const string DefiniteModuloByZero = "definite_modulo_by_zero";
             internal const string DefiniteCheckedIntegralOverflow = "definite_checked_integral_overflow";
+            internal const string DefiniteCheckedNumericConversionOverflow = "definite_checked_numeric_conversion_overflow";
             internal const string DefiniteNegativeArrayLength = "definite_negative_array_length";
             internal const string DefiniteNegativeStackAllocLength = "definite_negative_stackalloc_length";
             internal const string DefiniteNullDereference = "definite_null_dereference";
+            internal const string DefiniteWithNull = "definite_with_null";
+            internal const string DefiniteDeconstructionNull = "definite_deconstruction_null";
             internal const string DefiniteAwaitNull = "definite_await_null";
             internal const string DefiniteLockNull = "definite_lock_null";
             internal const string DefiniteNullableValueWithoutValue = "definite_nullable_value_without_value";
@@ -42,8 +46,14 @@ namespace PurelySharp.Symbolic
             internal const string DefiniteInvalidCast = "definite_invalid_cast";
             internal const string DefiniteArrayTypeMismatch = "definite_array_type_mismatch";
             internal const string DefiniteIndexOutOfRange = "definite_index_out_of_range";
+            internal const string DefiniteArrayGetValueIndexOutOfRange = "definite_array_get_value_index_out_of_range";
             internal const string DefiniteRangeOutOfRange = "definite_range_out_of_range";
             internal const string DefiniteCountIndexOutOfRange = "definite_count_index_out_of_range";
+            internal const string DefiniteStringSubstringOutOfRange = "definite_string_substring_out_of_range";
+            internal const string DefiniteStringRemoveOutOfRange = "definite_string_remove_out_of_range";
+            internal const string DefiniteSliceOutOfRange = "definite_slice_out_of_range";
+            internal const string DefiniteMemoryExtensionsAsSpanOutOfRange = "definite_memory_extensions_as_span_out_of_range";
+            internal const string DefiniteMemoryExtensionsAsMemoryOutOfRange = "definite_memory_extensions_as_memory_out_of_range";
             internal const string DefiniteSwitchExpressionNoMatch = "definite_switch_expression_no_match";
         }
 
@@ -62,8 +72,15 @@ namespace PurelySharp.Symbolic
             internal const string Cast = "cast";
             internal const string ArrayStore = "array_store";
             internal const string ArrayIndex = "array_index";
+            internal const string ArrayGetValue = "array_get_value";
             internal const string SpanSlice = "span_slice";
             internal const string RangeSlice = "range_slice";
+            internal const string StringSubstring = "string_substring";
+            internal const string StringRemove = "string_remove";
+            internal const string MemoryExtensionsAsSpan = "memory_extensions_as_span";
+            internal const string MemoryExtensionsAsMemory = "memory_extensions_as_memory";
+            internal const string WithExpression = "with_expression";
+            internal const string DeconstructionReceiver = "deconstruction_receiver";
             internal const string CountIndex = "count_index";
             internal const string SwitchExpression = "switch_expression";
         }
@@ -75,7 +92,10 @@ namespace PurelySharp.Symbolic
                 string.Equals(category, ExceptionCategories.SourceCallee, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.EffectSummary, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteDivideByZero, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteModuloByZero, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNullDereference, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteWithNull, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteDeconstructionNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteAwaitNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteLockNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteThrowNull, System.StringComparison.Ordinal) ||
@@ -85,10 +105,17 @@ namespace PurelySharp.Symbolic
                 string.Equals(category, ExceptionCategories.DefiniteUnboxNull, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteInvalidCast, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteCheckedIntegralOverflow, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteCheckedNumericConversionOverflow, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteArrayTypeMismatch, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteStringSubstringOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteStringRemoveOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteSliceOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteSwitchExpressionNoMatch, System.StringComparison.Ordinal);
         }
 

@@ -13011,6 +13011,35 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_RuntimeHazardModeAll_ReportsArrayGetValueSummaryAndSiteEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int[] values = new int[0];
+        return (int)values.GetValue(0)!;
+    }
+}",
+                RuntimeHazardAllOptions());
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_array_get_value_index_out_of_range"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.IndexOutOfRangeException=definite_array_get_value_index_out_of_range:array_get_value"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_array_get_value_index_out_of_range"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.IndexOutOfRangeException=definite_array_get_value_index_out_of_range:array_get_value"));
+        }
+
+        [Test]
         public async Task Ps0010_RuntimeHazardModeAll_ReportsSwitchNoMatchSummaryAndSiteEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

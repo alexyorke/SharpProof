@@ -276,7 +276,7 @@ namespace PurelySharp.Symbolic
                     if (TryCreateNullDereferenceCandidate(
                             withExpression,
                             withExpression.Expression,
-                            "definite_with_null",
+                            ExceptionCategories.DefiniteWithNull,
                             semanticModel,
                             cancellationToken,
                             out var withNullCandidate))
@@ -361,7 +361,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.DivideByZero,
                 trigger,
                 ExceptionTypes.DivideByZeroException,
-                binaryExpression.IsKind(SyntaxKind.ModuloExpression) ? "definite_modulo_by_zero" : ExceptionCategories.DefiniteDivideByZero);
+                binaryExpression.IsKind(SyntaxKind.ModuloExpression) ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero);
             return true;
         }
 
@@ -580,7 +580,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.DivideByZero,
                 trigger,
                 ExceptionTypes.DivideByZeroException,
-                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? "definite_modulo_by_zero" : ExceptionCategories.DefiniteDivideByZero);
+                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero);
             return true;
         }
 
@@ -617,7 +617,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.NullDereference,
                 trigger,
                 ExceptionTypes.NullReferenceException,
-                "definite_deconstruction_null");
+                ExceptionCategories.DefiniteDeconstructionNull);
             return true;
         }
 
@@ -693,7 +693,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
                 ExceptionTypes.OverflowException,
-                "definite_checked_numeric_conversion_overflow");
+                ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
             return true;
         }
 
@@ -1158,7 +1158,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.IndexOutOfRange,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
                 ExceptionTypes.IndexOutOfRangeException,
-                "definite_array_get_value_index_out_of_range");
+                ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
             return true;
         }
 
@@ -2049,8 +2049,8 @@ namespace PurelySharp.Symbolic
                     out countExpression))
             {
                 category = method.Name == "AsMemory"
-                    ? "definite_memory_extensions_as_memory_out_of_range"
-                    : "definite_memory_extensions_as_span_out_of_range";
+                    ? ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange
+                    : ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange;
                 return true;
             }
 
@@ -2066,7 +2066,7 @@ namespace PurelySharp.Symbolic
                 sourceExpression = instanceExpression;
                 startExpression = firstArgument;
                 oneArgumentUpperBoundIsInclusive = true;
-                category = "definite_string_substring_out_of_range";
+                category = ExceptionCategories.DefiniteStringSubstringOutOfRange;
                 return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
             }
 
@@ -2074,7 +2074,7 @@ namespace PurelySharp.Symbolic
             {
                 sourceExpression = instanceExpression;
                 startExpression = firstArgument;
-                category = "definite_string_remove_out_of_range";
+                category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
                 if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression))
                 {
                     return false;
@@ -2089,7 +2089,7 @@ namespace PurelySharp.Symbolic
                 sourceExpression = instanceExpression;
                 startExpression = firstArgument;
                 oneArgumentUpperBoundIsInclusive = true;
-                category = "definite_slice_out_of_range";
+                category = ExceptionCategories.DefiniteSliceOutOfRange;
                 return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
             }
 
