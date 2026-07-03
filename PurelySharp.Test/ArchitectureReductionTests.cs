@@ -325,6 +325,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ReturnRule_ConsumesSymbolicEscapeEvidenceForMutableReturns()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var engineSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var returnSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "ReturnStatementPurityRule.cs"));
+
+            Assert.That(engineSource, Does.Contain("TryCreateReturnEscapeEvidence("));
+            Assert.That(engineSource, Does.Contain("SymbolicEscapeAtom { Kind: SymbolicEscapeKind.Return }"));
+            Assert.That(returnSource, Does.Contain("TryCreateReturnEscapeEvidence("));
+            Assert.That(returnSource, Does.Contain("out var escapeEvidence"));
+        }
+
+        [Test]
         public void AssignmentRule_ConsumesSymbolicMutationEvidenceForCallerVisibleWrites()
         {
             var repositoryRoot = FindRepositoryRoot();

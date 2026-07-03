@@ -54,7 +54,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         spanToArrayMethod,
-                        "returned_span_to_array");
+                        "returned_span_to_array",
+                        currentState);
                 }
                 else if (IsAllowedTrustedArrayReturn(
                              sourceReturnedValue,
@@ -71,7 +72,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         factoryMethod,
-                        "returned_array_factory");
+                        "returned_array_factory",
+                        currentState);
                 }
                 else if (IsPureArrayReturningInvocationReturn(sourceReturnedValue, out var arrayReturningMethod))
                 {
@@ -80,7 +82,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         arrayReturningMethod,
-                        "returned_known_pure_array");
+                        "returned_known_pure_array",
+                        currentState);
                 }
                 else if (IsOwnedLocalArrayReturn(sourceReturnedValue, currentState, out var localSymbol))
                 {
@@ -89,7 +92,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         localSymbol,
-                        "owned_local_array_return");
+                        "owned_local_array_return",
+                        currentState);
                 }
                 else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
                 {
@@ -98,7 +102,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         readOnlyCollectionMethod,
-                        "returned_array_read_only_view");
+                        "returned_array_read_only_view",
+                        currentState);
                 }
                 else if (IsListAsReadOnlyReturn(sourceReturnedValue, out var listAsReadOnlyMethod))
                 {
@@ -107,7 +112,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         listAsReadOnlyMethod,
-                        "returned_list_read_only_view");
+                        "returned_list_read_only_view",
+                        currentState);
                 }
                 else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, out var spanMethod))
                 {
@@ -116,7 +122,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         spanMethod,
-                        "returned_array_span_view");
+                        "returned_array_span_view",
+                        currentState);
                 }
                 else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, out var memoryConstructor))
                 {
@@ -125,7 +132,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
                         memoryConstructor,
-                        "returned_array_memory_view");
+                        "returned_array_memory_view",
+                        currentState);
                 }
                 else if (TryFindReturnedInitializerArrayEscape(
                              returnOperation.ReturnedValue,
@@ -140,7 +148,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         escapeSyntax,
                         escapeSymbol,
-                        catalogSource);
+                        catalogSource,
+                        currentState);
                 }
                 else if (TryFindReturnedInitializerMutableObjectEscape(
                              returnOperation.ReturnedValue,
@@ -154,7 +163,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         nestedObjectEscapeSyntax,
                         nestedObjectEscapeSymbol,
-                        nestedObjectCatalogSource);
+                        nestedObjectCatalogSource,
+                        currentState);
                 }
                 else if (TryFindMutableCollectionReturnEscape(
                              returnOperation.ReturnedValue,
@@ -168,7 +178,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         collectionEscapeSyntax,
                         collectionEscapeSymbol,
-                        collectionCatalogSource);
+                        collectionCatalogSource,
+                        currentState);
                 }
                 else if (TryFindFreshMutableObjectReturnEscape(
                              returnOperation.ReturnedValue,
@@ -182,7 +193,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation,
                         objectEscapeSyntax,
                         objectEscapeSymbol,
-                        objectCatalogSource);
+                        objectCatalogSource,
+                        currentState);
                 }
                 else
                 {
@@ -198,8 +210,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IReturnOperation returnOperation,
             SyntaxNode escapeSyntax,
             ISymbol escapeSymbol,
-            string catalogSource)
+            string catalogSource,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
         {
+            if (PurityAnalysisEngine.TryCreateReturnEscapeEvidence(
+                    returnOperation,
+                    escapeSyntax,
+                    escapeSymbol,
+                    currentState,
+                    nameof(ReturnStatementPurityRule),
+                    catalogSource,
+                    out var escapeEvidence))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    escapeSyntax,
+                    escapeEvidence);
+            }
+
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 escapeSyntax,
                 PurityAnalysisEngine.PurityEvidence.Create(

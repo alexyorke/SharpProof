@@ -11607,6 +11607,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_MutableStateEscape_IncludesSymbolicEscapeEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public object TestMethod()
+    {
+        var array = new int[1];
+        object boxed = array;
+        return boxed;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("mutable_state_escape"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ReturnStatementPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("owned_local_array_return"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("boxed"));
+        }
+
+        [Test]
         public async Task Ps0002_AssignmentRhsImpurity_PreservesOriginalEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

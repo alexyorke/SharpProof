@@ -4766,6 +4766,41 @@ namespace PurelySharp.Analyzer.Engine
             return true;
         }
 
+        internal static bool TryCreateReturnEscapeEvidence(
+            IReturnOperation returnOperation,
+            SyntaxNode escapeSyntax,
+            ISymbol escapeSymbol,
+            PurityAnalysisState currentState,
+            string ruleName,
+            string fallbackCatalogSource,
+            out PurityEvidence evidence)
+        {
+            var escapeTerm = CreateSymbolicReferenceTerm(escapeSymbol, currentState);
+            var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
+                escapeTerm,
+                SymbolicEscapeKind.Return,
+                escapeSyntax,
+                "analyzer.escape.return",
+                escapeSymbol,
+                "evidence.escape.return");
+            if (escapeFact.Atom is not SymbolicEscapeAtom { Kind: SymbolicEscapeKind.Return })
+            {
+                evidence = default;
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "mutable_state_escape",
+                ruleName: ruleName,
+                operation: returnOperation,
+                syntaxNode: escapeSyntax,
+                symbol: escapeSymbol,
+                catalogSource: string.IsNullOrEmpty(fallbackCatalogSource)
+                    ? escapeFact.Provenance
+                    : fallbackCatalogSource);
+            return true;
+        }
+
         internal static bool TryCreateCallerVisibleMutationTerm(
             IOperation targetOperation,
             PurityAnalysisState currentState,
