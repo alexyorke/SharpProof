@@ -1617,15 +1617,37 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-            if (declaratorSyntax == null || initializerSyntax == null)
+            SyntaxNode declarationSyntax;
+            if (declaratorSyntax != null && initializerSyntax != null)
             {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
+                declarationSyntax = declaratorSyntax;
+                if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+                {
+                    escapeSyntax = null!;
+                    escapeSymbol = null!;
+                    catalogSource = string.Empty;
+                    return false;
+                }
             }
-
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+            else if (TryGetDeconstructionElementInitializer(
+                         localSymbol,
+                         semanticModel,
+                         out initializerSyntax,
+                         out declarationSyntax))
+            {
+                if (HasAssignmentToLocalBetweenDeclarationAndObservation(
+                        localSymbol,
+                        returnedValue.Syntax,
+                        declarationSyntax,
+                        semanticModel))
+                {
+                    escapeSyntax = null!;
+                    escapeSymbol = null!;
+                    catalogSource = string.Empty;
+                    return false;
+                }
+            }
+            else
             {
                 escapeSyntax = null!;
                 escapeSymbol = null!;
@@ -1675,6 +1697,139 @@ namespace PurelySharp.Analyzer.Engine.Rules
             escapeSyntax = null!;
             escapeSymbol = null!;
             catalogSource = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetDeconstructionElementInitializer(
+            ILocalSymbol localSymbol,
+            SemanticModel semanticModel,
+            out ExpressionSyntax initializerSyntax,
+            out SyntaxNode declarationSyntax)
+        {
+            var designation = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<SingleVariableDesignationSyntax>()
+                .FirstOrDefault();
+            if (designation == null ||
+                !TryGetDeconstructionDesignationPath(designation, out var path) ||
+                designation.FirstAncestorOrSelf<AssignmentExpressionSyntax>() is not { } assignment ||
+                !TryGetTupleElementExpression(assignment.Right, path, out initializerSyntax) ||
+                semanticModel.GetDeclaredSymbol(designation) is not ILocalSymbol declaredSymbol ||
+                !SymbolEqualityComparer.Default.Equals(declaredSymbol, localSymbol))
+            {
+                initializerSyntax = null!;
+                declarationSyntax = null!;
+                return false;
+            }
+
+            declarationSyntax = assignment;
+            return true;
+        }
+
+        private static bool TryGetDeconstructionDesignationPath(
+            SingleVariableDesignationSyntax designation,
+            out ImmutableArray<int> path)
+        {
+            var builder = ImmutableArray.CreateBuilder<int>();
+            VariableDesignationSyntax current = designation;
+            while (current.Parent is ParenthesizedVariableDesignationSyntax parenthesized)
+            {
+                var index = IndexOfDesignation(parenthesized, current);
+                if (index < 0)
+                {
+                    path = default;
+                    return false;
+                }
+
+                builder.Insert(0, index);
+                current = parenthesized;
+            }
+
+            path = builder.ToImmutable();
+            return path.Length > 0;
+        }
+
+        private static int IndexOfDesignation(
+            ParenthesizedVariableDesignationSyntax parenthesized,
+            VariableDesignationSyntax designation)
+        {
+            for (var i = 0; i < parenthesized.Variables.Count; i++)
+            {
+                if (ReferenceEquals(parenthesized.Variables[i], designation))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool TryGetTupleElementExpression(
+            ExpressionSyntax tupleExpression,
+            ImmutableArray<int> path,
+            out ExpressionSyntax elementExpression)
+        {
+            elementExpression = tupleExpression;
+            foreach (var index in path)
+            {
+                elementExpression = UnwrapParenthesizedExpression(elementExpression);
+                if (elementExpression is not TupleExpressionSyntax tuple ||
+                    index < 0 ||
+                    index >= tuple.Arguments.Count)
+                {
+                    elementExpression = null!;
+                    return false;
+                }
+
+                elementExpression = tuple.Arguments[index].Expression;
+            }
+
+            return true;
+        }
+
+        private static ExpressionSyntax UnwrapParenthesizedExpression(ExpressionSyntax expression)
+        {
+            while (expression is ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            return expression;
+        }
+
+        private static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SyntaxNode declarationSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var start = declarationSyntax.Span.End;
+            var end = observationSyntax.SpanStart;
+            if (end <= start)
+            {
+                return false;
+            }
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
