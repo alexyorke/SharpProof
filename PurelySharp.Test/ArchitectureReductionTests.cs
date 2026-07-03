@@ -141,6 +141,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerOwnedArrayFlowCaptures_ProjectOwnershipFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax)"));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwned("));
+            Assert.That(source, Does.Contain("RemoveOwnedArrayFlowCaptureFacts(PathState, id)"));
+            Assert.That(source, Does.Contain("SymbolicResourceLifetimeAtom lifetime => Equals(lifetime.Resource, term)"));
+        }
+
+        [Test]
         public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
         {
             var repositoryRoot = FindRepositoryRoot();

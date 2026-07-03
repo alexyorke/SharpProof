@@ -756,12 +756,19 @@ namespace PurelySharp.Analyzer.Engine
 
             public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id)
             {
+                return WithOwnedArrayFlowCapture(id, source: null);
+            }
+
+            public PurityAnalysisState WithOwnedArrayFlowCapture(CaptureId id, SyntaxNode? source)
+            {
                 if (OwnedArrayFlowCaptures.Contains(id))
                 {
                     return this;
                 }
 
-                return Copy(ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Add(id));
+                return Copy(
+                    ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Add(id),
+                    pathState: AddOwnedArrayFlowCaptureFacts(PathState, id, source));
             }
 
             public PurityAnalysisState WithoutOwnedArrayFlowCapture(CaptureId id)
@@ -771,12 +778,65 @@ namespace PurelySharp.Analyzer.Engine
                     return this;
                 }
 
-                return Copy(ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Remove(id));
+                return Copy(
+                    ownedArrayFlowCaptures: OwnedArrayFlowCaptures.Remove(id),
+                    pathState: RemoveOwnedArrayFlowCaptureFacts(PathState, id));
             }
 
             public bool IsOwnedArrayFlowCapture(CaptureId id)
             {
                 return OwnedArrayFlowCaptures.Contains(id);
+            }
+
+            private static SymbolicState AddOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id, SyntaxNode? source)
+            {
+                if (source == null)
+                {
+                    return pathState;
+                }
+
+                var term = CreateOwnedArrayFlowCaptureTerm(id);
+                var facts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+                    term,
+                    source,
+                    "analyzer.owned-array-flow-capture",
+                    evidenceKey: "evidence.owned-array-flow-capture");
+                foreach (var fact in facts)
+                {
+                    pathState = pathState.AddFact(fact);
+                }
+
+                return pathState;
+            }
+
+            private static SymbolicState RemoveOwnedArrayFlowCaptureFacts(SymbolicState pathState, CaptureId id)
+            {
+                var term = CreateOwnedArrayFlowCaptureTerm(id);
+                var facts = pathState.Facts
+                    .Where(fact => !IsOwnedArrayFlowCaptureFact(fact, term))
+                    .ToArray();
+                return facts.Length == pathState.Facts.Length
+                    ? pathState
+                    : new SymbolicState(facts, pathState.PathConditions);
+            }
+
+            private static SymbolicTerm CreateOwnedArrayFlowCaptureTerm(CaptureId id)
+            {
+                return new SymbolicVariableTerm(
+                    "flowCapture#" + id.GetHashCode().ToString(CultureInfo.InvariantCulture),
+                    SmtValueKind.Reference);
+            }
+
+            private static bool IsOwnedArrayFlowCaptureFact(SymbolicFact fact, SymbolicTerm term)
+            {
+                return fact.Provenance.StartsWith("analyzer.owned-array-flow-capture.", StringComparison.Ordinal) &&
+                       fact.Atom switch
+                       {
+                           SymbolicFreshnessAtom freshness => Equals(freshness.Value, term),
+                           SymbolicOwnershipAtom ownership => Equals(ownership.Value, term),
+                           SymbolicResourceLifetimeAtom lifetime => Equals(lifetime.Resource, term),
+                           _ => false,
+                       };
             }
 
             public PurityAnalysisState WithOwnedLocalArray(ISymbol localSymbol)
@@ -4176,7 +4236,7 @@ namespace PurelySharp.Analyzer.Engine
 
                     if (IsOwnedLocalArrayValue(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation))
                     {
-                        nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id);
+                        nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
                     }
                     else
                     {
