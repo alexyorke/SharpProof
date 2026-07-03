@@ -59,6 +59,135 @@ namespace PurelySharp.Test
             Assert.That(formula, Is.TypeOf<SmtStringStartsWithFormula>());
         }
 
+        [TestCase("Contains")]
+        [TestCase("StartsWith")]
+        [TestCase("EndsWith")]
+        public void KnownApiLowering_StringCharPredicateUsesDeclarativeStringPredicate(string methodName)
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                $"s.{methodName}('A')");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+
+            Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm("A")));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_StringConcatPredicateUsesSharedConcatTerm()
+        {
+            var context = CreateExpressionContext(
+                "string suffix",
+                """("pre" + suffix).StartsWith("pre")""");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+
+            Assert.That(fact.Value, Is.TypeOf<SymbolicStringConcatTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            var predicate = (SmtStringStartsWithFormula)formula;
+            Assert.That(predicate.Value, Is.TypeOf<SmtStringConcatTerm>());
+        }
+
+        [Test]
+        public void KnownApiLowering_InterpolatedStringPredicateUsesSharedConcatTerm()
+        {
+            var context = CreateExpressionContext(
+                "string suffix",
+                "$\"pre{suffix}\".StartsWith(\"pre\")");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+
+            Assert.That(fact.Value, Is.TypeOf<SymbolicStringConcatTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtStringStartsWithFormula>());
+        }
+
+        [Test]
+        public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                """System.Text.RegularExpressions.Regex.IsMatch(s, @"\A[A-Z]+\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant)""");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+
+            Assert.That(fact.Predicate, Is.EqualTo(SymbolicStringPredicateKind.RegexMatch));
+            Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm(@"\A[A-Z]+\z")));
+            Assert.That(fact.RegexOptions, Is.EqualTo(System.Text.RegularExpressions.RegexOptions.CultureInvariant));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtRegexMatchFormula>());
+        }
+
+        [Test]
+        public void KnownApiLowering_RegexUnsupportedOptionsStayOnLegacyPath()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                """System.Text.RegularExpressions.Regex.IsMatch(s, "A", System.Text.RegularExpressions.RegexOptions.RightToLeft)""");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
+        }
+
+        [Test]
+        public void KnownApiLowering_StringIsNullOrEmptyUsesNullnessAndLengthAtoms()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                "string.IsNullOrEmpty(s)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var disjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
+            var emptyAtom = AssertFactCondition<SymbolicRelationAtom>(disjunction.Right);
+            Assert.That(emptyAtom.Left, Is.TypeOf<SymbolicLengthTerm>());
+            Assert.That(emptyAtom.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_StringIsNullOrWhiteSpaceUsesNullnessAndRegexAtoms()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                "string.IsNullOrWhiteSpace(s)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var disjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
+            var regexAtom = AssertFactCondition<SymbolicStringPredicateAtom>(disjunction.Right);
+            Assert.That(regexAtom.Predicate, Is.EqualTo(SymbolicStringPredicateKind.RegexMatch));
+            Assert.That(regexAtom.Argument, Is.EqualTo(new SymbolicStringConstantTerm(@"\A\s*\z")));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_StringIsNullOrEmptyOverConcatOmitsImpossibleNullBranch()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                """string.IsNullOrEmpty("A" + s)""");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(atom.Left, Is.TypeOf<SymbolicLengthTerm>());
+            Assert.That(((SymbolicLengthTerm)atom.Left).Value, Is.TypeOf<SymbolicStringConcatTerm>());
+        }
+
         [Test]
         public void KnownApiLowering_StringComparisonOverloadFallsBackToLegacyTranslator()
         {
@@ -79,6 +208,37 @@ namespace PurelySharp.Test
                 "value / divisor == 2");
 
             Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
+        }
+
+        [Test]
+        public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms()
+        {
+            var context = CreateExpressionContext(
+                "System.Numerics.BigInteger value",
+                "value > System.Numerics.BigInteger.Zero && value <= System.Numerics.BigInteger.One");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_NullableHasValueUsesSharedNullableTerm()
+        {
+            var context = CreateExpressionContext(
+                "int? maybe",
+                "maybe.HasValue");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var atom = AssertFactCondition<SymbolicTruthAtom>(condition);
+
+            Assert.That(atom.Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+            var variable = (SmtVariable)formula;
+            Assert.That(variable.Kind, Is.EqualTo(SmtValueKind.Bool));
+            Assert.That(variable.Name, Does.StartWith("maybe#"));
+            Assert.That(variable.Name, Does.EndWith(".HasValue"));
         }
 
         [Test]
@@ -105,6 +265,239 @@ namespace PurelySharp.Test
                 SmtBinaryOperator.Equal,
                 new SmtVariable("d#1", SmtValueKind.Int),
                 new SmtIntegerConstant(0))));
+        }
+
+        [Test]
+        public void Encoder_BoundsExceptionPreconditionUsesSharedBoundsAtom()
+        {
+            var index = new SymbolicVariableTerm("i#1", SmtValueKind.Int);
+            var length = new SymbolicVariableTerm("values#1.Length", SmtValueKind.Int);
+            var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    index,
+                    length,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("values[i]"),
+                "test.bounds"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.IndexOutOfRange,
+                    index,
+                    new SymbolicNotCondition(inRange)),
+                SyntaxFactory.ParseExpression("values[i]"),
+                "test.exception-precondition.bounds"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtUnaryFormula>());
+            var negated = (SmtUnaryFormula)formula;
+            Assert.That(negated.Operator, Is.EqualTo(SmtUnaryOperator.Not));
+            Assert.That(negated.Operand, Is.TypeOf<SmtBinaryFormula>());
+        }
+
+        [Test]
+        public void Encoder_NegativeLengthExceptionPreconditionUsesRelationAtom()
+        {
+            var length = new SymbolicVariableTerm("length#1", SmtValueKind.Int);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    length,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("new int[length]"),
+                "test.negative-length"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.NegativeLength,
+                    length,
+                    trigger),
+                SyntaxFactory.ParseExpression("new int[length]"),
+                "test.exception-precondition.negative-length"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                new SmtVariable("length#1", SmtValueKind.Int),
+                new SmtIntegerConstant(0))));
+        }
+
+        [Test]
+        public void Encoder_CheckedOverflowExceptionPreconditionUsesOutOfRangeAtoms()
+        {
+            var result = new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Add,
+                new SymbolicVariableTerm("left#1", SmtValueKind.Int),
+                new SymbolicVariableTerm("right#1", SmtValueKind.Int));
+            var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    result,
+                    new SymbolicIntegerConstantTerm(int.MinValue)),
+                SyntaxFactory.ParseExpression("left + right"),
+                "test.checked-overflow.below-min"));
+            var upperOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    result,
+                    new SymbolicIntegerConstantTerm(int.MaxValue)),
+                SyntaxFactory.ParseExpression("left + right"),
+                "test.checked-overflow.above-max"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    result,
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        lowerOverflow,
+                        upperOverflow)),
+                SyntaxFactory.ParseExpression("checked(left + right)"),
+                "test.exception-precondition.checked-overflow"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtBinaryFormula>());
+            var disjunction = (SmtBinaryFormula)formula;
+            Assert.That(disjunction.Operator, Is.EqualTo(SmtBinaryOperator.Or));
+            Assert.That(disjunction.Left, Is.TypeOf<SmtBinaryFormula>());
+            Assert.That(disjunction.Right, Is.TypeOf<SmtBinaryFormula>());
+        }
+
+        [Test]
+        public void Encoder_NullDereferenceExceptionPreconditionUsesNullnessAtom()
+        {
+            var receiver = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    receiver,
+                    new SymbolicNullTerm()),
+                SyntaxFactory.ParseExpression("text.Length"),
+                "test.null-dereference"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.NullDereference,
+                    receiver,
+                    trigger),
+                SyntaxFactory.ParseExpression("text.Length"),
+                "test.exception-precondition.null-dereference"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable("text#1", SmtValueKind.Reference),
+                new SmtNullConstant())));
+        }
+
+        [Test]
+        public void Encoder_UnboxNullExceptionPreconditionUsesNullnessAtom()
+        {
+            var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    value,
+                    new SymbolicNullTerm()),
+                SyntaxFactory.ParseExpression("(int)value"),
+                "test.unbox-null"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.UnboxNull,
+                    value,
+                    trigger),
+                SyntaxFactory.ParseExpression("(int)value"),
+                "test.exception-precondition.unbox-null"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable("value#1", SmtValueKind.Reference),
+                new SmtNullConstant())));
+        }
+
+        [Test]
+        public void Encoder_ArgumentNullExceptionPreconditionUsesNullnessAtom()
+        {
+            var argument = new SymbolicVariableTerm("gate#1", SmtValueKind.Reference);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    argument,
+                    new SymbolicNullTerm()),
+                SyntaxFactory.ParseExpression("lock (gate) { }"),
+                "test.argument-null"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.ArgumentNull,
+                    argument,
+                    trigger),
+                SyntaxFactory.ParseExpression("lock (gate) { }"),
+                "test.exception-precondition.argument-null"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable("gate#1", SmtValueKind.Reference),
+                new SmtNullConstant())));
+        }
+
+        [Test]
+        public void Encoder_NullableValueExceptionPreconditionUsesHasValueAtom()
+        {
+            var hasValue = new SymbolicNullableHasValueTerm("maybe#1");
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(hasValue),
+                SyntaxFactory.ParseExpression("maybe.Value"),
+                "test.nullable-value"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+                    new SymbolicVariableTerm("maybe#1", SmtValueKind.Reference),
+                    new SymbolicNotCondition(trigger)),
+                SyntaxFactory.ParseExpression("maybe.Value"),
+                "test.exception-precondition.nullable-value"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtVariable("maybe#1.HasValue", SmtValueKind.Bool))));
+        }
+
+        [Test]
+        public void Encoder_InvalidCastExceptionPreconditionUsesTypeTestAtom()
+        {
+            var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTypeTestAtom(value, "System.String"),
+                SyntaxFactory.ParseExpression("(string)value"),
+                "test.invalid-cast"));
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.InvalidCast,
+                    value,
+                    new SymbolicNotCondition(trigger)),
+                SyntaxFactory.ParseExpression("(string)value"),
+                "test.exception-precondition.invalid-cast"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtRuntimeTypeTestFormula(
+                    new SmtVariable("value#1", SmtValueKind.Reference),
+                    "System.String"))));
+        }
+
+        [Test]
+        public void Encoder_DirectThrowExceptionPreconditionUsesConstantTrigger()
+        {
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DirectThrow,
+                    Subject: null,
+                    new SymbolicConstantCondition(true)),
+                SyntaxFactory.ParseStatement("throw new System.Exception();"),
+                "test.exception-precondition.direct-throw"));
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBooleanConstant(true)));
         }
 
         private static TAtom AssertFactCondition<TAtom>(SymbolicCondition condition)

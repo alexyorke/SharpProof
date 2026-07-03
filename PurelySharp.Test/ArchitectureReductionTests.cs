@@ -99,6 +99,242 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SearchLib_RemainsSolverBackendWithoutRoslynOrSymbolicSemantics()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var searchLibDirectory = Path.Combine(repositoryRoot, "SearchLib");
+            var offenders = Directory.GetFiles(searchLibDirectory, "*.cs", SearchOption.AllDirectories)
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(static file =>
+                    file.Source.Contains("Microsoft.CodeAnalysis", StringComparison.Ordinal) ||
+                    file.Source.Contains("PurelySharp.Symbolic", StringComparison.Ordinal) ||
+                    file.Source.Contains("PurelySharp.Analyzer", StringComparison.Ordinal))
+                .Select(static file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
+        public void SymbolicIrLowerer_KeepsStringAndRegexLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var stringSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Strings.cs"));
+
+            Assert.That(coreSource, Does.Contain("internal static partial class SymbolicIrLowerer"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerRegexIsMatchInvocation"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringPredicateInvocation"));
+            Assert.That(stringSource, Does.Contain("private static bool TryLowerRegexIsMatchInvocation"));
+            Assert.That(stringSource, Does.Contain("private static bool TryLowerStringPredicateInvocation"));
+        }
+
+        [Test]
+        public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
+            Assert.That(source, Does.Contain("return TryTranslateZeroCondition(divisor"));
+            Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
+            Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
+        }
+
+        [Test]
+        public void RuntimeHazardSimpleIndexing_UsesIrBoundsPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateIrElementAccessOutOfRangeTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
+            Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
+            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange"));
+        }
+
+        [Test]
+        public void RuntimeHazardArrayGetValue1D_UsesIrBoundsPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.bounds.in-range"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
+            Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
+            Assert.That(source, Does.Contain("TryTranslateArrayGetValueDimensionLength"));
+            Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
+        }
+
+        [Test]
+        public void RuntimeHazardNegativeLengths_UseIrExceptionPreconditionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateNegativeLengthTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeLength"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeStackAllocLength"));
+            Assert.That(source, Does.Contain("SymbolicRelationOperator.LessThan"));
+            Assert.That(source, Does.Contain("return TryTranslateNegativeCondition(lengthExpression"));
+            Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
+        }
+
+        [Test]
+        public void RuntimeHazardCheckedIntegralOutOfRange_UsesIrExceptionPreconditionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateCheckedIntegralOutOfRangeTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow"));
+            Assert.That(source, Does.Contain("IsSignedDivisionOverflowOperator"));
+            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateValue"));
+        }
+
+        [Test]
+        public void RuntimeHazardStableNullDereferences_UseIrExceptionPreconditionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateNullDereferenceTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullDereference"));
+            Assert.That(source, Does.Contain("IsStableIrReferenceSubject"));
+            Assert.That(source, Does.Contain("return TryTranslateNullCondition(receiver"));
+            Assert.That(source, Does.Contain("!TryCreateNullDereferenceTrigger(receiver"));
+        }
+
+        [Test]
+        public void RuntimeHazardUnboxNull_UsesIrExceptionPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateUnboxNullTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.UnboxNull"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.unbox-null"));
+            Assert.That(source, Does.Contain("return TryTranslateNullCondition(expression"));
+            Assert.That(source, Does.Contain("TryCreateUnboxNullTrigger("));
+        }
+
+        [Test]
+        public void RuntimeHazardStableArgumentNull_UsesIrExceptionPreconditionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateArgumentNullTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentNull"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.argument-null"));
+            Assert.That(source, Does.Contain("return TryTranslateNullCondition(expression"));
+            Assert.That(source, Does.Contain("!TryCreateArgumentNullTrigger(expression"));
+        }
+
+        [Test]
+        public void RuntimeHazardNullableValue_UsesIrExceptionPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateNullableValueWithoutValueTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullableValueWithoutValue"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
+            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateNullableHasValue"));
+            Assert.That(source, Does.Contain("!TryCreateNullableValueWithoutValueTrigger("));
+        }
+
+        [Test]
+        public void RuntimeHazardInvalidReferenceCast_UsesIrTypeTestPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateIrRuntimeReferenceCastMismatchTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.InvalidCast"));
+            Assert.That(source, Does.Contain("new SymbolicTypeTestAtom"));
+            Assert.That(source, Does.Contain("SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey"));
+            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
+        }
+
+        [Test]
+        public void RuntimeHazardDirectThrow_UsesIrExceptionPreconditionTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateDirectThrowTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DirectThrow"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.direct-throw"));
+            Assert.That(coreSource, Does.Contain("var trigger = !isRethrow"));
+            Assert.That(coreSource, Does.Contain("TryCreateDirectThrowTrigger(throwNode"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateDirectThrowTrigger"));
+        }
+
+        [Test]
+        public void RuntimeHazardIrTriggerBridge_LivesInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
+        }
+
+        [Test]
         public void RuntimeExceptionEvidenceFacts_AcceptsAllSharedCategories()
         {
             var rejectedCategories = typeof(SymbolicRuntimeExceptionFacts.ExceptionCategories)
@@ -205,6 +441,20 @@ namespace PurelySharp.Test
             }
 
             throw new InvalidOperationException("Could not find repository root.");
+        }
+
+        private static string ReadRuntimeHazardCandidateSources(string repositoryRoot)
+        {
+            return string.Concat(
+                File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "PurelySharp.Symbolic",
+                    "SymbolicRuntimeHazardCandidateFactory.cs")),
+                Environment.NewLine,
+                File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "PurelySharp.Symbolic",
+                    "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs")));
         }
 
         private static string FindPowerShellExecutable()

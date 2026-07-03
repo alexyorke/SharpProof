@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 using ExceptionCategories = PurelySharp.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
@@ -326,10 +327,13 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 stopAtUntypedCatch: false);
             var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
+            var trigger = !isRethrow && TryCreateDirectThrowTrigger(throwNode, out var directThrowTrigger)
+                ? directThrowTrigger
+                : new SmtBooleanConstant(true);
             return new RuntimeHazardCandidate(
                 throwNode,
                 isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
-                new SmtBooleanConstant(true),
+                trigger,
                 exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty) ??
                     (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),
                 isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow);
@@ -351,7 +355,7 @@ namespace PurelySharp.Symbolic
             var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
             var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
             if (!IsThrowingDivideByZeroType(rightType) ||
-                !TryTranslateZeroCondition(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
+                !TryCreateDivideByZeroTrigger(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -570,7 +574,7 @@ namespace PurelySharp.Symbolic
             var rightTypeInfo = semanticModel.GetTypeInfo(assignment.Right, cancellationToken);
             var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
             if (!IsThrowingDivideByZeroType(rightType) ||
-                !TryTranslateZeroCondition(assignment.Right, semanticModel, cancellationToken, out var trigger))
+                !TryCreateDivideByZeroTrigger(assignment.Right, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -607,7 +611,7 @@ namespace PurelySharp.Symbolic
             var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
             if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
                 !IsReferenceType(receiverType) ||
-                !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
+                !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -711,8 +715,12 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var trigger = TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger)
-                ? nullTrigger
+            var trigger = TryCreateUnboxNullTrigger(
+                castExpression.Expression,
+                semanticModel,
+                cancellationToken,
+                out var unboxNullTrigger)
+                ? unboxNullTrigger
                 : CreateUnknownTrigger(castExpression, "unbox_null");
 
             candidate = new RuntimeHazardCandidate(
@@ -735,11 +743,11 @@ namespace PurelySharp.Symbolic
                 conversionOperation.Conversion.IsUserDefined ||
                 conversionOperation.Conversion.IsIdentity ||
                 !IsNullableValueCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken) ||
-                !CSharpConditionToFormula.TryTranslateNullableHasValue(
+                !TryCreateNullableValueWithoutValueTrigger(
                     castExpression.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var hasValueFormula))
+                    out var trigger))
             {
                 return false;
             }
@@ -747,7 +755,7 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 castExpression,
                 SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
+                trigger,
                 ExceptionTypes.InvalidOperationException,
                 ExceptionCategories.DefiniteNullableValueWithoutValue);
             return true;
@@ -887,7 +895,7 @@ namespace PurelySharp.Symbolic
             var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
             if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
                 !IsReferenceType(receiverType) ||
-                !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
+                !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -913,7 +921,7 @@ namespace PurelySharp.Symbolic
             var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
             if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
                 !IsReferenceType(expressionType) ||
-                !TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var trigger))
+                !TryCreateArgumentNullTrigger(expression, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -986,11 +994,11 @@ namespace PurelySharp.Symbolic
         {
             candidate = default;
             if (!IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
-                !CSharpConditionToFormula.TryTranslateNullableHasValue(
+                !TryCreateNullableValueWithoutValueTrigger(
                     memberAccess.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var hasValueFormula))
+                    out var trigger))
             {
                 return false;
             }
@@ -998,7 +1006,7 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 memberAccess,
                 SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
+                trigger,
                 ExceptionTypes.InvalidOperationException,
                 ExceptionCategories.DefiniteNullableValueWithoutValue);
             return true;
@@ -1018,11 +1026,12 @@ namespace PurelySharp.Symbolic
                     out var kind,
                     out var exceptionType,
                     out var category) ||
-                !CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                !TryCreateIndexOrRangeTrigger(
                     elementAccess,
+                    kind,
                     semanticModel,
                     cancellationToken,
-                    out var inRangeFormula))
+                    out var trigger))
             {
                 return false;
             }
@@ -1030,7 +1039,7 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 elementAccess,
                 kind,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                trigger,
                 exceptionType,
                 category);
             return true;
@@ -1111,6 +1120,24 @@ namespace PurelySharp.Symbolic
                 invocationOperation.Arguments.Length != arrayType.Rank)
             {
                 return false;
+            }
+
+            if (TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
+                    invocation,
+                    invocationOperation,
+                    receiverExpression,
+                    arrayType,
+                    semanticModel,
+                    cancellationToken,
+                    out var trigger))
+            {
+                candidate = new RuntimeHazardCandidate(
+                    invocation,
+                    SymbolicRuntimeHazardKind.IndexOutOfRange,
+                    trigger,
+                    ExceptionTypes.IndexOutOfRangeException,
+                    ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
+                return true;
             }
 
             SmtFormula? inRange = null;
@@ -1199,7 +1226,13 @@ namespace PurelySharp.Symbolic
             var trigger = default(SmtFormula);
             foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
             {
-                if (!TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var negativeLength))
+                if (!TryCreateNegativeLengthTrigger(
+                        lengthExpression,
+                        SymbolicExceptionPreconditionKind.NegativeLength,
+                        "ir.runtime-hazard.array.negative-length",
+                        semanticModel,
+                        cancellationToken,
+                        out var negativeLength))
                 {
                     continue;
                 }
@@ -1233,7 +1266,13 @@ namespace PurelySharp.Symbolic
             var trigger = default(SmtFormula);
             foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
             {
-                if (!TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var negativeLength))
+                if (!TryCreateNegativeLengthTrigger(
+                        lengthExpression,
+                        SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                        "ir.runtime-hazard.stackalloc.negative-length",
+                        semanticModel,
+                        cancellationToken,
+                        out var negativeLength))
                 {
                     continue;
                 }
@@ -1312,6 +1351,19 @@ namespace PurelySharp.Symbolic
             out SmtFormula trigger)
         {
             trigger = null!;
+            if (!IsSignedDivisionOverflowOperator(smtOperator) &&
+                TryCreateCheckedIntegralOutOfRangeTrigger(
+                    binaryExpression,
+                    minValue,
+                    maxValue,
+                    "ir.runtime-hazard.checked-integral.binary-overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!CSharpConditionToFormula.TryTranslateValue(
                     binaryExpression.Left,
                     semanticModel,
@@ -1441,6 +1493,18 @@ namespace PurelySharp.Symbolic
             out SmtFormula trigger)
         {
             trigger = null!;
+            if (TryCreateCheckedIntegralOutOfRangeTrigger(
+                    castExpression.Expression,
+                    minValue,
+                    maxValue,
+                    "ir.runtime-hazard.checked-conversion.overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!CSharpConditionToFormula.TryTranslateValue(
                     castExpression.Expression,
                     semanticModel,
@@ -1809,30 +1873,6 @@ namespace PurelySharp.Symbolic
             return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
                 ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
                 : CreateUnknownTrigger(site, "cast_operand_not_null");
-        }
-
-        private static bool TryCreateRuntimeReferenceCastMismatchTrigger(
-            ExpressionSyntax expression,
-            ITypeSymbol targetType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula trigger)
-        {
-            if (!CSharpConditionToFormula.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var value,
-                    getSymbolVersion: null) ||
-                value is not { Kind: SmtValueKind.Reference } ||
-                !CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula(value, targetType, out var runtimeTypeTest))
-            {
-                trigger = null!;
-                return false;
-            }
-
-            trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest);
-            return true;
         }
 
         private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)

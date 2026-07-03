@@ -44,12 +44,14 @@ namespace PurelySharp.Symbolic.Ir
     {
         DivideByZero,
         NullDereference,
+        ArgumentNull,
         IndexOutOfRange,
         ArgumentOutOfRange,
         NegativeLength,
         NegativeStackAllocLength,
         CheckedOverflow,
         InvalidCast,
+        UnboxNull,
         NullableValueWithoutValue,
         SwitchExpressionNoMatch,
         DirectThrow,
@@ -68,6 +70,10 @@ namespace PurelySharp.Symbolic.Ir
     internal sealed record SymbolicVariableTerm(string Name, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
 
     internal sealed record SymbolicStringContentTerm(SymbolicTerm Reference) : SymbolicTerm(SmtValueKind.String);
+
+    internal sealed record SymbolicStringConcatTerm(SymbolicTerm Left, SymbolicTerm Right) : SymbolicTerm(SmtValueKind.String);
+
+    internal sealed record SymbolicNullableHasValueTerm(string NullableName) : SymbolicTerm(SmtValueKind.Bool);
 
     internal sealed record SymbolicLengthTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
 

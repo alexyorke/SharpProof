@@ -115,6 +115,20 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     break;
+                case SymbolicStringConcatTerm concat:
+                    if (TryEncodeTerm(concat.Left, out var leftString) &&
+                        TryEncodeTerm(concat.Right, out var rightString) &&
+                        leftString.Kind == SmtValueKind.String &&
+                        rightString.Kind == SmtValueKind.String)
+                    {
+                        formula = new SmtStringConcatTerm(leftString, rightString);
+                        return true;
+                    }
+
+                    break;
+                case SymbolicNullableHasValueTerm nullableHasValue:
+                    formula = new SmtVariable(nullableHasValue.NullableName + ".HasValue", SmtValueKind.Bool);
+                    return true;
                 case SymbolicLengthTerm length:
                     if (TryEncodeTerm(length.Value, out var value))
                     {

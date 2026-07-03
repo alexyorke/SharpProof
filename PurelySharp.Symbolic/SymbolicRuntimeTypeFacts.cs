@@ -180,6 +180,23 @@ namespace PurelySharp.Symbolic
                 (conversion.IsIdentity || conversion.IsImplicit);
         }
 
+        internal static bool TryGetRuntimeTypeTestKey(ITypeSymbol? targetType, out string typeKey)
+        {
+            if (targetType == null ||
+                targetType.TypeKind is TypeKind.Dynamic or TypeKind.Error or TypeKind.TypeParameter ||
+                !targetType.IsReferenceType)
+            {
+                typeKey = null!;
+                return false;
+            }
+
+            typeKey = targetType
+                .WithNullableAnnotation(NullableAnnotation.None)
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                .Replace("global::", string.Empty);
+            return true;
+        }
+
         private static bool TryResolveCurrentSimpleValueExpression(
             ExpressionSyntax expression,
             SyntaxNode useNode,

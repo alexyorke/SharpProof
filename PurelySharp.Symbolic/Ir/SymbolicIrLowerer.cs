@@ -7,13 +7,16 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Ir
 {
-    internal static class SymbolicIrLowerer
+    internal static partial class SymbolicIrLowerer
     {
         private static readonly ImmutableArray<KnownApiLoweringDescriptor> KnownApiLowerings =
             ImmutableArray.Create(
                 new KnownApiLoweringDescriptor("string", nameof(string.Contains), TryLowerStringPredicateInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
-                new KnownApiLoweringDescriptor("string", nameof(string.EndsWith), TryLowerStringPredicateInvocation));
+                new KnownApiLoweringDescriptor("string", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
+                new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrEmpty), TryLowerStringNullOrPredicateInvocation),
+                new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrWhiteSpace), TryLowerStringNullOrPredicateInvocation),
+                new KnownApiLoweringDescriptor("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch), TryLowerRegexIsMatchInvocation));
 
         public static bool TryLowerCondition(
             ExpressionSyntax expression,
@@ -135,6 +138,11 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (TryLowerStringExpressionTerm(expression, context, out term))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binary &&
                 TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
                 TryLowerTerm(binary.Left, context, out var left) &&
@@ -171,27 +179,49 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             term = null!;
-            if (!TryLowerTerm(memberAccess.Expression, context, out var receiver))
-            {
-                return false;
-            }
 
             var memberName = memberAccess.Name.Identifier.ValueText;
+            if (TryLowerKnownStaticValueMember(memberAccess, context, out term))
+            {
+                return true;
+            }
+
             var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
+            if (string.Equals(memberName, "HasValue", StringComparison.Ordinal) &&
+                TryLowerNullableHasValueTerm(memberAccess.Expression, context, out term))
+            {
+                return true;
+            }
+
             if (string.Equals(memberName, nameof(string.Length), StringComparison.Ordinal))
             {
                 if (receiverType?.SpecialType == SpecialType.System_String)
                 {
-                    term = new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver));
+                    if (!TryLowerStringTerm(memberAccess.Expression, context, out var stringValue))
+                    {
+                        return false;
+                    }
+
+                    term = new SymbolicLengthTerm(stringValue);
                     return true;
                 }
 
                 if (receiverType is IArrayTypeSymbol { Rank: 1 } ||
                     IsBuiltInSpanOrMemoryType(receiverType))
                 {
-                    term = new SymbolicLengthTerm(receiver);
+                    if (!TryLowerTerm(memberAccess.Expression, context, out var lengthReceiver))
+                    {
+                        return false;
+                    }
+
+                    term = new SymbolicLengthTerm(lengthReceiver);
                     return true;
                 }
+            }
+
+            if (!TryLowerTerm(memberAccess.Expression, context, out var receiver))
+            {
+                return false;
             }
 
             if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
@@ -201,6 +231,40 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            return false;
+        }
+
+        public static bool TryLowerNullableHasValueTerm(
+            ExpressionSyntax nullableExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            nullableExpression = UnwrapExpression(nullableExpression);
+            if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(
+                    context.SemanticModel.GetTypeInfo(nullableExpression, context.CancellationToken).Type,
+                    out _) ||
+                !TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicNullableHasValueTerm(context.GetVariableName(symbol));
+            return true;
+        }
+
+        private static bool TryGetStableVariableSymbol(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out ISymbol symbol)
+        {
+            if (expression is IdentifierNameSyntax)
+            {
+                symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol!;
+                return symbol is ILocalSymbol or IParameterSymbol;
+            }
+
+            symbol = null!;
             return false;
         }
 
@@ -227,51 +291,45 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
-        private static bool TryLowerStringPredicateInvocation(
-            InvocationExpressionSyntax invocation,
-            IMethodSymbol method,
+        private static bool TryLowerKnownStaticValueMember(
+            MemberAccessExpressionSyntax memberAccess,
             SymbolicLoweringContext context,
-            out SymbolicCondition condition)
+            out SymbolicTerm term)
         {
-            condition = null!;
-            if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
-                invocation.ArgumentList.Arguments.Count != 1 ||
-                method.Parameters.Length != 1 ||
-                method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
-                !TryLowerTerm(memberAccess.Expression, context, out var receiverReference) ||
-                !TryLowerTerm(invocation.ArgumentList.Arguments[0].Expression, context, out var argument) ||
-                argument.Kind != SmtValueKind.String)
+            if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is IPropertySymbol property &&
+                IsBigIntegerType(property.Type))
             {
-                return false;
+                if (string.Equals(property.Name, "Zero", StringComparison.Ordinal))
+                {
+                    term = new SymbolicIntegerConstantTerm(0);
+                    return true;
+                }
+
+                if (string.Equals(property.Name, "One", StringComparison.Ordinal))
+                {
+                    term = new SymbolicIntegerConstantTerm(1);
+                    return true;
+                }
             }
 
-            var predicate = method.Name switch
-            {
-                nameof(string.Contains) => SymbolicStringPredicateKind.Contains,
-                nameof(string.StartsWith) => SymbolicStringPredicateKind.StartsWith,
-                nameof(string.EndsWith) => SymbolicStringPredicateKind.EndsWith,
-                _ => (SymbolicStringPredicateKind?)null,
-            };
-
-            if (predicate == null)
-            {
-                return false;
-            }
-
-            condition = CreateFactCondition(
-                new SymbolicStringPredicateAtom(
-                    predicate.Value,
-                    new SymbolicStringContentTerm(receiverReference),
-                    argument,
-                    RegexOptions.None),
-                invocation,
-                "ir.known-api.string." + method.Name);
-            return true;
+            term = null!;
+            return false;
         }
 
         private static SymbolicCondition CreateFactCondition(SymbolicAtom atom, SyntaxNode node, string provenance)
         {
             return new SymbolicFactCondition(SymbolicFact.Exact(atom, node, provenance));
+        }
+
+        private static SymbolicCondition CreateReferenceIsNullCondition(SymbolicTerm reference, SyntaxNode node)
+        {
+            return CreateFactCondition(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    reference,
+                    new SymbolicNullTerm()),
+                node,
+                "ir.string.concat.null-empty");
         }
 
         private static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op)
