@@ -4883,6 +4883,33 @@ namespace PurelySharp.Analyzer.Engine
                 SmtValueKind.Reference);
         }
 
+        internal static bool HasSymbolicBorrowFactForLocal(
+            ILocalSymbol localSymbol,
+            PurityAnalysisState currentState,
+            SymbolicBorrowKind? borrowKind = null)
+        {
+            var localTerm = CreateSymbolicReferenceTerm(localSymbol, currentState);
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (!fact.Polarity ||
+                    fact.Confidence != SymbolicFactConfidence.Exact ||
+                    fact.Atom is not SymbolicBorrowAtom borrow ||
+                    !Equals(borrow.Borrow, localTerm) ||
+                    (borrowKind.HasValue && borrow.Kind != borrowKind.Value))
+                {
+                    continue;
+                }
+
+                if (fact.Symbol == null ||
+                    SymbolEqualityComparer.Default.Equals(fact.Symbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static PurityAnalysisState AddAssignedValueFact(
             PurityAnalysisState currentState,
             ISymbol targetSymbol,

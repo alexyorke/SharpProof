@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic.Ir;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {
@@ -703,6 +704,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            if (PurityAnalysisEngine.HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable) &&
+                IsRefLocalAliasToExternallyVisibleStorage(local, context, currentState, visited))
+            {
+                return true;
+            }
+
             return IsRefLocalAliasToExternallyVisibleStorage(local, context, currentState, visited);
         }
 

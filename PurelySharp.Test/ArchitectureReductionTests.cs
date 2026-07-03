@@ -282,6 +282,27 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AssignmentRule_ConsumesSymbolicBorrowFactsForRefAliasMutation()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var engineSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var assignmentSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "AssignmentPurityRule.cs"));
+
+            Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForLocal("));
+            Assert.That(engineSource, Does.Contain("SymbolicBorrowAtom borrow"));
+            Assert.That(assignmentSource, Does.Contain("HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable)"));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
