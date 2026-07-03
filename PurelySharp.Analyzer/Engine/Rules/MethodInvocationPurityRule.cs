@@ -54,6 +54,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return useAfterDisposeResult;
             }
 
+            if (TryCheckByRefArgumentBorrowConflict(invocationOperation, currentState, out var byRefBorrowConflictResult))
+            {
+                return byRefBorrowConflictResult;
+            }
+
             if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
             {
                 return earlyTypeEqualityResult;
@@ -1307,6 +1312,48 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invocationOperation.Syntax,
                 evidence);
             return true;
+        }
+
+        private static bool TryCheckByRefArgumentBorrowConflict(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (!IsRefOrOutArgument(argument))
+                {
+                    continue;
+                }
+
+                if (!PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
+                        argument,
+                        PurityAnalysisEngine.TryResolveTrackedSymbol(argument.Value, currentState),
+                        currentState,
+                        nameof(MethodInvocationPurityRule),
+                        out var borrowConflictEvidence))
+                {
+                    continue;
+                }
+
+                PurityAnalysisEngine.LogDebug($"  [MIR]   By-reference argument '{argument.Syntax}' mutates a symbol with an active mutable borrow.");
+                result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    argument.Syntax,
+                    borrowConflictEvidence);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsRefOrOutArgument(IArgumentOperation argument)
+        {
+            return argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref ||
+                   argument.Syntax is ArgumentSyntax argumentSyntax &&
+                   argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                   argument.Syntax is ArgumentSyntax outArgumentSyntax &&
+                   outArgumentSyntax.RefKindKeyword.IsKind(SyntaxKind.OutKeyword);
         }
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(

@@ -326,6 +326,8 @@ namespace PurelySharp.Test
                 "PurityAnalysisEngine.cs"));
 
             Assert.That(source, Does.Contain("AddDeclaredBorrowFact("));
+            Assert.That(source, Does.Contain("operationToTrack is IVariableDeclaratorOperation"));
+            Assert.That(source, Does.Contain("RefExpressionSyntax"));
             Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateBorrow("));
             Assert.That(source, Does.Contain("SymbolicBorrowKind.Mutable"));
             Assert.That(source, Does.Contain("SymbolicBorrowKind.Shared"));
@@ -348,6 +350,12 @@ namespace PurelySharp.Test
                 "Engine",
                 "Rules",
                 "AssignmentPurityRule.cs"));
+            var invocationSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "MethodInvocationPurityRule.cs"));
 
             Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForLocal("));
             Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForTerm("));
@@ -357,9 +365,11 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("SymbolicBorrowAtom { Kind: SymbolicBorrowKind.Mutable } borrow"));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(localTerm, currentState)"));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(ownerTerm, currentState)"));
+            Assert.That(engineSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));
             Assert.That(assignmentSource, Does.Contain("HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable)"));
-            Assert.That(assignmentSource, Does.Contain("HasSymbolicMutableBorrowerFactForSymbol(targetSymbol, currentState)"));
-            Assert.That(assignmentSource, Does.Contain("\"analyzer.borrow.mutable-conflict\""));
+            Assert.That(assignmentSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));
+            Assert.That(invocationSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));
+            Assert.That(engineSource, Does.Contain("\"analyzer.borrow.mutable-conflict\""));
         }
 
         [Test]

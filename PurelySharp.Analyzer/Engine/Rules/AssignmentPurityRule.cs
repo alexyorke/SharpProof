@@ -320,21 +320,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityEvidence evidence)
         {
-            if (targetSymbol == null ||
-                !PurityAnalysisEngine.HasSymbolicMutableBorrowerFactForSymbol(targetSymbol, currentState))
-            {
-                evidence = default;
-                return false;
-            }
-
-            evidence = PurityAnalysisEngine.PurityEvidence.Create(
-                "mutable_state_write",
-                ruleName: nameof(AssignmentPurityRule),
-                operation: operation,
-                syntaxNode: operation.Syntax,
-                symbol: targetSymbol,
-                catalogSource: "analyzer.borrow.mutable-conflict");
-            return true;
+            return PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
+                operation,
+                targetSymbol,
+                currentState,
+                nameof(AssignmentPurityRule),
+                out evidence);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(

@@ -4474,6 +4474,16 @@ namespace PurelySharp.Analyzer.Engine
                         "assigned value targets are unresolved");
                 }
 
+                else if (operationToTrack is IVariableDeclaratorOperation variableDeclaratorOperation &&
+                         variableDeclaratorOperation.Initializer?.Value is { } variableInitializer)
+                {
+                    nextState = AddDeclaredBorrowFact(
+                        nextState,
+                        variableDeclaratorOperation.Symbol,
+                        variableInitializer,
+                        context.SemanticModel);
+                }
+
                 else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
                 {
                     nextState = AddCallerVisibleMutationFact(
@@ -4622,7 +4632,8 @@ namespace PurelySharp.Analyzer.Engine
                                 nextState = AddDeclaredBorrowFact(
                                     nextState,
                                     declaredSymbol,
-                                    initializerValue);
+                                    initializerValue,
+                                    context.SemanticModel);
                                 if (!IsUsingResourceDeclarator(declarator))
                                 {
                                     nextState = AddOwnedDisposableLocalFacts(
@@ -5199,6 +5210,30 @@ namespace PurelySharp.Analyzer.Engine
                 new HashSet<SymbolicTerm>());
         }
 
+        internal static bool TryCreateMutableBorrowConflictEvidence(
+            IOperation operation,
+            ISymbol? targetSymbol,
+            PurityAnalysisState currentState,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            evidence = PurityEvidence.None;
+            if (targetSymbol == null ||
+                !HasSymbolicMutableBorrowerFactForSymbol(targetSymbol, currentState))
+            {
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "mutable_state_write",
+                ruleName: ruleName,
+                operation: operation,
+                syntaxNode: operation.Syntax,
+                symbol: targetSymbol,
+                catalogSource: "analyzer.borrow.mutable-conflict");
+            return true;
+        }
+
         private static bool HasSymbolicMutableBorrowerFactForTerm(
             SymbolicTerm ownerTerm,
             PurityAnalysisState currentState,
@@ -5556,14 +5591,19 @@ namespace PurelySharp.Analyzer.Engine
         private static PurityAnalysisState AddDeclaredBorrowFact(
             PurityAnalysisState currentState,
             ILocalSymbol declaredSymbol,
-            IOperation initializerValue)
+            IOperation initializerValue,
+            SemanticModel semanticModel)
         {
-            if (declaredSymbol.RefKind is not (RefKind.Ref or RefKind.Out or RefKind.In or RefKind.RefReadOnly))
+            var isRefInitializer = initializerValue.Syntax.Parent is RefExpressionSyntax ||
+                initializerValue.Syntax.Ancestors().OfType<RefExpressionSyntax>().Any();
+            if (!isRefInitializer &&
+                declaredSymbol.RefKind is not (RefKind.Ref or RefKind.Out or RefKind.In or RefKind.RefReadOnly))
             {
                 return currentState;
             }
 
-            var sourceSymbol = TryResolveTrackedSymbol(initializerValue, currentState);
+            var sourceSymbol = TryResolveTrackedSymbol(initializerValue, currentState) ??
+                TryResolveRefInitializerSymbol(initializerValue.Syntax, semanticModel, currentState);
             if (sourceSymbol == null)
             {
                 return currentState;
@@ -5586,6 +5626,26 @@ namespace PurelySharp.Analyzer.Engine
             return currentState.WithPathConditionsAndState(
                 currentState.PathConditions,
                 currentState.PathState.AddFact(borrowFact));
+        }
+
+        private static ISymbol? TryResolveRefInitializerSymbol(
+            SyntaxNode initializerSyntax,
+            SemanticModel semanticModel,
+            PurityAnalysisState currentState)
+        {
+            var refExpression = initializerSyntax.AncestorsAndSelf().OfType<RefExpressionSyntax>().FirstOrDefault();
+            if (refExpression == null)
+            {
+                return null;
+            }
+
+            if (semanticModel.GetOperation(refExpression.Expression) is { } operation &&
+                TryResolveTrackedSymbol(operation, currentState) is { } operationSymbol)
+            {
+                return operationSymbol;
+            }
+
+            return semanticModel.GetSymbolInfo(refExpression.Expression).Symbol;
         }
 
         private static PurityAnalysisState AddAssignedSymbolicEqualityFact(
