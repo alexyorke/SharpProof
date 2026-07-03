@@ -340,6 +340,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula"));
             Assert.That(source, Does.Contain("TryCreateReferenceNullCondition("));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.reference.non-null.guard\""));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("\"ir.runtime-hazard.invalid-cast.formula-fallback\""));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateReferenceNullCondition"));

@@ -883,7 +883,12 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 castExpression,
                 SymbolicRuntimeHazardKind.InvalidCast,
-                trigger,
+                CreateFormulaBackedExceptionPreconditionTrigger(
+                    castExpression,
+                    SymbolicExceptionPreconditionKind.InvalidCast,
+                    subject: null,
+                    trigger,
+                    "ir.runtime-hazard.invalid-cast.formula-fallback"),
                 ExceptionTypes.InvalidCastException,
                 ExceptionCategories.DefiniteInvalidCast);
             return true;
