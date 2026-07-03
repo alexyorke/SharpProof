@@ -2,7 +2,9 @@
 
 ## Summary And Current State
 
-PurelySharp has the right direction now, but the codebase is only halfway there. The target is a bounded symbolic C# platform where purity, runtime hazards, invariant queries, and effect-summary reasoning all use one path: Roslyn/C# -> Symbolic IR -> normalized state -> proof service -> Z3-backed proof -> analyzer/API/CLI output.
+PurelySharp has the right direction now, but the codebase is only halfway there. The target is a bounded symbolic C# platform where purity, runtime hazards, invariant queries, and effect-summary reasoning all use one path:
+
+Roslyn/C# -> Symbolic IR -> normalized state -> proof service -> Z3-backed proof -> analyzer/API/CLI output.
 
 Current repo facts from inspection:
 
