@@ -705,6 +705,35 @@ namespace PurelySharp.Analyzer
             return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
         }
 
+        private static bool SymbolicPathConditionsImplyBranch(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryCreateSymbolicPathState(pathConditions, condition, out var pathState) ||
+                !SymbolicIrLowerer.TryLowerCondition(
+                    condition,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var symbolicCondition))
+            {
+                return false;
+            }
+
+            if (!branchWhenTrue)
+            {
+                symbolicCondition = new SymbolicNotCondition(symbolicCondition);
+            }
+
+            var implication = SymbolicReachabilityService.ClassifyStateImplication(
+                pathState,
+                symbolicCondition,
+                smtAnalysis);
+            return implication.Info.Status == SymbolicProofStatus.ProvenTrue;
+        }
+
         private static bool TryClassifySymbolicPathFeasibility(
             IReadOnlyCollection<SmtFormula> pathConditions,
             SyntaxNode sourceNode,
@@ -884,13 +913,20 @@ namespace PurelySharp.Analyzer
             if (ifStatement.Else?.Statement is not { } elseStatement)
             {
                 return trueReachable && trueExits &&
-                    SymbolicReachabilityService.PathConditionsImplyBranch(
-                        pathConditions,
-                        ifStatement.Condition,
-                        branchWhenTrue: true,
-                        semanticModel,
-                        cancellationToken,
-                        smtAnalysis);
+                    (SymbolicPathConditionsImplyBranch(
+                            pathConditions,
+                            ifStatement.Condition,
+                            branchWhenTrue: true,
+                            semanticModel,
+                            cancellationToken,
+                            smtAnalysis) ||
+                        SymbolicReachabilityService.PathConditionsImplyBranch(
+                            pathConditions,
+                            ifStatement.Condition,
+                            branchWhenTrue: true,
+                            semanticModel,
+                            cancellationToken,
+                            smtAnalysis));
             }
 
             var falseConditions = SymbolicReachabilityService.TryCollectBranchConditions(

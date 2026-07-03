@@ -726,6 +726,7 @@ namespace PurelySharp.Test
             Assert.That(legacyFallbackIndex, Is.GreaterThan(symbolicHelperIndex));
             Assert.That(pathFactsSource, Does.Contain("TryCreateSymbolicPathState("));
             Assert.That(pathFactsSource, Does.Contain("SymbolicPathConditionsAreSatisfiable("));
+            Assert.That(pathFactsSource, Does.Contain("SymbolicPathConditionsImplyBranch("));
             Assert.That(pathFactsSource, Does.Contain("TryClassifySymbolicPathFeasibility("));
             Assert.That(pathFactsSource, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
             Assert.That(pathFactsSource, Does.Contain("ClassifyStateFeasibility(pathState"));
