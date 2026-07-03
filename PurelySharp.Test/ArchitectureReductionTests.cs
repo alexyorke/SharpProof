@@ -931,6 +931,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardThrowNullRefinement_UsesIrPathStateBeforeLegacyFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardQueryService.cs"));
+            var helperIndex = source.IndexOf("TryCreateThrowNullCondition(", StringComparison.Ordinal);
+            var irProofIndex = source.IndexOf("ClassifyStateImplication(\r\n                    analysis.PathState,\r\n                    nullCondition,", StringComparison.Ordinal);
+            if (irProofIndex < 0)
+            {
+                irProofIndex = source.IndexOf("ClassifyStateImplication(\n                    analysis.PathState,\n                    nullCondition,", StringComparison.Ordinal);
+            }
+
+            var legacyFallbackIndex = source.IndexOf("PathConditionsImply(analysis.PathConditions, legacyNullTrigger", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irProofIndex, Is.GreaterThan(helperIndex));
+            Assert.That(legacyFallbackIndex, Is.GreaterThan(irProofIndex));
+            Assert.That(source, Does.Contain("\"ir.runtime-hazard.throw-null.trigger\""));
+        }
+
+        [Test]
         public async Task ProductionMetricsScript_ReportsProductionModulesAndExcludesTests()
         {
             var repositoryRoot = FindRepositoryRoot();

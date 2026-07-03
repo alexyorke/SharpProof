@@ -457,15 +457,89 @@ namespace PurelySharp.Symbolic
         {
             trigger = null!;
             if (candidate.Kind != SymbolicRuntimeHazardKind.DirectThrow ||
-                !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression) ||
-                !TryTranslateNullCondition(thrownExpression, semanticModel, cancellationToken, out var nullTrigger))
+                !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression))
             {
                 return false;
             }
 
-            trigger = nullTrigger;
-            return nullTrigger is SmtBooleanConstant { Value: true } ||
-                SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, nullTrigger, smtAnalysis);
+            var hasIrNullCondition = TryCreateThrowNullCondition(
+                thrownExpression,
+                semanticModel,
+                cancellationToken,
+                out var nullCondition,
+                out var irNullTrigger);
+            var hasLegacyNullCondition = TryTranslateNullCondition(
+                thrownExpression,
+                semanticModel,
+                cancellationToken,
+                out var legacyNullTrigger);
+            if (!hasIrNullCondition && !hasLegacyNullCondition)
+            {
+                return false;
+            }
+
+            trigger = hasIrNullCondition ? irNullTrigger : legacyNullTrigger;
+            if (trigger is SmtBooleanConstant { Value: true })
+            {
+                return true;
+            }
+
+            if (hasIrNullCondition)
+            {
+                var provenNull = SymbolicReachabilityService.ClassifyStateImplication(
+                    analysis.PathState,
+                    nullCondition,
+                    smtAnalysis);
+                if (provenNull.Info.Status == SymbolicProofStatus.ProvenTrue)
+                {
+                    return true;
+                }
+            }
+
+            return hasLegacyNullCondition &&
+                SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, legacyNullTrigger, smtAnalysis);
+        }
+
+        private static bool TryCreateThrowNullCondition(
+            ExpressionSyntax thrownExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicCondition condition,
+            out SmtFormula trigger)
+        {
+            thrownExpression = UnwrapExpression(thrownExpression);
+            if (thrownExpression.IsKind(SyntaxKind.NullLiteralExpression))
+            {
+                condition = new SymbolicConstantCondition(true);
+                trigger = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (thrownExpression is DefaultExpressionSyntax defaultExpression &&
+                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+            {
+                condition = new SymbolicConstantCondition(true);
+                trigger = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(thrownExpression, context, out var thrownTerm) ||
+                thrownTerm.Kind != SmtValueKind.Reference)
+            {
+                condition = null!;
+                trigger = null!;
+                return false;
+            }
+
+            condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    thrownTerm,
+                    new SymbolicNullTerm()),
+                thrownExpression,
+                "ir.runtime-hazard.throw-null.trigger"));
+            return SymbolicIrFormulaEncoder.TryEncode(condition, out trigger);
         }
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(
