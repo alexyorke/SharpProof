@@ -36,6 +36,13 @@ public class TestClass
             Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
             Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
             Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.direct-throw"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.direct-throw"));
+            Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+            Assert.That(hazard.InvariantInfo.MergedText, Is.EqualTo(hazard.MergedInvariantText));
+            Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
+            Assert.That(hazard.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
         }
 
         [Test]
@@ -139,6 +146,10 @@ public class TestClass
             Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
             Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
             Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.divide-by-zero"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Has.Some.StartsWith("ir."));
+            Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
             Assert.That(hazard.PathConditions.Any(condition => condition.Contains("divisor", StringComparison.Ordinal) &&
                                                                condition.Contains("Value = 0", StringComparison.Ordinal)), Is.True);
         }

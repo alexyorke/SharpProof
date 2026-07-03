@@ -437,6 +437,11 @@ namespace PurelySharp.Symbolic
                 triggerPrecondition == null ? null : SymbolicFactInfo.FromFact(triggerPrecondition),
                 analysis.MergedInvariantText,
                 analysis.Facts,
+                SymbolicFactInfo.Distinct(
+                    SymbolicFactInfo.FromState(analysis.PathState).Concat(
+                        triggerPrecondition == null
+                            ? Array.Empty<SymbolicFactInfo>()
+                            : new[] { SymbolicFactInfo.FromFact(triggerPrecondition) })),
                 analysis.Reachability,
                 analysis.ReachabilityReason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -636,6 +641,7 @@ namespace PurelySharp.Symbolic
             SymbolicFactInfo? triggerPrecondition,
             string mergedInvariantText,
             IReadOnlyList<string> pathConditions,
+            IReadOnlyList<SymbolicFactInfo> symbolicFacts,
             SymbolicReachability reachability,
             string reachabilityReason,
             SymbolicSmtDiagnostics? smtDiagnostics = null)
@@ -662,8 +668,20 @@ namespace PurelySharp.Symbolic
             MergedInvariantText = mergedInvariantText;
             PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
             PathConditionCount = pathConditions.Count;
+            SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
+            Proof = new SymbolicProofInfo(
+                MapProofStatus(status),
+                ResolveProofBackend(status),
+                ResolveUnknownReason(status, statusReason),
+                statusReason,
+                cacheHit: false,
+                budget: null);
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariantText,
+                SymbolicFacts,
+                new[] { Proof });
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
@@ -711,11 +729,112 @@ namespace PurelySharp.Symbolic
 
         public int PathConditionCount { get; }
 
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+
+        public SymbolicProofInfo Proof { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
+
         public SymbolicReachability Reachability { get; }
 
         public string ReachabilityReason { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        private static SymbolicProofStatus MapProofStatus(SymbolicRuntimeHazardStatus status)
+        {
+            return status switch
+            {
+                SymbolicRuntimeHazardStatus.Proven => SymbolicProofStatus.ProvenTrue,
+                SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
+                _ => SymbolicProofStatus.Unknown,
+            };
+        }
+
+        private static SymbolicProofBackend ResolveProofBackend(SymbolicRuntimeHazardStatus status)
+        {
+            return status == SymbolicRuntimeHazardStatus.Unsupported
+                ? SymbolicProofBackend.None
+                : SymbolicProofBackend.Smt;
+        }
+
+        private static SymbolicUnknownReason ResolveUnknownReason(
+            SymbolicRuntimeHazardStatus status,
+            string reason)
+        {
+            if (status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable)
+            {
+                return SymbolicUnknownReason.None;
+            }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return SymbolicUnknownReason.Unknown;
+            }
+
+            if (ContainsReason(reason, "timeout") ||
+                ContainsReason(reason, "timed_out"))
+            {
+                return SymbolicUnknownReason.Timeout;
+            }
+
+            if (ContainsReason(reason, "method_budget"))
+            {
+                return SymbolicUnknownReason.MethodBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "path_condition") ||
+                ContainsReason(reason, "max_path_conditions") ||
+                ContainsReason(reason, "too_many_path_conditions"))
+            {
+                return SymbolicUnknownReason.PathConditionBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "expression_budget") ||
+                ContainsReason(reason, "max_expression"))
+            {
+                return SymbolicUnknownReason.ExpressionBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "cancellation") ||
+                ContainsReason(reason, "cancelled") ||
+                ContainsReason(reason, "canceled"))
+            {
+                return SymbolicUnknownReason.CancellationRequested;
+            }
+
+            if (ContainsReason(reason, "encoding"))
+            {
+                return SymbolicUnknownReason.EncodingFailure;
+            }
+
+            if (ContainsReason(reason, "unsupported"))
+            {
+                return SymbolicUnknownReason.UnsupportedIrEncoding;
+            }
+
+            if (ContainsReason(reason, "smt_required") ||
+                ContainsReason(reason, "smt_disabled") ||
+                ContainsReason(reason, "smt_off"))
+            {
+                return SymbolicUnknownReason.SmtDisabled;
+            }
+
+            if (ContainsReason(reason, "z3") ||
+                ContainsReason(reason, "native") ||
+                ContainsReason(reason, "unavailable") ||
+                ContainsReason(reason, "load"))
+            {
+                return SymbolicUnknownReason.SmtUnavailable;
+            }
+
+            return SymbolicUnknownReason.Unknown;
+        }
+
+        private static bool ContainsReason(string reason, string value)
+        {
+            return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
     }
 
     public enum SymbolicRuntimeHazardKind
