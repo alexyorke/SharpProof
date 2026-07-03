@@ -191,6 +191,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardSlicing_PreservesIrExceptionPreconditionWhenFormulaLowers()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.argument-out-of-range"));
+        }
+
+        [Test]
         public void RuntimeHazardArrayGetValue1D_UsesIrBoundsPreconditionBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -209,6 +222,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
             Assert.That(source, Does.Contain("TryTranslateArrayGetValueDimensionLength"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
             Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
         }

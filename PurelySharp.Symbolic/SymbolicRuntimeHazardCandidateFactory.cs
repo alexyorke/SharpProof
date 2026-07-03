@@ -1134,10 +1134,16 @@ namespace PurelySharp.Symbolic
                 start,
                 count,
                 oneArgumentUpperBoundIsInclusive);
+            var trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRange);
             candidate = new RuntimeHazardCandidate(
                 invocation,
                 SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                CreateFormulaBackedExceptionPreconditionTrigger(
+                    invocation,
+                    SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                    subject: null,
+                    trigger,
+                    "ir.runtime-hazard.slicing.argument-out-of-range"),
                 ExceptionTypes.ArgumentOutOfRangeException,
                 category);
             return true;
@@ -1220,7 +1226,12 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 invocation,
                 SymbolicRuntimeHazardKind.IndexOutOfRange,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                CreateFormulaBackedExceptionPreconditionTrigger(
+                    invocation,
+                    SymbolicExceptionPreconditionKind.IndexOutOfRange,
+                    subject: null,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                    "ir.runtime-hazard.array-get-value.index-out-of-range.fallback"),
                 ExceptionTypes.IndexOutOfRangeException,
                 ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
             return true;
