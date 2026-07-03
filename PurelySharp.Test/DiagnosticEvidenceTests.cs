@@ -549,6 +549,47 @@ public sealed class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
         }
 
+        [Test]
+        public async Task Ps0002_ReturnUseAfterDispose_UsesSymbolicResourceLifetimeEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var resource = new PureDisposable();
+        resource.Dispose();
+        return resource.Use();
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_use_after_dispose"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
+        }
+
         [TestCaseSource(nameof(GetThreadingSemanticRuleCases))]
         public async Task Ps0002_ThreadingSemanticRules_UseThreadingSemanticRuleSource(
             string source,

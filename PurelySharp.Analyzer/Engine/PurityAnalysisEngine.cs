@@ -1431,6 +1431,7 @@ namespace PurelySharp.Analyzer.Engine
                 var mergedOwnedArrayFlowCapturesFromCfg = ImmutableHashSet<CaptureId>.Empty;
                 var mergedOwnedLocalArraysFromCfg = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
                 var mergedLocalConcreteTypesFromCfg = ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+                var mergedPathStateFromCfg = new SymbolicState();
                 if (bodySyntaxNode != null)
                 {
                     bool requiresNestedBodyFallback = methodBodyIOperation?.Parent != null;
@@ -1462,7 +1463,8 @@ namespace PurelySharp.Analyzer.Engine
                             out mergedDelegateTargetsFromCfg,
                             out mergedOwnedArrayFlowCapturesFromCfg,
                             out mergedOwnedLocalArraysFromCfg,
-                            out mergedLocalConcreteTypesFromCfg);
+                            out mergedLocalConcreteTypesFromCfg,
+                            out mergedPathStateFromCfg);
                     }
 
                     LogDebug($"{indent}  CFG Analysis Result for {methodSymbol.ToDisplayString()}: IsPure={result.IsPure}, ImpureNode={result.ImpureSyntaxNode?.Kind()}");
@@ -1498,6 +1500,7 @@ namespace PurelySharp.Analyzer.Engine
                             null,
                             ownedLocalArraySymbols: mergedOwnedLocalArraysFromCfg,
                             localConcreteTypes: mergedLocalConcreteTypesFromCfg,
+                            pathState: mergedPathStateFromCfg,
                             ownedArrayFlowCaptures: mergedOwnedArrayFlowCapturesFromCfg);
                         foreach (var returnOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IReturnOperation>())
                         {
@@ -1829,12 +1832,14 @@ namespace PurelySharp.Analyzer.Engine
             out ImmutableDictionary<ISymbol, PotentialTargets> mergedDelegateTargetsFromBlocks,
             out ImmutableHashSet<CaptureId> mergedOwnedArrayFlowCapturesFromBlocks,
             out ImmutableHashSet<ISymbol> mergedOwnedLocalArraysFromBlocks,
-            out ImmutableDictionary<ISymbol, INamedTypeSymbol> mergedLocalConcreteTypesFromBlocks)
+            out ImmutableDictionary<ISymbol, INamedTypeSymbol> mergedLocalConcreteTypesFromBlocks,
+            out SymbolicState mergedPathStateFromBlocks)
         {
             mergedDelegateTargetsFromBlocks = ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
             mergedOwnedArrayFlowCapturesFromBlocks = ImmutableHashSet<CaptureId>.Empty;
             mergedOwnedLocalArraysFromBlocks = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
             mergedLocalConcreteTypesFromBlocks = ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            mergedPathStateFromBlocks = new SymbolicState();
             // Roslyn 4.x: Create(BlockSyntax|ArrowClause, model) throws ("operation has a non-null parent").
             // Create(BaseMethodDeclarationSyntax|LocalFunctionStatement|ConstructorDeclaration|... , model) is the supported root.
             ControlFlowGraph? cfg = null;
@@ -1966,6 +1971,7 @@ namespace PurelySharp.Analyzer.Engine
             mergedOwnedArrayFlowCapturesFromBlocks = MergeOwnedArrayFlowCapturesFromBlockStates(exitBlockStates.Values);
             mergedOwnedLocalArraysFromBlocks = MergeOwnedLocalArraySymbolsFromBlockStates(exitBlockStates.Values);
             mergedLocalConcreteTypesFromBlocks = MergeLocalConcreteTypesFromBlockStates(exitBlockStates.Values);
+            mergedPathStateFromBlocks = MergePathStatesAcrossAll(exitBlockStates.Values.ToArray());
 
             PurityAnalysisResult finalResult = PurityAnalysisResult.Pure;
             
@@ -2096,7 +2102,7 @@ namespace PurelySharp.Analyzer.Engine
             }
             else if (!currentStateInBlock.HasPotentialImpurity &&
                 block.BranchValue != null &&
-                ShouldAnalyzeExplicitConditionBranchValue(block.BranchValue.Syntax))
+                ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax))
             {
                 LogDebug($"    [ATF Block {block.Ordinal}] Checking Branch Value Kind: {block.BranchValue.Kind}, Syntax: {block.BranchValue.Syntax.ToString().Replace("\r\n", " ").Replace("\n", " ")}");
 
@@ -2408,6 +2414,25 @@ namespace PurelySharp.Analyzer.Engine
                     ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.DoStatementSyntax ||
                     ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax ||
                     ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhenClauseSyntax)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ShouldAnalyzeStateSensitiveBranchValue(SyntaxNode branchValueSyntax)
+        {
+            return ShouldAnalyzeExplicitConditionBranchValue(branchValueSyntax) ||
+                IsReturnExpressionBranchValue(branchValueSyntax);
+        }
+
+        private static bool IsReturnExpressionBranchValue(SyntaxNode branchValueSyntax)
+        {
+            foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
+            {
+                if (ancestor is ReturnStatementSyntax)
                 {
                     return true;
                 }

@@ -194,6 +194,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void PostCfgChecks_CarryMergedSymbolicPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("out mergedPathStateFromCfg"));
+            Assert.That(source, Does.Contain("pathState: mergedPathStateFromCfg"));
+            Assert.That(source, Does.Contain("mergedPathStateFromBlocks = MergePathStatesAcrossAll("));
+            Assert.That(source, Does.Contain("ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax)"));
+            Assert.That(source, Does.Contain("IsReturnExpressionBranchValue("));
+        }
+
+        [Test]
         public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
         {
             var repositoryRoot = FindRepositoryRoot();
