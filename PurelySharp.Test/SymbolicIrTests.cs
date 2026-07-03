@@ -43,6 +43,65 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_StringLiteralEqualityEmitsNullSafeContentFacts()
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                "s == \"A\"");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
+            var equality = AssertFactCondition<SymbolicRelationAtom>(conjunction.Right);
+            Assert.That(equality.Left, Is.TypeOf<SymbolicStringContentTerm>());
+            Assert.That(equality.Right, Is.EqualTo(new SymbolicStringConstantTerm("A")));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_TupleEqualityEmitsElementFacts()
+        {
+            var context = CreateExpressionContext(
+                "(int A, int B) left, (int A, int B) right",
+                "left == right");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            var firstElement = (SymbolicVariableTerm)AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Left;
+            var secondElement = (SymbolicVariableTerm)AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Left;
+            Assert.That(firstElement.Name, Does.StartWith("left#").And.EndsWith(".Item1"));
+            Assert.That(secondElement.Name, Does.StartWith("left#").And.EndsWith(".Item2"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_UncheckedEnumCastEqualityUsesIntegralEnumTerm()
+        {
+            var context = CreateExpressionContext(
+                "Mode mode",
+                "unchecked((int)mode) == 1",
+                "public enum Mode { None = 0, Ready = 1 }");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var equality = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(equality.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            var mode = (SymbolicVariableTerm)equality.Left;
+            Assert.That(mode.Name, Does.StartWith("mode#"));
+            Assert.That(equality.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(1)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(
@@ -587,9 +646,10 @@ namespace PurelySharp.Test
             return (TAtom)factCondition.Fact.Atom;
         }
 
-        private static ExpressionContext CreateExpressionContext(string parameters, string expression)
+        private static ExpressionContext CreateExpressionContext(string parameters, string expression, string declarations = "")
         {
             var source = $$"""
+                {{declarations}}
                 public sealed class C
                 {
                     public bool M({{parameters}})

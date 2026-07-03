@@ -1375,6 +1375,7 @@ namespace PurelySharp.Symbolic
                     condition,
                     conditionSemanticModel,
                     cancellationToken,
+                    out var symbolicCondition,
                     out var conditionFormula) ||
                 conditionFormula == null)
             {
@@ -1443,6 +1444,18 @@ namespace PurelySharp.Symbolic
                 }
             }
 
+            if (symbolicCondition != null &&
+                TryProveConditionWithIrState(
+                    analysis.PathState,
+                    symbolicCondition,
+                    conditionText,
+                    conditionFormula,
+                    smtAnalysis,
+                    out var irProofResult))
+            {
+                return irProofResult;
+            }
+
             return new SymbolicConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unknown,
@@ -1454,14 +1467,19 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax condition,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
+            out SymbolicCondition? symbolicCondition,
             out SmtFormula? formula)
         {
+            symbolicCondition = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
-                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encoded))
+            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var loweredCondition))
             {
-                formula = encoded;
-                return true;
+                symbolicCondition = loweredCondition;
+                if (SymbolicIrFormulaEncoder.TryEncode(loweredCondition, out var encoded))
+                {
+                    formula = encoded;
+                    return true;
+                }
             }
 
             return CSharpSmtFormulaTranslator.TryTranslate(
@@ -1469,6 +1487,73 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 out formula);
+        }
+
+        private static bool TryProveConditionWithIrState(
+            SymbolicState pathState,
+            SymbolicCondition symbolicCondition,
+            string conditionText,
+            SmtFormula conditionFormula,
+            SmtAnalysisService smtAnalysis,
+            out SymbolicConditionProofResult proofResult)
+        {
+            var trueProof = SymbolicReachabilityService.ClassifyStateImplication(
+                pathState,
+                symbolicCondition,
+                smtAnalysis);
+            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                proofResult = CreateConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenTrue,
+                    trueProof,
+                    conditionFormula);
+                return true;
+            }
+
+            var falseProof = SymbolicReachabilityService.ClassifyStateImplication(
+                pathState,
+                new SymbolicNotCondition(symbolicCondition),
+                smtAnalysis);
+            if (falseProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                proofResult = CreateConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenFalse,
+                    falseProof,
+                    conditionFormula);
+                return true;
+            }
+
+            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
+            if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
+            {
+                proofResult = CreateConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unreachable,
+                    reachabilityProof,
+                    conditionFormula);
+                return true;
+            }
+
+            proofResult = null!;
+            return false;
+        }
+
+        private static SymbolicConditionProofResult CreateConditionProofResult(
+            string conditionText,
+            SymbolicTruthValue truthValue,
+            SymbolicIrProofResult proof,
+            SmtFormula conditionFormula)
+        {
+            var reason = proof.RawResult?.Reason ?? proof.Info.Reason;
+            return new SymbolicConditionProofResult(
+                conditionText,
+                string.Equals(reason, "path_unsatisfiable", StringComparison.Ordinal)
+                    ? SymbolicTruthValue.Unreachable
+                    : truthValue,
+                reason,
+                conditionFormula);
         }
 
         private static bool TryCreateSpeculativeCondition(
