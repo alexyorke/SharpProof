@@ -173,6 +173,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerFreshMutableObjects_ProjectValueOwnershipFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddFreshMutableObjectFacts("));
+            Assert.That(source, Does.Contain("RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type)"));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwnedValue("));
+            Assert.That(source, Does.Contain("\"analyzer.object.acquire\""));
+            Assert.That(source, Does.Contain("\"evidence.object.acquire\""));
+        }
+
+        [Test]
         public void AnalyzerDisposeInvocations_ProjectDisposalFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -383,6 +400,23 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryFindCapturedOwnedLocalArray("));
             Assert.That(source, Does.Contain("HasSymbolicOwnedFactForSymbol(localReference.Local, currentState)"));
             Assert.That(source, Does.Contain("currentState.IsOwnedLocalArraySymbol(localReference.Local)"));
+        }
+
+        [Test]
+        public void DelegateRule_ConsumesSymbolicOwnershipFactsForFreshMutableObjectCapture()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "DelegateCreationPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("TryFindCapturedFreshMutableObject("));
+            Assert.That(source, Does.Contain("RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localReference.Local.Type)"));
+            Assert.That(source, Does.Contain("HasSymbolicOwnedFactForSymbol(localReference.Local, currentState)"));
+            Assert.That(source, Does.Contain("HasStableFreshMutableObjectInitializer(localReferenceFallback.Local"));
         }
 
         [Test]

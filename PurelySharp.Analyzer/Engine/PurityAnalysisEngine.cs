@@ -4589,6 +4589,11 @@ namespace PurelySharp.Analyzer.Engine
                                     nextState = nextState.WithoutOwnedLocalArray(declaredSymbol);
                                 }
 
+                                nextState = AddFreshMutableObjectFacts(
+                                    nextState,
+                                    declaredSymbol,
+                                    initializerValue);
+
                                 if (IsDefinitelyNullValue(initializerValue, nextState))
                                 {
                                     nextState = nextState.WithDefinitelyNullLocal(declaredSymbol);
@@ -4977,6 +4982,34 @@ namespace PurelySharp.Analyzer.Engine
                 "analyzer.array.acquire",
                 localSymbol,
                 "evidence.array.acquire");
+            foreach (var fact in ownershipFacts)
+            {
+                pathState = pathState.AddFact(fact);
+            }
+
+            return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        }
+
+        private static PurityAnalysisState AddFreshMutableObjectFacts(
+            PurityAnalysisState nextState,
+            ISymbol localSymbol,
+            IOperation valueOperation)
+        {
+            var unwrappedValue = SkipImplicitConversions(valueOperation);
+            if (unwrappedValue is not IObjectCreationOperation objectCreationOperation ||
+                !RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+            {
+                return nextState;
+            }
+
+            var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+            var pathState = nextState.PathState;
+            var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+                term,
+                valueOperation.Syntax,
+                "analyzer.object.acquire",
+                localSymbol,
+                "evidence.object.acquire");
             foreach (var fact in ownershipFacts)
             {
                 pathState = pathState.AddFact(fact);
@@ -5860,6 +5893,10 @@ namespace PurelySharp.Analyzer.Engine
                     writtenLocalSymbol,
                     valueOperation,
                     compilation);
+                nextState = AddFreshMutableObjectFacts(
+                    nextState,
+                    writtenLocalSymbol,
+                    valueOperation);
             }
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)

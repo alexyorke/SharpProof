@@ -95,6 +95,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         IsEscapingDelegateCreation(delegateCreation) &&
                         TryFindCapturedFreshMutableObject(
                             anonymousFunction,
+                            currentState,
                             delegateCreation.Syntax,
                             context.SemanticModel,
                             out var objectCaptureSyntax,
@@ -175,6 +176,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         IsEscapingDelegateCreation(delegateCreation) &&
                         TryFindCapturedFreshMutableObject(
                             flowAnonymousFunction,
+                            currentState,
                             delegateCreation.Syntax,
                             context.SemanticModel,
                             out var objectCaptureSyntax,
@@ -275,10 +277,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (IsEscapingDelegateCreation(delegateCreation) &&
                         targetMethod.MethodKind == MethodKind.LocalFunction &&
-                        TryFindLocalFunctionCapturedFreshMutableObject(
-                            targetMethod,
-                            delegateCreation.Syntax,
-                            context,
+                            TryFindLocalFunctionCapturedFreshMutableObject(
+                                targetMethod,
+                                currentState,
+                                delegateCreation.Syntax,
+                                context,
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
@@ -540,6 +543,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryFindCapturedFreshMutableObject(
             IOperation anonymousFunctionOperation,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
             out SyntaxNode captureSyntax,
@@ -551,6 +555,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 if (TryGetCapturedFreshMutableObject(
                     operation,
                     lambdaSpan,
+                    currentState,
                     delegateCreationSyntax,
                     semanticModel,
                     out capturedLocal))
@@ -567,6 +572,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryFindLocalFunctionCapturedFreshMutableObject(
             IMethodSymbol methodSymbol,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
             PurityAnalysisContext context,
             out SyntaxNode captureSyntax,
@@ -578,7 +584,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
                 var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
                 if (operation != null &&
-                    TryFindCapturedFreshMutableObject(operation, delegateCreationSyntax, semanticModel, out captureSyntax, out capturedLocal))
+                    TryFindCapturedFreshMutableObject(
+                        operation,
+                        currentState,
+                        delegateCreationSyntax,
+                        semanticModel,
+                        out captureSyntax,
+                        out capturedLocal))
                 {
                     return true;
                 }
@@ -592,16 +604,50 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool TryGetCapturedFreshMutableObject(
             IOperation? operation,
             Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
             out ILocalSymbol localSymbol)
         {
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            if (unwrappedOperation is IFieldReferenceOperation fieldReference &&
+                TryGetCapturedFreshMutableObject(
+                    fieldReference.Instance,
+                    lambdaSpan,
+                    currentState,
+                    delegateCreationSyntax,
+                    semanticModel,
+                    out localSymbol))
+            {
+                return true;
+            }
+
+            if (unwrappedOperation is IPropertyReferenceOperation propertyReference &&
+                TryGetCapturedFreshMutableObject(
+                    propertyReference.Instance,
+                    lambdaSpan,
+                    currentState,
+                    delegateCreationSyntax,
+                    semanticModel,
+                    out localSymbol))
+            {
+                return true;
+            }
+
             if (unwrappedOperation is ILocalReferenceOperation localReference &&
                 IsDeclaredOutsideSpan(localReference.Local, lambdaSpan) &&
-                HasStableFreshMutableObjectInitializer(localReference.Local, delegateCreationSyntax, semanticModel))
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localReference.Local.Type) &&
+                PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState))
             {
                 localSymbol = localReference.Local;
+                return true;
+            }
+
+            if (unwrappedOperation is ILocalReferenceOperation localReferenceFallback &&
+                IsDeclaredOutsideSpan(localReferenceFallback.Local, lambdaSpan) &&
+                HasStableFreshMutableObjectInitializer(localReferenceFallback.Local, delegateCreationSyntax, semanticModel))
+            {
+                localSymbol = localReferenceFallback.Local;
                 return true;
             }
 
