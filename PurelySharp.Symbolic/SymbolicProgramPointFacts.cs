@@ -28,7 +28,7 @@ namespace PurelySharp.Symbolic
         private const string MemberNotNullAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute";
         private const string MemberNotNullWhenAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
         private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
-        public static List<SmtFormula> CollectPriorAssignmentFacts(
+        internal static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -128,7 +128,7 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        public static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
+        internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
             SyntaxNode syntaxNode,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -576,7 +576,7 @@ namespace PurelySharp.Symbolic
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
 
-        public static IEnumerable<SmtFormula> CollectForInitializerFacts(
+        internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -612,7 +612,7 @@ namespace PurelySharp.Symbolic
             return facts;
         }
 
-        public static ImmutableArray<SmtFormula> CollectForLoopBodyInvariantFacts(
+        internal static ImmutableArray<SmtFormula> CollectForLoopBodyInvariantFacts(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -620,7 +620,7 @@ namespace PurelySharp.Symbolic
             return CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken);
         }
 
-        public static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
+        internal static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -645,7 +645,7 @@ namespace PurelySharp.Symbolic
             return builder.ToImmutable();
         }
 
-        public static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
+        internal static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
             StatementSyntax statement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -3271,7 +3271,7 @@ namespace PurelySharp.Symbolic
 
         private sealed class MergeableBranchFact
         {
-            public MergeableBranchFact(SmtFormula formula)
+            internal MergeableBranchFact(SmtFormula formula)
             {
                 Formula = formula;
                 FactKey = GetFormulaKey(formula);
@@ -3280,11 +3280,11 @@ namespace PurelySharp.Symbolic
                     : string.Empty;
             }
 
-            public SmtFormula Formula { get; }
+            internal SmtFormula Formula { get; }
 
-            public string FactKey { get; }
+            internal string FactKey { get; }
 
-            public string TargetKey { get; }
+            internal string TargetKey { get; }
 
             private static bool TryGetMergeTargetKey(SmtFormula formula, out string targetKey)
             {
@@ -3878,31 +3878,31 @@ namespace PurelySharp.Symbolic
 
         private sealed class SwitchBranchFacts
         {
-            public SwitchBranchFacts(SmtFormula condition, IReadOnlyList<SmtFormula> facts, bool conditionSymbolsMutated)
+            internal SwitchBranchFacts(SmtFormula condition, IReadOnlyList<SmtFormula> facts, bool conditionSymbolsMutated)
             {
                 Condition = condition;
                 Facts = facts;
                 ConditionSymbolsMutated = conditionSymbolsMutated;
             }
 
-            public SmtFormula Condition { get; }
+            internal SmtFormula Condition { get; }
 
-            public IReadOnlyList<SmtFormula> Facts { get; }
+            internal IReadOnlyList<SmtFormula> Facts { get; }
 
-            public bool ConditionSymbolsMutated { get; }
+            internal bool ConditionSymbolsMutated { get; }
         }
 
         private sealed class CompletedBranchFacts
         {
-            public CompletedBranchFacts(StatementSyntax statement, IReadOnlyList<SmtFormula> facts)
+            internal CompletedBranchFacts(StatementSyntax statement, IReadOnlyList<SmtFormula> facts)
             {
                 Statement = statement;
                 Facts = facts;
             }
 
-            public StatementSyntax Statement { get; }
+            internal StatementSyntax Statement { get; }
 
-            public IReadOnlyList<SmtFormula> Facts { get; }
+            internal IReadOnlyList<SmtFormula> Facts { get; }
         }
 
         private static void AddCompletedLoopStatementFacts(

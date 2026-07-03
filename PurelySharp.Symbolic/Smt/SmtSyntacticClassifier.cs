@@ -631,7 +631,7 @@ namespace PurelySharp.Symbolic.Smt
             private int _booleanFactInferenceDepth;
             private int _conditionalBranchEvaluationDepth;
 
-            public SyntacticFactSet()
+            internal SyntacticFactSet()
             {
             }
 
@@ -648,14 +648,14 @@ namespace PurelySharp.Symbolic.Smt
                 _conditionalBranchEvaluationDepth = source._conditionalBranchEvaluationDepth;
             }
 
-            public static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
+            internal static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
             {
                 var facts = new SyntacticFactSet();
                 facts.AddAll(formulas, out _);
                 return facts;
             }
 
-            public bool AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
+            internal bool AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
             {
                 hasContradiction = false;
                 var formulaArray = formulas as SmtFormula[] ?? formulas.ToArray();
@@ -683,7 +683,7 @@ namespace PurelySharp.Symbolic.Smt
                 return anyAdded;
             }
 
-            public bool Add(SmtFormula formula, out bool hasContradiction)
+            internal bool Add(SmtFormula formula, out bool hasContradiction)
             {
                 hasContradiction = false;
                 formula = NormalizeAliases(formula);
@@ -1168,12 +1168,12 @@ namespace PurelySharp.Symbolic.Smt
                 _referenceNullStates.Remove(alias);
             }
 
-            public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
+            internal bool TryEvaluateBoolean(SmtFormula formula, out bool value)
             {
                 return TryEvaluateBoolean(formula, out value, conditionalBranchDepth: 0);
             }
 
-            public bool IsContradictoryForBothBooleanBranches(SmtFormula condition)
+            internal bool IsContradictoryForBothBooleanBranches(SmtFormula condition)
             {
                 return IsContradictoryForBooleanBranch(condition, value: true) &&
                     IsContradictoryForBooleanBranch(condition, value: false);
@@ -1973,7 +1973,7 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            public bool TryClassifyBooleanFromFacts(SmtFormula formula, out bool value)
+            internal bool TryClassifyBooleanFromFacts(SmtFormula formula, out bool value)
             {
                 return TryClassifyBooleanFromFacts(formula, out value, conditionalBranchDepth: 0);
             }
@@ -3206,35 +3206,35 @@ namespace PurelySharp.Symbolic.Smt
 
             private readonly struct BooleanEquivalenceParent
             {
-                public BooleanEquivalenceParent(SmtFormula parent, bool isNegatedFromParent)
+                internal BooleanEquivalenceParent(SmtFormula parent, bool isNegatedFromParent)
                 {
                     Parent = parent;
                     IsNegatedFromParent = isNegatedFromParent;
                 }
 
-                public SmtFormula Parent { get; }
-                public bool IsNegatedFromParent { get; }
+                internal SmtFormula Parent { get; }
+                internal bool IsNegatedFromParent { get; }
             }
 
             private readonly struct AffineIntegerTerm
             {
-                public AffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
+                internal AffineIntegerTerm(SmtFormula? baseTerm, long scale, long offset)
                 {
                     BaseTerm = scale == 0 ? null : baseTerm;
                     Scale = BaseTerm == null ? 0 : scale;
                     Offset = offset;
                 }
 
-                public SmtFormula? BaseTerm { get; }
-                public long Scale { get; }
-                public long Offset { get; }
+                internal SmtFormula? BaseTerm { get; }
+                internal long Scale { get; }
+                internal long Offset { get; }
 
-                public static AffineIntegerTerm Constant(long value)
+                internal static AffineIntegerTerm Constant(long value)
                 {
                     return new AffineIntegerTerm(null, 0, value);
                 }
 
-                public static AffineIntegerTerm Term(SmtFormula term)
+                internal static AffineIntegerTerm Term(SmtFormula term)
                 {
                     return new AffineIntegerTerm(term, 1, 0);
                 }

@@ -389,8 +389,8 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
             Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
-            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.GreaterThan(0));
-            Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(1));
         }
 
         [Test]
@@ -412,6 +412,7 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New public symbolic API surfaces must expose fact/proof DTOs instead of SmtFormula.");
+            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(1));
         }
 
         [Test]
@@ -439,6 +440,7 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New formula-shaped compatibility surfaces must expose SymbolicFactInfo, SymbolicInvariantInfo, or SymbolicProofInfo instead.");
+            Assert.That(surfaces, Has.Length.EqualTo(1));
             Assert.That(categories, Does.Not.Contain("formula-metadata"));
             Assert.That(categories, Does.Not.Contain("merged-invariant"));
             Assert.That(categories, Does.Contain("path-conditions"));
@@ -775,27 +777,12 @@ namespace PurelySharp.Test
 
         private static readonly string[] ApprovedSymbolicPublicFormulaSurfaceFiles =
         {
-            "PurelySharp.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
-            "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs",
             "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
-            "PurelySharp.Symbolic/Smt/SmtSyntacticClassifier.cs",
-            "PurelySharp.Symbolic/SymbolicFactFactory.cs",
-            "PurelySharp.Symbolic/SymbolicInvariantService.cs",
-            "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
-            "PurelySharp.Symbolic/SymbolicProofService.cs",
-            "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
-            "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
-            "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
         };
 
         private static readonly string[] ApprovedSymbolicCompatibilitySurfaceFiles =
         {
             "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
-            "PurelySharp.Symbolic/SymbolicInvariantService.cs",
-            "PurelySharp.Symbolic/SymbolicProofService.cs",
-            "PurelySharp.Symbolic/SymbolicQueryApi.cs",
-            "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs",
-            "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
         };
 
         private static readonly string[] AllowedExportedSmtFormulaTypes =

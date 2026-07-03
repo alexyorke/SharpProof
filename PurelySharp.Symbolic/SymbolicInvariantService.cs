@@ -307,7 +307,7 @@ namespace PurelySharp.Symbolic
 
     internal sealed class SymbolicInvariantSnapshot
     {
-        public SymbolicInvariantSnapshot(int spanStart, IReadOnlyList<SmtFormula> formulas)
+        internal SymbolicInvariantSnapshot(int spanStart, IReadOnlyList<SmtFormula> formulas)
         {
             SpanStart = spanStart;
             Formulas = formulas;
@@ -318,7 +318,7 @@ namespace PurelySharp.Symbolic
 
         public int SpanStart { get; }
 
-        public IReadOnlyList<SmtFormula> Formulas { get; }
+        internal IReadOnlyList<SmtFormula> Formulas { get; }
 
         public IReadOnlyList<string> Facts { get; }
 

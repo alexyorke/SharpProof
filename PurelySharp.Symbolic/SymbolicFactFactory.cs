@@ -11,7 +11,7 @@ namespace PurelySharp.Symbolic
 {
     internal static class SymbolicFactFactory
     {
-        public static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
+        internal static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
         {
             if (targetFormula.Kind == SmtValueKind.Bool &&
                 valueFormula is SmtBooleanConstant booleanConstant)
@@ -24,21 +24,21 @@ namespace PurelySharp.Symbolic
             return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
         }
 
-        public static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
+        internal static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
         {
             return left.Kind == right.Kind ||
                 left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
                 right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
         }
 
-        public static string GetSmtVariableName(ISymbol symbol)
+        internal static string GetSmtVariableName(ISymbol symbol)
         {
             var firstLocation = symbol.Locations.FirstOrDefault();
             var start = firstLocation?.SourceSpan.Start ?? 0;
             return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static bool TryCreateReferenceBackedLengthFact(
+        internal static bool TryCreateReferenceBackedLengthFact(
             SmtFormula targetReference,
             ExpressionSyntax valueExpression,
             ExpressionSyntax unwrappedValueExpression,
@@ -60,7 +60,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool TryCreateReferenceBackedStringContentFact(
+        internal static bool TryCreateReferenceBackedStringContentFact(
             SmtFormula targetReference,
             ExpressionSyntax valueExpression,
             ExpressionSyntax unwrappedValueExpression,
@@ -82,7 +82,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static void AddReferenceBackedArrayDimensionLengthFacts(
+        internal static void AddReferenceBackedArrayDimensionLengthFacts(
             SmtFormula targetReference,
             ExpressionSyntax valueExpression,
             ExpressionSyntax unwrappedValueExpression,
@@ -113,7 +113,7 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        public static void AddArrayDimensionLengthAssignedValueFacts(
+        internal static void AddArrayDimensionLengthAssignedValueFacts(
             IArrayTypeSymbol targetArrayType,
             Func<int, SmtFormula?> createTargetDimensionLengthFormula,
             ExpressionSyntax valueExpression,
@@ -142,7 +142,7 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        public static bool TryCreateCollectionExpressionLengthLowerBoundFact(
+        internal static bool TryCreateCollectionExpressionLengthLowerBoundFact(
             SmtFormula targetLengthFormula,
             ExpressionSyntax unwrappedValueExpression,
             out SmtFormula fact)
@@ -161,7 +161,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        internal static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
         {
             if (receiverFormula.Kind != SmtValueKind.Reference)
             {
@@ -173,7 +173,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool TryCreateReferenceArrayDimensionLengthFormula(
+        internal static bool TryCreateReferenceArrayDimensionLengthFormula(
             SmtFormula receiverFormula,
             int dimension,
             out SmtFormula formula)
@@ -191,7 +191,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        internal static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
         {
             if (receiverFormula.Kind != SmtValueKind.Reference)
             {
@@ -203,7 +203,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool TryCreateStringContentFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
+        internal static bool TryCreateStringContentFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
         {
             if (type?.SpecialType == SpecialType.System_String)
             {
@@ -215,7 +215,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryCreateBuiltInLengthFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
+        internal static bool TryCreateBuiltInLengthFormula(string variableName, ITypeSymbol? type, out SmtFormula formula)
         {
             if (type?.SpecialType == SpecialType.System_String)
             {
@@ -233,7 +233,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryCreateBuiltInLengthFormulaForReference(
+        internal static bool TryCreateBuiltInLengthFormulaForReference(
             SmtFormula receiverFormula,
             ITypeSymbol? type,
             out SmtFormula formula)
@@ -261,7 +261,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryCreateArrayDimensionLengthFormula(
+        internal static bool TryCreateArrayDimensionLengthFormula(
             string variableName,
             IArrayTypeSymbol arrayType,
             int dimension,
@@ -280,7 +280,7 @@ namespace PurelySharp.Symbolic
                 out formula);
         }
 
-        public static bool TryCreateArrayDimensionLengthFormulaForReference(
+        internal static bool TryCreateArrayDimensionLengthFormulaForReference(
             SmtFormula receiverFormula,
             IArrayTypeSymbol arrayType,
             int dimension,
@@ -296,12 +296,12 @@ namespace PurelySharp.Symbolic
             return TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, dimension, out formula);
         }
 
-        public static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        internal static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
         {
             return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
         }
 
-        public static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
+        internal static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
         {
             return symbol switch
             {
@@ -311,7 +311,7 @@ namespace PurelySharp.Symbolic
             };
         }
 
-        public static bool TryGetDirectLocalOrParameterSymbol(
+        internal static bool TryGetDirectLocalOrParameterSymbol(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -328,7 +328,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryCreateSymbolVariableFormula(
+        internal static bool TryCreateSymbolVariableFormula(
             string variableName,
             ITypeSymbol? type,
             Func<ITypeSymbol, bool> isIntegralType,
@@ -363,7 +363,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryGetValueKind(
+        internal static bool TryGetValueKind(
             ITypeSymbol type,
             Func<ITypeSymbol, bool> isIntegralType,
             Func<ITypeSymbol, bool> isReferenceLikeType,
@@ -391,7 +391,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol)
+        internal static bool IsSupportedSmtIntegralOrEnumType(ITypeSymbol? typeSymbol)
         {
             if (typeSymbol == null)
             {
@@ -415,7 +415,7 @@ namespace PurelySharp.Symbolic
                 IsSupportedSmtIntegralOrEnumType(underlyingType);
         }
 
-        public static string GetReferenceFormulaName(SmtFormula receiverFormula)
+        internal static string GetReferenceFormulaName(SmtFormula receiverFormula)
         {
             return receiverFormula is SmtVariable variable
                 ? variable.Name

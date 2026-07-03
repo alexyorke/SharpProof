@@ -6863,7 +6863,7 @@ namespace PurelySharp.Symbolic
             return string.Join(" && ", pathConditions.Select(static condition => "(" + Format(condition) + ")"));
         }
 
-        public static string Format(SmtFormula formula)
+        internal static string Format(SmtFormula formula)
         {
             if (formula == null)
             {
@@ -6917,7 +6917,7 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        public static string GetMergeTarget(SmtFormula formula)
+        internal static string GetMergeTarget(SmtFormula formula)
         {
             if (formula == null)
             {

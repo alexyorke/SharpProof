@@ -15,21 +15,21 @@ namespace PurelySharp.Symbolic
     {
         private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache> s_structuralPathConditionCache = new();
 
-        public static bool IsSatisfiable(
+        internal static bool IsSatisfiable(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
             return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility != Feasibility.Unsatisfiable;
         }
 
-        public static bool IsUnsatisfiable(
+        internal static bool IsUnsatisfiable(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
             return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility == Feasibility.Unsatisfiable;
         }
 
-        public static bool PathConditionsImply(
+        internal static bool PathConditionsImply(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
@@ -37,7 +37,7 @@ namespace PurelySharp.Symbolic
             return ClassifyImplication(pathConditions, factFormula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
         }
 
-        public static bool PathConditionsAllowAndImply(
+        internal static bool PathConditionsAllowAndImply(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
@@ -101,7 +101,7 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
         }
 
-        public static List<SmtFormula>? TryCollectBranchConditions(
+        internal static List<SmtFormula>? TryCollectBranchConditions(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,
             bool branchWhenTrue,
@@ -227,7 +227,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        public static bool IsBranchReachable(
+        internal static bool IsBranchReachable(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,
             bool branchWhenTrue,
@@ -244,7 +244,7 @@ namespace PurelySharp.Symbolic
                 IsSatisfiable(branchConditions, smtAnalysis);
         }
 
-        public static bool IsBranchUnreachable(
+        internal static bool IsBranchUnreachable(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,
             bool branchWhenTrue,
@@ -261,7 +261,7 @@ namespace PurelySharp.Symbolic
                 IsUnsatisfiable(branchConditions, smtAnalysis);
         }
 
-        public static bool PathConditionsImplyBranch(
+        internal static bool PathConditionsImplyBranch(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,
             bool branchWhenTrue,
@@ -278,7 +278,7 @@ namespace PurelySharp.Symbolic
                 smtAnalysis);
         }
 
-        public static PurityProofResult ClassifyImplication(
+        internal static PurityProofResult ClassifyImplication(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
@@ -287,14 +287,14 @@ namespace PurelySharp.Symbolic
             return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyImplication(pathConditions, factFormula);
         }
 
-        public static bool IsFormulaAlwaysFalse(
+        internal static bool IsFormulaAlwaysFalse(
             SmtFormula formula,
             SmtAnalysisService? smtAnalysis)
         {
             return IsFormulaAlwaysFalse(formula, Array.Empty<SmtFormula>(), smtAnalysis);
         }
 
-        public static bool IsFormulaAlwaysFalse(
+        internal static bool IsFormulaAlwaysFalse(
             SmtFormula formula,
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
@@ -302,7 +302,7 @@ namespace PurelySharp.Symbolic
             return ClassifyBranchReachability(pathConditions, formula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
         }
 
-        public static bool IsFormulaAlwaysTrue(
+        internal static bool IsFormulaAlwaysTrue(
             SmtFormula formula,
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
@@ -310,7 +310,7 @@ namespace PurelySharp.Symbolic
             return IsFormulaAlwaysFalse(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), pathConditions, smtAnalysis);
         }
 
-        public static bool? EvaluateConditionTruth(
+        internal static bool? EvaluateConditionTruth(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -361,7 +361,7 @@ namespace PurelySharp.Symbolic
             return null;
         }
 
-        public static bool? EvaluateKnownConditionTruth(
+        internal static bool? EvaluateKnownConditionTruth(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -428,7 +428,7 @@ namespace PurelySharp.Symbolic
                 pathConditions);
         }
 
-        public static bool IsNodeReachable(
+        internal static bool IsNodeReachable(
             SyntaxNode node,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -437,7 +437,7 @@ namespace PurelySharp.Symbolic
             return IsSatisfiable(CollectPathConditionsAt(node, semanticModel, cancellationToken), smtAnalysis);
         }
 
-        public static bool IsNodeUnreachable(
+        internal static bool IsNodeUnreachable(
             SyntaxNode node,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -446,7 +446,7 @@ namespace PurelySharp.Symbolic
             return !IsNodeReachable(node, semanticModel, cancellationToken, smtAnalysis);
         }
 
-        public static List<SmtFormula> CollectPathConditionsAt(
+        internal static List<SmtFormula> CollectPathConditionsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -458,7 +458,7 @@ namespace PurelySharp.Symbolic
                 includeCurrentStatementCompletionFacts: false);
         }
 
-        public static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
+        internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -469,7 +469,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken);
         }
 
-        public static List<SmtFormula> CollectPriorAssignmentFacts(
+        internal static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -482,7 +482,7 @@ namespace PurelySharp.Symbolic
                 includeCurrentStatementCompletionFacts);
         }
 
-        public static List<SmtFormula> CollectPathConditionsAt(
+        internal static List<SmtFormula> CollectPathConditionsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -512,7 +512,7 @@ namespace PurelySharp.Symbolic
             return pathConditions;
         }
 
-        public static SmtFormula[] CollectForInitialEntryPathConditions(
+        internal static SmtFormula[] CollectForInitialEntryPathConditions(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -523,7 +523,7 @@ namespace PurelySharp.Symbolic
                 .ToArray();
         }
 
-        public static bool IsForInitialEntryConditionAlwaysFalse(
+        internal static bool IsForInitialEntryConditionAlwaysFalse(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -555,7 +555,7 @@ namespace PurelySharp.Symbolic
             return IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
-        public static IEnumerable<SmtFormula> CollectForInitializerFacts(
+        internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -566,7 +566,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken);
         }
 
-        public static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
+        internal static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -577,7 +577,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken);
         }
 
-        public static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
+        internal static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
             StatementSyntax statement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -588,7 +588,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken);
         }
 
-        public static PurityProofResult ClassifyBranchReachability(
+        internal static PurityProofResult ClassifyBranchReachability(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula branchCondition,
             SmtAnalysisService? smtAnalysis)
@@ -601,7 +601,7 @@ namespace PurelySharp.Symbolic
             return (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
         }
 
-        public static PurityProofResult ClassifyPathFeasibility(
+        internal static PurityProofResult ClassifyPathFeasibility(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
@@ -609,7 +609,7 @@ namespace PurelySharp.Symbolic
             return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyPathFeasibility(pathConditions);
         }
 
-        public static bool TryCreateArrayLengthCountAliasFact(
+        internal static bool TryCreateArrayLengthCountAliasFact(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -636,7 +636,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        public static bool TryCreateReferenceNullComparison(
+        internal static bool TryCreateReferenceNullComparison(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -726,7 +726,7 @@ namespace PurelySharp.Symbolic
 
         private sealed class StructuralPathConditionCache
         {
-            public ConcurrentDictionary<PathConditionCacheKey, ImmutableArray<SmtFormula>> Values { get; } = new();
+            internal ConcurrentDictionary<PathConditionCacheKey, ImmutableArray<SmtFormula>> Values { get; } = new();
         }
 
         private readonly struct PathConditionCacheKey : IEquatable<PathConditionCacheKey>

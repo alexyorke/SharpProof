@@ -25,30 +25,30 @@ namespace PurelySharp.Symbolic.Smt
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_sourceBooleanFormulaCache = new();
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_expressionFormulaCache = new();
 
-        public readonly struct NullableSmtValueParts
+        internal readonly struct NullableSmtValueParts
         {
-            public NullableSmtValueParts(SmtFormula hasValue, SmtFormula? value)
+            internal NullableSmtValueParts(SmtFormula hasValue, SmtFormula? value)
             {
                 HasValue = hasValue;
                 Value = value;
             }
 
-            public SmtFormula HasValue { get; }
+            internal SmtFormula HasValue { get; }
 
-            public SmtFormula? Value { get; }
+            internal SmtFormula? Value { get; }
         }
 
         private readonly struct SourceBooleanFormulaCacheEntry
         {
-            public SourceBooleanFormulaCacheEntry(bool success, SmtFormula? formula)
+            internal SourceBooleanFormulaCacheEntry(bool success, SmtFormula? formula)
             {
                 Success = success;
                 Formula = formula;
             }
 
-            public bool Success { get; }
+            internal bool Success { get; }
 
-            public SmtFormula? Formula { get; }
+            internal SmtFormula? Formula { get; }
         }
 
         private readonly struct SourceBooleanFormulaCacheKey : IEquatable<SourceBooleanFormulaCacheKey>
@@ -2887,7 +2887,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private sealed class SmtVariableSubstitution
         {
-            public SmtVariableSubstitution(
+            internal SmtVariableSubstitution(
                 string exactName,
                 string simpleMemberPrefix,
                 string formulaMemberPrefix,
@@ -2899,13 +2899,13 @@ namespace PurelySharp.Symbolic.Smt
                 Replacement = replacement;
             }
 
-            public string ExactName { get; }
+            internal string ExactName { get; }
 
-            public string SimpleMemberPrefix { get; }
+            internal string SimpleMemberPrefix { get; }
 
-            public string FormulaMemberPrefix { get; }
+            internal string FormulaMemberPrefix { get; }
 
-            public SmtFormula Replacement { get; }
+            internal SmtFormula Replacement { get; }
         }
 
         public static bool TryGetKnownStringLength(

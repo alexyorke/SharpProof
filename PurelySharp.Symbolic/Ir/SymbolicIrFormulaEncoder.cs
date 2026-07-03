@@ -4,7 +4,7 @@ namespace PurelySharp.Symbolic.Ir
 {
     internal static class SymbolicIrFormulaEncoder
     {
-        public static bool TryEncode(SymbolicCondition condition, out SmtFormula formula)
+        internal static bool TryEncode(SymbolicCondition condition, out SmtFormula formula)
         {
             switch (condition)
             {
@@ -41,7 +41,7 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
-        public static bool TryEncode(SymbolicFact fact, out SmtFormula formula)
+        internal static bool TryEncode(SymbolicFact fact, out SmtFormula formula)
         {
             if (fact.Confidence == SymbolicFactConfidence.Unsupported ||
                 !TryEncode(fact.Atom, out formula))
@@ -58,7 +58,7 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
-        public static bool TryEncode(SymbolicAtom atom, out SmtFormula formula)
+        internal static bool TryEncode(SymbolicAtom atom, out SmtFormula formula)
         {
             switch (atom)
             {
@@ -87,7 +87,7 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
-        public static bool TryEncodeTerm(SymbolicTerm term, out SmtFormula formula)
+        internal static bool TryEncodeTerm(SymbolicTerm term, out SmtFormula formula)
         {
             switch (term)
             {

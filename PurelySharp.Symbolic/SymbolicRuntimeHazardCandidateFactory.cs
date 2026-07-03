@@ -320,7 +320,7 @@ namespace PurelySharp.Symbolic
 
             public SymbolicRuntimeHazardKind Kind { get; }
 
-            public SmtFormula TriggerCondition { get; }
+            internal SmtFormula TriggerCondition { get; }
 
             public SymbolicFact? TriggerPrecondition { get; }
 
@@ -331,15 +331,15 @@ namespace PurelySharp.Symbolic
 
         private readonly struct RuntimeHazardTrigger
         {
-            public RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
+            internal RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
             {
                 Condition = condition ?? throw new ArgumentNullException(nameof(condition));
                 IrPrecondition = irPrecondition;
             }
 
-            public SmtFormula Condition { get; }
+            internal SmtFormula Condition { get; }
 
-            public SymbolicFact? IrPrecondition { get; }
+            internal SymbolicFact? IrPrecondition { get; }
         }
 
         private static RuntimeHazardCandidate CreateThrowCandidate(
