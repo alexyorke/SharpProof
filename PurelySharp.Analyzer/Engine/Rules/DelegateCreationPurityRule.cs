@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic.Ir;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {
@@ -565,6 +566,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
+            if (TryFindCapturedFreshMutableObjectBySyntax(
+                    anonymousFunctionOperation.Syntax,
+                    lambdaSpan,
+                    currentState,
+                    semanticModel,
+                    out captureSyntax,
+                    out capturedLocal))
+            {
+                return true;
+            }
+
             captureSyntax = null!;
             capturedLocal = null!;
             return false;
@@ -593,6 +605,48 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         out capturedLocal))
                 {
                     return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryFindCapturedFreshMutableObjectBySyntax(
+            SyntaxNode anonymousFunctionSyntax,
+            Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                if (semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol &&
+                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan) &&
+                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
+                    PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState))
+                {
+                    captureSyntax = identifierName;
+                    capturedLocal = localSymbol;
+                    return true;
+                }
+
+                foreach (var fact in currentState.PathState.Facts)
+                {
+                    if (fact.Polarity &&
+                        fact.Confidence == SymbolicFactConfidence.Exact &&
+                        fact.Atom is SymbolicOwnershipAtom { Escaped: false } &&
+                        fact.Symbol is ILocalSymbol factLocal &&
+                        identifierName.Identifier.ValueText == factLocal.Name &&
+                        IsDeclaredOutsideSpan(factLocal, lambdaSpan) &&
+                        RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type))
+                    {
+                        captureSyntax = identifierName;
+                        capturedLocal = factLocal;
+                        return true;
+                    }
                 }
             }
 
@@ -634,12 +688,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (unwrappedOperation is ILocalReferenceOperation localReference &&
-                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan) &&
-                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localReference.Local.Type) &&
-                PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState))
+            if (PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedOperation, currentState) is ILocalSymbol resolvedLocal &&
+                IsDeclaredOutsideSpan(resolvedLocal, lambdaSpan) &&
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(resolvedLocal.Type) &&
+                PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState))
             {
-                localSymbol = localReference.Local;
+                localSymbol = resolvedLocal;
                 return true;
             }
 

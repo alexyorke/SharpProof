@@ -414,8 +414,10 @@ namespace PurelySharp.Test
                 "DelegateCreationPurityRule.cs"));
 
             Assert.That(source, Does.Contain("TryFindCapturedFreshMutableObject("));
-            Assert.That(source, Does.Contain("RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localReference.Local.Type)"));
-            Assert.That(source, Does.Contain("HasSymbolicOwnedFactForSymbol(localReference.Local, currentState)"));
+            Assert.That(source, Does.Contain("TryFindCapturedFreshMutableObjectBySyntax("));
+            Assert.That(source, Does.Contain("TryResolveTrackedSymbol(unwrappedOperation, currentState) is ILocalSymbol resolvedLocal"));
+            Assert.That(source, Does.Contain("RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(resolvedLocal.Type)"));
+            Assert.That(source, Does.Contain("HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState)"));
             Assert.That(source, Does.Contain("HasStableFreshMutableObjectInitializer(localReferenceFallback.Local"));
         }
 
