@@ -19,14 +19,14 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility != Feasibility.Unsatisfiable;
+            return ClassifyFormulaReachability(pathConditions, smtAnalysis).Info.Status != SymbolicProofStatus.Unreachable;
         }
 
         internal static bool IsUnsatisfiable(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            return ClassifyPathFeasibility(pathConditions, smtAnalysis).PathFeasibility == Feasibility.Unsatisfiable;
+            return ClassifyFormulaReachability(pathConditions, smtAnalysis).Info.Status == SymbolicProofStatus.Unreachable;
         }
 
         internal static bool PathConditionsImply(
@@ -34,7 +34,8 @@ namespace PurelySharp.Symbolic
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
         {
-            return ClassifyImplication(pathConditions, factFormula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
+            var status = ClassifyFormulaConditionTruth(pathConditions, factFormula, smtAnalysis).Info.Status;
+            return status is SymbolicProofStatus.ProvenTrue or SymbolicProofStatus.Unreachable;
         }
 
         internal static bool PathConditionsAllowAndImply(
@@ -341,7 +342,8 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            return ClassifyBranchReachability(pathConditions, formula, smtAnalysis).Outcome == PurityProofOutcome.ProvablyPure;
+            var status = ClassifyFormulaConditionTruth(pathConditions, formula, smtAnalysis).Info.Status;
+            return status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
         }
 
         internal static bool IsFormulaAlwaysTrue(

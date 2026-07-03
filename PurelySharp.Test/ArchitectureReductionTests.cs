@@ -72,6 +72,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Not.Contain(".ClassifyImplication(pathConditions, factFormula)"));
             Assert.That(source, Does.Contain("ClassifyFormulaPathFeasibility(pathConditions)"));
             Assert.That(source, Does.Contain("ClassifyFormulaImplication("));
+            Assert.That(source, Does.Contain("ClassifyFormulaReachability(pathConditions, smtAnalysis).Info.Status"));
+            Assert.That(source, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, factFormula, smtAnalysis).Info.Status"));
+            Assert.That(source, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, formula, smtAnalysis).Info.Status"));
             Assert.That(source, Does.Contain("ClassifyFormulaBranchReachability("));
         }
 
