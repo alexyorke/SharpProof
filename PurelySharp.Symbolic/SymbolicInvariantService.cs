@@ -66,7 +66,7 @@ namespace PurelySharp.Symbolic
         public SymbolicInvariantImplicationResult ProveImplicationAt(
             SyntaxNode site,
             SemanticModel semanticModel,
-            SmtFormula condition,
+            SymbolicCondition condition,
             SmtAnalysisService? smtAnalysis,
             CancellationToken cancellationToken = default,
             bool includeCurrentStatementCompletionFacts = false)
@@ -92,7 +92,7 @@ namespace PurelySharp.Symbolic
 
         public static SymbolicInvariantImplicationResult ProveImplication(
             SymbolicProgramPointAnalysis analysis,
-            SmtFormula condition,
+            SymbolicCondition condition,
             SmtAnalysisService? smtAnalysis)
         {
             if (analysis == null)
@@ -105,7 +105,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(condition));
             }
 
-            var conditionText = condition.ToString() ?? string.Empty;
+            var conditionText = FormatCondition(condition);
             if (smtAnalysis == null)
             {
                 return new SymbolicInvariantImplicationResult(
@@ -130,33 +130,78 @@ namespace PurelySharp.Symbolic
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var trueProof = SymbolicReachabilityService.ClassifyImplication(
-                analysis.PathConditions,
+            var trueProof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
                 condition,
                 smtAnalysis);
-            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
                 return new SymbolicInvariantImplicationResult(
                     analysis.SpanStart,
                     conditionText,
                     SymbolicTruthValue.ProvenTrue,
-                    trueProof.Reason,
+                    trueProof.Info.Reason,
                     analysis.Reachability,
                     analysis.ReachabilityReason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var falseProof = SymbolicReachabilityService.ClassifyImplication(
-                analysis.PathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, condition),
+            var negatedCondition = new SymbolicNotCondition(condition);
+            var falseProof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                negatedCondition,
                 smtAnalysis);
-            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            if (falseProof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
                 return new SymbolicInvariantImplicationResult(
                     analysis.SpanStart,
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
-                    falseProof.Reason,
+                    falseProof.Info.Reason,
+                    analysis.Reachability,
+                    analysis.ReachabilityReason,
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
+            if (SymbolicIrFormulaEncoder.TryEncode(condition, out var conditionFormula))
+            {
+                var legacyTrueProof = SymbolicReachabilityService.ClassifyImplication(
+                    analysis.PathConditions,
+                    conditionFormula,
+                    smtAnalysis);
+                if (legacyTrueProof.Outcome == PurityProofOutcome.ProvablyPure)
+                {
+                    return new SymbolicInvariantImplicationResult(
+                        analysis.SpanStart,
+                        conditionText,
+                        SymbolicTruthValue.ProvenTrue,
+                        legacyTrueProof.Reason,
+                        analysis.Reachability,
+                        analysis.ReachabilityReason,
+                        SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                }
+
+                var legacyFalseProof = SymbolicReachabilityService.ClassifyImplication(
+                    analysis.PathConditions,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula),
+                    smtAnalysis);
+                if (legacyFalseProof.Outcome == PurityProofOutcome.ProvablyPure)
+                {
+                    return new SymbolicInvariantImplicationResult(
+                        analysis.SpanStart,
+                        conditionText,
+                        SymbolicTruthValue.ProvenFalse,
+                        legacyFalseProof.Reason,
+                        analysis.Reachability,
+                        analysis.ReachabilityReason,
+                        SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                }
+
+                return new SymbolicInvariantImplicationResult(
+                    analysis.SpanStart,
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    legacyFalseProof.Reason,
                     analysis.Reachability,
                     analysis.ReachabilityReason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -166,10 +211,17 @@ namespace PurelySharp.Symbolic
                 analysis.SpanStart,
                 conditionText,
                 SymbolicTruthValue.Unknown,
-                falseProof.Reason,
+                falseProof.Info.Reason,
                 analysis.Reachability,
                 analysis.ReachabilityReason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        private static string FormatCondition(SymbolicCondition condition)
+        {
+            return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula)
+                ? formula.ToString() ?? string.Empty
+                : condition.ToString() ?? string.Empty;
         }
 
         internal static SmtFormula ConjoinPathConditions(IReadOnlyList<SmtFormula> pathConditions)

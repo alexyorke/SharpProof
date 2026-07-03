@@ -5,8 +5,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Smt;
 
 namespace PurelySharp.Test
 {
@@ -63,7 +63,7 @@ public class TestClass
 
             var (returnStatement, semanticModel, condition) = CreateGuardedReturnContext(source, "return value;");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var negatedCondition = new SmtUnaryFormula(SmtUnaryOperator.Not, condition);
+            var negatedCondition = new SymbolicNotCondition(condition);
 
             var proof = new SymbolicInvariantService().ProveImplicationAt(
                 returnStatement,
@@ -98,7 +98,7 @@ public class TestClass
             var proof = new SymbolicInvariantService().ProveImplicationAt(
                 returnStatement,
                 semanticModel,
-                new SmtBooleanConstant(true),
+                new SymbolicConstantCondition(true),
                 smtAnalysis);
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable), proof.Reason);
@@ -135,7 +135,7 @@ public class TestClass
             Assert.That(proof.SmtDiagnostics.IsConfigured, Is.False);
         }
 
-        private static (ReturnStatementSyntax ReturnStatement, SemanticModel SemanticModel, SmtFormula GuardCondition)
+        private static (ReturnStatementSyntax ReturnStatement, SemanticModel SemanticModel, SymbolicCondition GuardCondition)
             CreateGuardedReturnContext(string source, string returnMarker)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
@@ -158,13 +158,8 @@ public class TestClass
                 .Single(statement => statement.SpanStart == returnPosition);
             var ifStatement = returnStatement.Ancestors().OfType<IfStatementSyntax>().First();
 
-            Assert.That(
-                CSharpConditionToFormula.TryTranslate(
-                    ifStatement.Condition,
-                    semanticModel,
-                    default,
-                    out var guardCondition),
-                Is.True);
+            var loweringContext = new SymbolicLoweringContext(semanticModel, default);
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(ifStatement.Condition, loweringContext, out var guardCondition), Is.True);
             Assert.That(guardCondition, Is.Not.Null);
 
             return (returnStatement, semanticModel, guardCondition!);

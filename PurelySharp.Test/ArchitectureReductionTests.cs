@@ -561,6 +561,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicInvariantImplication_UsesIrConditionEntryPoint()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicInvariantService.cs"));
+
+            Assert.That(source, Does.Contain("SymbolicCondition condition"));
+            Assert.That(source, Does.Contain("ClassifyStateImplication("));
+            Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));
+            Assert.That(source, Does.Not.Contain("SmtFormula condition,"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryResultConstruction_UsesSinglePathStateBridge()
         {
             var repositoryRoot = FindRepositoryRoot();
