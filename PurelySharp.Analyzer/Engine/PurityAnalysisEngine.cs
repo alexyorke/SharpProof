@@ -1509,7 +1509,18 @@ namespace PurelySharp.Analyzer.Engine
                                 methodBodyIOperation,
                                 semanticModel.Compilation),
                             methodBodyIOperation);
-                        foreach (var returnOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IReturnOperation>())
+                        var visibleReturnOperations = ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
+                            .OfType<IReturnOperation>()
+                            .ToArray();
+                        if (visibleReturnOperations.Length == 1)
+                        {
+                            postCfgExitResourceState = AddReturnedOwnedResourceFacts(
+                                postCfgExitResourceState.Value,
+                                visibleReturnOperations[0],
+                                postCfgExitResourceState.Value);
+                        }
+
+                        foreach (var returnOp in visibleReturnOperations)
                         {
                             if (returnOp.ReturnedValue != null)
                             {
@@ -2160,6 +2171,9 @@ namespace PurelySharp.Analyzer.Engine
                         ownedResources[disposal.Resource] = fact.Symbol;
                         break;
                     case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
+                        releasedResources.Add(lifetime.Resource);
+                        break;
+                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
                         releasedResources.Add(lifetime.Resource);
                         break;
                     case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
@@ -4467,6 +4481,11 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+                else if (operationToTrack is IReturnOperation returnOperation)
+                {
+                    nextState = AddReturnedOwnedResourceFacts(nextState, returnOperation, currentState);
+                }
+
                   else if (operationToTrack is IUsingOperation usingOperation)
                 {
                     nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
@@ -4573,6 +4592,38 @@ namespace PurelySharp.Analyzer.Engine
 
 
             return nextState;
+        }
+
+        private static PurityAnalysisState AddReturnedOwnedResourceFacts(
+            PurityAnalysisState nextState,
+            IReturnOperation returnOperation,
+            PurityAnalysisState currentState)
+        {
+            if (returnOperation.ReturnedValue == null ||
+                TryResolveTrackedSymbol(returnOperation.ReturnedValue, currentState) is not { } resourceSymbol ||
+                !HasSymbolicOwnedFactForSymbol(resourceSymbol, currentState))
+            {
+                return nextState;
+            }
+
+            var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+            var returnedFact = SymbolicOwnershipFactFactory.CreateReturnedOwnership(
+                term,
+                returnOperation.ReturnedValue.Syntax,
+                "analyzer.resource.returned",
+                resourceSymbol,
+                "evidence.resource.returned");
+            var lifetimeFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                term,
+                SymbolicResourceLifetimeState.Returned,
+                returnOperation.ReturnedValue.Syntax,
+                "analyzer.resource.returned.lifetime",
+                resourceSymbol,
+                "evidence.resource.returned");
+
+            return nextState.WithPathConditionsAndState(
+                nextState.PathConditions,
+                nextState.PathState.AddFact(returnedFact).AddFact(lifetimeFact));
         }
 
         private static PurityAnalysisState AddDisposeInvocationFacts(

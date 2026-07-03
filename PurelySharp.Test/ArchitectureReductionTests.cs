@@ -231,6 +231,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerReturnedOwnedResources_ProjectReturnedOwnershipFacts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddReturnedOwnedResourceFacts("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateReturnedOwnership("));
+            Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Returned"));
+            Assert.That(source, Does.Contain("\"analyzer.resource.returned\""));
+            Assert.That(source, Does.Contain("\"evidence.resource.returned\""));
+        }
+
+        [Test]
         public void AnalyzerCallerVisibleMutation_ProjectsMutationFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
