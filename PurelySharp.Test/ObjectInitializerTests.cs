@@ -223,6 +223,73 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConditionalFreshMutableObjectAssignedThenReturned_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Box {|PS0002:TestMethod|}(bool first)
+    {
+        Box box;
+        if (first)
+        {
+            box = new Box();
+        }
+        else
+        {
+            box = new Box();
+        }
+
+        return box;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalFreshMutableObjectAssignedThenMutatedLocally_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(bool first)
+    {
+        Box box;
+        if (first)
+        {
+            box = new Box();
+        }
+        else
+        {
+            box = new Box();
+        }
+
+        box.Value = 1;
+        return box.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FreshMutableObjectEscapesThroughImmutableWrapperConstructor_Diagnostic()
         {
             var test = @"

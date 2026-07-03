@@ -215,6 +215,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 else if (TryFindFreshMutableObjectReturnEscape(
                              returnOperation.ReturnedValue,
                              context.SemanticModel,
+                             currentState,
                              out var objectEscapeSyntax,
                              out var objectEscapeSymbol,
                              out var objectCatalogSource))
@@ -1312,6 +1313,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 if (TryFindFreshMutableObjectReturnEscape(
                     assignment.Value,
                     semanticModel,
+                    currentState: null,
                     out escapeSyntax,
                     out escapeSymbol,
                     out _))
@@ -1333,6 +1335,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     if (TryFindFreshMutableObjectReturnEscape(
                         argument.Value,
                         semanticModel,
+                        currentState: null,
                         out escapeSyntax,
                         out escapeSymbol,
                         out _))
@@ -1352,6 +1355,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool TryFindFreshMutableObjectReturnEscape(
             IOperation returnedValue,
             SemanticModel semanticModel,
+            PurityAnalysisEngine.PurityAnalysisState? currentState,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
@@ -1377,16 +1381,30 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
-                TryGetStableMutableObjectLocalEscape(
-                    localReference.Local,
-                    returnedValue,
-                    semanticModel,
-                    out escapeSyntax,
-                    out escapeSymbol,
-                    out catalogSource))
+            if (unwrappedReturnedValue is ILocalReferenceOperation localReference)
             {
-                return true;
+                if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableLocal(
+                        localReference.Local,
+                        returnedValue.Syntax,
+                        semanticModel,
+                        currentState))
+                {
+                    escapeSyntax = returnedValue.Syntax;
+                    escapeSymbol = localReference.Local;
+                    catalogSource = "symbolic_fresh_mutable_object_return";
+                    return true;
+                }
+
+                if (TryGetStableMutableObjectLocalEscape(
+                        localReference.Local,
+                        returnedValue,
+                        semanticModel,
+                        out escapeSyntax,
+                        out escapeSymbol,
+                        out catalogSource))
+                {
+                    return true;
+                }
             }
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
@@ -1396,6 +1414,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return TryFindFreshMutableObjectReturnEscape(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
                         semanticModel,
+                        currentState,
                         out escapeSyntax,
                         out escapeSymbol,
                         out catalogSource);
@@ -1404,12 +1423,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return TryFindFreshMutableObjectReturnEscape(
                            conditionalOperation.WhenTrue,
                            semanticModel,
+                           currentState,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        TryFindFreshMutableObjectReturnEscape(
                            conditionalOperation.WhenFalse,
                            semanticModel,
+                           currentState,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource);
@@ -1420,12 +1441,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return TryFindFreshMutableObjectReturnEscape(
                            coalesceOperation.Value,
                            semanticModel,
+                           currentState,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        TryFindFreshMutableObjectReturnEscape(
                            coalesceOperation.WhenNull,
                            semanticModel,
+                           currentState,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource);
@@ -1453,6 +1476,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 !TryFindFreshMutableObjectReturnEscape(
                     returnedOperation,
                     returnedSemanticModel,
+                    currentState: null,
                     out escapeSyntax,
                     out escapeSymbol,
                     out var nestedCatalogSource))

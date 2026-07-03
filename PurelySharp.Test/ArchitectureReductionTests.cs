@@ -141,6 +141,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void FreshMutableObjectClassifier_ConsumesSymbolicAndAllPathAssignmentFacts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var classifierSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "OwnedFreshMutableObjectClassifier.cs"));
+            var returnSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "ReturnStatementPurityRule.cs"));
+
+            Assert.That(classifierSource, Does.Contain("PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state)"));
+            Assert.That(classifierSource, Does.Contain("IsAssignedFreshMutableObjectOnAllPaths("));
+            Assert.That(classifierSource, Does.Contain("AnalyzeFreshMutableAssignments("));
+            Assert.That(returnSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableLocal("));
+            Assert.That(returnSource, Does.Contain("\"symbolic_fresh_mutable_object_return\""));
+        }
+
+        [Test]
         public void AnalyzerOwnedArrayFlowCaptures_ProjectOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();

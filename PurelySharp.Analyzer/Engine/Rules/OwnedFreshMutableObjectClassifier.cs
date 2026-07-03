@@ -13,17 +13,31 @@ namespace PurelySharp.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             PurityAnalysisContext context)
         {
+            return IsOwnedFreshMutableObjectReference(
+                operation,
+                observationSyntax,
+                context,
+                currentState: null);
+        }
+
+        internal static bool IsOwnedFreshMutableObjectReference(
+            IOperation? operation,
+            SyntaxNode observationSyntax,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState? currentState)
+        {
             if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
             {
-                return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context);
+                return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context, currentState);
             }
 
             if (operation is ILocalReferenceOperation localReference)
             {
-                return HasStableFreshMutableObjectValue(
+                return IsOwnedFreshMutableLocal(
                     localReference.Local,
                     observationSyntax,
                     context.SemanticModel,
+                    currentState,
                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
             }
 
@@ -32,6 +46,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                    IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel) ||
                    operation is IPropertyReferenceOperation propertyReference &&
                    IsOwnedFreshMutableStablePropertyReference(propertyReference, observationSyntax, context.SemanticModel);
+        }
+
+        internal static bool IsOwnedFreshMutableLocal(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            PurityAnalysisEngine.PurityAnalysisState? currentState)
+        {
+            return IsOwnedFreshMutableLocal(
+                localSymbol,
+                observationSyntax,
+                semanticModel,
+                currentState,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
         }
 
         internal static bool IsOwnedFreshMutableReadonlyFieldReference(
@@ -442,6 +470,170 @@ namespace PurelySharp.Analyzer.Engine.Rules
                        visitedLocals);
         }
 
+        private static bool IsOwnedFreshMutableLocal(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            PurityAnalysisEngine.PurityAnalysisState? currentState,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            if (currentState is { } state &&
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
+                PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state))
+            {
+                return true;
+            }
+
+            return HasStableFreshMutableObjectValue(
+                    localSymbol,
+                    observationSyntax,
+                    semanticModel,
+                    visitedLocals) ||
+                IsAssignedFreshMutableObjectOnAllPaths(
+                    localSymbol,
+                    observationSyntax,
+                    semanticModel,
+                    visitedLocals);
+        }
+
+        private static bool IsAssignedFreshMutableObjectOnAllPaths(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var containingBlock = declaratorSyntax?.FirstAncestorOrSelf<BlockSyntax>();
+            if (declaratorSyntax == null ||
+                declaratorSyntax.Initializer != null ||
+                containingBlock == null ||
+                declaratorSyntax.SpanStart >= observationSyntax.SpanStart)
+            {
+                return false;
+            }
+
+            var statements = containingBlock.Statements
+                .Where(statement => statement.SpanStart > declaratorSyntax.SpanStart &&
+                                    statement.SpanStart < observationSyntax.SpanStart)
+                .ToArray();
+            var states = AnalyzeFreshMutableAssignments(
+                statements,
+                assignedFresh: false,
+                localSymbol,
+                observationSyntax,
+                semanticModel,
+                visitedLocals);
+            return states.Count > 0 && states.All(static assignedFresh => assignedFresh);
+        }
+
+        private static List<bool> AnalyzeFreshMutableAssignments(
+            IReadOnlyList<StatementSyntax> statements,
+            bool assignedFresh,
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            var states = new List<bool> { assignedFresh };
+            foreach (var statement in statements)
+            {
+                var nextStates = new List<bool>();
+                foreach (var state in states)
+                {
+                    nextStates.AddRange(AnalyzeFreshMutableAssignment(
+                        statement,
+                        state,
+                        localSymbol,
+                        observationSyntax,
+                        semanticModel,
+                        visitedLocals));
+                }
+
+                states = nextStates;
+            }
+
+            return states;
+        }
+
+        private static List<bool> AnalyzeFreshMutableAssignment(
+            StatementSyntax statement,
+            bool assignedFresh,
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            if (statement is IfStatementSyntax ifStatement)
+            {
+                var thenStates = AnalyzeFreshMutableAssignments(
+                    GetStatementList(ifStatement.Statement),
+                    assignedFresh,
+                    localSymbol,
+                    observationSyntax,
+                    semanticModel,
+                    visitedLocals);
+                var elseStates = ifStatement.Else == null
+                    ? new List<bool> { assignedFresh }
+                    : AnalyzeFreshMutableAssignments(
+                        GetStatementList(ifStatement.Else.Statement),
+                        assignedFresh,
+                        localSymbol,
+                        observationSyntax,
+                        semanticModel,
+                        visitedLocals);
+
+                thenStates.AddRange(elseStates);
+                return thenStates;
+            }
+
+            var current = assignedFresh;
+            foreach (var assignment in statement.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>())
+            {
+                if (semanticModel.GetSymbolInfo(assignment.Left).Symbol is not { } assignedSymbol ||
+                    !SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    continue;
+                }
+
+                current = IsFreshMutableAssignmentValue(
+                    assignment.Right,
+                    observationSyntax,
+                    semanticModel,
+                    visitedLocals);
+            }
+
+            return new List<bool> { current };
+        }
+
+        private static IReadOnlyList<StatementSyntax> GetStatementList(StatementSyntax statement)
+        {
+            return statement is BlockSyntax block
+                ? block.Statements.ToArray()
+                : new[] { statement };
+        }
+
+        private static bool IsFreshMutableAssignmentValue(
+            ExpressionSyntax valueSyntax,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            var valueOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(valueSyntax));
+            if (valueOperation == null)
+            {
+                return false;
+            }
+
+            return HasStableFreshMutableObjectValueInOperation(
+                valueOperation,
+                observationSyntax,
+                semanticModel,
+                new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default));
+        }
+
         private static bool HasStableFreshMutableObjectValueInOperation(
             IOperation operation,
             SyntaxNode observationSyntax,
@@ -481,7 +673,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedOperation is ILocalReferenceOperation localReference)
             {
-                return HasStableFreshMutableObjectValue(localReference.Local, observationSyntax, semanticModel, visitedLocals);
+                return IsOwnedFreshMutableLocal(localReference.Local, observationSyntax, semanticModel, currentState: null, visitedLocals);
             }
 
             if (unwrappedOperation is IInvocationOperation invocationOperation &&

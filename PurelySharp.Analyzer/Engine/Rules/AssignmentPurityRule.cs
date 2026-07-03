@@ -632,7 +632,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on by-value local value-type receiver - Allowed (Target is Pure)");
                         return true;
                     }
-                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(fieldRefOp.Instance, fieldRefOp.Syntax, context))
+                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(fieldRefOp.Instance, fieldRefOp.Syntax, context, currentState))
                     {
                         PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on fresh local object receiver - Allowed (Target is Pure)");
                         return true;
@@ -687,7 +687,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
 
-                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(propRefOp.Instance, propRefOp.Syntax, context))
+                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(propRefOp.Instance, propRefOp.Syntax, context, currentState))
                     {
                         PurityAnalysisEngine.LogDebug(" Assignment Target: PropertyReference on fresh local object receiver - Allowed (Target is Pure)");
                         return true;

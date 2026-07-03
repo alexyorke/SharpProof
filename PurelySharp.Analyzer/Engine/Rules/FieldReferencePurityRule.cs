@@ -242,7 +242,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Readonly field '{fieldSymbol.Name}' on stable local wrapper carries an owned fresh mutable object. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
-                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(instanceOperation, fieldReferenceOperation.Syntax, context))
+                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(instanceOperation, fieldReferenceOperation.Syntax, context, currentState))
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance field '{fieldSymbol.Name}' on fresh local object receiver. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
