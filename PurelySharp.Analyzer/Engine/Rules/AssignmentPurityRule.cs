@@ -139,6 +139,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
 
                 PurityAnalysisEngine.LogDebug($"AssignmentPurityRule: Target check failed (Kind: {targetOperation.Kind}, RefKind: {(targetOperation as IParameterReferenceOperation)?.Parameter.RefKind}). Reporting impurity on the whole operation: {operation.Syntax}");
+                if (TryCreateMutableBorrowConflictEvidence(
+                        operation,
+                        TryResolveSymbol(targetOperation),
+                        currentState,
+                        out var borrowConflictEvidence))
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        borrowConflictEvidence);
+                }
+
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax, targetResult.Evidence);
             }
 
@@ -156,6 +167,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (!isPureAssignment)
             {
                 PurityAnalysisEngine.LogDebug($"    [AssignRule] Assignment target itself is considered impure for assignment. Assignment is Impure.");
+                if (TryCreateMutableBorrowConflictEvidence(
+                        operation,
+                        targetSymbol,
+                        currentState,
+                        out var borrowConflictEvidence))
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        borrowConflictEvidence);
+                }
+
                 if (PurityAnalysisEngine.TryCreateCallerVisibleMutationEvidence(
                         operation,
                         targetOperation,
@@ -290,6 +312,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool ShouldAnalyzeCompoundAssignmentOperator(IMethodSymbol operatorMethod)
         {
             return PurityAnalysisEngine.ShouldAnalyzeCompoundAssignmentOperator(operatorMethod);
+        }
+
+        private static bool TryCreateMutableBorrowConflictEvidence(
+            IOperation operation,
+            ISymbol? targetSymbol,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityEvidence evidence)
+        {
+            if (targetSymbol == null ||
+                !PurityAnalysisEngine.HasSymbolicMutableBorrowerFactForSymbol(targetSymbol, currentState))
+            {
+                evidence = default;
+                return false;
+            }
+
+            evidence = PurityAnalysisEngine.PurityEvidence.Create(
+                "mutable_state_write",
+                ruleName: nameof(AssignmentPurityRule),
+                operation: operation,
+                syntaxNode: operation.Syntax,
+                symbol: targetSymbol,
+                catalogSource: "analyzer.borrow.mutable-conflict");
+            return true;
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(

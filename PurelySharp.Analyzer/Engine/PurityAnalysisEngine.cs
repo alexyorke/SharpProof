@@ -5105,6 +5105,49 @@ namespace PurelySharp.Analyzer.Engine
                 new HashSet<SymbolicTerm>());
         }
 
+        internal static bool HasSymbolicMutableBorrowerFactForSymbol(
+            ISymbol ownerSymbol,
+            PurityAnalysisState currentState)
+        {
+            var ownerTerm = CreateSymbolicReferenceTerm(ownerSymbol, currentState);
+            return HasSymbolicMutableBorrowerFactForTerm(
+                ownerTerm,
+                currentState,
+                new HashSet<SymbolicTerm>());
+        }
+
+        private static bool HasSymbolicMutableBorrowerFactForTerm(
+            SymbolicTerm ownerTerm,
+            PurityAnalysisState currentState,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (!visitedTerms.Add(ownerTerm))
+            {
+                return false;
+            }
+
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (fact.Polarity &&
+                    fact.Confidence == SymbolicFactConfidence.Exact &&
+                    fact.Atom is SymbolicBorrowAtom { Kind: SymbolicBorrowKind.Mutable } borrow &&
+                    Equals(borrow.Owner, ownerTerm))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(ownerTerm, currentState))
+            {
+                if (HasSymbolicMutableBorrowerFactForTerm(aliasTerm, currentState, visitedTerms))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool HasSymbolicBorrowFactForTerm(
             SymbolicTerm localTerm,
             PurityAnalysisState currentState,
