@@ -5266,6 +5266,30 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
+            foreach (var usingDeclaration in containingBlock.DescendantNodes().OfType<LocalDeclarationStatementSyntax>())
+            {
+                if (!usingDeclaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword))
+                {
+                    continue;
+                }
+
+                var declarationBlock = usingDeclaration.FirstAncestorOrSelf<BlockSyntax>();
+                if (declarationBlock == null ||
+                    declarationBlock.Span.End > useSyntax.SpanStart)
+                {
+                    continue;
+                }
+
+                foreach (var variable in usingDeclaration.Declaration.Variables)
+                {
+                    if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is { } declaredUsingSymbol &&
+                        AreSymbolsSameOrAliased(resourceSymbol, declaredUsingSymbol, currentState))
+                    {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
 

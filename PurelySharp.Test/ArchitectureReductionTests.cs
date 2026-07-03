@@ -570,6 +570,8 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
             Assert.That(engineSource, Does.Contain("TryCreateDoubleDisposeEvidence("));
             Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierUsingStatement("));
+            Assert.That(engineSource, Does.Contain("LocalDeclarationStatementSyntax"));
+            Assert.That(engineSource, Does.Contain("UsingKeyword.IsKind(SyntaxKind.UsingKeyword)"));
             Assert.That(engineSource, Does.Contain("\"resource_double_dispose\""));
             Assert.That(engineSource, Does.Contain("\"resource_use_after_dispose\""));
             Assert.That(engineSource, Does.Contain("\"symbolic_resource_lifetime\""));
