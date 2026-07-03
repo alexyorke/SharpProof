@@ -228,6 +228,8 @@ public class TestClass
             Assert.That(returnPoint.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(result.SymbolicFacts, Is.Not.Empty);
             Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
+            Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
             Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
             Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
@@ -1655,6 +1657,8 @@ public class TestClass
             Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
             Assert.That(result.SymbolicFacts, Is.Not.Empty);
             Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
+            Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
             Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
             Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(invariantResult.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));

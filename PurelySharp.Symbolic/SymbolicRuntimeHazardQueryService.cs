@@ -681,7 +681,9 @@ namespace PurelySharp.Symbolic
             InvariantInfo = new SymbolicInvariantInfo(
                 MergedInvariantText,
                 SymbolicFacts,
-                new[] { Proof });
+                new[] { Proof },
+                SymbolicInvariantMergeKind.Conjunction,
+                PathConditionCount);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 

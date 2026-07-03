@@ -130,8 +130,8 @@ static void PrintFileResult(
     Console.WriteLine($"Program points: {result.ProgramPointCount}");
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
-    Console.WriteLine($"Merged invariant merge: {result.MergedInvariant.MergeKind}");
-    Console.WriteLine($"Merged invariant conditions: {result.MergedInvariant.ConditionCount}");
+    Console.WriteLine($"Merged invariant merge: {result.InvariantInfo.MergeKind}");
+    Console.WriteLine($"Merged invariant conditions: {result.InvariantInfo.ConditionCount}");
     PrintInvariantQuery("Merged invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Merged path facts", result.MergedPathFacts);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
@@ -168,8 +168,8 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
-    Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
-    Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
+    Console.WriteLine($"Line invariant merge: {result.InvariantInfo.MergeKind}");
+    Console.WriteLine($"Line invariant conditions: {result.InvariantInfo.ConditionCount}");
     PrintInvariantQuery("Line invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
@@ -193,8 +193,8 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Span merged invariant: {result.MergedInvariantText}");
-    Console.WriteLine($"Span invariant merge: {result.MergedInvariant.MergeKind}");
-    Console.WriteLine($"Span invariant conditions: {result.MergedInvariant.ConditionCount}");
+    Console.WriteLine($"Span invariant merge: {result.InvariantInfo.MergeKind}");
+    Console.WriteLine($"Span invariant conditions: {result.InvariantInfo.ConditionCount}");
     PrintInvariantQuery("Span invariant query", result.InvariantQuery, options);
     PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
     PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));

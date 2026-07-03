@@ -239,14 +239,22 @@ namespace PurelySharp.Symbolic
         public SymbolicInvariantInfo(
             string mergedText,
             IReadOnlyList<SymbolicFactInfo>? facts = null,
-            IReadOnlyList<SymbolicProofInfo>? proofs = null)
+            IReadOnlyList<SymbolicProofInfo>? proofs = null,
+            SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction,
+            int conditionCount = 0)
         {
             MergedText = mergedText ?? string.Empty;
             Facts = facts ?? Array.Empty<SymbolicFactInfo>();
             Proofs = proofs ?? Array.Empty<SymbolicProofInfo>();
+            MergeKind = mergeKind;
+            ConditionCount = conditionCount;
         }
 
         public string MergedText { get; }
+
+        public SymbolicInvariantMergeKind MergeKind { get; }
+
+        public int ConditionCount { get; }
 
         public IReadOnlyList<SymbolicFactInfo> Facts { get; }
 
