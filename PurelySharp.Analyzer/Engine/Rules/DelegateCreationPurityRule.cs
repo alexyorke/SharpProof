@@ -72,7 +72,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
-                        TryFindCapturedOwnedLocalArray(anonymousFunction, currentState, out var captureSyntax, out var capturedArrayLocal))
+                        TryFindCapturedOwnedLocalArray(
+                            anonymousFunction,
+                            currentState,
+                            context.SemanticModel,
+                            out var captureSyntax,
+                            out var capturedArrayLocal))
                     {
                         PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -147,7 +152,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
-                        TryFindCapturedOwnedLocalArray(flowAnonymousFunction, currentState, out var captureSyntax, out var capturedArrayLocal))
+                        TryFindCapturedOwnedLocalArray(
+                            flowAnonymousFunction,
+                            currentState,
+                            context.SemanticModel,
+                            out var captureSyntax,
+                            out var capturedArrayLocal))
                     {
                         PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -418,9 +428,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryFindCapturedOwnedLocalArray(
+        internal static bool TryFindCapturedOwnedLocalArray(
             IOperation anonymousFunctionOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
             out SyntaxNode captureSyntax,
             out ILocalSymbol capturedLocal)
         {
@@ -434,12 +445,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
+            if (TryFindCapturedOwnedLocalArrayBySyntax(
+                    anonymousFunctionOperation.Syntax,
+                    lambdaSpan,
+                    currentState,
+                    semanticModel,
+                    out captureSyntax,
+                    out capturedLocal))
+            {
+                return true;
+            }
+
             captureSyntax = null!;
             capturedLocal = null!;
             return false;
         }
 
-        private static bool TryFindLocalFunctionCapturedOwnedLocalArray(
+        internal static bool TryFindLocalFunctionCapturedOwnedLocalArray(
             IMethodSymbol methodSymbol,
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
@@ -452,8 +474,40 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
                 var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
                 if (operation != null &&
-                    TryFindCapturedOwnedLocalArray(operation, currentState, out captureSyntax, out capturedLocal))
+                    TryFindCapturedOwnedLocalArray(
+                        operation,
+                        currentState,
+                        semanticModel,
+                        out captureSyntax,
+                        out capturedLocal))
                 {
+                    return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryFindCapturedOwnedLocalArrayBySyntax(
+            SyntaxNode anonymousFunctionSyntax,
+            Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                if (semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol &&
+                    localSymbol.Type is IArrayTypeSymbol &&
+                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan) &&
+                    (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
+                     currentState.IsOwnedLocalArraySymbol(localSymbol)))
+                {
+                    captureSyntax = identifierName;
+                    capturedLocal = localSymbol;
                     return true;
                 }
             }
@@ -471,7 +525,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             if (unwrappedOperation is ILocalReferenceOperation localReference &&
-                currentState.IsOwnedLocalArraySymbol(localReference.Local) &&
+                localReference.Local.Type is IArrayTypeSymbol &&
+                (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState) ||
+                 currentState.IsOwnedLocalArraySymbol(localReference.Local)) &&
                 IsDeclaredOutsideSpan(localReference.Local, lambdaSpan))
             {
                 localSymbol = localReference.Local;

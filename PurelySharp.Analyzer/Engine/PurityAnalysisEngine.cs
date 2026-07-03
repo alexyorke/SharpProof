@@ -4579,6 +4579,10 @@ namespace PurelySharp.Analyzer.Engine
                                 if (IsOwnedLocalArrayValue(initializerValue, nextState, context.SemanticModel.Compilation))
                                 {
                                     nextState = nextState.WithOwnedLocalArray(declaredSymbol);
+                                    nextState = AddOwnedLocalArrayFacts(
+                                        nextState,
+                                        declaredSymbol,
+                                        initializerValue);
                                 }
                                 else
                                 {
@@ -4958,6 +4962,27 @@ namespace PurelySharp.Analyzer.Engine
                     term = null!;
                     return false;
             }
+        }
+
+        private static PurityAnalysisState AddOwnedLocalArrayFacts(
+            PurityAnalysisState nextState,
+            ISymbol localSymbol,
+            IOperation valueOperation)
+        {
+            var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+            var pathState = nextState.PathState;
+            var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+                term,
+                valueOperation.Syntax,
+                "analyzer.array.acquire",
+                localSymbol,
+                "evidence.array.acquire");
+            foreach (var fact in ownershipFacts)
+            {
+                pathState = pathState.AddFact(fact);
+            }
+
+            return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
         }
 
         private static PurityAnalysisState AddOwnedDisposableLocalFacts(
@@ -5820,6 +5845,10 @@ namespace PurelySharp.Analyzer.Engine
                 if (IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
                 {
                     nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
+                    nextState = AddOwnedLocalArrayFacts(
+                        nextState,
+                        writtenLocalSymbol,
+                        valueOperation);
                 }
                 else
                 {

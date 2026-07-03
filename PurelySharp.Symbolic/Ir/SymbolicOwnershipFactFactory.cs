@@ -19,6 +19,18 @@ namespace PurelySharp.Symbolic.Ir
                 CreateFact(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned), source, provenance + ".lifetime", symbol, evidenceKey));
         }
 
+        internal static ImmutableArray<SymbolicFact> CreateFreshOwnedValue(
+            SymbolicTerm value,
+            SyntaxNode source,
+            string provenance,
+            ISymbol? symbol = null,
+            string? evidenceKey = null)
+        {
+            return ImmutableArray.Create(
+                CreateFact(new SymbolicFreshnessAtom(value), source, provenance + ".fresh", symbol, evidenceKey),
+                CreateFact(new SymbolicOwnershipAtom(value, Escaped: false), source, provenance + ".owned", symbol, evidenceKey));
+        }
+
         internal static SymbolicFact CreateAlias(
             SymbolicTerm source,
             SymbolicTerm target,

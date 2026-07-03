@@ -157,6 +157,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerOwnedLocalArrays_ProjectValueOwnershipFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddOwnedLocalArrayFacts("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwnedValue("));
+            Assert.That(source, Does.Contain("\"analyzer.array.acquire\""));
+            Assert.That(source, Does.Contain("\"evidence.array.acquire\""));
+        }
+
+        [Test]
         public void AnalyzerDisposeInvocations_ProjectDisposalFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -351,6 +367,39 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms("));
             Assert.That(engineSource, Does.Contain("SymbolicAliasAtom { MayAlias: true }"));
             Assert.That(returnSource, Does.Contain("HasSymbolicOwnedFactForSymbol(trackedLocal, currentState)"));
+        }
+
+        [Test]
+        public void DelegateRule_ConsumesSymbolicOwnershipFactsForOwnedArrayCapture()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "DelegateCreationPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("TryFindCapturedOwnedLocalArray("));
+            Assert.That(source, Does.Contain("HasSymbolicOwnedFactForSymbol(localReference.Local, currentState)"));
+            Assert.That(source, Does.Contain("currentState.IsOwnedLocalArraySymbol(localReference.Local)"));
+        }
+
+        [Test]
+        public void ReturnRule_DelegatesReturnedClosureArrayCaptureToDelegateRule()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "ReturnStatementPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("TryFindReturnedDelegateOwnedLocalArrayCapture("));
+            Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindCapturedOwnedLocalArray("));
+            Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindLocalFunctionCapturedOwnedLocalArray("));
+            Assert.That(source, Does.Contain("\"escaping_closure_owned_array_capture\""));
         }
 
         [Test]

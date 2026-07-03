@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using System;
 using System.Collections.Generic;
@@ -93,6 +94,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation.ReturnedValue.Syntax,
                         localSymbol,
                         "owned_local_array_return",
+                        currentState);
+                }
+                else if (TryFindReturnedDelegateOwnedLocalArrayCapture(
+                             sourceReturnedValue,
+                             context,
+                             currentState,
+                             out var delegateCaptureSyntax,
+                             out var delegateCapturedArrayLocal))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned delegate captures owned fresh local array '{delegateCapturedArrayLocal.Name}'. Return statement is Impure.");
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
+                        delegateCaptureSyntax,
+                        delegateCapturedArrayLocal,
+                        "escaping_closure_owned_array_capture",
                         currentState);
                 }
                 else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
@@ -204,6 +220,52 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool TryFindReturnedDelegateOwnedLocalArrayCapture(
+            IOperation? returnedValue,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            var delegateTarget = unwrappedReturnedValue is IDelegateCreationOperation delegateCreation
+                ? PurityAnalysisEngine.SkipImplicitConversions(delegateCreation.Target)
+                : unwrappedReturnedValue;
+
+            switch (delegateTarget)
+            {
+                case IAnonymousFunctionOperation anonymousFunction:
+                    return DelegateCreationPurityRule.TryFindCapturedOwnedLocalArray(
+                        anonymousFunction,
+                        currentState,
+                        context.SemanticModel,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                case IFlowAnonymousFunctionOperation flowAnonymousFunction:
+                    return DelegateCreationPurityRule.TryFindCapturedOwnedLocalArray(
+                        flowAnonymousFunction,
+                        currentState,
+                        context.SemanticModel,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                case IMethodReferenceOperation methodReference
+                    when methodReference.Method.MethodKind == MethodKind.LocalFunction:
+                    return DelegateCreationPurityRule.TryFindLocalFunctionCapturedOwnedLocalArray(
+                        methodReference.Method,
+                        context,
+                        currentState,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                default:
+                    captureSyntax = null!;
+                    capturedLocal = null!;
+                    return false;
+            }
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CreateMutableStateEscapeResult(

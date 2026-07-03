@@ -119,6 +119,28 @@ public class TestClass
         }
 
         [Test]
+        public async Task EscapingDelegateCapturesFreshArrayAlias_Diagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var array = new int[1];
+        var alias = array;
+        return () => alias[0];
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
         public async Task ReadonlyDelegateFieldInitializerOverwrittenInConstructor_Diagnostic()
         {
             var testCode = @"

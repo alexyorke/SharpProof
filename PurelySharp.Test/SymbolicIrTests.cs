@@ -637,6 +637,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void OwnershipFactFactory_CreatesFreshOwnedValueFactsWithoutResourceLifetime()
+        {
+            var value = new SymbolicVariableTerm("array#1", SmtValueKind.Reference);
+            var syntax = SyntaxFactory.ParseExpression("new int[1]");
+
+            var facts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
+                value,
+                syntax,
+                "test.array",
+                evidenceKey: "evidence.array");
+
+            Assert.That(facts, Has.Length.EqualTo(2));
+            Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
+            Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, Escaped: false)));
+            Assert.That(facts.Any(static fact => fact.Atom is SymbolicResourceLifetimeAtom), Is.False);
+            Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
+            {
+                "test.array.fresh",
+                "test.array.owned",
+            }));
+            Assert.That(facts.All(static fact => fact.Confidence == SymbolicFactConfidence.Exact), Is.True);
+            Assert.That(facts.All(static fact => fact.EvidenceKey == "evidence.array"), Is.True);
+        }
+
+        [Test]
         public void OwnershipFactFactory_CreatesAliasBorrowEscapeMutationAndDisposalFacts()
         {
             var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
