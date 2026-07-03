@@ -652,6 +652,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
             Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
             Assert.That(source, Does.Not.Contain("new SymbolicNotCondition(symbolicCondition)"));
+            Assert.That(source, Does.Contain("ClassifyFormulaConditionTruth("));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
         }
 
@@ -1244,9 +1245,11 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
             var irIndex = source.IndexOf("TryClassifyIrTrigger(", StringComparison.Ordinal);
-            var legacyIndex = source.LastIndexOf("SymbolicReachabilityService.ClassifyImplication(", StringComparison.Ordinal);
+            var legacyIndex = source.LastIndexOf("SymbolicReachabilityService.ClassifyFormulaConditionTruth(", StringComparison.Ordinal);
 
             Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
+            Assert.That(source, Does.Contain("ClassifyFormulaConditionTruth("));
+            Assert.That(source, Does.Not.Contain("new SmtUnaryFormula(SmtUnaryOperator.Not, triggerCondition)"));
             Assert.That(source, Does.Contain("analysis.PathState"));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));

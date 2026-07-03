@@ -1310,47 +1310,34 @@ namespace PurelySharp.Symbolic
                     "condition_not_supported");
             }
 
-            var trueProof = SymbolicReachabilityService.ClassifyImplication(
+            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
                 analysis.PathConditions,
                 conditionFormula,
                 smtAnalysis);
-            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                if (string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal))
-                {
-                    return new SymbolicConditionProofResult(
-                        conditionText,
-                        SymbolicTruthValue.Unreachable,
-                        trueProof.Reason,
-                        conditionFormula);
-                }
-
                 return new SymbolicConditionProofResult(
                     conditionText,
-                    SymbolicTruthValue.ProvenTrue,
-                    trueProof.Reason,
+                    SymbolicTruthValue.Unreachable,
+                    formulaTruth.Info.Reason,
                     conditionFormula);
             }
 
-            var falseProof = SymbolicReachabilityService.ClassifyImplication(
-                analysis.PathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula),
-                smtAnalysis);
-            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
-                if (string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal))
-                {
-                    return new SymbolicConditionProofResult(
-                        conditionText,
-                        SymbolicTruthValue.Unreachable,
-                        falseProof.Reason,
-                        conditionFormula);
-                }
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenTrue,
+                    formulaTruth.Info.Reason,
+                    conditionFormula);
+            }
 
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
+            {
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
-                    falseProof.Reason,
+                    formulaTruth.Info.Reason,
                     conditionFormula);
             }
 
@@ -1384,7 +1371,7 @@ namespace PurelySharp.Symbolic
             return new SymbolicConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unknown,
-                falseProof.Reason,
+                formulaTruth.Info.Reason,
                 conditionFormula);
         }
 

@@ -312,6 +312,16 @@ namespace PurelySharp.Symbolic
                 factFormula);
         }
 
+        internal static SymbolicIrProofResult ClassifyFormulaConditionTruth(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(
+                pathConditions,
+                conditionFormula);
+        }
+
         internal static bool IsFormulaAlwaysFalse(
             SmtFormula formula,
             SmtAnalysisService? smtAnalysis)

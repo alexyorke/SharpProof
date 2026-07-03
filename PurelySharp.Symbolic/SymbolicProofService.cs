@@ -141,6 +141,47 @@ namespace PurelySharp.Symbolic
             return ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, factFormula));
         }
 
+        internal SymbolicIrProofResult ClassifyFormulaConditionTruth(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula)
+        {
+            if (conditionFormula == null)
+            {
+                throw new ArgumentNullException(nameof(conditionFormula));
+            }
+
+            var trueProof = ClassifyFormulaImplication(pathConditions, conditionFormula);
+            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                var status = string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
+                    ? SymbolicProofStatus.Unreachable
+                    : SymbolicProofStatus.ProvenTrue;
+                return SymbolicIrProofResult.FromConditionTruth(
+                    trueProof,
+                    status,
+                    CreateBudgetInfo());
+            }
+
+            var falseProof = ClassifyFormulaImplication(
+                pathConditions,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
+            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                var status = string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
+                    ? SymbolicProofStatus.Unreachable
+                    : SymbolicProofStatus.ProvenFalse;
+                return SymbolicIrProofResult.FromConditionTruth(
+                    falseProof,
+                    status,
+                    CreateBudgetInfo());
+            }
+
+            return SymbolicIrProofResult.FromConditionTruth(
+                trueProof,
+                SymbolicProofStatus.Unknown,
+                CreateBudgetInfo());
+        }
+
         internal PurityProofResult ClassifyFormulaBranchReachability(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula branchCondition)
@@ -279,9 +320,12 @@ namespace PurelySharp.Symbolic
             SymbolicProofStatus status,
             SymbolicBudgetInfo? budget)
         {
-            if (status is not SymbolicProofStatus.ProvenTrue and not SymbolicProofStatus.ProvenFalse)
+            if (status is not SymbolicProofStatus.ProvenTrue and
+                not SymbolicProofStatus.ProvenFalse and
+                not SymbolicProofStatus.Unreachable and
+                not SymbolicProofStatus.Unknown)
             {
-                throw new ArgumentOutOfRangeException(nameof(status), status, "Condition truth proofs must be proven true or proven false.");
+                throw new ArgumentOutOfRangeException(nameof(status), status, "Condition truth proofs must be proven true, proven false, unreachable, or unknown.");
             }
 
             return FromResult(result, status, budget);

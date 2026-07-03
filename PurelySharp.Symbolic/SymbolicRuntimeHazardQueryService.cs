@@ -549,25 +549,22 @@ namespace PurelySharp.Symbolic
                 return irResult;
             }
 
-            var proven = SymbolicReachabilityService.ClassifyImplication(
+            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
                 analysis.PathConditions,
                 triggerCondition,
                 smtAnalysis);
-            if (proven.Outcome == PurityProofOutcome.ProvablyPure)
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
-                return (SymbolicRuntimeHazardStatus.Proven, proven.Reason);
+                return (SymbolicRuntimeHazardStatus.Proven, formulaTruth.Info.Reason);
             }
 
-            var disproven = SymbolicReachabilityService.ClassifyImplication(
-                analysis.PathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, triggerCondition),
-                smtAnalysis);
-            if (disproven.Outcome == PurityProofOutcome.ProvablyPure)
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse ||
+                formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                return (SymbolicRuntimeHazardStatus.Unreachable, disproven.Reason);
+                return (SymbolicRuntimeHazardStatus.Unreachable, formulaTruth.Info.Reason);
             }
 
-            return (SymbolicRuntimeHazardStatus.Unknown, proven.Reason);
+            return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason);
         }
 
         private static bool TryClassifyIrTrigger(
