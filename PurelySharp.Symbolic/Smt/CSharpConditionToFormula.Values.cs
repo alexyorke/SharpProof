@@ -434,7 +434,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralOrEnumType(type))
+            if (IsIntegerSmtType(type))
             {
                 formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Int);
                 return true;
@@ -577,7 +577,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralOrEnumType(type))
+            if (IsIntegerSmtType(type))
             {
                 formula = new SmtIntegerConstant(0);
                 return true;
@@ -600,7 +600,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralOrEnumType(type))
+            if (IsIntegerSmtType(type))
             {
                 formula = new SmtIntegerConstant(0);
                 return true;
@@ -1748,6 +1748,102 @@ namespace PurelySharp.Symbolic.Smt
 
             return nonZeroDivisors != null &&
                 nonZeroDivisors.Contains(CreateDivisorKey(divisor));
+        }
+
+        private static bool TryTranslateDecimalZeroComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (!binaryExpression.IsKind(SyntaxKind.EqualsExpression) &&
+                !binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))
+            {
+                return false;
+            }
+
+            if (!TryCreateDecimalZeroComparisonOperands(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var value,
+                    getSymbolVersion) &&
+                !TryCreateDecimalZeroComparisonOperands(
+                    binaryExpression.Right,
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out value,
+                    getSymbolVersion))
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                binaryExpression.IsKind(SyntaxKind.EqualsExpression)
+                    ? SmtBinaryOperator.Equal
+                    : SmtBinaryOperator.NotEqual,
+                value,
+                new SmtIntegerConstant(0));
+            return true;
+        }
+
+        private static bool TryCreateDecimalZeroComparisonOperands(
+            ExpressionSyntax valueExpression,
+            ExpressionSyntax zeroExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula value,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            value = null!;
+            if (!IsDecimalZeroExpression(zeroExpression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            valueExpression = UnwrapExpression(valueExpression);
+            var symbol = semanticModel.GetSymbolInfo(valueExpression, cancellationToken).Symbol;
+            if (symbol is not ILocalSymbol and not IParameterSymbol ||
+                !IsDecimalType(semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type))
+            {
+                return false;
+            }
+
+            value = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Int);
+            return true;
+        }
+
+        private static bool IsDecimalZeroExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is DefaultExpressionSyntax defaultExpression &&
+                IsDecimalType(semanticModel.GetTypeInfo(defaultExpression, cancellationToken).Type))
+            {
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            if (!IsDecimalType(typeInfo.ConvertedType ?? typeInfo.Type))
+            {
+                return false;
+            }
+
+            var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+            return constant.HasValue &&
+                constant.Value is decimal decimalValue &&
+                decimalValue == 0m;
+        }
+
+        private static bool IsDecimalType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol?.SpecialType == SpecialType.System_Decimal;
         }
 
         private static bool TryTranslateNullableCoalesceValue(
@@ -2943,7 +3039,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralOrEnumType(type))
+            if (IsIntegerSmtType(type))
             {
                 kind = SmtValueKind.Int;
                 return true;
@@ -3045,6 +3141,18 @@ namespace PurelySharp.Symbolic.Smt
                 typeSymbol.TypeKind == TypeKind.Enum;
         }
 
+        private static bool IsIntegerSmtType(ITypeSymbol typeSymbol)
+        {
+            return IsIntegralOrEnumType(typeSymbol) ||
+                IsBigIntegerType(typeSymbol);
+        }
+
+        private static bool IsBigIntegerType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.ToDisplayString() == "System.Numerics.BigInteger";
+        }
+
         private static bool TryGetIntegralSpecialType(ITypeSymbol typeSymbol, out SpecialType specialType)
         {
             if (IsIntegralType(typeSymbol))
@@ -3112,7 +3220,7 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken)
         {
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
-            return type != null && IsIntegralOrEnumType(type);
+            return type != null && IsIntegerSmtType(type);
         }
 
         private static bool HasSupportedBooleanType(

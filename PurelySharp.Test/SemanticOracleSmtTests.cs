@@ -28,6 +28,16 @@ public static partial class RegexFactories
     public static partial Regex SinglelineAny();
 }";
 
+        private const string StaticRegexCacheSource = @"
+using System.Text.RegularExpressions;
+
+public static class RegexCache
+{
+    public static readonly Regex Ab = new Regex(@""\AAB\z"");
+
+    public static Regex MutableAb = new Regex(@""\AAB\z"");
+}";
+
         private const string SourcePredicateSource = @"
 public static class SourcePredicates
 {
@@ -7063,6 +7073,57 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_BigIntegerZeroContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("BigInteger x", "x == 0 && x != 0", "using System.Numerics;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_BigIntegerAdditionContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("BigInteger x", "x + 1 == 5 && x != 4", "using System.Numerics;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_BigIntegerGuardedDivisionContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "BigInteger value, BigInteger divisor",
+                    "divisor != 0 && value / divisor == 2 && value / divisor != 2",
+                    "using System.Numerics;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DefaultBigIntegerContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("", "default(BigInteger) != 0", "using System.Numerics;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DecimalZeroContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("decimal value", "value == 0m && value != 0m"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DecimalFractionalRangeRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("decimal value", "value > 0m && value < 1m"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_ConditionalExpressionContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -7745,6 +7806,50 @@ public class TestClass
 }",
                     "return 1;"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticReadonlyRegexLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"RegexCache.Ab.IsMatch(text) && text != ""AB""",
+                    StaticRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticReadonlyRegexMatchSuccessImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "RegexCache.Ab.Match(text).Success && text.Length != 2",
+                    StaticRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticReadonlyRegexMatchesCountImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "RegexCache.Ab.Matches(text).Count > 0 && text.Length != 2",
+                    StaticRegexCacheSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_MutableStaticRegexFieldRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"RegexCache.MutableAb.IsMatch(text) && text != ""AB""",
+                    StaticRegexCacheSource),
+                Is.False);
         }
 
         [Test]
@@ -11864,6 +11969,100 @@ public class TestClass
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_DecimalGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public decimal TestMethod(decimal value, decimal divisor)
+    {
+        if (divisor == 0m)
+        {
+            return value / divisor;
+        }
+
+        return 0m;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_DecimalNonZeroGuardSuppressesDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public decimal TestMethod(decimal value, decimal divisor)
+    {
+        if (divisor != 0m)
+        {
+            return value / divisor;
+        }
+
+        return 0m;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_BigIntegerGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System.Numerics;
+
+public class TestClass
+{
+    public BigInteger TestMethod(BigInteger value, BigInteger divisor)
+    {
+        if (divisor == 0)
+        {
+            return value / divisor;
+        }
+
+        return BigInteger.Zero;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_BigIntegerNonZeroGuardSuppressesDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System.Numerics;
+
+public class TestClass
+{
+    public BigInteger TestMethod(BigInteger value, BigInteger divisor)
+    {
+        if (divisor != 0)
+        {
+            return value / divisor;
+        }
+
+        return BigInteger.Zero;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         [Test]

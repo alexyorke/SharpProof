@@ -159,8 +159,14 @@ namespace PurelySharp.Symbolic
                 case SpecialType.System_Decimal:
                     return true;
                 default:
-                    return false;
+                    return IsBigIntegerType(typeSymbol);
             }
+        }
+
+        private static bool IsBigIntegerType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.ToDisplayString() == "System.Numerics.BigInteger";
         }
 
         public static bool TryGetCheckedIntegralRange(

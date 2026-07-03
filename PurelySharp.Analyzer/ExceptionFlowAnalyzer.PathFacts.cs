@@ -2311,7 +2311,8 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            if (!SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol))
+            if (!SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol) &&
+                typeSymbol.SpecialType != SpecialType.System_Decimal)
             {
                 return false;
             }

@@ -348,7 +348,8 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var rightType = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken).ConvertedType;
+            var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
+            var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
             if (!IsThrowingDivideByZeroType(rightType) ||
                 !TryTranslateZeroCondition(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
             {
@@ -566,7 +567,8 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var rightType = semanticModel.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType;
+            var rightTypeInfo = semanticModel.GetTypeInfo(assignment.Right, cancellationToken);
+            var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
             if (!IsThrowingDivideByZeroType(rightType) ||
                 !TryTranslateZeroCondition(assignment.Right, semanticModel, cancellationToken, out var trigger))
             {
@@ -1870,11 +1872,33 @@ namespace PurelySharp.Symbolic
                     getSymbolVersion: null) ||
                 value is not { Kind: SmtValueKind.Int })
             {
-                trigger = null!;
-                return false;
+                if (!TryTranslateDecimalZeroComparableValue(expression, semanticModel, cancellationToken, out value))
+                {
+                    trigger = null!;
+                    return false;
+                }
             }
 
             trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
+            return true;
+        }
+
+        private static bool TryTranslateDecimalZeroComparableValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula value)
+        {
+            expression = UnwrapExpression(expression);
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is not ILocalSymbol and not IParameterSymbol ||
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
+            {
+                value = null!;
+                return false;
+            }
+
+            value = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
             return true;
         }
 

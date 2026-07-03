@@ -34,7 +34,8 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var rightType = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken).ConvertedType;
+                var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
+                var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
                 if (!IsThrowingDivideByZeroType(rightType))
                 {
                     continue;

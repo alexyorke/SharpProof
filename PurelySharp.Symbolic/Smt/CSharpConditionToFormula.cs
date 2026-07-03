@@ -523,6 +523,18 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateDecimalZeroComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var decimalZeroComparison,
+                        getSymbolVersion) &&
+                    decimalZeroComparison != null)
+                {
+                    formula = decimalZeroComparison;
+                    return true;
+                }
+
                 if (TryTranslateValueWithSafeDivisors(
                         binaryExpression.Left,
                         semanticModel,

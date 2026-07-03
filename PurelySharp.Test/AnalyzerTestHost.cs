@@ -299,6 +299,7 @@ public static class ConditionHost
                     if (string.Equals(fileName, "System.Runtime", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(fileName, "netstandard", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(fileName, "System.Runtime.Extensions", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(fileName, "System.Runtime.Numerics", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(fileName, "System.ObjectModel", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(fileName, "System.Text.RegularExpressions", StringComparison.OrdinalIgnoreCase))
                     {

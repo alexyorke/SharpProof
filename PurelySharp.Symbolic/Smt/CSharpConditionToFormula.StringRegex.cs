@@ -1035,6 +1035,11 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryGetRegexPatternFromStaticReadonlyField(receiver, semanticModel, cancellationToken, out pattern, out options))
+            {
+                return true;
+            }
+
             if (semanticModel.GetSymbolInfo(receiver, cancellationToken).Symbol is not ILocalSymbol localSymbol ||
                 localSymbol.Type is not INamedTypeSymbol localType ||
                 !IsRegexType(localType))
@@ -1060,6 +1065,38 @@ namespace PurelySharp.Symbolic.Smt
         {
             return TryGetRegexPatternFromObjectCreation(expression, semanticModel, cancellationToken, out pattern, out options) ||
                 TryGetRegexPatternFromGeneratedRegexFactory(expression, semanticModel, cancellationToken, out pattern, out options);
+        }
+
+        private static bool TryGetRegexPatternFromStaticReadonlyField(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            var symbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol;
+            if (symbol is not IFieldSymbol fieldSymbol ||
+                !fieldSymbol.IsStatic ||
+                !fieldSymbol.IsReadOnly ||
+                fieldSymbol.Type is not INamedTypeSymbol fieldType ||
+                !IsRegexType(fieldType) ||
+                fieldSymbol.DeclaringSyntaxReferences.Length != 1 ||
+                fieldSymbol.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer
+                })
+            {
+                return false;
+            }
+
+            return TryGetRegexPatternFromCreationOrGeneratedFactory(
+                initializer,
+                semanticModel,
+                cancellationToken,
+                out pattern,
+                out options);
         }
 
         private static bool TryGetRegexPatternFromObjectCreation(
