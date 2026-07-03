@@ -43,6 +43,25 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        internal static bool TryTranslateValueWithPathFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            IEnumerable<SmtFormula>? pathFacts,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+                expression,
+                semanticModel,
+                cancellationToken,
+                pathFacts,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
         internal static bool TryTranslateStringValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -236,6 +255,25 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        internal static bool TryCreateNotNullIfNotNullResultNonNullFormula(
+            ExpressionSyntax resultExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            bool requireLocalOrParameterSource = false)
+        {
+            return CSharpConditionToFormula.TryCreateNotNullIfNotNullResultNonNullFormula(
+                resultExpression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                requireLocalOrParameterSource);
+        }
+
         internal static bool TryCreateAsExpressionAssignmentFacts(
             ExpressionSyntax valueExpression,
             SmtFormula targetFormula,
@@ -253,6 +291,21 @@ namespace PurelySharp.Symbolic.Smt
                 out facts,
                 getSymbolVersion,
                 inlineDepth);
+        }
+
+        internal static bool TryGetMathAbsRemainderOperands(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax dividendExpression,
+            out ExpressionSyntax divisorExpression)
+        {
+            return CSharpConditionToFormula.TryGetMathAbsRemainderOperands(
+                invocationExpression,
+                semanticModel,
+                cancellationToken,
+                out dividendExpression,
+                out divisorExpression);
         }
 
         internal static bool TryCreateRuntimeTypeTestFormula(

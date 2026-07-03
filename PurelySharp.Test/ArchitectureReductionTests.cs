@@ -518,6 +518,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LegacyTranslatorReferencesOutsideShim_AreIsolatedToProgramPointFacts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var symbolicDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic");
+            var allowedFiles = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
+            };
+            var offenders = Directory.GetFiles(symbolicDirectory, "*.cs", SearchOption.AllDirectories)
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(static file =>
+                    !file.Path.StartsWith("PurelySharp.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
+                    file.Path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs" &&
+                    file.Source.Contains("CSharpConditionToFormula.", StringComparison.Ordinal))
+                .Select(static file => file.Path)
+                .Distinct(StringComparer.Ordinal)
+                .Except(allowedFiles, StringComparer.Ordinal)
+                .ToArray();
+            var programPointSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(offenders, Is.Empty);
+            Assert.That(programPointSource, Does.Contain("CSharpConditionToFormula."));
+        }
+
+        [Test]
         public void SymbolicCleanBreakDtos_DoNotExposeSmtFormula()
         {
             var dtoTypes = new[]
