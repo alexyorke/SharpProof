@@ -207,6 +207,58 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task OutArgumentToSharedBorrowedLocal_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(int value)
+    {
+        int local = value;
+        ref readonly int alias = ref local;
+        Reset(out local);
+        return alias;
+    }
+
+    private static void Reset(out int value)
+    {
+        value = 0;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task OutArgumentToMutablyBorrowedLocal_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(int value)
+    {
+        int local = value;
+        ref int alias = ref local;
+        Reset(out local);
+        return alias;
+    }
+
+    private static void Reset(out int value)
+    {
+        value = 0;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task RefLocalAliasToArrayParameterElementWrite_Diagnostic()
         {
             var test = @"
