@@ -1180,10 +1180,15 @@ namespace PurelySharp.Analyzer
 
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-            return SymbolicReachabilityService.PathConditionsAllowAndImply(
-                pathConditions,
-                outOfRangeFormula,
-                smtAnalysis);
+            return SymbolicPathConditionsAllowAndImply(
+                    pathConditions,
+                    outOfRangeFormula,
+                    useNode,
+                    smtAnalysis) ||
+                SymbolicReachabilityService.PathConditionsAllowAndImply(
+                    pathConditions,
+                    outOfRangeFormula,
+                    smtAnalysis);
         }
 
         private static bool IsDefinitelyTrueAtUse(
@@ -1195,10 +1200,15 @@ namespace PurelySharp.Analyzer
         {
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-            return SymbolicReachabilityService.PathConditionsAllowAndImply(
-                pathConditions,
-                formula,
-                smtAnalysis);
+            return SymbolicPathConditionsAllowAndImply(
+                    pathConditions,
+                    formula,
+                    useNode,
+                    smtAnalysis) ||
+                SymbolicReachabilityService.PathConditionsAllowAndImply(
+                    pathConditions,
+                    formula,
+                    smtAnalysis);
         }
 
         private static bool IsBuiltInSequenceElementAccess(

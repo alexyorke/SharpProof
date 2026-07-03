@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -42,7 +43,12 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
             return pathConditions.Count > 0 &&
-                SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula, smtAnalysis);
+                (SymbolicPathConditionsAllowAndImply(
+                    pathConditions,
+                    factFormula,
+                    useNode,
+                    smtAnalysis) ||
+                 SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula, smtAnalysis));
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -644,6 +650,61 @@ namespace PurelySharp.Analyzer
                 relevantSymbols,
                 semanticModel,
                 cancellationToken);
+        }
+
+        private static bool SymbolicPathConditionsAllowAndImply(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SmtFormula factFormula,
+            SyntaxNode sourceNode,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryCreateSymbolicPathState(pathConditions, sourceNode, out var pathState) ||
+                !SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    factFormula,
+                    sourceNode,
+                    "exception.path.query",
+                    "exception.path.query",
+                    out var factCondition))
+            {
+                return false;
+            }
+
+            var feasibility = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
+            if (feasibility.Info.Status != SymbolicProofStatus.Reachable)
+            {
+                return false;
+            }
+
+            var implication = SymbolicReachabilityService.ClassifyStateImplication(
+                pathState,
+                factCondition,
+                smtAnalysis);
+            return implication.Info.Status == SymbolicProofStatus.ProvenTrue;
+        }
+
+        private static bool TryCreateSymbolicPathState(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SyntaxNode sourceNode,
+            out SymbolicState pathState)
+        {
+            pathState = new SymbolicState();
+            foreach (var pathCondition in pathConditions)
+            {
+                if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                        pathCondition,
+                        sourceNode,
+                        "exception.path.condition",
+                        "exception.path.condition",
+                        out var symbolicCondition))
+                {
+                    pathState = new SymbolicState();
+                    return false;
+                }
+
+                pathState = pathState.AddPathCondition(symbolicCondition);
+            }
+
+            return true;
         }
 
         internal static bool IsShadowedByPathSensitiveThrowingFinally(

@@ -707,6 +707,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExceptionFlowPathProofs_TrySymbolicStateBeforeLegacyFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var pathFactsSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "ExceptionFlowAnalyzer.PathFacts.cs"));
+            var exceptionSitesSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+
+            var symbolicHelperIndex = pathFactsSource.IndexOf("SymbolicPathConditionsAllowAndImply(", StringComparison.Ordinal);
+            var legacyFallbackIndex = pathFactsSource.IndexOf("SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula", StringComparison.Ordinal);
+
+            Assert.That(symbolicHelperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyFallbackIndex, Is.GreaterThan(symbolicHelperIndex));
+            Assert.That(pathFactsSource, Does.Contain("TryCreateSymbolicPathState("));
+            Assert.That(pathFactsSource, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
+            Assert.That(pathFactsSource, Does.Contain("ClassifyStateFeasibility(pathState"));
+            Assert.That(pathFactsSource, Does.Contain("ClassifyStateImplication("));
+            Assert.That(exceptionSitesSource, Does.Contain("SymbolicPathConditionsAllowAndImply("));
+        }
+
+        [Test]
         public void AnalyzerNullPathProbes_CarrySymbolicNullStateBeforeFeasibility()
         {
             var repositoryRoot = FindRepositoryRoot();
