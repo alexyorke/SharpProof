@@ -1160,6 +1160,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     IsOwnedLocalArrayReturn(coalesceOperation.WhenNull, currentState, out localSymbol);
             }
 
+            if (unwrappedReturnedValue is ITupleOperation tupleOperation)
+            {
+                foreach (var element in tupleOperation.Elements)
+                {
+                    if (IsOwnedLocalArrayReturn(element, currentState, out localSymbol))
+                    {
+                        return true;
+                    }
+                }
+            }
+
             localSymbol = null!;
             return false;
         }
@@ -1404,6 +1415,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         out catalogSource))
                 {
                     return true;
+                }
+            }
+
+            if (unwrappedReturnedValue is ITupleOperation tupleOperation)
+            {
+                foreach (var element in tupleOperation.Elements)
+                {
+                    if (TryFindFreshMutableObjectReturnEscape(
+                            element,
+                            semanticModel,
+                            currentState,
+                            out escapeSyntax,
+                            out escapeSymbol,
+                            out catalogSource))
+                    {
+                        catalogSource = catalogSource switch
+                        {
+                            "fresh_mutable_object_return" => "fresh_mutable_object_tuple_return",
+                            "symbolic_fresh_mutable_object_return" => "symbolic_fresh_mutable_object_tuple_return",
+                            _ => catalogSource
+                        };
+                        return true;
+                    }
                 }
             }
 

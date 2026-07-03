@@ -176,6 +176,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task FreshLocalArrayEscapesThroughTupleReturn_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public (int[] Values, int Count) {|PS0002:TestMethod|}()
+    {
+        var values = new int[1];
+        return (values, values.Length);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FreshMutableObjectReturned_Diagnostic()
         {
             var test = @"
@@ -241,6 +260,53 @@ public class TestClass
         var box = new Box();
         object alias = box;
         return alias;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FreshMutableObjectEscapesThroughTupleReturn_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public (Box Box, int Count) {|PS0002:TestMethod|}()
+    {
+        return (new Box(), 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FreshMutableObjectAliasEscapesThroughTupleReturn_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public (Box Box, int Count) {|PS0002:TestMethod|}()
+    {
+        var box = new Box();
+        return (box, 1);
     }
 }";
 
