@@ -978,7 +978,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
             if (PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedReturnedValue, currentState) is ILocalSymbol trackedLocal &&
-                currentState.IsOwnedLocalArraySymbol(trackedLocal))
+                (currentState.IsOwnedLocalArraySymbol(trackedLocal) ||
+                 (trackedLocal.Type is IArrayTypeSymbol &&
+                  PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(trackedLocal, currentState))))
             {
                 localSymbol = trackedLocal;
                 return true;

@@ -303,6 +303,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ReturnRule_ConsumesSymbolicOwnershipFactsForOwnedArrayEscape()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var engineSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var returnSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "ReturnStatementPurityRule.cs"));
+
+            Assert.That(engineSource, Does.Contain("HasSymbolicOwnedFactForSymbol("));
+            Assert.That(engineSource, Does.Contain("SymbolicOwnershipAtom { Escaped: false }"));
+            Assert.That(engineSource, Does.Contain("SymbolicResourceLifetimeState.Owned"));
+            Assert.That(returnSource, Does.Contain("HasSymbolicOwnedFactForSymbol(trackedLocal, currentState)"));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();

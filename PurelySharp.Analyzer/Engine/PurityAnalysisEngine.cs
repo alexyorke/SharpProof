@@ -4910,6 +4910,35 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
+        internal static bool HasSymbolicOwnedFactForSymbol(
+            ISymbol symbol,
+            PurityAnalysisState currentState)
+        {
+            var symbolTerm = CreateSymbolicReferenceTerm(symbol, currentState);
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (!fact.Polarity ||
+                    fact.Confidence != SymbolicFactConfidence.Exact)
+                {
+                    continue;
+                }
+
+                if (fact.Atom is SymbolicOwnershipAtom { Escaped: false } ownership &&
+                    Equals(ownership.Value, symbolTerm))
+                {
+                    return true;
+                }
+
+                if (fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime &&
+                    Equals(lifetime.Resource, symbolTerm))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static PurityAnalysisState AddAssignedValueFact(
             PurityAnalysisState currentState,
             ISymbol targetSymbol,
