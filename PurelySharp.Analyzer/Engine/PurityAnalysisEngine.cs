@@ -902,7 +902,7 @@ namespace PurelySharp.Analyzer.Engine
                 var builder = ImmutableArray.CreateBuilder<SmtFormula>(PathConditions.Length);
                 foreach (var condition in PathConditions)
                 {
-                    if (!ReferencesSmtVariable(condition, variablePrefix))
+                    if (!SmtFormulaReferenceScanner.ContainsVariablePrefix(condition, variablePrefix))
                     {
                         builder.Add(condition);
                     }
@@ -911,49 +911,6 @@ namespace PurelySharp.Analyzer.Engine
                 return builder.Count == PathConditions.Length
                     ? PathConditions
                     : builder.ToImmutable();
-            }
-
-            private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
-            {
-                switch (formula)
-                {
-                    case SmtVariable variable:
-                        return variable.Name.Contains(variablePrefix, StringComparison.Ordinal);
-                    case SmtUnaryFormula unary:
-                        return ReferencesSmtVariable(unary.Operand, variablePrefix);
-                    case SmtBinaryFormula binary:
-                        return ReferencesSmtVariable(binary.Left, variablePrefix) ||
-                            ReferencesSmtVariable(binary.Right, variablePrefix);
-                    case SmtIntegerUnaryTerm unary:
-                        return ReferencesSmtVariable(unary.Operand, variablePrefix);
-                    case SmtIntegerBinaryTerm binary:
-                        return ReferencesSmtVariable(binary.Left, variablePrefix) ||
-                            ReferencesSmtVariable(binary.Right, variablePrefix);
-                    case SmtStringLengthTerm stringLength:
-                        return ReferencesSmtVariable(stringLength.Value, variablePrefix);
-                    case SmtStringConcatTerm stringConcat:
-                        return ReferencesSmtVariable(stringConcat.Left, variablePrefix) ||
-                            ReferencesSmtVariable(stringConcat.Right, variablePrefix);
-                    case SmtStringContainsFormula stringContains:
-                        return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
-                            ReferencesSmtVariable(stringContains.Search, variablePrefix);
-                    case SmtStringStartsWithFormula stringStartsWith:
-                        return ReferencesSmtVariable(stringStartsWith.Value, variablePrefix) ||
-                            ReferencesSmtVariable(stringStartsWith.Prefix, variablePrefix);
-                    case SmtStringEndsWithFormula stringEndsWith:
-                        return ReferencesSmtVariable(stringEndsWith.Value, variablePrefix) ||
-                            ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
-                    case SmtRegexMatchFormula regexMatch:
-                        return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
-                    case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                        return ReferencesSmtVariable(runtimeTypeTest.Value, variablePrefix);
-                    case SmtConditionalFormula conditional:
-                        return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
-                            ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
-                            ReferencesSmtVariable(conditional.WhenFalse, variablePrefix);
-                    default:
-                        return false;
-                }
             }
 
             private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)

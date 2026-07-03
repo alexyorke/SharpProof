@@ -2087,7 +2087,9 @@ namespace PurelySharp.Analyzer
             return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
                 targetFormula,
                 previousValue,
-                ReferencesSmtVariable(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
+                SmtFormulaReferenceScanner.ContainsVariablePrefix(
+                    previousValue,
+                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
                 ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken),
                 assignment.Kind(),
                 rightValue,
@@ -2109,7 +2111,9 @@ namespace PurelySharp.Analyzer
             return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
                 targetFormula,
                 previousValue,
-                ReferencesSmtVariable(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
+                SmtFormulaReferenceScanner.ContainsVariablePrefix(
+                    previousValue,
+                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
                 delta,
                 out fact);
         }
@@ -2192,57 +2196,7 @@ namespace PurelySharp.Analyzer
 
         private static void RemoveFactsReferencingSymbol(List<SmtFormula> facts, ISymbol symbol)
         {
-            var variablePrefix = SymbolicFactFactory.GetSmtVariableName(symbol);
-            for (var index = facts.Count - 1; index >= 0; index--)
-            {
-                if (ReferencesSmtVariable(facts[index], variablePrefix))
-                {
-                    facts.RemoveAt(index);
-                }
-            }
-        }
-
-        private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
-        {
-            switch (formula)
-            {
-                case SmtVariable variable:
-                    return variable.Name.Contains(variablePrefix, System.StringComparison.Ordinal);
-                case SmtUnaryFormula unary:
-                    return ReferencesSmtVariable(unary.Operand, variablePrefix);
-                case SmtBinaryFormula binary:
-                    return ReferencesSmtVariable(binary.Left, variablePrefix) ||
-                        ReferencesSmtVariable(binary.Right, variablePrefix);
-                case SmtIntegerUnaryTerm integerUnary:
-                    return ReferencesSmtVariable(integerUnary.Operand, variablePrefix);
-                case SmtIntegerBinaryTerm integerBinary:
-                    return ReferencesSmtVariable(integerBinary.Left, variablePrefix) ||
-                        ReferencesSmtVariable(integerBinary.Right, variablePrefix);
-                case SmtStringLengthTerm stringLength:
-                    return ReferencesSmtVariable(stringLength.Value, variablePrefix);
-                case SmtStringConcatTerm stringConcat:
-                    return ReferencesSmtVariable(stringConcat.Left, variablePrefix) ||
-                        ReferencesSmtVariable(stringConcat.Right, variablePrefix);
-                case SmtStringContainsFormula stringContains:
-                    return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
-                        ReferencesSmtVariable(stringContains.Search, variablePrefix);
-                case SmtStringStartsWithFormula stringStartsWith:
-                    return ReferencesSmtVariable(stringStartsWith.Value, variablePrefix) ||
-                        ReferencesSmtVariable(stringStartsWith.Prefix, variablePrefix);
-                case SmtStringEndsWithFormula stringEndsWith:
-                    return ReferencesSmtVariable(stringEndsWith.Value, variablePrefix) ||
-                        ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
-                case SmtRegexMatchFormula regexMatch:
-                    return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
-                case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                    return ReferencesSmtVariable(runtimeTypeTest.Value, variablePrefix);
-                case SmtConditionalFormula conditional:
-                    return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
-                        ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
-                        ReferencesSmtVariable(conditional.WhenFalse, variablePrefix);
-                default:
-                    return false;
-            }
+            SmtFormulaReferenceScanner.RemoveFactsReferencingSymbol(facts, symbol);
         }
 
         private static ISymbol? GetLocalOrParameterSymbol(

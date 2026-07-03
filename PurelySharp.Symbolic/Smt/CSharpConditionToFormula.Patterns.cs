@@ -1245,63 +1245,7 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             var variableName = GetVariableName(symbol.OriginalDefinition, getSymbolVersion);
-            foreach (var formula in formulas.ToArray())
-            {
-                if (ReferencesVariable(formula, variableName))
-                {
-                    formulas.Remove(formula);
-                }
-            }
-        }
-
-        private static bool ReferencesVariable(SmtFormula formula, string variableName)
-        {
-            switch (formula)
-            {
-                case SmtVariable variable:
-                    return IsVariableOrMemberOf(variable.Name, variableName);
-                case SmtUnaryFormula unary:
-                    return ReferencesVariable(unary.Operand, variableName);
-                case SmtBinaryFormula binary:
-                    return ReferencesVariable(binary.Left, variableName) ||
-                        ReferencesVariable(binary.Right, variableName);
-                case SmtIntegerUnaryTerm unary:
-                    return ReferencesVariable(unary.Operand, variableName);
-                case SmtIntegerBinaryTerm binary:
-                    return ReferencesVariable(binary.Left, variableName) ||
-                        ReferencesVariable(binary.Right, variableName);
-                case SmtStringLengthTerm stringLength:
-                    return ReferencesVariable(stringLength.Value, variableName);
-                case SmtStringConcatTerm stringConcat:
-                    return ReferencesVariable(stringConcat.Left, variableName) ||
-                        ReferencesVariable(stringConcat.Right, variableName);
-                case SmtStringContainsFormula stringContains:
-                    return ReferencesVariable(stringContains.Value, variableName) ||
-                        ReferencesVariable(stringContains.Search, variableName);
-                case SmtStringStartsWithFormula stringStartsWith:
-                    return ReferencesVariable(stringStartsWith.Value, variableName) ||
-                        ReferencesVariable(stringStartsWith.Prefix, variableName);
-                case SmtStringEndsWithFormula stringEndsWith:
-                    return ReferencesVariable(stringEndsWith.Value, variableName) ||
-                        ReferencesVariable(stringEndsWith.Suffix, variableName);
-                case SmtRegexMatchFormula regexMatch:
-                    return ReferencesVariable(regexMatch.Value, variableName);
-                case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                    return ReferencesVariable(runtimeTypeTest.Value, variableName);
-                case SmtConditionalFormula conditional:
-                    return ReferencesVariable(conditional.Condition, variableName) ||
-                        ReferencesVariable(conditional.WhenTrue, variableName) ||
-                        ReferencesVariable(conditional.WhenFalse, variableName);
-                default:
-                    return false;
-            }
-        }
-
-        private static bool IsVariableOrMemberOf(string candidateName, string variableName)
-        {
-            return string.Equals(candidateName, variableName, StringComparison.Ordinal) ||
-                candidateName.StartsWith(variableName + ".", StringComparison.Ordinal) ||
-                candidateName.StartsWith(variableName + "[", StringComparison.Ordinal);
+            SmtFormulaReferenceScanner.RemoveFormulasReferencingVariable(formulas, variableName);
         }
 
         private static void AddConditionalAccessStringEqualityBranchFacts(
