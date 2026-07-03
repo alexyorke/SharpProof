@@ -85,7 +85,9 @@ namespace PurelySharp.Test
                 "SymbolicRuntimeHazardQueryService.cs"));
 
             Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
+            Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
             Assert.That(source, Does.Not.Contain("new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition))"));
+            Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
         }
 
         [Test]
@@ -837,6 +839,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ClassifiesIrConditionTruthWithoutPublicFormulaInput()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var stateFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x > 0"),
+                "test.state");
+            var conditionFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x <= 0"),
+                "test.condition");
+            var state = new SymbolicState(new[] { stateFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicFactCondition(conditionFact),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
         public void SymbolicProofService_ClassifiesIrHazardTriggerWithoutPublicFormulaInput()
         {
             var divisor = new SymbolicVariableTerm("divisor", SmtValueKind.Int);
@@ -927,7 +959,8 @@ namespace PurelySharp.Test
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
             Assert.That(irIndex, Is.LessThan(legacyIndex));
-            Assert.That(helperSource, Does.Contain("ClassifyStateBranchFeasibility(state"));
+            Assert.That(helperSource, Does.Contain("ClassifyStateConditionTruth(state"));
+            Assert.That(helperSource, Does.Not.Contain("ClassifyStateBranchFeasibility(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateImplication(state, condition"));
         }
 
@@ -1210,7 +1243,7 @@ namespace PurelySharp.Test
             var irIndex = source.IndexOf("TryClassifyIrTrigger(", StringComparison.Ordinal);
             var legacyIndex = source.LastIndexOf("SymbolicReachabilityService.ClassifyImplication(", StringComparison.Ordinal);
 
-            Assert.That(source, Does.Contain("ClassifyStateImplication("));
+            Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
             Assert.That(source, Does.Contain("analysis.PathState"));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
@@ -1226,10 +1259,10 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
             var helperIndex = source.IndexOf("TryCreateReferenceNullCondition(", StringComparison.Ordinal);
-            var irProofIndex = source.IndexOf("ClassifyStateImplication(\r\n                    analysis.PathState,\r\n                    nullCondition,", StringComparison.Ordinal);
+            var irProofIndex = source.IndexOf("ClassifyStateConditionTruth(\r\n                    analysis.PathState,\r\n                    nullCondition,", StringComparison.Ordinal);
             if (irProofIndex < 0)
             {
-                irProofIndex = source.IndexOf("ClassifyStateImplication(\n                    analysis.PathState,\n                    nullCondition,", StringComparison.Ordinal);
+                irProofIndex = source.IndexOf("ClassifyStateConditionTruth(\n                    analysis.PathState,\n                    nullCondition,", StringComparison.Ordinal);
             }
 
             var legacyFallbackIndex = source.IndexOf("PathConditionsImply(analysis.PathConditions, legacyNullTrigger", StringComparison.Ordinal);

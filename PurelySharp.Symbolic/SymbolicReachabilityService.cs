@@ -77,6 +77,14 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis).ClassifyBranchFeasibility(state, branchCondition);
         }
 
+        internal static SymbolicIrProofResult ClassifyStateConditionTruth(
+            SymbolicState state,
+            SymbolicCondition condition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition);
+        }
+
         internal static SymbolicIrProofResult ClassifyStateHazardTrigger(
             SymbolicState state,
             SymbolicFact triggerPrecondition,
@@ -402,22 +410,14 @@ namespace PurelySharp.Symbolic
             }
 
             var state = CreateStateFromFormulaPath(pathConditions, expression);
-            var reachability = ClassifyStateFeasibility(state, smtAnalysis);
-            if (reachability.Info.Status == SymbolicProofStatus.Unreachable)
+            var truth = ClassifyStateConditionTruth(state, condition, smtAnalysis);
+            return truth.Info.Status switch
             {
-                return false;
-            }
-
-            var trueBranch = ClassifyStateBranchFeasibility(state, condition, smtAnalysis);
-            if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable)
-            {
-                return false;
-            }
-
-            var falseBranch = ClassifyStateBranchFeasibility(state, new SymbolicNotCondition(condition), smtAnalysis);
-            return falseBranch.Info.Status == SymbolicProofStatus.Unreachable
-                ? true
-                : null;
+                SymbolicProofStatus.Unreachable => false,
+                SymbolicProofStatus.ProvenTrue => true,
+                SymbolicProofStatus.ProvenFalse => false,
+                _ => null,
+            };
         }
 
         private static SymbolicState CreateStateFromFormulaPath(

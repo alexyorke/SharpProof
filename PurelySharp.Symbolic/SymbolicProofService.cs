@@ -67,6 +67,42 @@ namespace PurelySharp.Symbolic
             return ClassifyReachability(state.AddPathCondition(branchCondition));
         }
 
+        public SymbolicIrProofResult ClassifyConditionTruth(SymbolicState state, SymbolicCondition condition)
+        {
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition));
+            }
+
+            var reachability = ClassifyReachability(state);
+            if (reachability.Info.Status == SymbolicProofStatus.Unreachable)
+            {
+                return reachability;
+            }
+
+            var trueBranch = ClassifyBranchFeasibility(state, condition);
+            if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable &&
+                trueBranch.RawResult != null)
+            {
+                return SymbolicIrProofResult.FromConditionTruth(
+                    trueBranch.RawResult,
+                    SymbolicProofStatus.ProvenFalse,
+                    CreateBudgetInfo());
+            }
+
+            var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
+            if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable &&
+                falseBranch.RawResult != null)
+            {
+                return SymbolicIrProofResult.FromConditionTruth(
+                    falseBranch.RawResult,
+                    SymbolicProofStatus.ProvenTrue,
+                    CreateBudgetInfo());
+            }
+
+            return SymbolicIrProofResult.Unknown(falseBranch.Info.UnknownReason);
+        }
+
         public SymbolicIrProofResult ClassifyHazardTrigger(SymbolicState state, SymbolicFact triggerPrecondition)
         {
             if (triggerPrecondition == null)
@@ -234,6 +270,19 @@ namespace PurelySharp.Symbolic
                 PurityProofOutcome.ProvablyImpure => SymbolicProofStatus.ProvenFalse,
                 _ => SymbolicProofStatus.Unknown,
             };
+
+            return FromResult(result, status, budget);
+        }
+
+        public static SymbolicIrProofResult FromConditionTruth(
+            PurityProofResult result,
+            SymbolicProofStatus status,
+            SymbolicBudgetInfo? budget)
+        {
+            if (status is not SymbolicProofStatus.ProvenTrue and not SymbolicProofStatus.ProvenFalse)
+            {
+                throw new ArgumentOutOfRangeException(nameof(status), status, "Condition truth proofs must be proven true or proven false.");
+            }
 
             return FromResult(result, status, budget);
         }

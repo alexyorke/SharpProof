@@ -491,7 +491,7 @@ namespace PurelySharp.Symbolic
 
             if (hasIrNullCondition)
             {
-                var provenNull = SymbolicReachabilityService.ClassifyStateImplication(
+                var provenNull = SymbolicReachabilityService.ClassifyStateConditionTruth(
                     analysis.PathState,
                     nullCondition,
                     smtAnalysis);
