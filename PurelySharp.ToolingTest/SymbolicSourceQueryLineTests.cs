@@ -171,6 +171,10 @@ public class TestClass
             var returnProof = returnPoint.ConditionProofs.Single();
             Assert.That(returnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
             Assert.That(returnProof.HasSmtFormula, Is.True);
+            Assert.That(returnProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+            Assert.That(returnProof.Proof.Reason, Is.EqualTo(returnProof.Reason));
             Assert.That(returnProof.Target, Is.EqualTo("value"));
             Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
             Assert.That(returnProof.FormulaText, Is.EqualTo("value > 0"));
@@ -181,6 +185,10 @@ public class TestClass
             Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
             var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
             Assert.That(aggregateProof.HasSmtFormula, Is.True);
+            Assert.That(aggregateProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
+            Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
             Assert.That(aggregateProof.Target, Is.EqualTo("value"));
             Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
             Assert.That(aggregateProof.FormulaText, Is.EqualTo("value > 0"));

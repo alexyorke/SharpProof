@@ -6455,6 +6455,13 @@ namespace PurelySharp.Symbolic
             ResolvedCount = ProvenTrueCount + ProvenFalseCount + UnreachableCount;
             Status = ResolveStatus(TotalCount, ReachableCount, UnknownCount, ProvenTrueCount, ProvenFalseCount, UnreachableCount);
             Summary = CreateSummary(Status);
+            Proof = new SymbolicProofInfo(
+                MapProofStatus(Status),
+                ResolveProofBackend(Status, HasSmtFormula),
+                ResolveUnknownReason(Status, Reasons),
+                Summary,
+                cacheHit: false,
+                budget: null);
         }
 
         public string Condition { get; }
@@ -6486,6 +6493,8 @@ namespace PurelySharp.Symbolic
         public SymbolicConditionProofSummaryStatus Status { get; }
 
         public string Summary { get; }
+
+        public SymbolicProofInfo Proof { get; }
 
         public bool HoldsOnAllReachablePoints => Status == SymbolicConditionProofSummaryStatus.AlwaysTrue;
 
@@ -6618,6 +6627,115 @@ namespace PurelySharp.Symbolic
                 default:
                     return "The condition has at least one unresolved reachable proof outcome.";
             }
+        }
+
+        private static SymbolicProofStatus MapProofStatus(SymbolicConditionProofSummaryStatus status)
+        {
+            return status switch
+            {
+                SymbolicConditionProofSummaryStatus.AlwaysTrue => SymbolicProofStatus.ProvenTrue,
+                SymbolicConditionProofSummaryStatus.AlwaysFalse => SymbolicProofStatus.ProvenFalse,
+                SymbolicConditionProofSummaryStatus.UnreachableOnly => SymbolicProofStatus.Unreachable,
+                _ => SymbolicProofStatus.Unknown,
+            };
+        }
+
+        private static SymbolicProofBackend ResolveProofBackend(
+            SymbolicConditionProofSummaryStatus status,
+            bool hasSmtFormula)
+        {
+            if (hasSmtFormula)
+            {
+                return SymbolicProofBackend.Smt;
+            }
+
+            return status is SymbolicConditionProofSummaryStatus.AlwaysTrue or
+                    SymbolicConditionProofSummaryStatus.AlwaysFalse or
+                    SymbolicConditionProofSummaryStatus.UnreachableOnly
+                ? SymbolicProofBackend.Syntactic
+                : SymbolicProofBackend.None;
+        }
+
+        private static SymbolicUnknownReason ResolveUnknownReason(
+            SymbolicConditionProofSummaryStatus status,
+            IReadOnlyList<SymbolicConditionProofReasonSummary> reasons)
+        {
+            if (status != SymbolicConditionProofSummaryStatus.Unknown)
+            {
+                return SymbolicUnknownReason.None;
+            }
+
+            var reason = reasons
+                .FirstOrDefault(static item => item.TruthValue == SymbolicTruthValue.Unknown)
+                ?.Reason;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return SymbolicUnknownReason.Unknown;
+            }
+
+            var normalizedReason = reason!;
+            if (ContainsReason(normalizedReason, "timeout") ||
+                ContainsReason(normalizedReason, "timed_out"))
+            {
+                return SymbolicUnknownReason.Timeout;
+            }
+
+            if (ContainsReason(normalizedReason, "method_budget"))
+            {
+                return SymbolicUnknownReason.MethodBudgetExceeded;
+            }
+
+            if (ContainsReason(normalizedReason, "path_condition") ||
+                ContainsReason(normalizedReason, "max_path_conditions") ||
+                ContainsReason(normalizedReason, "too_many_path_conditions"))
+            {
+                return SymbolicUnknownReason.PathConditionBudgetExceeded;
+            }
+
+            if (ContainsReason(normalizedReason, "expression_budget") ||
+                ContainsReason(normalizedReason, "max_expression"))
+            {
+                return SymbolicUnknownReason.ExpressionBudgetExceeded;
+            }
+
+            if (ContainsReason(normalizedReason, "cancellation") ||
+                ContainsReason(normalizedReason, "cancelled") ||
+                ContainsReason(normalizedReason, "canceled"))
+            {
+                return SymbolicUnknownReason.CancellationRequested;
+            }
+
+            if (ContainsReason(normalizedReason, "encoding"))
+            {
+                return SymbolicUnknownReason.EncodingFailure;
+            }
+
+            if (ContainsReason(normalizedReason, "unsupported"))
+            {
+                return SymbolicUnknownReason.UnsupportedIrEncoding;
+            }
+
+            if (ContainsReason(normalizedReason, "smt_required") ||
+                ContainsReason(normalizedReason, "smt_disabled") ||
+                ContainsReason(normalizedReason, "smt_off"))
+            {
+                return SymbolicUnknownReason.SmtDisabled;
+            }
+
+            if (ContainsReason(normalizedReason, "z3") ||
+                ContainsReason(normalizedReason, "native") ||
+                ContainsReason(normalizedReason, "unavailable") ||
+                ContainsReason(normalizedReason, "load"))
+            {
+                return SymbolicUnknownReason.SmtUnavailable;
+            }
+
+            return SymbolicUnknownReason.Unknown;
+        }
+
+        private static bool ContainsReason(string reason, string value)
+        {
+            return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private readonly struct ProofReasonKey
@@ -7499,6 +7617,13 @@ namespace PurelySharp.Symbolic
             RequestedPosition = requestedPosition;
             RequestedPositionDistance = requestedPositionDistance;
             ContainsRequestedPosition = containsRequestedPosition;
+            Proof = new SymbolicProofInfo(
+                MapProofStatus(TruthValue),
+                ResolveProofBackend(TruthValue, HasSmtFormula),
+                ResolveUnknownReason(TruthValue, Reason),
+                Reason,
+                cacheHit: false,
+                budget: null);
         }
 
         public string Condition { get; }
@@ -7516,6 +7641,8 @@ namespace PurelySharp.Symbolic
         public SymbolicTruthValue TruthValue { get; }
 
         public string Reason { get; }
+
+        public SymbolicProofInfo Proof { get; }
 
         public string? FilePath { get; }
 
@@ -7610,6 +7737,109 @@ namespace PurelySharp.Symbolic
             return name.EndsWith("Formula", StringComparison.Ordinal)
                 ? name.Substring(0, name.Length - "Formula".Length)
                 : name;
+        }
+
+        private static SymbolicProofStatus MapProofStatus(SymbolicTruthValue truthValue)
+        {
+            return truthValue switch
+            {
+                SymbolicTruthValue.ProvenTrue => SymbolicProofStatus.ProvenTrue,
+                SymbolicTruthValue.ProvenFalse => SymbolicProofStatus.ProvenFalse,
+                SymbolicTruthValue.Unreachable => SymbolicProofStatus.Unreachable,
+                _ => SymbolicProofStatus.Unknown,
+            };
+        }
+
+        private static SymbolicProofBackend ResolveProofBackend(
+            SymbolicTruthValue truthValue,
+            bool hasSmtFormula)
+        {
+            if (hasSmtFormula)
+            {
+                return SymbolicProofBackend.Smt;
+            }
+
+            return truthValue == SymbolicTruthValue.Unknown
+                ? SymbolicProofBackend.None
+                : SymbolicProofBackend.Syntactic;
+        }
+
+        private static SymbolicUnknownReason ResolveUnknownReason(
+            SymbolicTruthValue truthValue,
+            string reason)
+        {
+            if (truthValue != SymbolicTruthValue.Unknown)
+            {
+                return SymbolicUnknownReason.None;
+            }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return SymbolicUnknownReason.Unknown;
+            }
+
+            if (ContainsReason(reason, "timeout") ||
+                ContainsReason(reason, "timed_out"))
+            {
+                return SymbolicUnknownReason.Timeout;
+            }
+
+            if (ContainsReason(reason, "method_budget"))
+            {
+                return SymbolicUnknownReason.MethodBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "path_condition") ||
+                ContainsReason(reason, "max_path_conditions") ||
+                ContainsReason(reason, "too_many_path_conditions"))
+            {
+                return SymbolicUnknownReason.PathConditionBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "expression_budget") ||
+                ContainsReason(reason, "max_expression"))
+            {
+                return SymbolicUnknownReason.ExpressionBudgetExceeded;
+            }
+
+            if (ContainsReason(reason, "cancellation") ||
+                ContainsReason(reason, "cancelled") ||
+                ContainsReason(reason, "canceled"))
+            {
+                return SymbolicUnknownReason.CancellationRequested;
+            }
+
+            if (ContainsReason(reason, "encoding"))
+            {
+                return SymbolicUnknownReason.EncodingFailure;
+            }
+
+            if (ContainsReason(reason, "unsupported"))
+            {
+                return SymbolicUnknownReason.UnsupportedIrEncoding;
+            }
+
+            if (ContainsReason(reason, "smt_required") ||
+                ContainsReason(reason, "smt_disabled") ||
+                ContainsReason(reason, "smt_off"))
+            {
+                return SymbolicUnknownReason.SmtDisabled;
+            }
+
+            if (ContainsReason(reason, "z3") ||
+                ContainsReason(reason, "native") ||
+                ContainsReason(reason, "unavailable") ||
+                ContainsReason(reason, "load"))
+            {
+                return SymbolicUnknownReason.SmtUnavailable;
+            }
+
+            return SymbolicUnknownReason.Unknown;
+        }
+
+        private static bool ContainsReason(string reason, string value)
+        {
+            return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 
