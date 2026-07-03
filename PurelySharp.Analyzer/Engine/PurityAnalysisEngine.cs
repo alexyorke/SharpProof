@@ -4730,7 +4730,43 @@ namespace PurelySharp.Analyzer.Engine
                 nextState.PathState.AddFact(mutationFact));
         }
 
-        private static bool TryCreateCallerVisibleMutationTerm(
+        internal static bool TryCreateCallerVisibleMutationEvidence(
+            IOperation operation,
+            IOperation targetOperation,
+            PurityAnalysisState currentState,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
+            {
+                evidence = default;
+                return false;
+            }
+
+            var mutationFact = SymbolicOwnershipFactFactory.CreateMutation(
+                term,
+                callerVisible: true,
+                targetOperation.Syntax,
+                "analyzer.mutation.caller-visible",
+                symbol,
+                "evidence.mutation.caller-visible");
+            if (mutationFact.Atom is not SymbolicMutationAtom { CallerVisible: true })
+            {
+                evidence = default;
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "mutable_state_write",
+                ruleName: ruleName,
+                operation: operation,
+                syntaxNode: operation.Syntax,
+                symbol: symbol,
+                catalogSource: mutationFact.Provenance);
+            return true;
+        }
+
+        internal static bool TryCreateCallerVisibleMutationTerm(
             IOperation targetOperation,
             PurityAnalysisState currentState,
             out SymbolicTerm term,

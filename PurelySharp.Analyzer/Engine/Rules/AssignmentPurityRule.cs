@@ -156,6 +156,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (!isPureAssignment)
             {
                 PurityAnalysisEngine.LogDebug($"    [AssignRule] Assignment target itself is considered impure for assignment. Assignment is Impure.");
+                if (PurityAnalysisEngine.TryCreateCallerVisibleMutationEvidence(
+                        operation,
+                        targetOperation,
+                        currentState,
+                        nameof(AssignmentPurityRule),
+                        out var mutationEvidence))
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        mutationEvidence);
+                }
+
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     operation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(

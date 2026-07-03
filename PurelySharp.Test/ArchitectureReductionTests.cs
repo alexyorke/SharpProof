@@ -325,6 +325,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AssignmentRule_ConsumesSymbolicMutationEvidenceForCallerVisibleWrites()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var engineSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var assignmentSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "AssignmentPurityRule.cs"));
+
+            Assert.That(engineSource, Does.Contain("TryCreateCallerVisibleMutationEvidence("));
+            Assert.That(engineSource, Does.Contain("SymbolicMutationAtom { CallerVisible: true }"));
+            Assert.That(assignmentSource, Does.Contain("TryCreateCallerVisibleMutationEvidence("));
+            Assert.That(assignmentSource, Does.Contain("out var mutationEvidence"));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
