@@ -5147,6 +5147,144 @@ namespace PurelySharp.Analyzer.Engine
             return true;
         }
 
+        internal static bool TryCreateUseAfterDisposeEvidence(
+            IOperation useOperation,
+            IOperation? resourceOperation,
+            ISymbol usedMemberSymbol,
+            PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            if (TryCreateUseAfterDisposeEvidence(
+                    useOperation,
+                    resourceOperation,
+                    usedMemberSymbol,
+                    currentState,
+                    ruleName,
+                    out evidence))
+            {
+                return true;
+            }
+
+            if (TryResolveTrackedSymbol(resourceOperation, currentState) is not { } resourceSymbol ||
+                !WasResourceDisposedByEarlierUsingStatement(
+                    resourceSymbol,
+                    useOperation.Syntax,
+                    currentState,
+                    semanticModel,
+                    cancellationToken))
+            {
+                evidence = PurityEvidence.None;
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "resource_use_after_dispose",
+                ruleName,
+                useOperation,
+                syntaxNode: useOperation.Syntax,
+                symbol: usedMemberSymbol,
+                catalogSource: "symbolic_resource_lifetime.using");
+            return true;
+        }
+
+        internal static bool TryCreateDoubleDisposeEvidence(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol invokedMethodSymbol,
+            PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            evidence = PurityEvidence.None;
+            if (!IsParameterlessDisposeInvocation(invocationOperation) ||
+                invocationOperation.Instance == null ||
+                TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
+                (!HasDisposedResourceFact(currentState, resourceSymbol) &&
+                 !WasResourceDisposedByEarlierUsingStatement(
+                     resourceSymbol,
+                     invocationOperation.Syntax,
+                     currentState,
+                     semanticModel,
+                     cancellationToken)))
+            {
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "resource_double_dispose",
+                ruleName,
+                invocationOperation,
+                symbol: invokedMethodSymbol,
+                catalogSource: "symbolic_resource_lifetime");
+            return true;
+        }
+
+        private static bool WasResourceDisposedByEarlierUsingStatement(
+            ISymbol resourceSymbol,
+            SyntaxNode useSyntax,
+            PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var containingBlock = useSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            foreach (var usingStatement in containingBlock.DescendantNodes().OfType<UsingStatementSyntax>())
+            {
+                if (usingStatement.Span.End > useSyntax.SpanStart ||
+                    usingStatement.Statement == null)
+                {
+                    continue;
+                }
+
+                if (usingStatement.Expression is { } usingExpression &&
+                    semanticModel.GetSymbolInfo(usingExpression, cancellationToken).Symbol is { } usingSymbol &&
+                    AreSymbolsSameOrAliased(resourceSymbol, usingSymbol, currentState))
+                {
+                    return true;
+                }
+
+                if (usingStatement.Declaration == null)
+                {
+                    continue;
+                }
+
+                foreach (var variable in usingStatement.Declaration.Variables)
+                {
+                    if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is { } declaredUsingSymbol &&
+                        AreSymbolsSameOrAliased(resourceSymbol, declaredUsingSymbol, currentState))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool AreSymbolsSameOrAliased(
+            ISymbol first,
+            ISymbol second,
+            PurityAnalysisState currentState)
+        {
+            if (SymbolEqualityComparer.Default.Equals(first, second))
+            {
+                return true;
+            }
+
+            var firstTerm = CreateSymbolicReferenceTerm(first, currentState);
+            var secondTerm = CreateSymbolicReferenceTerm(second, currentState);
+            return EnumerateSymbolicAliasTerms(firstTerm, currentState).Any(aliasTerm => Equals(aliasTerm, secondTerm)) ||
+                   EnumerateSymbolicAliasTerms(secondTerm, currentState).Any(aliasTerm => Equals(aliasTerm, firstTerm));
+        }
+
         private static bool HasDisposedResourceFactForTerm(
             SymbolicTerm resourceTerm,
             PurityAnalysisState currentState,

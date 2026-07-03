@@ -73,6 +73,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         fieldReferenceOperation.Instance,
                         fieldSymbol,
                         currentState,
+                        context.SemanticModel,
+                        context.CancellationToken,
                         nameof(FieldReferencePurityRule),
                         out var useAfterDisposeEvidence))
                 {

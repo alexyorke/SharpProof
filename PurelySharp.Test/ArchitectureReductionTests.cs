@@ -568,7 +568,9 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTerm("));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(resourceTerm, currentState)"));
             Assert.That(engineSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
-            Assert.That(source, Does.Contain("\"resource_double_dispose\""));
+            Assert.That(engineSource, Does.Contain("TryCreateDoubleDisposeEvidence("));
+            Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierUsingStatement("));
+            Assert.That(engineSource, Does.Contain("\"resource_double_dispose\""));
             Assert.That(engineSource, Does.Contain("\"resource_use_after_dispose\""));
             Assert.That(engineSource, Does.Contain("\"symbolic_resource_lifetime\""));
         }

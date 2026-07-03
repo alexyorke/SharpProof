@@ -670,5 +670,76 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ExplicitDisposeAfterUsingStatementExistingLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        var resource = new PureDisposable();
+        using (resource)
+        {
+        }
+
+        resource.Dispose();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task UseAfterUsingStatementAlias_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        using (alias)
+        {
+        }
+
+        return resource.Use();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

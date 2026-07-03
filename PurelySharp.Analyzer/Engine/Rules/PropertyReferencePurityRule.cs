@@ -45,6 +45,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         ? getterSymbolForUseAfterDispose
                         : propertySymbol,
                     currentState,
+                    context.SemanticModel,
+                    context.CancellationToken,
                     nameof(PropertyReferencePurityRule),
                     out var useAfterDisposeEvidence))
             {

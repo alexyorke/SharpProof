@@ -44,12 +44,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     nameof(MethodInvocationPurityRule));
             }
 
-            if (TryCheckDoubleDispose(invocationOperation, invokedMethodSymbol, currentState, out var doubleDisposeResult))
+            if (TryCheckDoubleDispose(invocationOperation, invokedMethodSymbol, context, currentState, out var doubleDisposeResult))
             {
                 return doubleDisposeResult;
             }
 
-            if (TryCheckUseAfterDispose(invocationOperation, invokedMethodSymbol, currentState, out var useAfterDisposeResult))
+            if (TryCheckUseAfterDispose(invocationOperation, invokedMethodSymbol, context, currentState, out var useAfterDisposeResult))
             {
                 return useAfterDisposeResult;
             }
@@ -1261,14 +1261,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool TryCheckDoubleDispose(
             IInvocationOperation invocationOperation,
             IMethodSymbol invokedMethodSymbol,
+            PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            if (!PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
-                invocationOperation.Instance == null ||
-                PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
-                !PurityAnalysisEngine.HasDisposedResourceFact(currentState, resourceSymbol))
+            if (!PurityAnalysisEngine.TryCreateDoubleDisposeEvidence(
+                    invocationOperation,
+                    invokedMethodSymbol,
+                    currentState,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    nameof(MethodInvocationPurityRule),
+                    out var evidence))
             {
                 return false;
             }
@@ -1276,18 +1281,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.LogDebug("  [MIR] Dispose invoked on a resource already marked disposed by symbolic ownership facts.");
             result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 invocationOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "resource_double_dispose",
-                    nameof(MethodInvocationPurityRule),
-                    invocationOperation,
-                    symbol: invokedMethodSymbol,
-                    catalogSource: "symbolic_resource_lifetime"));
+                evidence);
             return true;
         }
 
         private static bool TryCheckUseAfterDispose(
             IInvocationOperation invocationOperation,
             IMethodSymbol invokedMethodSymbol,
+            PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
@@ -1301,6 +1302,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     invocationOperation.Instance,
                     invokedMethodSymbol,
                     currentState,
+                    context.SemanticModel,
+                    context.CancellationToken,
                     nameof(MethodInvocationPurityRule),
                     out var evidence))
             {
