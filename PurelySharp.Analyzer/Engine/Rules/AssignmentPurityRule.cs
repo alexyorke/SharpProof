@@ -162,6 +162,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var targetSymbol = TryResolveSymbol(targetOperation);
+            if (TryCreateMutableBorrowConflictEvidence(
+                    operation,
+                    targetSymbol,
+                    currentState,
+                    out var earlyBorrowConflictEvidence))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    operation.Syntax,
+                    earlyBorrowConflictEvidence);
+            }
+
             bool isPureAssignment = IsAssignmentTargetPure(targetOperation, context, targetSymbol, currentState);
 
             if (!isPureAssignment)
