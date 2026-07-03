@@ -675,17 +675,11 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var feasibility = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-            if (feasibility.Info.Status != SymbolicProofStatus.Reachable)
-            {
-                return false;
-            }
-
-            var implication = SymbolicReachabilityService.ClassifyStateImplication(
+            var truth = SymbolicReachabilityService.ClassifyStateConditionTruth(
                 pathState,
                 factCondition,
                 smtAnalysis);
-            return implication.Info.Status == SymbolicProofStatus.ProvenTrue;
+            return truth.Info.Status == SymbolicProofStatus.ProvenTrue;
         }
 
         private static bool SymbolicPathConditionsAreSatisfiable(
@@ -727,11 +721,11 @@ namespace PurelySharp.Analyzer
                 symbolicCondition = new SymbolicNotCondition(symbolicCondition);
             }
 
-            var implication = SymbolicReachabilityService.ClassifyStateImplication(
+            var truth = SymbolicReachabilityService.ClassifyStateConditionTruth(
                 pathState,
                 symbolicCondition,
                 smtAnalysis);
-            return implication.Info.Status == SymbolicProofStatus.ProvenTrue;
+            return truth.Info.Status == SymbolicProofStatus.ProvenTrue;
         }
 
         private static bool TryClassifySymbolicPathFeasibility(

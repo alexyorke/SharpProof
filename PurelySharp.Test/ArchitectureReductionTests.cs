@@ -1170,7 +1170,8 @@ namespace PurelySharp.Test
             Assert.That(pathFactsSource, Does.Contain("TryClassifySymbolicPathFeasibility("));
             Assert.That(pathFactsSource, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
             Assert.That(pathFactsSource, Does.Contain("ClassifyStateFeasibility(pathState"));
-            Assert.That(pathFactsSource, Does.Contain("ClassifyStateImplication("));
+            Assert.That(pathFactsSource, Does.Contain("ClassifyStateConditionTruth("));
+            Assert.That(pathFactsSource, Does.Not.Contain("ClassifyStateImplication("));
             Assert.That(exceptionSitesSource, Does.Contain("SymbolicPathConditionsAllowAndImply("));
         }
 
