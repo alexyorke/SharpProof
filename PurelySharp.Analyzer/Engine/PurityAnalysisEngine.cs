@@ -1512,7 +1512,7 @@ namespace PurelySharp.Analyzer.Engine
                             AddStraightLineResourceActionFacts(
                                 postCfgReturnState,
                                 methodBodyIOperation,
-                                semanticModel.Compilation),
+                                semanticModel),
                             methodBodyIOperation);
                         var visibleReturnOperations = ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
                             .OfType<IReturnOperation>()
@@ -1907,7 +1907,7 @@ namespace PurelySharp.Analyzer.Engine
         private static PurityAnalysisState AddStraightLineResourceActionFacts(
             PurityAnalysisState currentState,
             IOperation methodBodyOperation,
-            Compilation compilation)
+            SemanticModel semanticModel)
         {
             var nextState = currentState;
             foreach (var declarationGroup in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IVariableDeclarationGroupOperation>())
@@ -1932,7 +1932,7 @@ namespace PurelySharp.Analyzer.Engine
                                 nextState,
                                 declarator.Symbol,
                                 initializer,
-                                compilation);
+                                semanticModel.Compilation);
                         }
                     }
                 }
@@ -1946,6 +1946,44 @@ namespace PurelySharp.Analyzer.Engine
                 }
 
                 nextState = AddDisposeInvocationFacts(nextState, invocation, nextState);
+            }
+
+            nextState = AddFinallyResourceDisposeFacts(nextState, methodBodyOperation, semanticModel);
+            return nextState;
+        }
+
+        private static PurityAnalysisState AddFinallyResourceDisposeFacts(
+            PurityAnalysisState currentState,
+            IOperation methodBodyOperation,
+            SemanticModel semanticModel)
+        {
+            var nextState = currentState;
+            foreach (var tryStatement in methodBodyOperation.Syntax.DescendantNodes().OfType<TryStatementSyntax>())
+            {
+                if (tryStatement.Finally?.Block is not { } finallyBlock)
+                {
+                    continue;
+                }
+
+                foreach (var invocation in finallyBlock.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                {
+                    if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                        memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
+                        semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } resourceSymbol ||
+                        !FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
+                    {
+                        continue;
+                    }
+
+                    var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+                    nextState = AddResourceDisposedFacts(
+                        nextState,
+                        term,
+                        resourceSymbol,
+                        invocation,
+                        "analyzer.resource.finally.dispose",
+                        "evidence.resource.finally.dispose");
+                }
             }
 
             return nextState;
@@ -2373,6 +2411,14 @@ namespace PurelySharp.Analyzer.Engine
                     thenSummary.FallthroughReleasedStates.AddRange(elseSummary.FallthroughReleasedStates));
             }
 
+            if (statement is TryStatementSyntax { Finally.Block: { } finallyBlock } &&
+                FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
+            {
+                return new ResourceReleasePathSummary(
+                    true,
+                    ImmutableArray.Create(true));
+            }
+
             var released = initiallyReleased ||
                 DisposesSymbol(statement, resourceSymbol, semanticModel);
             return new ResourceReleasePathSummary(
@@ -2385,6 +2431,23 @@ namespace PurelySharp.Analyzer.Engine
             return statement is BlockSyntax block
                 ? block.Statements.ToArray()
                 : new[] { statement };
+        }
+
+        private static bool FinallyBlockReleasesResource(
+            BlockSyntax finallyBlock,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            var summary = AnalyzeResourceReleaseStatements(
+                finallyBlock.Statements.ToArray(),
+                initiallyReleased: false,
+                endIsTerminal: false,
+                resourceSymbol,
+                semanticModel);
+
+            return summary.AllTerminalPathsReleased &&
+                summary.FallthroughReleasedStates.Length > 0 &&
+                summary.FallthroughReleasedStates.All(static released => released);
         }
 
         private static bool IsReturnedSymbol(
@@ -5568,6 +5631,19 @@ namespace PurelySharp.Analyzer.Engine
                 new HashSet<SymbolicTerm>());
         }
 
+        private static bool HasDisposedResourceFactBefore(
+            PurityAnalysisState currentState,
+            ISymbol resourceSymbol,
+            SyntaxNode observationSyntax)
+        {
+            var term = CreateSymbolicReferenceTerm(resourceSymbol, currentState);
+            return HasDisposedResourceFactForTermBefore(
+                term,
+                currentState,
+                observationSyntax.SpanStart,
+                new HashSet<SymbolicTerm>());
+        }
+
         internal static bool TryCreateUseAfterDisposeEvidence(
             IOperation useOperation,
             IOperation? resourceOperation,
@@ -5654,7 +5730,7 @@ namespace PurelySharp.Analyzer.Engine
             if (!IsParameterlessDisposeInvocation(invocationOperation) ||
                 invocationOperation.Instance == null ||
                 TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
-                (!HasDisposedResourceFact(currentState, resourceSymbol) &&
+                (!HasDisposedResourceFactBefore(currentState, resourceSymbol, invocationOperation.Syntax) &&
                  !WasResourceDisposedByEarlierUsingStatement(
                      resourceSymbol,
                      invocationOperation.Syntax,
@@ -5951,6 +6027,44 @@ namespace PurelySharp.Analyzer.Engine
             foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
             {
                 if (HasDisposedResourceFactForTerm(aliasTerm, currentState, visitedTerms))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDisposedResourceFactForTermBefore(
+            SymbolicTerm resourceTerm,
+            PurityAnalysisState currentState,
+            int observationSpanStart,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (!visitedTerms.Add(resourceTerm))
+            {
+                return false;
+            }
+
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (fact.Polarity &&
+                    fact.Confidence == SymbolicFactConfidence.Exact &&
+                    fact.SourceSpan.Start < observationSpanStart &&
+                    fact.Atom is SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal &&
+                    Equals(disposal.Resource, resourceTerm))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
+            {
+                if (HasDisposedResourceFactForTermBefore(
+                        aliasTerm,
+                        currentState,
+                        observationSpanStart,
+                        visitedTerms))
                 {
                     return true;
                 }

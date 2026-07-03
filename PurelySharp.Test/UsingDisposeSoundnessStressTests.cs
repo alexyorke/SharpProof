@@ -548,6 +548,40 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task FinallyDisposeSatisfiesOwnedLocalDisposal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var resource = new PureDisposable();
+        try
+        {
+        }
+        finally
+        {
+            resource.Dispose();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task UseAfterConditionalDisposeBothBranches_Diagnostic()
         {
             var test = @"
