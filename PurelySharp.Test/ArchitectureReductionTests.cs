@@ -538,6 +538,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicSourceQueryResultConstruction_UsesSinglePathStateBridge()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicSourceQueryService.cs"));
+
+            Assert.That(source, Does.Contain("private static SymbolicSourceQueryResult CreateSourceQueryResult("));
+            Assert.That(source.Split("new SymbolicSourceQueryResult(", StringSplitOptions.None).Length - 1, Is.EqualTo(1));
+            Assert.That(source, Does.Contain("SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions)"));
+            Assert.That(source, Does.Contain("SymbolicFactInfo.FromState(query.Analysis.PathState)"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UsesTranslatorShimForSpeculativeConditionProofs()
         {
             var repositoryRoot = FindRepositoryRoot();
