@@ -1,8 +1,9 @@
-# Rebrand PurelySharp Into An IR-Native Symbolic C# Analysis Platform
+# Make SharpProof An IR-Native Symbolic C# Analysis Platform
 
 ## Summary
 
-PurelySharp has outgrown a purity-only identity. The project direction is a
+SharpProof, formerly PurelySharp, has outgrown a purity-only identity. The
+project direction is a
 bounded symbolic C# analysis platform where purity diagnostics, runtime-hazard
 detection, invariant queries, ownership/resource facts, and effect-summary
 reasoning all use one shared path:
@@ -11,13 +12,13 @@ reasoning all use one shared path:
 Roslyn/C# -> Symbolic IR -> normalized facts/state -> proof service -> Z3-backed conclusions -> analyzer/API/CLI outputs
 ```
 
-The staged product direction is to keep the current `PurelySharp`
-compatibility identity while documenting a broader platform position.
-`SharpProof` is only a working codename until formal package, repository, and
-trademark clearance is complete.
+The staged product direction is to use SharpProof as the product-facing name
+while keeping the current `PurelySharp` compatibility identity until package,
+repository, and trademark clearance plus migration shims are complete.
 
 ## Current State
 
+- Product-facing name is SharpProof.
 - Compatibility package/API identity is still `PurelySharp`.
 - Main production modules are analyzer, symbolic library, solver backend,
   package/VSIX, attributes, code fixes, and tools.
@@ -37,7 +38,8 @@ trademark clearance is complete.
 - Do not rename projects, namespaces, package IDs, diagnostic IDs, analyzer
   config keys, attributes, additional-file names, or
   `*.PurelySharp.EffectSummary.json` conventions in this tranche.
-- Rebrand docs, package descriptions, tags, and repository metadata first.
+- Rebrand docs, package descriptions, tags, VSIX display metadata, and
+  repository metadata first.
 - Treat a future hard rename as a separate compatibility project with package
   forwarding, analyzerconfig aliases, migration docs, and deprecation policy.
 - Public users should see symbolic facts, proof outcomes, unknown reasons,
@@ -62,10 +64,10 @@ trademark clearance is complete.
 
 ### 1. Staged Rebrand
 
-- Update README, backlog, package descriptions, VSIX description, tags, and
-  repository metadata guidance to present PurelySharp as a bounded symbolic C#
-  analysis platform.
-- Keep `SharpProof` as a codename only until formal availability review.
+- Update README, backlog, package descriptions, VSIX display metadata, tags,
+  and repository metadata guidance to present SharpProof as a bounded symbolic
+  C# analysis platform.
+- Keep hard identity changes blocked until formal availability review.
 - Preserve all current compatibility identifiers.
 
 ### 2. Measurable Architecture
@@ -127,7 +129,8 @@ trademark clearance is complete.
 ## Assumptions
 
 - Staged rebrand is preferred over a hard rename.
-- `SharpProof` is a non-final codename.
+- SharpProof is the product-facing name, but hard package/namespace renames are
+  blocked until formal availability and migration work.
 - The platform remains bounded and conservative; it should not claim full
   execution prediction.
 - Code deletion is allowed only after shared IR/proof behavior is locked by

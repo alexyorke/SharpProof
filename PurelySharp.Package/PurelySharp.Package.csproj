@@ -17,10 +17,11 @@
     <RepositoryUrl>https://github.com/alexyorke/PurelySharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Description>Bounded symbolic C# analysis platform delivered as a Roslyn analyzer and code fix package for purity, side effects, invariants, runtime hazards, ownership facts, and Z3-backed proofs.</Description>
-    <PackageReleaseNotes>Position PurelySharp as a bounded symbolic C# analysis platform while preserving compatibility package IDs, diagnostics, attributes, config keys, and effect-summary conventions.</PackageReleaseNotes>
+    <Title>SharpProof</Title>
+    <Description>SharpProof bounded symbolic C# analysis platform delivered through the PurelySharp compatibility package for purity, side effects, invariants, runtime hazards, ownership facts, and Z3-backed proofs.</Description>
+    <PackageReleaseNotes>Rebrand product-facing documentation and package metadata to SharpProof while preserving PurelySharp compatibility package IDs, diagnostics, attributes, config keys, and effect-summary conventions.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>PurelySharp;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards</PackageTags>
+    <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <DevelopmentDependency>true</DevelopmentDependency>
     <NoPackageAnalysis>true</NoPackageAnalysis>

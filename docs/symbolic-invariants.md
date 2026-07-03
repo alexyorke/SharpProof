@@ -1,6 +1,8 @@
 # Symbolic Invariant Queries
 
-`PurelySharp.Symbolic` exposes a Roslyn-based invariant query surface that can be used without the analyzer package.
+SharpProof exposes a Roslyn-based invariant query surface through the current
+`PurelySharp.Symbolic` compatibility assembly. It can be used without the
+analyzer package.
 The API accepts a `SyntaxTree` plus `Compilation`, or raw source/file helpers that create a compilation from trusted platform references.
 
 The primary entrypoint is `SymbolicQueryService`:

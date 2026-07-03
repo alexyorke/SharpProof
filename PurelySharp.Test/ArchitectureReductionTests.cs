@@ -1153,18 +1153,25 @@ namespace PurelySharp.Test
             var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
 
             Assert.That(ReadProjectElement(packageMetadata, "PackageId"), Is.EqualTo("PurelySharp"));
-            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("Bounded symbolic C# analysis platform"));
+            Assert.That(ReadProjectElement(packageMetadata, "Title"), Is.EqualTo("SharpProof"));
+            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("SharpProof bounded symbolic C# analysis platform"));
+            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("PurelySharp compatibility package"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SharpProof"));
             Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
             Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("RuntimeHazards"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageId"), Is.EqualTo("PurelySharp.Attributes"));
-            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("compatibility attributes"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Title"), Is.EqualTo("SharpProof Attributes"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("SharpProof symbolic C# analysis"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SharpProof"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
-            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("PurelySharp"));
-            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("bounded symbolic C# analysis"));
+            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("SharpProof"));
+            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("SharpProof bounded symbolic C# analysis"));
             Assert.That(readme, Does.Contain("SharpProof"));
-            Assert.That(readme, Does.Contain("working codename"));
-            Assert.That(readme, Does.Contain("package, namespace, diagnostic, configuration, additional-file, and"));
-            Assert.That(readme, Does.Contain("summary-artifact identity remains `PurelySharp`"));
+            Assert.That(readme, Does.Contain("previously called PurelySharp"));
+            Assert.That(readme, Does.Contain("package, namespace,"));
+            Assert.That(readme, Does.Contain("diagnostic, configuration, additional-file, and summary-artifact identity"));
+            Assert.That(readme, Does.Contain("summary-artifact identity"));
+            Assert.That(readme, Does.Contain("remains `PurelySharp` for compatibility"));
         }
 
         [Test]

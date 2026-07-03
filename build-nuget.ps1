@@ -46,7 +46,7 @@ try {
 
 	if ($InstallProject) {
 		$projPath = Resolve-Path $InstallProject
-		Write-Host "Installing PurelySharp from local source into project: $projPath" -ForegroundColor Cyan
+		Write-Host "Installing SharpProof compatibility package from local source into project: $projPath" -ForegroundColor Cyan
 		# Install the main analyzer package (includes Attributes for NuGet consumption)
 		Invoke-DotnetInRepo @('add', "$projPath", 'package', 'PurelySharp', '--source', "$outFull")
 	}

@@ -1,8 +1,13 @@
 # Effect summary tooling
 
-`Tools/PurelySharp.EffectSummary` is the first step toward evidence-based BCL and framework purity summaries.
+SharpProof's compatibility tool `Tools/PurelySharp.EffectSummary` is the first
+step toward evidence-based BCL and framework purity summaries.
 
-The analyzer now regenerates its built-in effect-summary JSON into `obj` during build/test from `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json` and consumes those summaries only as embedded resources from the current build. Checked-in effect-summary JSON artifacts and the reviewed artifact spec are gone. Treat ad hoc outputs from this tool as disposable local calibration data.
+The analyzer now regenerates its built-in effect-summary JSON into `obj` during
+build/test from `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
+and consumes those summaries only as embedded resources from the current build.
+Checked-in effect-summary JSON artifacts and the reviewed artifact spec are
+gone. Treat ad hoc outputs from this tool as disposable local calibration data.
 
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,

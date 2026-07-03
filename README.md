@@ -1,10 +1,14 @@
-# PurelySharp - Bounded Symbolic C# Analysis with Z3 SMT
+# SharpProof - Bounded Symbolic C# Analysis with Z3 SMT
 
-PurelySharp is a conservative .NET static analysis tool and C# Roslyn analyzer
+SharpProof is a conservative .NET static analysis tool and C# Roslyn analyzer
 for bounded symbolic C# analysis. It includes method purity checking,
 side-effect detection, symbolic invariants, runtime-hazard and exception-flow
 checks, build-time generated effect-summary data, Z3/SMT reasoning, code
 fixes, attributes, and a standalone symbolic query library/CLI.
+
+SharpProof was previously called PurelySharp. The repository and current NuGet
+package identifiers still use `PurelySharp` for compatibility while the
+product-facing name moves to SharpProof.
 
 The analyzer does not execute user code and does not attempt an unbounded
 whole-program proof. When it cannot prove a fact within the implemented rules
@@ -13,7 +17,7 @@ marked pure, and SMT/exceptions fall back to unknown or no proof.
 
 ## Platform Direction
 
-PurelySharp is moving toward one bounded symbolic C# analysis platform, not a
+SharpProof is moving toward one bounded symbolic C# analysis platform, not a
 set of unrelated analyzer rules and not only a purity analyzer. Purity is one
 consumer of the shared platform. The intended spine is:
 
@@ -37,23 +41,22 @@ and method budgets, native-load fallback, and conservative unknown results.
 
 ## Naming Direction
 
-The current package, namespace, diagnostic, configuration, additional-file, and
-summary-artifact identity remains `PurelySharp` for compatibility. The project
-is being positioned as a symbolic analysis platform, and `SharpProof` is only a
-working codename for a possible future rebrand. It is not final: exact NuGet
-registration and the `SharpProof/SharpProof` GitHub repository were not found
-during the July 2026 check, but a similarly named public web presence exists,
-so formal package, repository, and trademark clearance is still required before
-any hard rename.
+The product-facing name is now SharpProof. The current package, namespace,
+diagnostic, configuration, additional-file, and summary-artifact identity
+remains `PurelySharp` for compatibility. Exact NuGet registration and the
+`SharpProof/SharpProof` GitHub repository were not found during the July 2026
+check, but a similarly named public web presence exists, so formal package,
+repository, and trademark clearance is still required before any hard rename of
+packages, namespaces, diagnostics, or file conventions.
 
 Suggested GitHub repository metadata for the current staged rebrand:
 
 - About: `Bounded symbolic C# analysis platform for purity, invariants, runtime hazards, ownership/resource facts, and Z3-backed proofs.`
-- Topics: `csharp`, `roslyn-analyzer`, `static-analysis`, `symbolic-execution`, `smt`, `z3`, `purity`, `runtime-hazards`, `invariants`, `dotnet`.
+- Topics: `csharp`, `roslyn-analyzer`, `static-analysis`, `symbolic-execution`, `smt`, `z3`, `purity`, `runtime-hazards`, `invariants`, `dotnet`, `sharpproof`.
 
 ## Current State
 
-- Current package metadata: `PurelySharp` `0.0.4` and
+- Current compatibility package metadata: `PurelySharp` `0.0.4` and
   `PurelySharp.Attributes` `0.0.4`.
 - Product positioning is broader than the compatibility package name: the
   analyzer is one delivery surface for the symbolic analysis platform.
@@ -149,7 +152,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](PurelySharp.Test/ConstantsTests.cs), [CryptographyTests.cs](PurelySharp.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL method, property, constructor, or field, `PS0002` carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `purelysharp_emit_explanations = true` or `purelysharp_report_bcl_fallback_guesses = true`, `PS0012` reports the same guess as an info diagnostic. The effect-summary tool can also emit a local `BclFallbackInventory` for SDK/runtime auditing. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [BclPurityFallbackClassifier.cs](PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
 | Full C# operation coverage | [~] | Every Roslyn operation kind should have an explicit coverage decision. Some shapes are intentionally conservative, including unsafe address capture, function pointer invocation, and custom interpolated-string-handler execution. | [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs) |
-| Whole-program execution prediction | [ ] | PurelySharp does not run or fully simulate arbitrary C# programs. It derives bounded facts from syntax, semantics, CFG/path facts, catalogs, summaries, and SMT. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
+| Whole-program execution prediction | [ ] | SharpProof does not run or fully simulate arbitrary C# programs. It derives bounded facts from syntax, semantics, CFG/path facts, catalogs, summaries, and SMT. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | Rust-style borrow checker | [ ] | A full borrow/resource ownership system is roadmap work. Current ownership handling is local, bounded, and purity-focused. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 
 ## Diagnostics
@@ -248,7 +251,8 @@ patterns, null checks, numeric comparisons, string predicates, and regex
 predicates. Larger conclusions are derived by formula lowering and Z3 rather
 than by hard-coding one method's control flow.
 
-`PurelySharp.Symbolic` exposes:
+SharpProof exposes symbolic queries through the current
+`PurelySharp.Symbolic` compatibility assembly:
 
 - `SymbolicQueryService.Query(SymbolicQueryRequest)` for point, position, line, span, line-span, all-lines, and node queries
 - `SymbolicSourceInput.FromFile`, `FromText`, `FromSyntaxTree`, and `FromNode`
@@ -308,7 +312,7 @@ is separate integration work.
 
 ## Effect Summaries
 
-PurelySharp still uses effect-summary JSON as data, but not as checked-in
+SharpProof still uses effect-summary JSON as data, but not as checked-in
 generated outputs.
 
 - The source manifest `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
@@ -329,7 +333,7 @@ fallback inventories. See
 
 ## Known Limitations
 
-- Purity for arbitrary C# is undecidable; PurelySharp is a bounded practical
+- Purity for arbitrary C# is undecidable; SharpProof is a bounded practical
   analyzer, not a proof assistant.
 - Unknown external calls remain conservative unless trusted by explicit
   attributes, configuration, catalogs, or validated summaries. BCL fallback

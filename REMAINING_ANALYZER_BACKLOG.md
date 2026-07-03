@@ -1,9 +1,9 @@
-# Remaining PurelySharp Symbolic Platform Backlog
+# Remaining SharpProof Symbolic Platform Backlog
 
 This is the single canonical backlog file for remaining symbolic platform and
-analyzer work. PurelySharp remains the compatibility identity, but the product
-direction is a bounded symbolic C# analysis platform where purity is one
-consumer of shared facts and proofs.
+analyzer work. SharpProof is the product-facing name. PurelySharp remains the
+compatibility identity, but the product direction is a bounded symbolic C#
+analysis platform where purity is one consumer of shared facts and proofs.
 
 Merged here and expected to stay deleted:
 
@@ -36,8 +36,10 @@ Not backlog files:
     implicit indexer reference
 - Last confirmed full `PurelySharp.Test` baseline: `2149/2149` green.
 - Staged rebrand direction:
+  - product-facing name is `SharpProof`
   - current compatibility identity remains `PurelySharp`
-  - `SharpProof` is only a working codename pending formal availability review
+  - hard package/namespace/file-convention renames wait for formal availability
+    review and migration shims
   - package IDs, namespaces, diagnostics, config keys, attributes, and
     additional-file conventions are intentionally unchanged in the current
     tranche

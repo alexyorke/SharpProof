@@ -12,10 +12,10 @@
     <PackageId>PurelySharp.Attributes</PackageId>
     <Version>0.0.4</Version> 
     <Authors>Alex Yorke</Authors>
-    <Description>Contains compatibility attributes for PurelySharp symbolic C# analysis, including EnforcePureAttribute, PureAttribute, PureExternalAttribute, ImpureAttribute, and AllowSynchronizationAttribute.</Description>
-    <PackageTags>PurelySharp;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis</PackageTags>
+    <Description>Contains compatibility attributes for SharpProof symbolic C# analysis, including EnforcePureAttribute, PureAttribute, PureExternalAttribute, ImpureAttribute, and AllowSynchronizationAttribute.</Description>
+    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Title>PurelySharp.Attributes</Title>
+    <Title>SharpProof Attributes</Title>
     <PackageProjectUrl>https://github.com/alexyorke/PurelySharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/alexyorke/PurelySharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
