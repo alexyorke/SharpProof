@@ -354,6 +354,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardSwitchExpressionNoMatch_PreservesIrExceptionPreconditionWhenLowerable()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateSwitchExpressionNoMatchCandidate"));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch"));
+            Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.switch-expression.no-match"));
+            Assert.That(source, Does.Contain("ExceptionTypes.SwitchExpressionException"));
+            Assert.That(source, Does.Contain("ExceptionCategories.DefiniteSwitchExpressionNoMatch"));
+        }
+
+        [Test]
         public void RuntimeHazardIrTriggerBridge_LivesInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();

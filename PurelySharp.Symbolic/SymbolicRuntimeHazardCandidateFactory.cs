@@ -1457,10 +1457,39 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 switchExpression,
                 SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-                trigger,
-                "System.Runtime.CompilerServices.SwitchExpressionException",
-                "definite_switch_expression_no_match");
+                CreateFormulaBackedExceptionPreconditionTrigger(
+                    switchExpression,
+                    SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+                    subject: null,
+                    trigger,
+                    "ir.runtime-hazard.switch-expression.no-match"),
+                ExceptionTypes.SwitchExpressionException,
+                ExceptionCategories.DefiniteSwitchExpressionNoMatch);
             return true;
+        }
+
+        private static RuntimeHazardTrigger CreateFormulaBackedExceptionPreconditionTrigger(
+            SyntaxNode site,
+            SymbolicExceptionPreconditionKind kind,
+            SymbolicTerm? subject,
+            SmtFormula triggerFormula,
+            string provenance)
+        {
+            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    triggerFormula,
+                    site,
+                    provenance + ".trigger",
+                    provenance + ".trigger",
+                    out var triggerCondition))
+            {
+                return new RuntimeHazardTrigger(triggerFormula);
+            }
+
+            var precondition = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
+                site,
+                provenance);
+            return new RuntimeHazardTrigger(triggerFormula, precondition);
         }
 
         private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
