@@ -380,10 +380,17 @@ namespace PurelySharp.Test
                 "Engine",
                 "Rules",
                 "MethodInvocationPurityRule.cs"));
+            var engineSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
 
             Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
             Assert.That(source, Does.Contain("TryCheckUseAfterDispose("));
             Assert.That(source, Does.Contain("HasDisposedResourceFact(currentState, resourceSymbol)"));
+            Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTerm("));
+            Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(resourceTerm, currentState)"));
             Assert.That(source, Does.Contain("\"resource_double_dispose\""));
             Assert.That(source, Does.Contain("\"resource_use_after_dispose\""));
             Assert.That(source, Does.Contain("\"symbolic_resource_lifetime\""));

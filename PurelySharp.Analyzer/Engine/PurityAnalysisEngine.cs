@@ -4933,12 +4933,36 @@ namespace PurelySharp.Analyzer.Engine
         internal static bool HasDisposedResourceFact(PurityAnalysisState currentState, ISymbol resourceSymbol)
         {
             var term = CreateSymbolicReferenceTerm(resourceSymbol, currentState);
+            return HasDisposedResourceFactForTerm(
+                term,
+                currentState,
+                new HashSet<SymbolicTerm>());
+        }
+
+        private static bool HasDisposedResourceFactForTerm(
+            SymbolicTerm resourceTerm,
+            PurityAnalysisState currentState,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (!visitedTerms.Add(resourceTerm))
+            {
+                return false;
+            }
+
             foreach (var fact in currentState.PathState.Facts)
             {
                 if (fact.Polarity &&
                     fact.Confidence == SymbolicFactConfidence.Exact &&
                     fact.Atom is SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal &&
-                    Equals(disposal.Resource, term))
+                    Equals(disposal.Resource, resourceTerm))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
+            {
+                if (HasDisposedResourceFactForTerm(aliasTerm, currentState, visitedTerms))
                 {
                     return true;
                 }
