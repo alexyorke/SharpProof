@@ -36,6 +36,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return argumentResult;
             }
 
+            if (!propertySymbol.IsStatic &&
+                propertyReferenceOperation.Instance != null &&
+                PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+                    propertyReferenceOperation,
+                    propertyReferenceOperation.Instance,
+                    propertySymbol.GetMethod is ISymbol getterSymbolForUseAfterDispose
+                        ? getterSymbolForUseAfterDispose
+                        : propertySymbol,
+                    currentState,
+                    nameof(PropertyReferencePurityRule),
+                    out var useAfterDisposeEvidence))
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property '{propertySymbol.Name}' reads a resource already marked disposed by symbolic ownership facts.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    propertyReferenceOperation.Syntax,
+                    useAfterDisposeEvidence);
+            }
+
             if (IsArrayLengthProperty(propertyReferenceOperation))
             {
                 PurityAnalysisEngine.LogDebug("    [PropRefRule] System.Array.Length is treated as a pure property read after its receiver is analyzed.");

@@ -67,6 +67,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         instanceResult.ImpureSyntaxNode ?? fieldReferenceOperation.Syntax,
                         instanceResult.Evidence);
                 }
+
+                if (PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+                        fieldReferenceOperation,
+                        fieldReferenceOperation.Instance,
+                        fieldSymbol,
+                        currentState,
+                        nameof(FieldReferencePurityRule),
+                        out var useAfterDisposeEvidence))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Field '{fieldSymbol.Name}' reads a resource already marked disposed by symbolic ownership facts.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        fieldReferenceOperation.Syntax,
+                        useAfterDisposeEvidence);
+                }
             }
 
 

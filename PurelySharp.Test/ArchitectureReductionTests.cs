@@ -516,7 +516,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
+        public void MemberAccessRules_UseSymbolicDisposalFactsForUseAfterDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -525,6 +525,18 @@ namespace PurelySharp.Test
                 "Engine",
                 "Rules",
                 "MethodInvocationPurityRule.cs"));
+            var propertySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "PropertyReferencePurityRule.cs"));
+            var fieldSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "FieldReferencePurityRule.cs"));
             var engineSource = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Analyzer",
@@ -533,12 +545,16 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
             Assert.That(source, Does.Contain("TryCheckUseAfterDispose("));
-            Assert.That(source, Does.Contain("HasDisposedResourceFact(currentState, resourceSymbol)"));
+            Assert.That(source, Does.Contain("TryCreateUseAfterDisposeEvidence("));
+            Assert.That(propertySource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
+            Assert.That(fieldSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
+            Assert.That(engineSource, Does.Contain("HasDisposedResourceFact(currentState, resourceSymbol)"));
             Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTerm("));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(resourceTerm, currentState)"));
+            Assert.That(engineSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
             Assert.That(source, Does.Contain("\"resource_double_dispose\""));
-            Assert.That(source, Does.Contain("\"resource_use_after_dispose\""));
-            Assert.That(source, Does.Contain("\"symbolic_resource_lifetime\""));
+            Assert.That(engineSource, Does.Contain("\"resource_use_after_dispose\""));
+            Assert.That(engineSource, Does.Contain("\"symbolic_resource_lifetime\""));
         }
 
         [Test]

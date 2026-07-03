@@ -1291,8 +1291,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invokedMethodSymbol.IsStatic ||
                 invocationOperation.Instance == null ||
                 invokedMethodSymbol.ContainingType?.SpecialType == SpecialType.System_Object ||
-                PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
-                !PurityAnalysisEngine.HasDisposedResourceFact(currentState, resourceSymbol))
+                !PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+                    invocationOperation,
+                    invocationOperation.Instance,
+                    invokedMethodSymbol,
+                    currentState,
+                    nameof(MethodInvocationPurityRule),
+                    out var evidence))
             {
                 return false;
             }
@@ -1300,12 +1305,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.LogDebug("  [MIR] Instance invocation uses a resource already marked disposed by symbolic ownership facts.");
             result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 invocationOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "resource_use_after_dispose",
-                    nameof(MethodInvocationPurityRule),
-                    invocationOperation,
-                    symbol: invokedMethodSymbol,
-                    catalogSource: "symbolic_resource_lifetime"));
+                evidence);
             return true;
         }
 

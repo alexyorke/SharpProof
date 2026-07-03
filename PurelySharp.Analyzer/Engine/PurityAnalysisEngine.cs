@@ -5111,6 +5111,31 @@ namespace PurelySharp.Analyzer.Engine
                 new HashSet<SymbolicTerm>());
         }
 
+        internal static bool TryCreateUseAfterDisposeEvidence(
+            IOperation useOperation,
+            IOperation? resourceOperation,
+            ISymbol usedMemberSymbol,
+            PurityAnalysisState currentState,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            evidence = PurityEvidence.None;
+            if (TryResolveTrackedSymbol(resourceOperation, currentState) is not { } resourceSymbol ||
+                !HasDisposedResourceFact(currentState, resourceSymbol))
+            {
+                return false;
+            }
+
+            evidence = PurityEvidence.Create(
+                "resource_use_after_dispose",
+                ruleName,
+                useOperation,
+                syntaxNode: useOperation.Syntax,
+                symbol: usedMemberSymbol,
+                catalogSource: "symbolic_resource_lifetime");
+            return true;
+        }
+
         private static bool HasDisposedResourceFactForTerm(
             SymbolicTerm resourceTerm,
             PurityAnalysisState currentState,
