@@ -1581,7 +1581,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_NegativeDividendDivision_ReturnsUnknown()
+        public void SmtSolver_NegativeDividendDivision_UsesCSharpTruncation()
         {
             using var solver = new SmtSolver();
             var dividend = new SmtVariable("dividend", SmtValueKind.Int);
@@ -1599,11 +1599,11 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
         }
 
         [Test]
-        public void SmtSolver_NegativeDividendRemainder_ReturnsUnknown()
+        public void SmtSolver_NegativeDividendRemainder_UsesCSharpSign()
         {
             using var solver = new SmtSolver();
             var dividend = new SmtVariable("dividend", SmtValueKind.Int);
@@ -1621,11 +1621,11 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
         }
 
         [Test]
-        public void SmtSolver_NegativeDivisorDivision_ReturnsUnknown()
+        public void SmtSolver_NegativeDivisorDivision_UsesCSharpTruncation()
         {
             using var solver = new SmtSolver();
             var divisor = new SmtVariable("divisor", SmtValueKind.Int);
@@ -1643,7 +1643,7 @@ namespace PurelySharp.Test
                 },
                 TimeSpan.FromMilliseconds(50));
 
-            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
         }
 
         [Test]

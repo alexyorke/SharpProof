@@ -3118,8 +3118,7 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 if (expression is CheckedExpressionSyntax checkedExpression &&
-                    (checkedExpression.IsKind(SyntaxKind.CheckedExpression) ||
-                     checkedExpression.IsKind(SyntaxKind.UncheckedExpression)))
+                    checkedExpression.IsKind(SyntaxKind.CheckedExpression))
                 {
                     expression = checkedExpression.Expression;
                     continue;

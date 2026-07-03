@@ -651,7 +651,7 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken)
         {
             var method = invocationOperation.TargetMethod;
-            if (method.Name != "IndexOf" ||
+            if (!IsSupportedStringIndexSearchMethodName(method.Name) ||
                 method.ReturnType.SpecialType != SpecialType.System_Int32 ||
                 method.ContainingType?.SpecialType != SpecialType.System_String ||
                 method.IsStatic ||
@@ -686,7 +686,7 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken)
         {
             var method = invocationOperation.TargetMethod;
-            if (method.Name != "IndexOf" ||
+            if (!IsSupportedStringIndexSearchMethodName(method.Name) ||
                 method.ReturnType.SpecialType != SpecialType.System_Int32 ||
                 method.ContainingType?.SpecialType != SpecialType.System_String ||
                 method.IsStatic ||
@@ -700,6 +700,11 @@ namespace PurelySharp.Symbolic.Smt
 
             var firstParameter = method.Parameters[0];
             return firstParameter.Type.SpecialType is SpecialType.System_Char or SpecialType.System_String;
+        }
+
+        private static bool IsSupportedStringIndexSearchMethodName(string methodName)
+        {
+            return methodName is "IndexOf" or "LastIndexOf";
         }
 
         private static bool TryClassifyStringIndexOfComparison(

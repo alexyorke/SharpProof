@@ -160,10 +160,41 @@ namespace SearchLib.Smt
                 SmtIntegerBinaryOperator.Add => _context.MkAdd(EncodeInteger(term.Left), EncodeInteger(term.Right)),
                 SmtIntegerBinaryOperator.Subtract => _context.MkSub(EncodeInteger(term.Left), EncodeInteger(term.Right)),
                 SmtIntegerBinaryOperator.Multiply => _context.MkMul(EncodeInteger(term.Left), EncodeInteger(term.Right)),
-                SmtIntegerBinaryOperator.Divide => _context.MkDiv(EncodeInteger(term.Left), EncodeInteger(term.Right)),
-                SmtIntegerBinaryOperator.Remainder => _context.MkRem((IntExpr)EncodeInteger(term.Left), (IntExpr)EncodeInteger(term.Right)),
+                SmtIntegerBinaryOperator.Divide => EncodeCSharpIntegerDivide(term),
+                SmtIntegerBinaryOperator.Remainder => EncodeCSharpIntegerRemainder(term),
                 _ => throw new InvalidOperationException("Unsupported SMT integer binary operator."),
             };
+        }
+
+        private ArithExpr EncodeCSharpIntegerDivide(SmtIntegerBinaryTerm term)
+        {
+            var left = EncodeInteger(term.Left);
+            var right = EncodeInteger(term.Right);
+            return EncodeCSharpIntegerDivide(left, right);
+        }
+
+        private ArithExpr EncodeCSharpIntegerRemainder(SmtIntegerBinaryTerm term)
+        {
+            var left = EncodeInteger(term.Left);
+            var right = EncodeInteger(term.Right);
+            var quotient = EncodeCSharpIntegerDivide(left, right);
+            return _context.MkSub(left, _context.MkMul(quotient, right));
+        }
+
+        private ArithExpr EncodeCSharpIntegerDivide(ArithExpr left, ArithExpr right)
+        {
+            var zero = _context.MkInt(0);
+            var leftAbs = (ArithExpr)_context.MkITE(
+                _context.MkGe(left, zero),
+                left,
+                _context.MkUnaryMinus(left));
+            var rightAbs = (ArithExpr)_context.MkITE(
+                _context.MkGe(right, zero),
+                right,
+                _context.MkUnaryMinus(right));
+            var magnitude = _context.MkDiv(leftAbs, rightAbs);
+            var signsDiffer = _context.MkXor(_context.MkLt(left, zero), _context.MkLt(right, zero));
+            return (ArithExpr)_context.MkITE(signsDiffer, _context.MkUnaryMinus(magnitude), magnitude);
         }
 
         private Expr EncodeConditional(SmtConditionalFormula formula)

@@ -6996,6 +6996,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_UncheckedAdditionWraparoundRemainsReachable()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "unchecked(value + 1) <= value && value == int.MaxValue"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UncheckedSubtractionWraparoundRemainsReachable()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "unchecked(value - 1) >= value && value == int.MinValue"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UncheckedMultiplicationWraparoundRemainsReachable()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "unchecked(value * 2) == 0 && value == 1073741824"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_GuardedDivisionContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -7816,6 +7840,44 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     "text.IndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLastIndexOfCharFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.LastIndexOf('Z') >= 0 && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLastIndexOfOrdinalNotFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.LastIndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLastIndexOfDefaultStringSearchRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.LastIndexOf(\"a\") >= 0 && text == \"A\""),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLastIndexOfOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.LastIndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"",
                     "using System;"),
                 Is.True);
         }
