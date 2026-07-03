@@ -4321,9 +4321,7 @@ namespace PurelySharp.Analyzer.Engine
                 return nextState;
             }
 
-            var term = new SymbolicVariableTerm(
-                GetSmtVariableName(resourceSymbol, nextState.GetSmtSymbolVersion),
-                SmtValueKind.Reference);
+            var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
             var disposedFact = SymbolicOwnershipFactFactory.CreateDisposal(
                 term,
                 SymbolicDisposalState.Disposed,
@@ -4344,12 +4342,36 @@ namespace PurelySharp.Analyzer.Engine
                 nextState.PathState.AddFact(disposedFact).AddFact(releasedFact));
         }
 
-        private static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
+        internal static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
         {
             var targetMethod = invocationOperation.TargetMethod?.ReducedFrom ?? invocationOperation.TargetMethod;
             return targetMethod != null &&
                    targetMethod.Parameters.Length == 0 &&
                    targetMethod.Name is nameof(IDisposable.Dispose) or "DisposeAsync";
+        }
+
+        internal static bool HasDisposedResourceFact(PurityAnalysisState currentState, ISymbol resourceSymbol)
+        {
+            var term = CreateSymbolicReferenceTerm(resourceSymbol, currentState);
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (fact.Polarity &&
+                    fact.Confidence == SymbolicFactConfidence.Exact &&
+                    fact.Atom is SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal &&
+                    Equals(disposal.Resource, term))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static SymbolicVariableTerm CreateSymbolicReferenceTerm(ISymbol symbol, PurityAnalysisState currentState)
+        {
+            return new SymbolicVariableTerm(
+                GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
+                SmtValueKind.Reference);
         }
 
         private static PurityAnalysisState AddAssignedValueFact(

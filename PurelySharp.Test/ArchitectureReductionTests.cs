@@ -175,6 +175,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "MethodInvocationPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
+            Assert.That(source, Does.Contain("HasDisposedResourceFact(currentState, resourceSymbol)"));
+            Assert.That(source, Does.Contain("\"resource_double_dispose\""));
+            Assert.That(source, Does.Contain("\"symbolic_resource_lifetime\""));
+        }
+
+        [Test]
         public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
         {
             var repositoryRoot = FindRepositoryRoot();

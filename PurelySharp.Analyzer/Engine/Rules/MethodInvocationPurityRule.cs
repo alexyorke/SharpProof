@@ -44,6 +44,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     nameof(MethodInvocationPurityRule));
             }
 
+            if (TryCheckDoubleDispose(invocationOperation, invokedMethodSymbol, currentState, out var doubleDisposeResult))
+            {
+                return doubleDisposeResult;
+            }
+
             if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
             {
                 return earlyTypeEqualityResult;
@@ -1241,6 +1246,33 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return methodSymbol.Name == "CreateRange" &&
                 methodSymbol.ContainingType?.OriginalDefinition.Name == "ImmutableHashSet" &&
                 methodSymbol.ContainingType?.ContainingNamespace.ToDisplayString() == "System.Collections.Immutable";
+        }
+
+        private static bool TryCheckDoubleDispose(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol invokedMethodSymbol,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            if (!PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
+                invocationOperation.Instance == null ||
+                PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
+                !PurityAnalysisEngine.HasDisposedResourceFact(currentState, resourceSymbol))
+            {
+                return false;
+            }
+
+            PurityAnalysisEngine.LogDebug("  [MIR] Dispose invoked on a resource already marked disposed by symbolic ownership facts.");
+            result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                invocationOperation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "resource_double_dispose",
+                    nameof(MethodInvocationPurityRule),
+                    invocationOperation,
+                    symbol: invokedMethodSymbol,
+                    catalogSource: "symbolic_resource_lifetime"));
+            return true;
         }
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(
