@@ -322,6 +322,69 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            return TryTranslateRegexMatchInvocation(
+                invocationExpression,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateRegexMatchSuccessProperty(
+            MemberAccessExpressionSyntax memberAccessExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (memberAccessExpression.Name.Identifier.ValueText != "Success" ||
+                semanticModel.GetOperation(memberAccessExpression, cancellationToken) is not IPropertyReferenceOperation
+                {
+                    Property:
+                    {
+                        Name: "Success",
+                        Type.SpecialType: SpecialType.System_Boolean
+                    } property
+                } ||
+                !IsRegexMatchSuccessProperty(property) ||
+                UnwrapExpression(memberAccessExpression.Expression) is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "Match" ||
+                !IsRegexType(method.ContainingType))
+            {
+                return false;
+            }
+
+            return TryTranslateRegexMatchInvocation(
+                invocationExpression,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateRegexMatchInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            var method = invocationOperation.TargetMethod;
             ExpressionSyntax? inputExpression = null;
             string? pattern = null;
             RegexOptions options = RegexOptions.None;
@@ -800,6 +863,12 @@ namespace PurelySharp.Symbolic.Smt
         private static bool IsRegexType(INamedTypeSymbol? type)
         {
             return type?.ToDisplayString() == "System.Text.RegularExpressions.Regex";
+        }
+
+        private static bool IsRegexMatchSuccessProperty(IPropertySymbol property)
+        {
+            var containingTypeName = property.ContainingType?.ToDisplayString();
+            return containingTypeName is "System.Text.RegularExpressions.Group" or "System.Text.RegularExpressions.Match";
         }
 
         private static bool TryGetRegexPatternFromReceiver(

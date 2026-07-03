@@ -1554,6 +1554,32 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsRegexMatchSuccessReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (Regex.Match(input, ""^[A-Z][0-9]$"").Success)
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsLocalRegexReachabilityFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -7501,6 +7527,28 @@ public static class UnknownFallback
                 IsConditionAlwaysFalse(
                     "string text",
                     @"Regex.IsMatch(text, @""\AAB\z"") && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_RegexMatchSuccessImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.Match(text, @""\A[A-Z][0-9]\z"").Success && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceRegexMatchSuccessImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\A[A-Z][0-9]\z"").Match(text).Success && text.Length != 2",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }

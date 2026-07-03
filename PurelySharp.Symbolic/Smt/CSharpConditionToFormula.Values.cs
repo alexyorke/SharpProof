@@ -724,6 +724,18 @@ namespace PurelySharp.Symbolic.Smt
                 return formula != null;
             }
 
+            if (expression is MemberAccessExpressionSyntax memberAccessExpression &&
+                TryTranslateRegexMatchSuccessProperty(
+                    memberAccessExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return formula != null;
+            }
+
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&

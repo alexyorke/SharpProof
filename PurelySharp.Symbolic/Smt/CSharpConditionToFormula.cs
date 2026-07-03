@@ -251,6 +251,20 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is MemberAccessExpressionSyntax memberAccessExpression &&
+                TryTranslateRegexMatchSuccessProperty(
+                    memberAccessExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var regexMatchSuccessFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                regexMatchSuccessFormula != null)
+            {
+                formula = regexMatchSuccessFormula;
+                return true;
+            }
+
             if (TryTranslateValue(expression, semanticModel, cancellationToken, out var directValue, getSymbolVersion, inlineDepth) &&
                 directValue is { Kind: SmtValueKind.Bool })
             {
