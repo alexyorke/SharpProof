@@ -28,7 +28,7 @@ namespace PurelySharp.Symbolic
             return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
         }
 
-        public bool TryEncode(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
+        internal bool TryEncode(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
         {
             return TryEncodeState(state, out pathConditions, out _);
         }

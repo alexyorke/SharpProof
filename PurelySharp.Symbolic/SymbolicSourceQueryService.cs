@@ -6829,7 +6829,7 @@ namespace PurelySharp.Symbolic
 
     internal static class SymbolicFormulaDisplay
     {
-        public static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
+        internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
         {
             if (pathConditions == null)
             {

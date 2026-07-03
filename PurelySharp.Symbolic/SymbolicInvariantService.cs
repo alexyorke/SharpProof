@@ -322,7 +322,7 @@ namespace PurelySharp.Symbolic
 
         public IReadOnlyList<string> Facts { get; }
 
-        public SmtFormula MergedInvariant { get; }
+        internal SmtFormula MergedInvariant { get; }
 
         public string MergedInvariantText { get; }
     }
@@ -398,13 +398,13 @@ namespace PurelySharp.Symbolic
 
         public int SpanStart { get; }
 
-        public IReadOnlyList<SmtFormula> PathConditions { get; }
+        internal IReadOnlyList<SmtFormula> PathConditions { get; }
 
         public SymbolicState PathState { get; }
 
         public IReadOnlyList<string> Facts { get; }
 
-        public SmtFormula MergedInvariant { get; }
+        internal SmtFormula MergedInvariant { get; }
 
         public string MergedInvariantText { get; }
 
