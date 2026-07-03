@@ -611,6 +611,74 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void OwnershipFactFactory_CreatesConsistentFreshOwnedResourceFacts()
+        {
+            var value = new SymbolicVariableTerm("value#1", SmtValueKind.Reference);
+            var syntax = SyntaxFactory.ParseExpression("new MutableResource()");
+
+            var facts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+                value,
+                syntax,
+                "test.ownership",
+                evidenceKey: "evidence.ownership");
+
+            Assert.That(facts, Has.Length.EqualTo(3));
+            Assert.That(facts[0].Atom, Is.EqualTo(new SymbolicFreshnessAtom(value)));
+            Assert.That(facts[1].Atom, Is.EqualTo(new SymbolicOwnershipAtom(value, Escaped: false)));
+            Assert.That(facts[2].Atom, Is.EqualTo(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned)));
+            Assert.That(facts.Select(static fact => fact.Provenance), Is.EqualTo(new[]
+            {
+                "test.ownership.fresh",
+                "test.ownership.owned",
+                "test.ownership.lifetime",
+            }));
+            Assert.That(facts.All(static fact => fact.Confidence == SymbolicFactConfidence.Exact), Is.True);
+            Assert.That(facts.All(static fact => fact.EvidenceKey == "evidence.ownership"), Is.True);
+        }
+
+        [Test]
+        public void OwnershipFactFactory_CreatesAliasBorrowEscapeMutationAndDisposalFacts()
+        {
+            var owner = new SymbolicVariableTerm("owner#1", SmtValueKind.Reference);
+            var alias = new SymbolicVariableTerm("alias#1", SmtValueKind.Reference);
+            var syntax = SyntaxFactory.ParseExpression("owner");
+            var facts = new[]
+            {
+                SymbolicOwnershipFactFactory.CreateAlias(owner, alias, mayAlias: true, syntax, "test.alias"),
+                SymbolicOwnershipFactFactory.CreateBorrow(owner, alias, SymbolicBorrowKind.Mutable, syntax, "test.borrow"),
+                SymbolicOwnershipFactFactory.CreateEscape(owner, SymbolicEscapeKind.Argument, syntax, "test.escape"),
+                SymbolicOwnershipFactFactory.CreateReturnedOwnership(owner, syntax, "test.returned"),
+                SymbolicOwnershipFactFactory.CreateMutation(owner, callerVisible: true, syntax, "test.mutation"),
+                SymbolicOwnershipFactFactory.CreateDisposal(owner, SymbolicDisposalState.MaybeDisposed, syntax, "test.disposal"),
+                SymbolicOwnershipFactFactory.CreateResourceLifetime(owner, SymbolicResourceLifetimeState.Escaped, syntax, "test.lifetime"),
+            };
+            var state = new SymbolicState(facts);
+            var infos = SymbolicFactInfo.FromState(state);
+
+            Assert.That(infos.Select(static info => info.Kind), Is.EqualTo(new[]
+            {
+                nameof(SymbolicAliasAtom),
+                nameof(SymbolicBorrowAtom),
+                nameof(SymbolicEscapeAtom),
+                nameof(SymbolicReturnedOwnershipAtom),
+                nameof(SymbolicMutationAtom),
+                nameof(SymbolicDisposalAtom),
+                nameof(SymbolicResourceLifetimeAtom),
+            }));
+            Assert.That(infos.Select(static info => info.Provenance), Is.EqualTo(new[]
+            {
+                "test.alias",
+                "test.borrow",
+                "test.escape",
+                "test.returned",
+                "test.mutation",
+                "test.disposal",
+                "test.lifetime",
+            }));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(facts[5], out _), Is.False);
+        }
+
+        [Test]
         public void SmtFormulaLowerer_LengthLowerBoundUsesSharedLengthAtom()
         {
             var sourceNode = SyntaxFactory.ParseExpression("items");
