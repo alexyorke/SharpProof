@@ -388,10 +388,9 @@ namespace PurelySharp.Test
 
             Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForLocal("));
             Assert.That(engineSource, Does.Contain("HasSymbolicBorrowFactForTerm("));
-            Assert.That(engineSource, Does.Contain("HasSymbolicMutableBorrowerFactForSymbol("));
-            Assert.That(engineSource, Does.Contain("HasSymbolicMutableBorrowerFactForTerm("));
+            Assert.That(engineSource, Does.Contain("HasSymbolicBorrowerFactForSymbol("));
+            Assert.That(engineSource, Does.Contain("HasSymbolicBorrowerFactForTerm("));
             Assert.That(engineSource, Does.Contain("SymbolicBorrowAtom borrow"));
-            Assert.That(engineSource, Does.Contain("SymbolicBorrowAtom { Kind: SymbolicBorrowKind.Mutable } borrow"));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(localTerm, currentState)"));
             Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(ownerTerm, currentState)"));
             Assert.That(engineSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));

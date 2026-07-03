@@ -6169,12 +6169,12 @@ namespace PurelySharp.Analyzer.Engine
                 new HashSet<SymbolicTerm>());
         }
 
-        internal static bool HasSymbolicMutableBorrowerFactForSymbol(
+        internal static bool HasSymbolicBorrowerFactForSymbol(
             ISymbol ownerSymbol,
             PurityAnalysisState currentState)
         {
             var ownerTerm = CreateSymbolicReferenceTerm(ownerSymbol, currentState);
-            return HasSymbolicMutableBorrowerFactForTerm(
+            return HasSymbolicBorrowerFactForTerm(
                 ownerTerm,
                 currentState,
                 new HashSet<SymbolicTerm>());
@@ -6189,7 +6189,7 @@ namespace PurelySharp.Analyzer.Engine
         {
             evidence = PurityEvidence.None;
             if (targetSymbol == null ||
-                !HasSymbolicMutableBorrowerFactForSymbol(targetSymbol, currentState))
+                !HasSymbolicBorrowerFactForSymbol(targetSymbol, currentState))
             {
                 return false;
             }
@@ -6315,7 +6315,7 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
-        private static bool HasSymbolicMutableBorrowerFactForTerm(
+        private static bool HasSymbolicBorrowerFactForTerm(
             SymbolicTerm ownerTerm,
             PurityAnalysisState currentState,
             HashSet<SymbolicTerm> visitedTerms)
@@ -6329,7 +6329,7 @@ namespace PurelySharp.Analyzer.Engine
             {
                 if (fact.Polarity &&
                     fact.Confidence == SymbolicFactConfidence.Exact &&
-                    fact.Atom is SymbolicBorrowAtom { Kind: SymbolicBorrowKind.Mutable } borrow &&
+                    fact.Atom is SymbolicBorrowAtom borrow &&
                     Equals(borrow.Owner, ownerTerm))
                 {
                     return true;
@@ -6338,7 +6338,7 @@ namespace PurelySharp.Analyzer.Engine
 
             foreach (var aliasTerm in EnumerateSymbolicAliasTerms(ownerTerm, currentState))
             {
-                if (HasSymbolicMutableBorrowerFactForTerm(aliasTerm, currentState, visitedTerms))
+                if (HasSymbolicBorrowerFactForTerm(aliasTerm, currentState, visitedTerms))
                 {
                     return true;
                 }
