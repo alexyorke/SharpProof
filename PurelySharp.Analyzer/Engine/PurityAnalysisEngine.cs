@@ -1316,7 +1316,12 @@ namespace PurelySharp.Analyzer.Engine
                                             .FirstOrDefault(n => n is Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax ins && ins.Identifier.ValueText == methodSymbol.Name)
                                             ?.Parent;
 
-                    purityCache[methodSymbol] = ImpureResult(locationSyntax ?? bodySyntaxNode);
+                    var escapeSyntax = locationSyntax ?? bodySyntaxNode;
+                    purityCache[methodSymbol] = escapeSyntax == null
+                        ? ImpureResult(bodySyntaxNode)
+                        : PurityAnalysisResult.Impure(
+                            escapeSyntax,
+                            CreateByRefReturnEscapeEvidence(methodSymbol, escapeSyntax));
                     LogDebug($"{indent}<< Exit DeterminePurity (ReturnsByRef): {methodSymbol.ToDisplayString()}");
                     return purityCache[methodSymbol];
                 }
@@ -4882,6 +4887,32 @@ namespace PurelySharp.Analyzer.Engine
                     ? escapeFact.Provenance
                     : fallbackCatalogSource);
             return true;
+        }
+
+        private static PurityEvidence CreateByRefReturnEscapeEvidence(
+            IMethodSymbol methodSymbol,
+            SyntaxNode escapeSyntax)
+        {
+            var escapeTerm = new SymbolicVariableTerm(
+                methodSymbol.ToDisplayString(_signatureFormat),
+                SmtValueKind.Reference);
+            var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
+                escapeTerm,
+                SymbolicEscapeKind.Return,
+                escapeSyntax,
+                "analyzer.escape.return.byref",
+                methodSymbol,
+                "evidence.escape.return.byref");
+
+            var catalogSource = escapeFact.Atom is SymbolicEscapeAtom { Kind: SymbolicEscapeKind.Return }
+                ? escapeFact.Provenance
+                : "return_by_ref";
+            return PurityEvidence.Create(
+                "mutable_state_escape",
+                ruleName: "ReturnByRefAnalysis",
+                syntaxNode: escapeSyntax,
+                symbol: methodSymbol,
+                catalogSource: catalogSource);
         }
 
         internal static bool TryCreateCallerVisibleMutationTerm(

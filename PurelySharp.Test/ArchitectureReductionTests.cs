@@ -368,6 +368,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerByRefReturns_UseSymbolicEscapeEvidence()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("CreateByRefReturnEscapeEvidence("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateEscape("));
+            Assert.That(source, Does.Contain("\"analyzer.escape.return.byref\""));
+            Assert.That(source, Does.Contain("\"evidence.escape.return.byref\""));
+        }
+
+        [Test]
         public void AssignmentRule_ConsumesSymbolicMutationEvidenceForCallerVisibleWrites()
         {
             var repositoryRoot = FindRepositoryRoot();

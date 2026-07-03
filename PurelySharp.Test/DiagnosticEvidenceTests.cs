@@ -11675,6 +11675,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ByRefReturn_IncludesSymbolicEscapeEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private int _value;
+
+    [EnforcePure]
+    public ref int GetValue()
+    {
+        return ref _value;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("mutable_state_escape"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ReturnByRefAnalysis"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("analyzer.escape.return.byref"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("TestClass.GetValue"));
+        }
+
+        [Test]
         public async Task Ps0002_AssignmentRhsImpurity_PreservesOriginalEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
