@@ -7557,13 +7557,13 @@ namespace PurelySharp.Symbolic
 
         public SymbolicProgramPointAnalysis Analysis { get; }
 
-        public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions;
+        internal IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions;
 
         public IReadOnlyList<string> Facts => Analysis.Facts;
 
         public IReadOnlyList<SymbolicFactInfo> SymbolicFacts => SymbolicFactInfo.FromState(Analysis.PathState);
 
-        public SmtFormula MergedInvariant => Analysis.MergedInvariant;
+        internal SmtFormula MergedInvariant => Analysis.MergedInvariant;
 
         public string MergedInvariantText => Analysis.MergedInvariantText;
 

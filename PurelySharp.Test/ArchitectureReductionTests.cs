@@ -445,6 +445,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ProgramPointQueryResult_DoesNotPubliclyExposeRawFormulaAccessors()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicSourceQueryService.cs"));
+
+            Assert.That(source, Does.Not.Contain("public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
+            Assert.That(source, Does.Not.Contain("public SmtFormula MergedInvariant => Analysis.MergedInvariant"));
+            Assert.That(source, Does.Contain("internal IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
+            Assert.That(source, Does.Contain("internal SmtFormula MergedInvariant => Analysis.MergedInvariant"));
+        }
+
+        [Test]
         public void SymbolicCleanBreakDtos_DoNotExposeSmtFormula()
         {
             var dtoTypes = new[]
