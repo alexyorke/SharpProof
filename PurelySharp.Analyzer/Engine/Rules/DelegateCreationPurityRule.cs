@@ -542,7 +542,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryFindCapturedFreshMutableObject(
+        internal static bool TryFindCapturedFreshMutableObject(
             IOperation anonymousFunctionOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
@@ -582,7 +582,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryFindLocalFunctionCapturedFreshMutableObject(
+        internal static bool TryFindLocalFunctionCapturedFreshMutableObject(
             IMethodSymbol methodSymbol,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
@@ -714,12 +714,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel)
         {
+            return HasStableFreshMutableObjectInitializer(
+                localSymbol,
+                delegateCreationSyntax,
+                semanticModel,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+        }
+
+        private static bool HasStableFreshMutableObjectInitializer(
+            ILocalSymbol localSymbol,
+            SyntaxNode delegateCreationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
                 .Select(reference => reference.GetSyntax())
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-            if (declaratorSyntax == null || initializerSyntax == null)
+            if (declaratorSyntax == null ||
+                initializerSyntax == null ||
+                !visitedLocals.Add(localSymbol))
             {
                 return false;
             }
@@ -730,8 +745,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
-            return initializerOperation is IObjectCreationOperation objectCreationOperation &&
-                   IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
+            if (initializerOperation is IObjectCreationOperation objectCreationOperation)
+            {
+                return IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
+            }
+
+            return initializerOperation is ILocalReferenceOperation aliasReference &&
+                   IsDeclaredOutsideSpan(aliasReference.Local, delegateCreationSyntax.Span) &&
+                   RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(aliasReference.Local.Type) &&
+                   HasStableFreshMutableObjectInitializer(
+                       aliasReference.Local,
+                       delegateCreationSyntax,
+                       semanticModel,
+                       visitedLocals);
         }
 
         private static bool HasAssignmentToLocalBetweenDeclarationAndEscape(

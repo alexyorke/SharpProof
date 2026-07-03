@@ -439,6 +439,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ReturnRule_DelegatesReturnedClosureFreshObjectCaptureToDelegateRule()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "Rules",
+                "ReturnStatementPurityRule.cs"));
+
+            Assert.That(source, Does.Contain("TryFindReturnedDelegateFreshMutableObjectCapture("));
+            Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindCapturedFreshMutableObject("));
+            Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindLocalFunctionCapturedFreshMutableObject("));
+            Assert.That(source, Does.Contain("\"escaping_closure_fresh_mutable_object_capture\""));
+        }
+
+        [Test]
         public void ReturnRule_ConsumesSymbolicEscapeEvidenceForMutableReturns()
         {
             var repositoryRoot = FindRepositoryRoot();

@@ -526,6 +526,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task LambdaCapturingFreshMutableObjectAliasAndEscaping_Diagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Counter
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var counter = new Counter();
+        var alias = counter;
+        return () => alias.Value;
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
         public async Task DelegateInvocation_ConstantConditionalDeadImpureTarget_NoDiagnostic()
         {
             var test = @"

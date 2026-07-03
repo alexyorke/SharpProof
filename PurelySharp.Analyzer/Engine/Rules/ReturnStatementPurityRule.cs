@@ -111,6 +111,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         "escaping_closure_owned_array_capture",
                         currentState);
                 }
+                else if (TryFindReturnedDelegateFreshMutableObjectCapture(
+                             sourceReturnedValue,
+                             context,
+                             currentState,
+                             out var objectDelegateCaptureSyntax,
+                             out var objectDelegateCapturedLocal))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned delegate captures fresh mutable object '{objectDelegateCapturedLocal.Name}'. Return statement is Impure.");
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
+                        objectDelegateCaptureSyntax,
+                        objectDelegateCapturedLocal,
+                        "escaping_closure_fresh_mutable_object_capture",
+                        currentState);
+                }
                 else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes read-only collection view over caller-owned array through '{readOnlyCollectionMethod.ToDisplayString()}'. Return statement is Impure.");
@@ -220,6 +235,55 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool TryFindReturnedDelegateFreshMutableObjectCapture(
+            IOperation? returnedValue,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            var delegateTarget = unwrappedReturnedValue is IDelegateCreationOperation delegateCreation
+                ? PurityAnalysisEngine.SkipImplicitConversions(delegateCreation.Target)
+                : unwrappedReturnedValue;
+
+            switch (delegateTarget)
+            {
+                case IAnonymousFunctionOperation anonymousFunction:
+                    return DelegateCreationPurityRule.TryFindCapturedFreshMutableObject(
+                        anonymousFunction,
+                        currentState,
+                        delegateTarget.Syntax,
+                        context.SemanticModel,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                case IFlowAnonymousFunctionOperation flowAnonymousFunction:
+                    return DelegateCreationPurityRule.TryFindCapturedFreshMutableObject(
+                        flowAnonymousFunction,
+                        currentState,
+                        delegateTarget.Syntax,
+                        context.SemanticModel,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                case IMethodReferenceOperation methodReference
+                    when methodReference.Method.MethodKind == MethodKind.LocalFunction:
+                    return DelegateCreationPurityRule.TryFindLocalFunctionCapturedFreshMutableObject(
+                        methodReference.Method,
+                        currentState,
+                        delegateTarget.Syntax,
+                        context,
+                        out captureSyntax,
+                        out capturedLocal);
+
+                default:
+                    captureSyntax = null!;
+                    capturedLocal = null!;
+                    return false;
+            }
         }
 
         private static bool TryFindReturnedDelegateOwnedLocalArrayCapture(
