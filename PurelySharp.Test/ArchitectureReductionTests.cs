@@ -389,8 +389,8 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
             Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
-            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(0));
+            Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(0));
         }
 
         [Test]
@@ -412,7 +412,7 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New public symbolic API surfaces must expose fact/proof DTOs instead of SmtFormula.");
-            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(0));
         }
 
         [Test]
@@ -440,10 +440,10 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New formula-shaped compatibility surfaces must expose SymbolicFactInfo, SymbolicInvariantInfo, or SymbolicProofInfo instead.");
-            Assert.That(surfaces, Has.Length.EqualTo(1));
+            Assert.That(surfaces, Is.Empty);
             Assert.That(categories, Does.Not.Contain("formula-metadata"));
             Assert.That(categories, Does.Not.Contain("merged-invariant"));
-            Assert.That(categories, Does.Contain("path-conditions"));
+            Assert.That(categories, Does.Not.Contain("path-conditions"));
         }
 
         [Test]
@@ -510,6 +510,26 @@ namespace PurelySharp.Test
                 offenders,
                 Is.Empty,
                 "Exported symbolic APIs should expose symbolic facts/proofs, not backend SmtFormula.");
+        }
+
+        [Test]
+        public void SmtAnalysisService_RawBackendQueryMethodsAreInternal()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Smt",
+                "SmtAnalysisService.cs"));
+
+            Assert.That(source, Does.Not.Contain("public PurityProofResult ClassifyPathFeasibility("));
+            Assert.That(source, Does.Not.Contain("public PurityProofResult ClassifyImplication("));
+            Assert.That(source, Does.Not.Contain("public bool PathConditionsImply("));
+            Assert.That(source, Does.Not.Contain("public PurityProofResult Classify(PurityProofQuery query)"));
+            Assert.That(source, Does.Contain("internal PurityProofResult ClassifyPathFeasibility("));
+            Assert.That(source, Does.Contain("internal PurityProofResult ClassifyImplication("));
+            Assert.That(source, Does.Contain("internal bool PathConditionsImply("));
+            Assert.That(source, Does.Contain("internal PurityProofResult Classify(PurityProofQuery query)"));
         }
 
         [Test]
@@ -910,20 +930,11 @@ namespace PurelySharp.Test
             "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
         };
 
-        private static readonly string[] ApprovedSymbolicPublicFormulaSurfaceFiles =
-        {
-            "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
-        };
+        private static readonly string[] ApprovedSymbolicPublicFormulaSurfaceFiles = Array.Empty<string>();
 
-        private static readonly string[] ApprovedSymbolicCompatibilitySurfaceFiles =
-        {
-            "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
-        };
+        private static readonly string[] ApprovedSymbolicCompatibilitySurfaceFiles = Array.Empty<string>();
 
-        private static readonly string[] AllowedExportedSmtFormulaTypes =
-        {
-            "PurelySharp.Symbolic.Smt.SmtAnalysisService",
-        };
+        private static readonly string[] AllowedExportedSmtFormulaTypes = Array.Empty<string>();
 
         private static bool PublicMemberReferencesSmtFormula(MemberInfo member)
         {
