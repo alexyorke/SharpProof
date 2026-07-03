@@ -657,6 +657,113 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        private static bool TryTranslateRegexMatchesCountComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (TryTranslateRegexMatchesCountComparisonOperand(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    binaryExpression.Kind(),
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            return TryTranslateRegexMatchesCountComparisonOperand(
+                binaryExpression.Right,
+                binaryExpression.Left,
+                ReverseComparisonKind(binaryExpression.Kind()),
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateRegexMatchesCountComparisonOperand(
+            ExpressionSyntax countExpression,
+            ExpressionSyntax constantExpression,
+            SyntaxKind comparisonKind,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateRegexMatchesAnyFormula(
+                    countExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var anyMatchFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                anyMatchFormula == null ||
+                !TryGetIntegralConstantValue(constantExpression, semanticModel, cancellationToken, out var constantValue) ||
+                !TryClassifyRegexMatchesCountComparison(comparisonKind, constantValue, out var hasAnyMatch))
+            {
+                return false;
+            }
+
+            formula = hasAnyMatch
+                ? anyMatchFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, anyMatchFormula);
+            return true;
+        }
+
+        private static bool TryTranslateRegexMatchesAnyFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            expression = UnwrapExpression(expression);
+            if (expression is not MemberAccessExpressionSyntax memberAccessExpression ||
+                memberAccessExpression.Name.Identifier.ValueText != "Count" ||
+                semanticModel.GetOperation(memberAccessExpression, cancellationToken) is not IPropertyReferenceOperation
+                {
+                    Property:
+                    {
+                        Name: "Count",
+                        Type.SpecialType: SpecialType.System_Int32
+                    } property
+                } ||
+                !IsRegexMatchCollectionType(property.ContainingType) ||
+                UnwrapExpression(memberAccessExpression.Expression) is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "Matches" ||
+                !IsRegexType(method.ContainingType))
+            {
+                return false;
+            }
+
+            return TryTranslateRegexMatchInvocation(
+                invocationExpression,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
         private static bool TryTranslateStringIndexOfComparisonOperand(
             ExpressionSyntax indexExpression,
             ExpressionSyntax constantExpression,
@@ -828,6 +935,31 @@ namespace PurelySharp.Symbolic.Smt
             }
         }
 
+        private static bool TryClassifyRegexMatchesCountComparison(
+            SyntaxKind comparisonKind,
+            long constantValue,
+            out bool hasAnyMatch)
+        {
+            hasAnyMatch = default;
+            switch (comparisonKind)
+            {
+                case SyntaxKind.EqualsExpression when constantValue == 0:
+                case SyntaxKind.LessThanExpression when constantValue == 1:
+                case SyntaxKind.LessThanOrEqualExpression when constantValue == 0:
+                    hasAnyMatch = false;
+                    return true;
+
+                case SyntaxKind.NotEqualsExpression when constantValue == 0:
+                case SyntaxKind.GreaterThanExpression when constantValue == 0:
+                case SyntaxKind.GreaterThanOrEqualExpression when constantValue == 1:
+                    hasAnyMatch = true;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         private static bool TryTranslateStringIsNullOrEmptyInvocation(
             IInvocationOperation invocationOperation,
             SemanticModel semanticModel,
@@ -869,6 +1001,11 @@ namespace PurelySharp.Symbolic.Smt
         {
             var containingTypeName = property.ContainingType?.ToDisplayString();
             return containingTypeName is "System.Text.RegularExpressions.Group" or "System.Text.RegularExpressions.Match";
+        }
+
+        private static bool IsRegexMatchCollectionType(INamedTypeSymbol? type)
+        {
+            return type?.ToDisplayString() == "System.Text.RegularExpressions.MatchCollection";
         }
 
         private static bool TryGetRegexPatternFromReceiver(

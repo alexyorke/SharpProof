@@ -1580,6 +1580,32 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsRegexMatchesCountReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (Regex.Matches(input, ""^[A-Z][0-9]$"").Count > 0)
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsLocalRegexReachabilityFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -7551,6 +7577,85 @@ public static class UnknownFallback
                     @"new Regex(@""\A[A-Z][0-9]\z"").Match(text).Success && text.Length != 2",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_RegexMatchesCountPositiveImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count > 0 && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_RegexMatchesCountZeroImpliesNonMatch()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.Matches(text, @""\AAB\z"").Count == 0 && text == ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ReversedRegexMatchesCountPositiveImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"1 <= Regex.Matches(text, @""\A[A-Z][0-9]\z"").Count && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceRegexMatchesCountPositiveImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\A[A-Z][0-9]\z"").Matches(text).Count != 0 && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalRegexMatchesCountPositiveImpliesStringLength()
+        {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        var regex = new Regex(@""\A[A-Z][0-9]\z"");
+        if (regex.Matches(text).Count >= 1 && text.Length != 2)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_RegexMatchesCountThresholdAboveOneRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.Matches(text, ""A"").Count > 1 && text == ""A""",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
         }
 
         [Test]

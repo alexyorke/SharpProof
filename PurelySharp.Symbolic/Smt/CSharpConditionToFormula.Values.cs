@@ -835,6 +835,19 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateRegexMatchesCountComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var regexMatchesCountComparison,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    regexMatchesCountComparison != null)
+                {
+                    formula = regexMatchesCountComparison;
+                    return true;
+                }
+
                 if (TryTranslateNotNullIfNotNullNullComparison(
                         binaryExpression,
                         semanticModel,
