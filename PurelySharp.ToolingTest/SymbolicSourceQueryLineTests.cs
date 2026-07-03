@@ -170,7 +170,6 @@ public class TestClass
             var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
             var returnProof = returnPoint.ConditionProofs.Single();
             Assert.That(returnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-            Assert.That(returnProof.HasSmtFormula, Is.True);
             Assert.That(returnProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
@@ -186,7 +185,6 @@ public class TestClass
             Assert.That(returnProof.NodeSpanStart, Is.EqualTo(returnPoint.NodeSpanStart));
             Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
             var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
-            Assert.That(aggregateProof.HasSmtFormula, Is.True);
             Assert.That(aggregateProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
             Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
@@ -501,7 +499,7 @@ public class TestClass
             Assert.That(
                 postLinePoint.Invariant.Conditions,
                 Has.Some.Matches<SymbolicInvariantCondition>(
-                    condition => condition.Target == "value" && condition.HasSmtFormula));
+                    condition => condition.Target == "value" && condition.IsSolverBacked));
         }
 
         [Test]

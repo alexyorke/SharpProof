@@ -533,6 +533,7 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Not.Contain("public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
             Assert.That(source, Does.Not.Contain("public SmtFormula MergedInvariant => Analysis.MergedInvariant"));
+            Assert.That(source, Does.Not.Contain("HasSmtFormula"));
             Assert.That(source, Does.Contain("internal IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
             Assert.That(source, Does.Contain("internal SmtFormula MergedInvariant => Analysis.MergedInvariant"));
         }

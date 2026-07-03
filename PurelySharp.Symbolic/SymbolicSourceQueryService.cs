@@ -2932,7 +2932,7 @@ namespace PurelySharp.Symbolic
             public void AddCondition(SymbolicInvariantCondition condition)
             {
                 _pathConditionCount++;
-                if (condition.HasSmtFormula)
+                if (condition.IsSolverBacked)
                 {
                     _smtConditionCount++;
                 }
@@ -6551,14 +6551,14 @@ namespace PurelySharp.Symbolic
             string? formulaKind = null,
             string? valueKind = null,
             string? formulaText = null,
-            bool hasSmtFormula = false)
+            bool isSolverBacked = false)
         {
             Condition = condition ?? throw new ArgumentNullException(nameof(condition));
             Target = target ?? string.Empty;
             FormulaKind = formulaKind ?? "Unknown";
             ValueKind = valueKind ?? "Unknown";
             FormulaText = string.IsNullOrWhiteSpace(formulaText) ? Condition : formulaText!;
-            HasSmtFormula = hasSmtFormula;
+            IsSolverBacked = isSolverBacked;
             DisplayKind = FormulaKind;
             UnknownCount = unknownCount;
             ProvenTrueCount = provenTrueCount;
@@ -6572,7 +6572,7 @@ namespace PurelySharp.Symbolic
             Summary = CreateSummary(Status);
             Proof = new SymbolicProofInfo(
                 MapProofStatus(Status),
-                ResolveProofBackend(Status, HasSmtFormula),
+                ResolveProofBackend(Status, IsSolverBacked),
                 ResolveUnknownReason(Status, Reasons),
                 Summary,
                 cacheHit: false,
@@ -6594,7 +6594,7 @@ namespace PurelySharp.Symbolic
 
         internal string FormulaText { get; }
 
-        internal bool HasSmtFormula { get; }
+        internal bool IsSolverBacked { get; }
 
         public int TotalCount { get; }
 
@@ -6668,7 +6668,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            var metadataProof = proofArray.FirstOrDefault(static proof => proof.HasSmtFormula) ??
+            var metadataProof = proofArray.FirstOrDefault(static proof => proof.IsSolverBacked) ??
                 proofArray.FirstOrDefault();
             return new SymbolicConditionProofSummary(
                 condition,
@@ -6691,7 +6691,7 @@ namespace PurelySharp.Symbolic
                 formulaKind: metadataProof?.FormulaKind,
                 valueKind: metadataProof?.ValueKind,
                 formulaText: metadataProof?.FormulaText,
-                hasSmtFormula: metadataProof?.HasSmtFormula ?? false);
+                isSolverBacked: metadataProof?.IsSolverBacked ?? false);
         }
 
         private static SymbolicConditionProofSummaryStatus ResolveStatus(
@@ -6762,9 +6762,9 @@ namespace PurelySharp.Symbolic
 
         private static SymbolicProofBackend ResolveProofBackend(
             SymbolicConditionProofSummaryStatus status,
-            bool hasSmtFormula)
+            bool isSolverBacked)
         {
-            if (hasSmtFormula)
+            if (isSolverBacked)
             {
                 return SymbolicProofBackend.Smt;
             }
@@ -7515,7 +7515,7 @@ namespace PurelySharp.Symbolic
             string text,
             string formulaKind,
             string valueKind,
-            bool hasSmtFormula,
+            bool isSolverBacked,
             string target,
             bool isConservativeUnknown)
         {
@@ -7523,9 +7523,8 @@ namespace PurelySharp.Symbolic
             Text = text ?? throw new ArgumentNullException(nameof(text));
             FormulaKind = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
             ValueKind = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
-            HasSmtFormula = hasSmtFormula;
+            IsSolverBacked = isSolverBacked;
             DisplayKind = FormulaKind;
-            IsSolverBacked = HasSmtFormula;
             Target = target ?? string.Empty;
             IsConservativeUnknown = isConservativeUnknown;
         }
@@ -7541,8 +7540,6 @@ namespace PurelySharp.Symbolic
         public bool IsSolverBacked { get; }
 
         internal string FormulaKind { get; }
-
-        internal bool HasSmtFormula { get; }
 
         public string Target { get; }
 
@@ -7560,7 +7557,7 @@ namespace PurelySharp.Symbolic
                 SymbolicFormulaDisplay.Format(formula),
                 GetFormulaKind(formula),
                 formula.Kind.ToString(),
-                hasSmtFormula: true,
+                isSolverBacked: true,
                 SymbolicFormulaDisplay.GetMergeTarget(formula),
                 isConservativeUnknown: false);
         }
@@ -7572,7 +7569,7 @@ namespace PurelySharp.Symbolic
                 text ?? string.Empty,
                 "Text",
                 "Unknown",
-                hasSmtFormula: false,
+                isSolverBacked: false,
                 text ?? string.Empty,
                 isConservativeUnknown: false);
         }
@@ -7585,7 +7582,7 @@ namespace PurelySharp.Symbolic
                 text ?? string.Empty,
                 "ConservativeUnknown",
                 "Unknown",
-                hasSmtFormula: false,
+                isSolverBacked: false,
                 target,
                 isConservativeUnknown: true);
         }
@@ -7686,7 +7683,7 @@ namespace PurelySharp.Symbolic
             string? formulaKind = null,
             string? valueKind = null,
             string? formulaText = null,
-            bool? hasSmtFormula = null,
+            bool? isSolverBacked = null,
             string? filePath = null,
             int? line = null,
             int? column = null,
@@ -7709,7 +7706,7 @@ namespace PurelySharp.Symbolic
             Condition = condition ?? string.Empty;
             TruthValue = truthValue;
             Reason = reason ?? string.Empty;
-            HasSmtFormula = hasSmtFormula ?? formula != null;
+            IsSolverBacked = isSolverBacked ?? formula != null;
             FormulaText = string.IsNullOrWhiteSpace(formulaText)
                 ? formula == null
                     ? Condition
@@ -7754,7 +7751,7 @@ namespace PurelySharp.Symbolic
             ContainsRequestedPosition = containsRequestedPosition;
             Proof = new SymbolicProofInfo(
                 MapProofStatus(TruthValue),
-                ResolveProofBackend(TruthValue, HasSmtFormula),
+                ResolveProofBackend(TruthValue, IsSolverBacked),
                 ResolveUnknownReason(TruthValue, Reason),
                 Reason,
                 cacheHit: false,
@@ -7776,7 +7773,7 @@ namespace PurelySharp.Symbolic
 
         internal string FormulaText { get; }
 
-        internal bool HasSmtFormula { get; }
+        internal bool IsSolverBacked { get; }
 
         public SymbolicTruthValue TruthValue { get; }
 
@@ -7850,7 +7847,7 @@ namespace PurelySharp.Symbolic
                 formulaKind: FormulaKind,
                 valueKind: ValueKind,
                 formulaText: FormulaText,
-                hasSmtFormula: HasSmtFormula,
+                isSolverBacked: IsSolverBacked,
                 filePath: FilePath ?? filePath,
                 line: Line ?? line,
                 column: Column ?? column,
@@ -7892,9 +7889,9 @@ namespace PurelySharp.Symbolic
 
         private static SymbolicProofBackend ResolveProofBackend(
             SymbolicTruthValue truthValue,
-            bool hasSmtFormula)
+            bool isSolverBacked)
         {
-            if (hasSmtFormula)
+            if (isSolverBacked)
             {
                 return SymbolicProofBackend.Smt;
             }
