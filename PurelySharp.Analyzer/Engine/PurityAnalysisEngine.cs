@@ -4891,7 +4891,11 @@ namespace PurelySharp.Analyzer.Engine
                 return currentState;
             }
 
-            var nextState = currentState;
+            var nextState = AddAssignedAliasFact(
+                currentState,
+                targetSymbol,
+                valueOperation,
+                valueState);
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) &&
                 CSharpSmtFormulaTranslator.TryTranslateValue(
                     valueExpression,
@@ -5050,6 +5054,37 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return nextState;
+        }
+
+        private static PurityAnalysisState AddAssignedAliasFact(
+            PurityAnalysisState currentState,
+            ISymbol targetSymbol,
+            IOperation valueOperation,
+            PurityAnalysisState valueState)
+        {
+            var sourceSymbol = TryResolveTrackedSymbol(valueOperation, valueState);
+            if (sourceSymbol == null ||
+                SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
+                SymbolicFactFactory.GetTrackedSymbolType(sourceSymbol)?.IsReferenceType != true ||
+                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.IsReferenceType != true)
+            {
+                return currentState;
+            }
+
+            var sourceTerm = CreateSymbolicReferenceTerm(sourceSymbol, valueState);
+            var targetTerm = CreateSymbolicReferenceTerm(targetSymbol, currentState);
+            var aliasFact = SymbolicOwnershipFactFactory.CreateAlias(
+                sourceTerm,
+                targetTerm,
+                mayAlias: true,
+                valueOperation.Syntax,
+                "analyzer.assignment.alias",
+                targetSymbol,
+                "evidence.assignment.alias");
+
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                currentState.PathState.AddFact(aliasFact));
         }
 
         private static PurityAnalysisState AddAssignedSymbolicEqualityFact(

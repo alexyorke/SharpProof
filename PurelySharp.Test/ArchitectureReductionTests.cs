@@ -248,6 +248,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerAssignment_ProjectsAliasFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddAssignedAliasFact("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateAlias("));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.alias\""));
+            Assert.That(source, Does.Contain("\"evidence.assignment.alias\""));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
