@@ -157,6 +157,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerDisposeInvocations_ProjectDisposalFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);"));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateDisposal("));
+            Assert.That(source, Does.Contain("SymbolicDisposalState.Disposed"));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateResourceLifetime("));
+            Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Released"));
+            Assert.That(source, Does.Contain("targetMethod.Name is nameof(IDisposable.Dispose) or \"DisposeAsync\""));
+        }
+
+        [Test]
         public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -1036,6 +1054,40 @@ namespace PurelySharp.Test
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
             Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.None));
+        }
+
+        [Test]
+        public void SymbolicProofService_UnsupportedMetadataFactsDoNotPoisonSupportedProofs()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var unsupportedFact = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("resource", SmtValueKind.Reference)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("resource"),
+                "test.metadata");
+            var supportedFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x > 0"),
+                "test.supported");
+            var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x <= 0"),
+                "test.branch"));
+            var state = new SymbolicState(new[] { unsupportedFact, supportedFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                state,
+                impossibleBranch,
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
         }
 
         [Test]

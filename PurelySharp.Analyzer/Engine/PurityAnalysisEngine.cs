@@ -4185,6 +4185,8 @@ namespace PurelySharp.Analyzer.Engine
 
                   else if (operationToTrack is IInvocationOperation invocationOperation)
                 {
+                    nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
+
                     foreach (var argument in invocationOperation.Arguments)
                     {
                         if (argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.Out))
@@ -4305,6 +4307,49 @@ namespace PurelySharp.Analyzer.Engine
 
 
             return nextState;
+        }
+
+        private static PurityAnalysisState AddDisposeInvocationFacts(
+            PurityAnalysisState nextState,
+            IInvocationOperation invocationOperation,
+            PurityAnalysisState currentState)
+        {
+            if (!IsParameterlessDisposeInvocation(invocationOperation) ||
+                invocationOperation.Instance == null ||
+                TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol)
+            {
+                return nextState;
+            }
+
+            var term = new SymbolicVariableTerm(
+                GetSmtVariableName(resourceSymbol, nextState.GetSmtSymbolVersion),
+                SmtValueKind.Reference);
+            var disposedFact = SymbolicOwnershipFactFactory.CreateDisposal(
+                term,
+                SymbolicDisposalState.Disposed,
+                invocationOperation.Syntax,
+                "analyzer.resource.dispose",
+                resourceSymbol,
+                "evidence.resource.dispose");
+            var releasedFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                term,
+                SymbolicResourceLifetimeState.Released,
+                invocationOperation.Syntax,
+                "analyzer.resource.dispose.lifetime",
+                resourceSymbol,
+                "evidence.resource.dispose");
+
+            return nextState.WithPathConditionsAndState(
+                nextState.PathConditions,
+                nextState.PathState.AddFact(disposedFact).AddFact(releasedFact));
+        }
+
+        private static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.ReducedFrom ?? invocationOperation.TargetMethod;
+            return targetMethod != null &&
+                   targetMethod.Parameters.Length == 0 &&
+                   targetMethod.Name is nameof(IDisposable.Dispose) or "DisposeAsync";
         }
 
         private static PurityAnalysisState AddAssignedValueFact(

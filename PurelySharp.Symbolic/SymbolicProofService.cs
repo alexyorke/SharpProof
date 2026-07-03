@@ -176,14 +176,14 @@ namespace PurelySharp.Symbolic
         {
             var builder = ImmutableArray.CreateBuilder<SmtFormula>(
                 state.Facts.Length + state.PathConditions.Length);
+            var skippedUnsupported = false;
 
             foreach (var fact in state.Facts)
             {
                 if (!SymbolicIrFormulaEncoder.TryEncode(fact, out var formula))
                 {
-                    pathConditions = ImmutableArray<SmtFormula>.Empty;
-                    unknownReason = SymbolicUnknownReason.UnsupportedIrEncoding;
-                    return false;
+                    skippedUnsupported = true;
+                    continue;
                 }
 
                 builder.Add(formula);
@@ -193,12 +193,18 @@ namespace PurelySharp.Symbolic
             {
                 if (!SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
                 {
-                    pathConditions = ImmutableArray<SmtFormula>.Empty;
-                    unknownReason = SymbolicUnknownReason.UnsupportedIrEncoding;
-                    return false;
+                    skippedUnsupported = true;
+                    continue;
                 }
 
                 builder.Add(formula);
+            }
+
+            if (skippedUnsupported && builder.Count == 0)
+            {
+                pathConditions = ImmutableArray<SmtFormula>.Empty;
+                unknownReason = SymbolicUnknownReason.UnsupportedIrEncoding;
+                return false;
             }
 
             pathConditions = builder.ToImmutable();
