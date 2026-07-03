@@ -400,10 +400,11 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     smtAnalysis,
                     cancellationToken,
-                    out var throwNullTrigger))
+                    out var throwNullTrigger,
+                    out var throwNullTriggerPrecondition))
             {
                 triggerCondition = throwNullTrigger;
-                triggerPrecondition = null;
+                triggerPrecondition = throwNullTriggerPrecondition;
                 exceptionType = ExceptionTypes.NullReferenceException;
                 category = ExceptionCategories.DefiniteThrowNull;
             }
@@ -453,9 +454,11 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             SmtAnalysisService smtAnalysis,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out SmtFormula trigger,
+            out SymbolicFact? triggerPrecondition)
         {
             trigger = null!;
+            triggerPrecondition = null;
             if (candidate.Kind != SymbolicRuntimeHazardKind.DirectThrow ||
                 !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression))
             {
@@ -480,6 +483,7 @@ namespace PurelySharp.Symbolic
             }
 
             trigger = hasIrNullCondition ? irNullTrigger : legacyNullTrigger;
+            triggerPrecondition = hasIrNullCondition ? TryGetFactPrecondition(nullCondition) : null;
             if (trigger is SmtBooleanConstant { Value: true })
             {
                 return true;
@@ -499,6 +503,13 @@ namespace PurelySharp.Symbolic
 
             return hasLegacyNullCondition &&
                 SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, legacyNullTrigger, smtAnalysis);
+        }
+
+        private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)
+        {
+            return condition is SymbolicFactCondition factCondition
+                ? factCondition.Fact
+                : null;
         }
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(

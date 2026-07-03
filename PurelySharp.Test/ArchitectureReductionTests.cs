@@ -1051,6 +1051,9 @@ namespace PurelySharp.Test
             Assert.That(irProofIndex, Is.GreaterThan(helperIndex));
             Assert.That(legacyFallbackIndex, Is.GreaterThan(irProofIndex));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.throw-null.trigger\""));
+            Assert.That(source, Does.Contain("out var throwNullTriggerPrecondition"));
+            Assert.That(source, Does.Contain("triggerPrecondition = throwNullTriggerPrecondition"));
+            Assert.That(source, Does.Contain("private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)"));
         }
 
         [Test]
