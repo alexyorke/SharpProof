@@ -1631,6 +1631,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
             else if (TryGetDeconstructionElementInitializer(
                          localSymbol,
+                         returnedValue.Syntax,
                          semanticModel,
                          out initializerSyntax,
                          out declarationSyntax))
@@ -1702,10 +1703,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryGetDeconstructionElementInitializer(
             ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             out ExpressionSyntax initializerSyntax,
             out SyntaxNode declarationSyntax)
         {
+            if (TryGetPriorDeconstructionAssignmentElementInitializer(
+                    localSymbol,
+                    observationSyntax,
+                    semanticModel,
+                    out initializerSyntax,
+                    out declarationSyntax))
+            {
+                return true;
+            }
+
             var designation = localSymbol.DeclaringSyntaxReferences
                 .Select(reference => reference.GetSyntax())
                 .OfType<SingleVariableDesignationSyntax>()
@@ -1724,6 +1736,148 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             declarationSyntax = assignment;
             return true;
+        }
+
+        private static bool TryGetPriorDeconstructionAssignmentElementInitializer(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            out ExpressionSyntax initializerSyntax,
+            out SyntaxNode declarationSyntax)
+        {
+            initializerSyntax = null!;
+            declarationSyntax = null!;
+            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var localDeclarationStart = localSymbol.DeclaringSyntaxReferences
+                .Select(static reference => reference.GetSyntax().SpanStart)
+                .DefaultIfEmpty(int.MinValue)
+                .Min();
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart <= localDeclarationStart ||
+                    assignment.SpanStart >= observationSyntax.SpanStart ||
+                    !TryGetDeconstructionAssignmentTargetPath(
+                        assignment.Left,
+                        localSymbol,
+                        semanticModel,
+                        out var path) ||
+                    !TryGetTupleElementExpression(assignment.Right, path, out var candidateInitializer))
+                {
+                    continue;
+                }
+
+                initializerSyntax = candidateInitializer;
+                declarationSyntax = assignment;
+            }
+
+            return initializerSyntax != null;
+        }
+
+        private static bool TryGetDeconstructionAssignmentTargetPath(
+            ExpressionSyntax target,
+            ILocalSymbol localSymbol,
+            SemanticModel semanticModel,
+            out ImmutableArray<int> path)
+        {
+            var builder = ImmutableArray.CreateBuilder<int>();
+            if (TryGetDeconstructionAssignmentTargetPathCore(
+                    UnwrapParenthesizedExpression(target),
+                    localSymbol,
+                    semanticModel,
+                    builder))
+            {
+                path = builder.ToImmutable();
+                return path.Length > 0;
+            }
+
+            path = default;
+            return false;
+        }
+
+        private static bool TryGetDeconstructionAssignmentTargetPathCore(
+            ExpressionSyntax target,
+            ILocalSymbol localSymbol,
+            SemanticModel semanticModel,
+            ImmutableArray<int>.Builder path)
+        {
+            target = UnwrapParenthesizedExpression(target);
+            if (target is DeclarationExpressionSyntax declarationExpression)
+            {
+                return TryGetDeconstructionDesignationPathForLocal(
+                    declarationExpression.Designation,
+                    localSymbol,
+                    semanticModel,
+                    path);
+            }
+
+            if (target is IdentifierNameSyntax identifierName &&
+                semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol targetLocal &&
+                SymbolEqualityComparer.Default.Equals(targetLocal, localSymbol))
+            {
+                return true;
+            }
+
+            if (target is TupleExpressionSyntax tuple)
+            {
+                for (var i = 0; i < tuple.Arguments.Count; i++)
+                {
+                    var count = path.Count;
+                    path.Add(i);
+                    if (TryGetDeconstructionAssignmentTargetPathCore(
+                            tuple.Arguments[i].Expression,
+                            localSymbol,
+                            semanticModel,
+                            path))
+                    {
+                        return true;
+                    }
+
+                    path.RemoveRange(count, path.Count - count);
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetDeconstructionDesignationPathForLocal(
+            VariableDesignationSyntax designation,
+            ILocalSymbol localSymbol,
+            SemanticModel semanticModel,
+            ImmutableArray<int>.Builder path)
+        {
+            if (designation is SingleVariableDesignationSyntax singleVariable &&
+                semanticModel.GetDeclaredSymbol(singleVariable) is ILocalSymbol declaredLocal &&
+                SymbolEqualityComparer.Default.Equals(declaredLocal, localSymbol))
+            {
+                return true;
+            }
+
+            if (designation is ParenthesizedVariableDesignationSyntax parenthesized)
+            {
+                for (var i = 0; i < parenthesized.Variables.Count; i++)
+                {
+                    var count = path.Count;
+                    path.Add(i);
+                    if (TryGetDeconstructionDesignationPathForLocal(
+                            parenthesized.Variables[i],
+                            localSymbol,
+                            semanticModel,
+                            path))
+                    {
+                        return true;
+                    }
+
+                    path.RemoveRange(count, path.Count - count);
+                }
+            }
+
+            return false;
         }
 
         private static bool TryGetDeconstructionDesignationPath(
