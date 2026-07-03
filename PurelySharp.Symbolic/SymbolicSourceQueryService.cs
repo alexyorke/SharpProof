@@ -1370,7 +1370,7 @@ namespace PurelySharp.Symbolic
                     failureReason);
             }
 
-            if (!CSharpConditionToFormula.TryTranslate(
+            if (!CSharpSmtFormulaTranslator.TryTranslate(
                     condition,
                     conditionSemanticModel,
                     cancellationToken,
