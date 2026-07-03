@@ -4353,6 +4353,12 @@ namespace PurelySharp.Analyzer.Engine
                     out var referenceLengthFact))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceLengthFact));
+                nextState = AddSymbolicEqualityFactFromFormula(
+                    nextState,
+                    referenceLengthFact,
+                    valueExpression,
+                    "analyzer.assignment.reference_length",
+                    "analyzer.assignment.reference_length");
             }
 
             if (TryCreateCollectionExpressionLengthLowerBoundFact(
@@ -4407,6 +4413,12 @@ namespace PurelySharp.Analyzer.Engine
                     out var referenceStringFact))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceStringFact));
+                nextState = AddSymbolicEqualityFactFromFormula(
+                    nextState,
+                    referenceStringFact,
+                    valueExpression,
+                    "analyzer.assignment.reference_string",
+                    "analyzer.assignment.reference_string");
             }
 
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
@@ -4441,7 +4453,7 @@ namespace PurelySharp.Analyzer.Engine
             string provenance,
             string evidenceKey)
         {
-            if (!TryCreateSymbolicTerm(targetFormula, out var targetTerm) ||
+            if (!SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula, out var targetTerm) ||
                 !lowerValueTerm(
                     valueExpression,
                     new SymbolicLoweringContext(
@@ -4462,6 +4474,28 @@ namespace PurelySharp.Analyzer.Engine
                 valueExpression,
                 provenance,
                 evidenceKey: evidenceKey);
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
+        }
+
+        private static PurityAnalysisState AddSymbolicEqualityFactFromFormula(
+            PurityAnalysisState currentState,
+            SmtFormula formula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey)
+        {
+            if (!SymbolicSmtFormulaLowerer.TryLowerEqualityFact(
+                    formula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var fact))
+            {
+                return currentState;
+            }
+
             return currentState.WithPathConditionsAndState(
                 currentState.PathConditions,
                 currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
@@ -4489,31 +4523,6 @@ namespace PurelySharp.Analyzer.Engine
 
             term = null!;
             return false;
-        }
-
-        private static bool TryCreateSymbolicTerm(SmtFormula formula, out SymbolicTerm term)
-        {
-            switch (formula)
-            {
-                case SmtBooleanConstant boolean:
-                    term = new SymbolicBooleanConstantTerm(boolean.Value);
-                    return true;
-                case SmtIntegerConstant integer:
-                    term = new SymbolicIntegerConstantTerm(integer.Value);
-                    return true;
-                case SmtStringConstant text:
-                    term = new SymbolicStringConstantTerm(text.Value);
-                    return true;
-                case SmtNullConstant:
-                    term = new SymbolicNullTerm();
-                    return true;
-                case SmtVariable variable:
-                    term = new SymbolicVariableTerm(variable.Name, variable.Kind);
-                    return true;
-                default:
-                    term = null!;
-                    return false;
-            }
         }
 
         private static bool CanCompareSymbolicTerms(SymbolicTerm left, SymbolicTerm right)

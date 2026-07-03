@@ -744,10 +744,13 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerTerm("));
             Assert.That(source, Does.Contain("TryLowerAssignedLengthTerm"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerStringTerm"));
+            Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerEqualityFact("));
             Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
             Assert.That(source, Does.Contain("\"analyzer.assignment.value\""));
             Assert.That(source, Does.Contain("\"analyzer.assignment.length\""));
             Assert.That(source, Does.Contain("\"analyzer.assignment.string\""));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.reference_length\""));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.reference_string\""));
         }
 
         [Test]
