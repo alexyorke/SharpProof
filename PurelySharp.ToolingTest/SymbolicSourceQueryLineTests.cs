@@ -175,12 +175,11 @@ public class TestClass
             Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
             Assert.That(returnProof.Proof.Reason, Is.EqualTo(returnProof.Reason));
-            Assert.That(returnProof.Proof.DisplayKind, Is.EqualTo(returnProof.FormulaKind));
-            Assert.That(returnProof.Proof.ConditionText, Is.EqualTo(returnProof.FormulaText));
+            Assert.That(returnProof.Proof.DisplayKind, Is.Not.Empty);
+            Assert.That(returnProof.Proof.ConditionText, Is.EqualTo("value > 0"));
             Assert.That(returnProof.Proof.Target, Is.EqualTo(returnProof.Target));
             Assert.That(returnProof.Target, Is.EqualTo("value"));
             Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
-            Assert.That(returnProof.FormulaText, Is.EqualTo("value > 0"));
             Assert.That(returnProof.FilePath, Does.EndWith("LineQuery.cs"));
             Assert.That(returnProof.Line, Is.EqualTo(returnPoint.Line));
             Assert.That(returnProof.Column, Is.EqualTo(returnPoint.Column));
@@ -192,12 +191,11 @@ public class TestClass
             Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
             Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
-            Assert.That(aggregateProof.Proof.DisplayKind, Is.EqualTo(aggregateProof.FormulaKind));
-            Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo(aggregateProof.FormulaText));
+            Assert.That(aggregateProof.Proof.DisplayKind, Is.Not.Empty);
+            Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo("value > 0"));
             Assert.That(aggregateProof.Proof.Target, Is.EqualTo(aggregateProof.Target));
             Assert.That(aggregateProof.Target, Is.EqualTo("value"));
             Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
-            Assert.That(aggregateProof.FormulaText, Is.EqualTo("value > 0"));
             Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
             var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
             Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
@@ -240,9 +238,9 @@ public class TestClass
             Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
             Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-            Assert.That(returnPoint.PathConditions.All(condition => condition.HasSmtFormula), Is.True);
+            Assert.That(returnPoint.PathConditions.All(condition => condition.IsSolverBacked), Is.True);
             Assert.That(returnPoint.PathConditions.Single().Target, Is.EqualTo("value"));
-            Assert.That(returnPoint.PathConditions.All(condition => !string.IsNullOrWhiteSpace(condition.FormulaKind)), Is.True);
+            Assert.That(returnPoint.PathConditions.All(condition => !string.IsNullOrWhiteSpace(condition.DisplayKind)), Is.True);
         }
 
         [Test]

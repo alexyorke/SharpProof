@@ -968,6 +968,12 @@ namespace PurelySharp.Symbolic
             ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
+            InvariantInfo = new SymbolicInvariantInfo(
+                MergedInvariant.MergedInvariantText,
+                SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
+                ConditionProofs.Select(static proof => proof.Proof).ToArray(),
+                MergedInvariant.MergeKind,
+                MergedInvariant.ConditionCount);
             FilePath = filePath ?? string.Empty;
             Line = line;
             Column = column;
@@ -999,7 +1005,9 @@ namespace PurelySharp.Symbolic
 
         public SymbolicInvariantResult ObservedInvariant { get; }
 
-        public SymbolicInvariantResult MergedInvariant { get; }
+        internal SymbolicInvariantResult MergedInvariant { get; }
+
+        public SymbolicInvariantInfo InvariantInfo { get; }
 
         public SymbolicMergedPathFacts MergedPathFacts { get; }
 

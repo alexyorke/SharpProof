@@ -730,7 +730,7 @@ namespace PurelySharp.Symbolic
 
         public string MergedInvariantText { get; }
 
-        public IReadOnlyList<string> PathConditions { get; }
+        internal IReadOnlyList<string> PathConditions { get; }
 
         public int PathConditionCount { get; }
 

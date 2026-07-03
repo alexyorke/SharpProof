@@ -439,8 +439,8 @@ namespace PurelySharp.Test
                 unexpectedPaths,
                 Is.Empty,
                 "New formula-shaped compatibility surfaces must expose SymbolicFactInfo, SymbolicInvariantInfo, or SymbolicProofInfo instead.");
-            Assert.That(categories, Does.Contain("formula-metadata"));
-            Assert.That(categories, Does.Contain("merged-invariant"));
+            Assert.That(categories, Does.Not.Contain("formula-metadata"));
+            Assert.That(categories, Does.Not.Contain("merged-invariant"));
             Assert.That(categories, Does.Contain("path-conditions"));
         }
 

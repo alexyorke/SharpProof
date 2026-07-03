@@ -6478,6 +6478,7 @@ namespace PurelySharp.Symbolic
             ValueKind = valueKind ?? "Unknown";
             FormulaText = string.IsNullOrWhiteSpace(formulaText) ? Condition : formulaText!;
             HasSmtFormula = hasSmtFormula;
+            DisplayKind = FormulaKind;
             UnknownCount = unknownCount;
             ProvenTrueCount = provenTrueCount;
             ProvenFalseCount = provenFalseCount;
@@ -6504,13 +6505,15 @@ namespace PurelySharp.Symbolic
 
         public string Target { get; }
 
-        public string FormulaKind { get; }
+        public string DisplayKind { get; }
+
+        internal string FormulaKind { get; }
 
         public string ValueKind { get; }
 
-        public string FormulaText { get; }
+        internal string FormulaText { get; }
 
-        public bool HasSmtFormula { get; }
+        internal bool HasSmtFormula { get; }
 
         public int TotalCount { get; }
 
@@ -7260,9 +7263,9 @@ namespace PurelySharp.Symbolic
 
         public SymbolicInvariantInfo InvariantInfo { get; }
 
-        public IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
+        internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
 
-        public int PathConditionCount => PathConditions.Count;
+        public int PathConditionCount => InvariantInfo.ConditionCount;
 
         public SymbolicReachability Reachability { get; }
 
@@ -7440,6 +7443,8 @@ namespace PurelySharp.Symbolic
             FormulaKind = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
             ValueKind = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
             HasSmtFormula = hasSmtFormula;
+            DisplayKind = FormulaKind;
+            IsSolverBacked = HasSmtFormula;
             Target = target ?? string.Empty;
             IsConservativeUnknown = isConservativeUnknown;
         }
@@ -7448,11 +7453,15 @@ namespace PurelySharp.Symbolic
 
         public string Text { get; }
 
-        public string FormulaKind { get; }
+        public string DisplayKind { get; }
 
         public string ValueKind { get; }
 
-        public bool HasSmtFormula { get; }
+        public bool IsSolverBacked { get; }
+
+        internal string FormulaKind { get; }
+
+        internal bool HasSmtFormula { get; }
 
         public string Target { get; }
 
@@ -7640,6 +7649,7 @@ namespace PurelySharp.Symbolic
                     ? string.Empty
                     : SymbolicFormulaDisplay.GetMergeTarget(formula)
                 : target!;
+            DisplayKind = FormulaKind;
             FilePath = string.IsNullOrWhiteSpace(filePath) ? null : filePath;
             Line = line;
             Column = column;
@@ -7677,13 +7687,15 @@ namespace PurelySharp.Symbolic
 
         public string Target { get; }
 
-        public string FormulaKind { get; }
+        public string DisplayKind { get; }
 
         public string ValueKind { get; }
 
-        public string FormulaText { get; }
+        internal string FormulaKind { get; }
 
-        public bool HasSmtFormula { get; }
+        internal string FormulaText { get; }
+
+        internal bool HasSmtFormula { get; }
 
         public SymbolicTruthValue TruthValue { get; }
 

@@ -537,7 +537,7 @@ static void PrintPointResult(
             var unknown = condition.IsConservativeUnknown ? " conservative-unknown" : string.Empty;
             Console.WriteLine(
                 $"  [{condition.Index}] {condition.Text} " +
-                $"target={condition.Target} kind={condition.FormulaKind}{unknown}");
+                $"target={condition.Target} kind={condition.DisplayKind}{unknown}");
         }
     }
 
