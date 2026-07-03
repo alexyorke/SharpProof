@@ -553,6 +553,7 @@ namespace PurelySharp.Test
             Assert.That(end, Is.GreaterThan(start));
             var snapshotSource = source[start..end];
 
+            Assert.That(snapshotSource, Does.Not.Contain("IReadOnlyList<SmtFormula> formulas"));
             Assert.That(snapshotSource, Does.Not.Contain("internal IReadOnlyList<SmtFormula> Formulas { get; }"));
             Assert.That(snapshotSource, Does.Not.Contain("internal SmtFormula MergedInvariant { get; }"));
             Assert.That(snapshotSource, Does.Contain("public IReadOnlyList<string> Facts { get; }"));

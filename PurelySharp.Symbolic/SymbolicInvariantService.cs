@@ -24,8 +24,10 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 includeCurrentStatementCompletionFacts);
+            var facts = FormatFacts(formulas);
+            var mergedInvariantText = FormatMergedInvariant(formulas);
 
-            return new SymbolicInvariantSnapshot(site.SpanStart, formulas);
+            return new SymbolicInvariantSnapshot(site.SpanStart, facts, mergedInvariantText);
         }
 
         public SymbolicProgramPointAnalysis AnalyzeAt(
@@ -241,6 +243,11 @@ namespace PurelySharp.Symbolic
             return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
         }
 
+        private static IReadOnlyList<string> FormatFacts(IEnumerable<SmtFormula> formulas)
+        {
+            return formulas.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
+        }
+
         private static SmtFormula[] CollectInvariantsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
@@ -335,11 +342,14 @@ namespace PurelySharp.Symbolic
 
     internal sealed class SymbolicInvariantSnapshot
     {
-        internal SymbolicInvariantSnapshot(int spanStart, IReadOnlyList<SmtFormula> formulas)
+        internal SymbolicInvariantSnapshot(
+            int spanStart,
+            IReadOnlyList<string> facts,
+            string mergedInvariantText)
         {
             SpanStart = spanStart;
-            Facts = formulas.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
-            MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(formulas);
+            Facts = facts ?? throw new ArgumentNullException(nameof(facts));
+            MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
         }
 
         public int SpanStart { get; }
