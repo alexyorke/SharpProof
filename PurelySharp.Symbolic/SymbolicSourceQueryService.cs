@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -1370,7 +1371,7 @@ namespace PurelySharp.Symbolic
                     failureReason);
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslate(
+            if (!TryTranslateProofCondition(
                     condition,
                     conditionSemanticModel,
                     cancellationToken,
@@ -1447,6 +1448,27 @@ namespace PurelySharp.Symbolic
                 SymbolicTruthValue.Unknown,
                 falseProof.Reason,
                 conditionFormula);
+        }
+
+        private static bool TryTranslateProofCondition(
+            ExpressionSyntax condition,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encoded))
+            {
+                formula = encoded;
+                return true;
+            }
+
+            return CSharpSmtFormulaTranslator.TryTranslate(
+                condition,
+                semanticModel,
+                cancellationToken,
+                out formula);
         }
 
         private static bool TryCreateSpeculativeCondition(

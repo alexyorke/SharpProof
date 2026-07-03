@@ -42,6 +42,13 @@ namespace PurelySharp.Symbolic.Ir
                 return false;
             }
 
+            if (predicate != SymbolicStringPredicateKind.Contains &&
+                method.Parameters[0].Type.SpecialType != SpecialType.System_Char &&
+                argument is not SymbolicStringConstantTerm)
+            {
+                return false;
+            }
+
             condition = CreateFactCondition(
                 new SymbolicStringPredicateAtom(
                     predicate.Value,

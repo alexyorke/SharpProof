@@ -59,6 +59,18 @@ namespace PurelySharp.Symbolic.Ir
                     return true;
                 }
 
+                if (IsEqualityExpression(binaryExpression) &&
+                    TryLowerStringEqualityCondition(binaryExpression, context, out condition))
+                {
+                    return true;
+                }
+
+                if (IsEqualityExpression(binaryExpression) &&
+                    TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
+                {
+                    return true;
+                }
+
                 if (TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
                     TryLowerTerm(binaryExpression.Left, context, out var left) &&
                     TryLowerTerm(binaryExpression.Right, context, out var right) &&
@@ -87,6 +99,138 @@ namespace PurelySharp.Symbolic.Ir
 
             condition = null!;
             return false;
+        }
+
+        private static bool TryLowerStringEqualityCondition(
+            BinaryExpressionSyntax binaryExpression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!IsStringExpression(binaryExpression.Left, context) ||
+                !IsStringExpression(binaryExpression.Right, context) ||
+                !TryLowerStringTerm(binaryExpression.Left, context, out var leftValue) ||
+                !TryLowerStringTerm(binaryExpression.Right, context, out var rightValue))
+            {
+                return false;
+            }
+
+            var valuesEqual = CreateRelationCondition(
+                SymbolicRelationOperator.Equal,
+                leftValue,
+                rightValue,
+                binaryExpression,
+                "ir.string.equality.value");
+            if (TryLowerTerm(binaryExpression.Left, context, out var leftReference) &&
+                leftReference.Kind == SmtValueKind.Reference &&
+                TryLowerTerm(binaryExpression.Right, context, out var rightReference) &&
+                rightReference.Kind == SmtValueKind.Reference)
+            {
+                var bothNull = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.Equal,
+                        leftReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Left,
+                        "ir.string.equality.left-null"),
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.Equal,
+                        rightReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Right,
+                        "ir.string.equality.right-null"));
+                var bothNonNull = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        leftReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Left,
+                        "ir.string.equality.left-not-null"),
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        rightReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Right,
+                        "ir.string.equality.right-not-null"));
+                valuesEqual = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    bothNull,
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.And, bothNonNull, valuesEqual));
+            }
+            else if (TryLowerTerm(binaryExpression.Left, context, out leftReference) &&
+                     leftReference.Kind == SmtValueKind.Reference &&
+                     rightValue is SymbolicStringConstantTerm)
+            {
+                valuesEqual = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        leftReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Left,
+                        "ir.string.equality.left-not-null"),
+                    valuesEqual);
+            }
+            else if (TryLowerTerm(binaryExpression.Right, context, out rightReference) &&
+                     rightReference.Kind == SmtValueKind.Reference &&
+                     leftValue is SymbolicStringConstantTerm)
+            {
+                valuesEqual = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        rightReference,
+                        new SymbolicNullTerm(),
+                        binaryExpression.Right,
+                        "ir.string.equality.right-not-null"),
+                    valuesEqual);
+            }
+
+            condition = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
+                ? valuesEqual
+                : new SymbolicNotCondition(valuesEqual);
+            return true;
+        }
+
+        private static bool TryLowerTupleEqualityCondition(
+            BinaryExpressionSyntax binaryExpression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerTupleElementTerms(binaryExpression.Left, context, out var leftElements) ||
+                !TryLowerTupleElementTerms(binaryExpression.Right, context, out var rightElements) ||
+                leftElements.Length == 0 ||
+                leftElements.Length != rightElements.Length)
+            {
+                return false;
+            }
+
+            SymbolicCondition? equality = null;
+            for (var index = 0; index < leftElements.Length; index++)
+            {
+                if (!CanCompareTerms(leftElements[index], rightElements[index], SymbolicRelationOperator.Equal))
+                {
+                    return false;
+                }
+
+                var elementEquality = CreateRelationCondition(
+                    SymbolicRelationOperator.Equal,
+                    leftElements[index],
+                    rightElements[index],
+                    binaryExpression,
+                    "ir.tuple.equality.element");
+                equality = equality == null
+                    ? elementEquality
+                    : new SymbolicBinaryCondition(SymbolicConditionOperator.And, equality, elementEquality);
+            }
+
+            condition = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
+                ? equality!
+                : new SymbolicNotCondition(equality!);
+            return true;
         }
 
         public static bool TryLowerTerm(
@@ -129,6 +273,11 @@ namespace PurelySharp.Symbolic.Ir
                 literal.IsKind(SyntaxKind.NullLiteralExpression))
             {
                 term = new SymbolicNullTerm();
+                return true;
+            }
+
+            if (TryLowerSupportedConversionTerm(expression, context, out term))
+            {
                 return true;
             }
 
@@ -187,6 +336,11 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
+            if (TryLowerTupleElementMemberTerm(memberAccess, context, out term))
+            {
+                return true;
+            }
+
             if (string.Equals(memberName, "HasValue", StringComparison.Ordinal) &&
                 TryLowerNullableHasValueTerm(memberAccess.Expression, context, out term))
             {
@@ -232,6 +386,60 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             return false;
+        }
+
+        private static bool TryLowerSupportedConversionTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            if (expression is CheckedExpressionSyntax checkedExpression &&
+                checkedExpression.IsKind(SyntaxKind.UncheckedExpression))
+            {
+                if (checkedExpression.Expression is CastExpressionSyntax)
+                {
+                    return TryLowerSupportedConversionTerm(checkedExpression.Expression, context, out term);
+                }
+
+                term = null!;
+                return false;
+            }
+
+            if (expression is CastExpressionSyntax castExpression)
+            {
+                var sourceType = context.SemanticModel.GetTypeInfo(castExpression.Expression, context.CancellationToken).Type;
+                var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
+                if (sourceType?.TypeKind == TypeKind.Enum &&
+                    sourceType is INamedTypeSymbol { EnumUnderlyingType.SpecialType: SpecialType.System_Int32 } &&
+                    targetType?.SpecialType == SpecialType.System_Int32 &&
+                    TryLowerTerm(castExpression.Expression, context, out var operand) &&
+                    operand.Kind == SmtValueKind.Int)
+                {
+                    term = operand;
+                    return true;
+                }
+            }
+
+            term = null!;
+            return false;
+        }
+
+        private static bool TryLowerTupleElementMemberTerm(
+            MemberAccessExpressionSyntax memberAccess,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (!TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol) ||
+                context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IFieldSymbol field ||
+                !TryGetTupleElementStorageName(field, out var storageName) ||
+                !TryGetValueKind(field.Type, out var kind))
+            {
+                return false;
+            }
+
+            term = new SymbolicVariableTerm(context.GetVariableName(tupleSymbol) + "." + storageName, kind);
+            return true;
         }
 
         public static bool TryLowerNullableHasValueTerm(
@@ -321,6 +529,16 @@ namespace PurelySharp.Symbolic.Ir
             return new SymbolicFactCondition(SymbolicFact.Exact(atom, node, provenance));
         }
 
+        private static SymbolicCondition CreateRelationCondition(
+            SymbolicRelationOperator op,
+            SymbolicTerm left,
+            SymbolicTerm right,
+            SyntaxNode node,
+            string provenance)
+        {
+            return CreateFactCondition(new SymbolicRelationAtom(op, left, right), node, provenance);
+        }
+
         private static SymbolicCondition CreateReferenceIsNullCondition(SymbolicTerm reference, SyntaxNode node)
         {
             return CreateFactCondition(
@@ -343,6 +561,49 @@ namespace PurelySharp.Symbolic.Ir
             return left.Kind == right.Kind ||
                 left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference ||
                 right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference;
+        }
+
+        private static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
+        {
+            return binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
+        }
+
+        private static bool TryLowerTupleElementTerms(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out ImmutableArray<SymbolicTerm> terms)
+        {
+            terms = ImmutableArray<SymbolicTerm>.Empty;
+            if (!TryGetStableVariableSymbol(expression, context, out var symbol) ||
+                context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not INamedTypeSymbol { IsTupleType: true } tupleType ||
+                tupleType.TupleElements.Length == 0)
+            {
+                return false;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleType.TupleElements.Length);
+            foreach (var element in tupleType.TupleElements)
+            {
+                var field = element.CorrespondingTupleField ?? element;
+                if (!TryGetTupleElementStorageName(field, out var storageName) ||
+                    !TryGetValueKind(field.Type, out var kind))
+                {
+                    return false;
+                }
+
+                builder.Add(new SymbolicVariableTerm(context.GetVariableName(symbol) + "." + storageName, kind));
+            }
+
+            terms = builder.ToImmutable();
+            return true;
+        }
+
+        private static bool TryGetTupleElementStorageName(IFieldSymbol field, out string storageName)
+        {
+            var storageField = field.CorrespondingTupleField ?? field;
+            storageName = storageField.Name;
+            return storageName.StartsWith("Item", StringComparison.Ordinal);
         }
 
         private static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op)
