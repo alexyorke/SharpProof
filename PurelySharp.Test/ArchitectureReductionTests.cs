@@ -59,6 +59,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_RoutesLegacyFormulaProofsThroughProofService()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+
+            Assert.That(source, Does.Not.Contain("new SmtAnalysisService("));
+            Assert.That(source, Does.Not.Contain(".ClassifyPathFeasibility(pathConditions)"));
+            Assert.That(source, Does.Not.Contain(".ClassifyImplication(pathConditions, factFormula)"));
+            Assert.That(source, Does.Contain("ClassifyFormulaPathFeasibility(pathConditions)"));
+            Assert.That(source, Does.Contain("ClassifyFormulaImplication("));
+            Assert.That(source, Does.Contain("ClassifyFormulaBranchReachability("));
+        }
+
+        [Test]
         public void ExecutionVisibility_UsesSymbolicReachabilityForConditionProofs()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -595,11 +612,12 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
             var irIndex = source.IndexOf("TryAddIrBranchConditionFact(", StringComparison.Ordinal);
-            var legacyIndex = source.IndexOf("CSharpConditionToFormula.TryCollectBranchAssumptions", StringComparison.Ordinal);
+            var legacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions", StringComparison.Ordinal);
 
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(irIndex, Is.LessThan(legacyIndex));
+            Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
         }
 
         [Test]

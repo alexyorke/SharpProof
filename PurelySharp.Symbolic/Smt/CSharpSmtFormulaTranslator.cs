@@ -94,6 +94,38 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        internal static bool TryCollectDomainFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            return CSharpConditionToFormula.TryCollectDomainFacts(
+                expression,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        internal static bool TryCollectBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+                expression,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
         internal static bool TryTranslateBuiltInLengthValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,

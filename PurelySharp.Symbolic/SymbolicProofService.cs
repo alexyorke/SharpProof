@@ -24,7 +24,7 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Unknown(unknownReason);
             }
 
-            var result = ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
+            var result = ClassifyFormulaPathFeasibility(pathConditions);
             return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
         }
 
@@ -41,7 +41,7 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Unknown(unknownReason);
             }
 
-            var result = ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, factFormula));
+            var result = ClassifyFormulaImplication(pathConditions, factFormula);
             return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
         }
 
@@ -53,8 +53,39 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Unknown(unknownReason);
             }
 
-            var result = ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, formula));
+            var result = ClassifyFormulaImplication(pathConditions, formula);
             return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
+        }
+
+        internal PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
+        {
+            return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
+        }
+
+        internal PurityProofResult ClassifyFormulaImplication(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula)
+        {
+            if (factFormula == null)
+            {
+                throw new ArgumentNullException(nameof(factFormula));
+            }
+
+            return ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, factFormula));
+        }
+
+        internal PurityProofResult ClassifyFormulaBranchReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula branchCondition)
+        {
+            if (branchCondition == null)
+            {
+                throw new ArgumentNullException(nameof(branchCondition));
+            }
+
+            return ClassifyWithFallback(service => service.Classify(new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(PurityHazardKind.BranchReachability, branchCondition))));
         }
 
         private PurityProofResult ClassifyWithFallback(Func<SmtAnalysisService, PurityProofResult> classify)

@@ -134,7 +134,7 @@ namespace PurelySharp.Symbolic
 
             if (collectDomainFactsBeforeBranchAssumptions)
             {
-                CSharpConditionToFormula.TryCollectDomainFacts(
+                CSharpSmtFormulaTranslator.TryCollectDomainFacts(
                     condition,
                     semanticModel,
                     cancellationToken,
@@ -151,7 +151,7 @@ namespace PurelySharp.Symbolic
                 getSymbolVersion);
 
             var countBeforeBranchAssumptions = pathConditions.Count;
-            CSharpConditionToFormula.TryCollectBranchAssumptions(
+            CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
                 condition,
                 branchWhenTrue,
                 semanticModel,
@@ -162,7 +162,7 @@ namespace PurelySharp.Symbolic
             var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
             if ((addTranslatedFormulaAlways ||
                  addTranslatedFormulaFallback && !addedIrBranchFact && !addedBranchFacts) &&
-                CSharpConditionToFormula.TryTranslate(
+                CSharpSmtFormulaTranslator.TryTranslate(
                     condition,
                     semanticModel,
                     cancellationToken,
@@ -283,8 +283,9 @@ namespace PurelySharp.Symbolic
             SmtFormula factFormula,
             SmtAnalysisService? smtAnalysis)
         {
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyImplication(pathConditions, factFormula);
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaImplication(
+                pathConditions,
+                factFormula);
         }
 
         internal static bool IsFormulaAlwaysFalse(
@@ -318,7 +319,7 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula>? pathConditions = null)
         {
             var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
-            if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
+            if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
                 if (IsBranchUnreachable(
@@ -346,7 +347,7 @@ namespace PurelySharp.Symbolic
                 return null;
             }
 
-            CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, basePathConditions);
+            CSharpSmtFormulaTranslator.TryCollectDomainFacts(expression, semanticModel, cancellationToken, basePathConditions);
             if (!IsSatisfiable(basePathConditions, smtAnalysis) ||
                 IsFormulaAlwaysFalse(formula, basePathConditions, smtAnalysis))
             {
@@ -535,7 +536,7 @@ namespace PurelySharp.Symbolic
             }
 
             var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
-            if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
+            if (!CSharpSmtFormulaTranslator.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
                 return EvaluateKnownConditionTruth(
@@ -551,7 +552,7 @@ namespace PurelySharp.Symbolic
                 pathConditions.Add(initializerFact);
             }
 
-            CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
+            CSharpSmtFormulaTranslator.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
             return IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 
@@ -593,20 +594,16 @@ namespace PurelySharp.Symbolic
             SmtFormula branchCondition,
             SmtAnalysisService? smtAnalysis)
         {
-            var query = new PurityProofQuery(
-                pathConditions.ToArray(),
-                new PurityHazard(PurityHazardKind.BranchReachability, branchCondition));
-
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            return (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaBranchReachability(
+                pathConditions,
+                branchCondition);
         }
 
         internal static PurityProofResult ClassifyPathFeasibility(
             IEnumerable<SmtFormula> pathConditions,
             SmtAnalysisService? smtAnalysis)
         {
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            return (smtAnalysis ?? fallbackSmtAnalysis!).ClassifyPathFeasibility(pathConditions);
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaPathFeasibility(pathConditions);
         }
 
         internal static bool TryCreateArrayLengthCountAliasFact(
@@ -617,7 +614,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is IArrayTypeSymbol &&
-                CSharpConditionToFormula.TryTranslateValue(
+                CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -645,7 +642,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
