@@ -112,6 +112,28 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task AssignmentToMutablyBorrowedLocalThroughAliasChain_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(int value)
+    {
+        int local = value;
+        ref int first = ref local;
+        ref int second = ref first;
+        local = 42;
+        return second;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task RefArgumentToMutablyBorrowedLocal_Diagnostic()
         {
             var test = @"

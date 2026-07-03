@@ -6066,18 +6066,33 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            var borrowedLocals = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            var changed = true;
+            while (changed)
             {
-                if (declarator.SpanStart >= writeSyntax.SpanStart ||
-                    declarator.Initializer?.Value is not RefExpressionSyntax refExpression ||
-                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol refLocal ||
-                    semanticModel.GetSymbolInfo(refExpression.Expression, cancellationToken).Symbol is not ILocalSymbol sourceLocal ||
-                    !SymbolEqualityComparer.Default.Equals(sourceLocal, targetLocal))
+                changed = false;
+                foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
                 {
-                    continue;
-                }
+                    if (declarator.SpanStart >= writeSyntax.SpanStart ||
+                        declarator.Initializer?.Value is not RefExpressionSyntax refExpression ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol refLocal ||
+                        semanticModel.GetSymbolInfo(refExpression.Expression, cancellationToken).Symbol is not ILocalSymbol sourceLocal)
+                    {
+                        continue;
+                    }
 
-                if (IsLocalUsedAfter(refLocal, writeSyntax, containingBlock, semanticModel, cancellationToken))
+                    if ((SymbolEqualityComparer.Default.Equals(sourceLocal, targetLocal) ||
+                         borrowedLocals.Contains(sourceLocal)) &&
+                        borrowedLocals.Add(refLocal))
+                    {
+                        changed = true;
+                    }
+                }
+            }
+
+            foreach (var borrowedLocal in borrowedLocals.OfType<ILocalSymbol>())
+            {
+                if (IsLocalUsedAfter(borrowedLocal, writeSyntax, containingBlock, semanticModel, cancellationToken))
                 {
                     return true;
                 }
