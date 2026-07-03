@@ -1638,7 +1638,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
+            formula = SmtFormulaFactory.CreateBoolVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".HasValue");
             return true;
         }
 
@@ -1651,7 +1651,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".Value", kind);
+            formula = SmtFormulaFactory.CreateVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".Value", kind);
             return true;
         }
 
@@ -2377,7 +2377,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 factFormula = SmtFormulaFactory.CreateReferenceNullComparison(
-                    new SmtVariable(variableName, SmtValueKind.Reference),
+                    SmtFormulaFactory.CreateReferenceVariable(variableName),
                     isNull: true);
                 return true;
             }
@@ -2388,7 +2388,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(new SmtVariable(variableName, SmtValueKind.Int));
+            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(SmtFormulaFactory.CreateIntVariable(variableName));
             return true;
         }
 
@@ -2418,7 +2418,7 @@ namespace PurelySharp.Analyzer
             {
                 if (isNull != isDefinitelyNull)
                 {
-                    pathConditions.Add(new SmtBooleanConstant(false));
+                    pathConditions.Add(SmtFormulaFactory.CreateFalse());
                 }
 
                 return;

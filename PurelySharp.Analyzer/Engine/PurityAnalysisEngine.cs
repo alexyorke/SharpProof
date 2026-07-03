@@ -2537,7 +2537,7 @@ namespace PurelySharp.Analyzer.Engine
 
             var edgeFormula = takeConditionalSuccessor
                 ? branchFormula
-                : new SmtUnaryFormula(SmtUnaryOperator.Not, branchFormula);
+                : SmtFormulaFactory.CreateNot(branchFormula);
             if (!addedBranchAssumptions)
             {
                 nextPathConditionsBuilder.Add(edgeFormula);
@@ -2829,14 +2829,14 @@ namespace PurelySharp.Analyzer.Engine
             if (TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol localSymbol &&
                 localSymbol.Type?.IsReferenceType == true)
             {
-                formula = new SmtVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
+                formula = SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion));
                 return true;
             }
 
             if (TryResolveTrackedSymbol(operation, currentState) is IParameterSymbol parameterSymbol &&
                 parameterSymbol.Type?.IsReferenceType == true)
             {
-                formula = new SmtVariable(GetSmtVariableName(parameterSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
+                formula = SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(parameterSymbol, currentState.GetSmtSymbolVersion));
                 return true;
             }
 
@@ -2864,7 +2864,7 @@ namespace PurelySharp.Analyzer.Engine
                 }
 
                 builder.Add(SmtFormulaFactory.CreateReferenceNullComparison(
-                    new SmtVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference),
+                    SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion)),
                     isNull: true));
             }
 

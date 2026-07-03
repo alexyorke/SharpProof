@@ -485,7 +485,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
+            var resultFormula = SmtFormulaFactory.CreateIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
             return IsDefinitelyFalseAtUse(
                 binaryExpression,
                 SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
@@ -504,7 +504,7 @@ namespace PurelySharp.Analyzer
                 CSharpConditionToFormula.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) &&
                 operandFormula is { Kind: SmtValueKind.Int })
             {
-                var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
+                var resultFormula = SmtFormulaFactory.CreateIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
                 return IsDefinitelyFalseAtUse(
                     unaryExpression,
                     SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
@@ -556,7 +556,10 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
+            var resultFormula = SmtFormulaFactory.CreateIntegerBinaryTerm(
+                smtOperator,
+                operandFormula,
+                SmtFormulaFactory.CreateIntegerOne());
             return IsDefinitelyFalseAtUse(
                 updateExpression,
                 SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
@@ -1160,7 +1163,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
+            var outOfRangeFormula = SmtFormulaFactory.CreateNot(formula);
 
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 

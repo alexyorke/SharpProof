@@ -4,9 +4,52 @@ namespace PurelySharp.Symbolic.Smt
 {
     internal static class SmtFormulaFactory
     {
+        internal static SmtFormula CreateVariable(string name, SmtValueKind kind)
+        {
+            return new SmtVariable(name, kind);
+        }
+
+        internal static SmtFormula CreateReferenceVariable(string name)
+        {
+            return CreateVariable(name, SmtValueKind.Reference);
+        }
+
+        internal static SmtFormula CreateIntVariable(string name)
+        {
+            return CreateVariable(name, SmtValueKind.Int);
+        }
+
+        internal static SmtFormula CreateBoolVariable(string name)
+        {
+            return CreateVariable(name, SmtValueKind.Bool);
+        }
+
+        internal static SmtFormula CreateFalse()
+        {
+            return new SmtBooleanConstant(false);
+        }
+
+        internal static SmtFormula CreateNot(SmtFormula formula)
+        {
+            return new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
+        }
+
         internal static SmtFormula CreateEquality(SmtFormula left, SmtFormula right)
         {
             return new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+        }
+
+        internal static SmtFormula CreateIntegerBinaryTerm(
+            SmtIntegerBinaryOperator op,
+            SmtFormula left,
+            SmtFormula right)
+        {
+            return new SmtIntegerBinaryTerm(op, left, right);
+        }
+
+        internal static SmtFormula CreateIntegerUnaryTerm(SmtIntegerUnaryOperator op, SmtFormula operand)
+        {
+            return new SmtIntegerUnaryTerm(op, operand);
         }
 
         internal static SmtFormula CreateReferenceNullComparison(SmtFormula value, bool isNull)
@@ -43,6 +86,11 @@ namespace PurelySharp.Symbolic.Smt
         internal static SmtFormula CreateIntegerEqualsZero(SmtFormula value)
         {
             return CreateIntegerComparison(SmtBinaryOperator.Equal, value, 0);
+        }
+
+        internal static SmtFormula CreateIntegerOne()
+        {
+            return new SmtIntegerConstant(1);
         }
     }
 }
