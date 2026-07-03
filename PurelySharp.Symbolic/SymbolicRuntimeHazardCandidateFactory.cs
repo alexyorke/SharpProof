@@ -297,10 +297,21 @@ namespace PurelySharp.Symbolic
                 SmtFormula triggerCondition,
                 string exceptionType,
                 string category)
+                : this(site, kind, new RuntimeHazardTrigger(triggerCondition), exceptionType, category)
+            {
+            }
+
+            public RuntimeHazardCandidate(
+                SyntaxNode site,
+                SymbolicRuntimeHazardKind kind,
+                RuntimeHazardTrigger trigger,
+                string exceptionType,
+                string category)
             {
                 Site = site;
                 Kind = kind;
-                TriggerCondition = triggerCondition;
+                TriggerCondition = trigger.Condition;
+                TriggerPrecondition = trigger.IrPrecondition;
                 ExceptionType = exceptionType;
                 Category = category;
             }
@@ -311,9 +322,24 @@ namespace PurelySharp.Symbolic
 
             public SmtFormula TriggerCondition { get; }
 
+            public SymbolicFact? TriggerPrecondition { get; }
+
             public string ExceptionType { get; }
 
             public string Category { get; }
+        }
+
+        private readonly struct RuntimeHazardTrigger
+        {
+            public RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
+            {
+                Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+                IrPrecondition = irPrecondition;
+            }
+
+            public SmtFormula Condition { get; }
+
+            public SymbolicFact? IrPrecondition { get; }
         }
 
         private static RuntimeHazardCandidate CreateThrowCandidate(
@@ -329,7 +355,7 @@ namespace PurelySharp.Symbolic
             var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
             var trigger = !isRethrow && TryCreateDirectThrowTrigger(throwNode, out var directThrowTrigger)
                 ? directThrowTrigger
-                : new SmtBooleanConstant(true);
+                : new RuntimeHazardTrigger(new SmtBooleanConstant(true));
             return new RuntimeHazardCandidate(
                 throwNode,
                 isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
@@ -721,7 +747,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var unboxNullTrigger)
                 ? unboxNullTrigger
-                : CreateUnknownTrigger(castExpression, "unbox_null");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "unbox_null"));
 
             candidate = new RuntimeHazardCandidate(
                 castExpression,
@@ -1238,8 +1264,8 @@ namespace PurelySharp.Symbolic
                 }
 
                 trigger = trigger == null
-                    ? negativeLength
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength);
+                    ? negativeLength.Condition
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength.Condition);
             }
 
             if (trigger == null)
@@ -1278,8 +1304,8 @@ namespace PurelySharp.Symbolic
                 }
 
                 trigger = trigger == null
-                    ? negativeLength
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength);
+                    ? negativeLength.Condition
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength.Condition);
             }
 
             if (trigger == null)
@@ -1359,8 +1385,9 @@ namespace PurelySharp.Symbolic
                     "ir.runtime-hazard.checked-integral.binary-overflow",
                     semanticModel,
                     cancellationToken,
-                    out trigger))
+                    out var irTrigger))
             {
+                trigger = irTrigger.Condition;
                 return true;
             }
 
@@ -1500,8 +1527,9 @@ namespace PurelySharp.Symbolic
                     "ir.runtime-hazard.checked-conversion.overflow",
                     semanticModel,
                     cancellationToken,
-                    out trigger))
+                    out var irTrigger))
             {
+                trigger = irTrigger.Condition;
                 return true;
             }
 

@@ -12,7 +12,7 @@ namespace PurelySharp.Symbolic
     {
         private static bool TryCreateDirectThrowTrigger(
             SyntaxNode throwNode,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             var precondition = SymbolicFact.Exact(
                 new SymbolicExceptionPreconditionAtom(
@@ -22,14 +22,21 @@ namespace PurelySharp.Symbolic
                 throwNode,
                 "ir.runtime-hazard.direct-throw");
 
-            return SymbolicIrFormulaEncoder.TryEncode(precondition, out trigger);
+            if (SymbolicIrFormulaEncoder.TryEncode(precondition, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula, precondition);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateDivideByZeroTrigger(
             ExpressionSyntax divisor,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (TryCreateIrExceptionPreconditionTrigger(
                     SymbolicExceptionPreconditionKind.DivideByZero,
@@ -43,7 +50,14 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out trigger);
+            if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateIndexOrRangeTrigger(
@@ -51,7 +65,7 @@ namespace PurelySharp.Symbolic
             SymbolicRuntimeHazardKind kind,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (TryCreateIrElementAccessOutOfRangeTrigger(
                     elementAccess,
@@ -69,11 +83,11 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var inRangeFormula))
             {
-                trigger = null!;
+                trigger = default;
                 return false;
             }
 
-            trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            trigger = new RuntimeHazardTrigger(new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula));
             return true;
         }
 
@@ -82,9 +96,9 @@ namespace PurelySharp.Symbolic
             SymbolicRuntimeHazardKind kind,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             if (elementAccess.ArgumentList.Arguments.Count != 1 ||
                 IsBuiltInRangeAccessArgument(
                     elementAccess.ArgumentList.Arguments[0].Expression,
@@ -188,9 +202,9 @@ namespace PurelySharp.Symbolic
             IArrayTypeSymbol arrayType,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             if (arrayType.Rank != 1 ||
                 invocationOperation.Arguments.Length != 1 ||
                 !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var indexExpression))
@@ -237,7 +251,7 @@ namespace PurelySharp.Symbolic
             string provenance,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (TryCreateIrRelationalExceptionPreconditionTrigger(
                     kind,
@@ -252,7 +266,14 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out trigger);
+            if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
@@ -262,9 +283,9 @@ namespace PurelySharp.Symbolic
             string provenance,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
                 value.Kind != SmtValueKind.Int)
@@ -304,7 +325,7 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax receiver,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (IsStableIrReferenceSubject(receiver, semanticModel, cancellationToken) &&
                 TryCreateIrRelationalExceptionPreconditionTrigger(
@@ -320,14 +341,21 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out trigger);
+            if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateUnboxNullTrigger(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (IsStableIrReferenceSubject(expression, semanticModel, cancellationToken) &&
                 TryCreateIrRelationalExceptionPreconditionTrigger(
@@ -343,14 +371,21 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out trigger);
+            if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateArgumentNullTrigger(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             if (IsStableIrReferenceSubject(expression, semanticModel, cancellationToken) &&
                 TryCreateIrRelationalExceptionPreconditionTrigger(
@@ -366,14 +401,21 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out trigger);
+            if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
 
         private static bool TryCreateNullableValueWithoutValueTrigger(
             ExpressionSyntax nullableExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(nullableExpression, context, out var hasValueTerm) &&
@@ -398,11 +440,11 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var hasValueFormula))
             {
-                trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula);
+                trigger = new RuntimeHazardTrigger(new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula));
                 return true;
             }
 
-            trigger = null!;
+            trigger = default;
             return false;
         }
 
@@ -418,8 +460,9 @@ namespace PurelySharp.Symbolic
                     targetType,
                     semanticModel,
                     cancellationToken,
-                    out trigger))
+                    out var irTrigger))
             {
+                trigger = irTrigger.Condition;
                 return true;
             }
 
@@ -445,9 +488,9 @@ namespace PurelySharp.Symbolic
             ITypeSymbol targetType,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
             {
                 return false;
@@ -500,7 +543,7 @@ namespace PurelySharp.Symbolic
             string provenance,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             return TryCreateIrRelationalExceptionPreconditionTrigger(
                 kind,
@@ -521,9 +564,9 @@ namespace PurelySharp.Symbolic
             string provenance,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (!SymbolicIrLowerer.TryLowerTerm(subjectExpression, context, out var subject) ||
                 subject.Kind != triggeringValue.Kind)
@@ -553,14 +596,21 @@ namespace PurelySharp.Symbolic
             SymbolicCondition triggerCondition,
             SyntaxNode site,
             string provenance,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
             var precondition = SymbolicFact.Exact(
                 new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
                 site,
                 provenance);
 
-            return SymbolicIrFormulaEncoder.TryEncode(precondition, out trigger);
+            if (SymbolicIrFormulaEncoder.TryEncode(precondition, out var formula))
+            {
+                trigger = new RuntimeHazardTrigger(formula, precondition);
+                return true;
+            }
+
+            trigger = default;
+            return false;
         }
     }
 }

@@ -33,6 +33,9 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
             Assert.That(hazard.Category, Is.EqualTo("direct_throw"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.direct-throw"));
         }
 
         [Test]
@@ -133,6 +136,9 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
             Assert.That(hazard.PathConditions.Any(condition => condition.Contains("divisor", StringComparison.Ordinal) &&
                                                                condition.Contains("Value = 0", StringComparison.Ordinal)), Is.True);
         }

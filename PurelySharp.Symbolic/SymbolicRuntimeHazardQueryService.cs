@@ -390,6 +390,7 @@ namespace PurelySharp.Symbolic
                 smtAnalysis,
                 cancellationToken);
             var triggerCondition = candidate.TriggerCondition;
+            var triggerPrecondition = candidate.TriggerPrecondition;
             var exceptionType = candidate.ExceptionType;
             var category = candidate.Category;
             if (TryRefineThrowNullCandidate(
@@ -401,6 +402,7 @@ namespace PurelySharp.Symbolic
                     out var throwNullTrigger))
             {
                 triggerCondition = throwNullTrigger;
+                triggerPrecondition = null;
                 exceptionType = ExceptionTypes.NullReferenceException;
                 category = ExceptionCategories.DefiniteThrowNull;
             }
@@ -430,6 +432,7 @@ namespace PurelySharp.Symbolic
                 sourceSpan.EndLine,
                 sourceSpan.EndColumn,
                 triggerCondition.ToString() ?? string.Empty,
+                triggerPrecondition == null ? null : SymbolicFactInfo.FromFact(triggerPrecondition),
                 analysis.MergedInvariantText,
                 analysis.Facts,
                 analysis.Reachability,
@@ -590,6 +593,7 @@ namespace PurelySharp.Symbolic
             int nodeEndLine,
             int nodeEndColumn,
             string triggerCondition,
+            SymbolicFactInfo? triggerPrecondition,
             string mergedInvariantText,
             IReadOnlyList<string> pathConditions,
             SymbolicReachability reachability,
@@ -614,6 +618,7 @@ namespace PurelySharp.Symbolic
             NodeEndLine = nodeEndLine;
             NodeEndColumn = nodeEndColumn;
             TriggerCondition = triggerCondition;
+            TriggerPrecondition = triggerPrecondition;
             MergedInvariantText = mergedInvariantText;
             PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
             PathConditionCount = pathConditions.Count;
@@ -657,6 +662,8 @@ namespace PurelySharp.Symbolic
         public int NodeEndColumn { get; }
 
         public string TriggerCondition { get; }
+
+        public SymbolicFactInfo? TriggerPrecondition { get; }
 
         public string MergedInvariantText { get; }
 

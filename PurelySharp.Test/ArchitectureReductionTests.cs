@@ -154,7 +154,8 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
-            Assert.That(source, Does.Contain("return TryTranslateZeroCondition(divisor"));
+            Assert.That(source, Does.Contain("TryTranslateZeroCondition(divisor"));
+            Assert.That(source, Does.Contain("new RuntimeHazardTrigger(formula)"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
         }
@@ -205,7 +206,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeLength"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeStackAllocLength"));
             Assert.That(source, Does.Contain("SymbolicRelationOperator.LessThan"));
-            Assert.That(source, Does.Contain("return TryTranslateNegativeCondition(lengthExpression"));
+            Assert.That(source, Does.Contain("TryTranslateNegativeCondition(lengthExpression"));
             Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
         }
 
@@ -232,7 +233,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateNullDereferenceTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullDereference"));
             Assert.That(source, Does.Contain("IsStableIrReferenceSubject"));
-            Assert.That(source, Does.Contain("return TryTranslateNullCondition(receiver"));
+            Assert.That(source, Does.Contain("TryTranslateNullCondition(receiver"));
             Assert.That(source, Does.Contain("!TryCreateNullDereferenceTrigger(receiver"));
         }
 
@@ -245,7 +246,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateUnboxNullTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.UnboxNull"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.unbox-null"));
-            Assert.That(source, Does.Contain("return TryTranslateNullCondition(expression"));
+            Assert.That(source, Does.Contain("TryTranslateNullCondition(expression"));
             Assert.That(source, Does.Contain("TryCreateUnboxNullTrigger("));
         }
 
@@ -258,7 +259,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateArgumentNullTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentNull"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.argument-null"));
-            Assert.That(source, Does.Contain("return TryTranslateNullCondition(expression"));
+            Assert.That(source, Does.Contain("TryTranslateNullCondition(expression"));
             Assert.That(source, Does.Contain("!TryCreateArgumentNullTrigger(expression"));
         }
 
