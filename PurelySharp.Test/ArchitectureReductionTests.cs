@@ -370,6 +370,8 @@ namespace PurelySharp.Test
             Assert.That(assignmentSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));
             Assert.That(assignmentSource, Does.Contain("earlyBorrowConflictEvidence"));
             Assert.That(assignmentSource.IndexOf("earlyBorrowConflictEvidence", StringComparison.Ordinal), Is.LessThan(assignmentSource.IndexOf("IsAssignmentTargetPure(", StringComparison.Ordinal)));
+            Assert.That(assignmentSource, Does.Contain("HasActiveRefLocalBorrowAfterWrite("));
+            Assert.That(assignmentSource, Does.Contain("IsLocalUsedAfter("));
             Assert.That(invocationSource, Does.Contain("TryCreateMutableBorrowConflictEvidence("));
             Assert.That(engineSource, Does.Contain("\"analyzer.borrow.mutable-conflict\""));
         }

@@ -143,6 +143,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         operation,
                         TryResolveSymbol(targetOperation),
                         currentState,
+                        context,
                         out var borrowConflictEvidence))
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -166,6 +167,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     operation,
                     targetSymbol,
                     currentState,
+                    context,
                     out var earlyBorrowConflictEvidence))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -182,6 +184,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         operation,
                         targetSymbol,
                         currentState,
+                        context,
                         out var borrowConflictEvidence))
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -329,14 +332,88 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation operation,
             ISymbol? targetSymbol,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            PurityAnalysisContext context,
             out PurityAnalysisEngine.PurityEvidence evidence)
         {
-            return PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
+            if (PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
                 operation,
                 targetSymbol,
                 currentState,
                 nameof(AssignmentPurityRule),
-                out evidence);
+                out evidence))
+            {
+                return true;
+            }
+
+            if (targetSymbol is ILocalSymbol targetLocal &&
+                HasActiveRefLocalBorrowAfterWrite(targetLocal, operation.Syntax, context))
+            {
+                evidence = PurityAnalysisEngine.PurityEvidence.Create(
+                    "mutable_state_write",
+                    ruleName: nameof(AssignmentPurityRule),
+                    operation: operation,
+                    syntaxNode: operation.Syntax,
+                    symbol: targetLocal,
+                    catalogSource: "analyzer.borrow.mutable-conflict");
+                return true;
+            }
+
+            evidence = default;
+            return false;
+        }
+
+        private static bool HasActiveRefLocalBorrowAfterWrite(
+            ILocalSymbol targetLocal,
+            SyntaxNode writeSyntax,
+            PurityAnalysisContext context)
+        {
+            var containingBlock = writeSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (declarator.SpanStart >= writeSyntax.SpanStart ||
+                    declarator.Initializer?.Value is not RefExpressionSyntax refExpression ||
+                    context.SemanticModel.GetDeclaredSymbol(declarator, context.CancellationToken) is not ILocalSymbol refLocal ||
+                    context.SemanticModel.GetSymbolInfo(refExpression.Expression, context.CancellationToken).Symbol is not ILocalSymbol sourceLocal ||
+                    !SymbolEqualityComparer.Default.Equals(sourceLocal, targetLocal))
+                {
+                    continue;
+                }
+
+                if (IsLocalUsedAfter(refLocal, writeSyntax, containingBlock, context))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsLocalUsedAfter(
+            ILocalSymbol localSymbol,
+            SyntaxNode writeSyntax,
+            BlockSyntax containingBlock,
+            PurityAnalysisContext context)
+        {
+            foreach (var identifierName in containingBlock.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                if (identifierName.SpanStart <= writeSyntax.SpanStart)
+                {
+                    continue;
+                }
+
+                if (context.SemanticModel.GetSymbolInfo(identifierName, context.CancellationToken).Symbol is ILocalSymbol usedLocal &&
+                    SymbolEqualityComparer.Default.Equals(usedLocal, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(
