@@ -264,6 +264,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerRefLocalDeclarations_ProjectBorrowFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddDeclaredBorrowFact("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateBorrow("));
+            Assert.That(source, Does.Contain("SymbolicBorrowKind.Mutable"));
+            Assert.That(source, Does.Contain("SymbolicBorrowKind.Shared"));
+            Assert.That(source, Does.Contain("\"analyzer.declaration.borrow\""));
+            Assert.That(source, Does.Contain("\"evidence.declaration.borrow\""));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();

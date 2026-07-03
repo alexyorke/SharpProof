@@ -4554,6 +4554,10 @@ namespace PurelySharp.Analyzer.Engine
                                     initializerValue,
                                     nextState,
                                     context.SemanticModel);
+                                nextState = AddDeclaredBorrowFact(
+                                    nextState,
+                                    declaredSymbol,
+                                    initializerValue);
                                 if (!IsUsingResourceDeclarator(declarator))
                                 {
                                     nextState = AddOwnedDisposableLocalFacts(
@@ -5085,6 +5089,41 @@ namespace PurelySharp.Analyzer.Engine
             return currentState.WithPathConditionsAndState(
                 currentState.PathConditions,
                 currentState.PathState.AddFact(aliasFact));
+        }
+
+        private static PurityAnalysisState AddDeclaredBorrowFact(
+            PurityAnalysisState currentState,
+            ILocalSymbol declaredSymbol,
+            IOperation initializerValue)
+        {
+            if (declaredSymbol.RefKind is not (RefKind.Ref or RefKind.Out or RefKind.In or RefKind.RefReadOnly))
+            {
+                return currentState;
+            }
+
+            var sourceSymbol = TryResolveTrackedSymbol(initializerValue, currentState);
+            if (sourceSymbol == null)
+            {
+                return currentState;
+            }
+
+            var borrowKind = declaredSymbol.RefKind is RefKind.In or RefKind.RefReadOnly
+                ? SymbolicBorrowKind.Shared
+                : SymbolicBorrowKind.Mutable;
+            var sourceTerm = CreateSymbolicReferenceTerm(sourceSymbol, currentState);
+            var borrowTerm = CreateSymbolicReferenceTerm(declaredSymbol, currentState);
+            var borrowFact = SymbolicOwnershipFactFactory.CreateBorrow(
+                sourceTerm,
+                borrowTerm,
+                borrowKind,
+                initializerValue.Syntax,
+                "analyzer.declaration.borrow",
+                declaredSymbol,
+                "evidence.declaration.borrow");
+
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                currentState.PathState.AddFact(borrowFact));
         }
 
         private static PurityAnalysisState AddAssignedSymbolicEqualityFact(
