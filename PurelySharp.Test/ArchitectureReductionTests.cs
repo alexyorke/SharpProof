@@ -728,6 +728,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerAssignmentFacts_AreMirroredIntoSymbolicState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var rawFactIndex = source.IndexOf("CreateAssignedValueFact(targetFormula, valueFormula)", StringComparison.Ordinal);
+            var symbolicFactIndex = source.IndexOf("AddAssignedValueSymbolicFact(", StringComparison.Ordinal);
+
+            Assert.That(rawFactIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(symbolicFactIndex, Is.GreaterThan(rawFactIndex));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerTerm("));
+            Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
+            Assert.That(source, Does.Contain("\"analyzer.assignment.value\""));
+        }
+
+        [Test]
         public void AnalyzerStateMerge_PreservesCommonSymbolicPathState()
         {
             var repositoryRoot = FindRepositoryRoot();

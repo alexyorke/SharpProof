@@ -4312,6 +4312,12 @@ namespace PurelySharp.Analyzer.Engine
             {
                 var assignedFact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
+                nextState = AddAssignedValueSymbolicFact(
+                    nextState,
+                    targetFormula,
+                    valueExpression,
+                    valueState,
+                    semanticModel);
             }
 
             if (TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
@@ -4402,6 +4408,71 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return nextState;
+        }
+
+        private static PurityAnalysisState AddAssignedValueSymbolicFact(
+            PurityAnalysisState currentState,
+            SmtFormula targetFormula,
+            ExpressionSyntax valueExpression,
+            PurityAnalysisState valueState,
+            SemanticModel semanticModel)
+        {
+            if (!TryCreateSymbolicTerm(targetFormula, out var targetTerm) ||
+                !SymbolicIrLowerer.TryLowerTerm(
+                    valueExpression,
+                    new SymbolicLoweringContext(
+                        semanticModel,
+                        CancellationToken.None,
+                        valueState.GetSmtSymbolVersion),
+                    out var valueTerm) ||
+                !CanCompareSymbolicTerms(targetTerm, valueTerm))
+            {
+                return currentState;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    valueTerm),
+                valueExpression,
+                "analyzer.assignment",
+                evidenceKey: "analyzer.assignment.value");
+            return currentState.WithPathConditionsAndState(
+                currentState.PathConditions,
+                currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
+        }
+
+        private static bool TryCreateSymbolicTerm(SmtFormula formula, out SymbolicTerm term)
+        {
+            switch (formula)
+            {
+                case SmtBooleanConstant boolean:
+                    term = new SymbolicBooleanConstantTerm(boolean.Value);
+                    return true;
+                case SmtIntegerConstant integer:
+                    term = new SymbolicIntegerConstantTerm(integer.Value);
+                    return true;
+                case SmtStringConstant text:
+                    term = new SymbolicStringConstantTerm(text.Value);
+                    return true;
+                case SmtNullConstant:
+                    term = new SymbolicNullTerm();
+                    return true;
+                case SmtVariable variable:
+                    term = new SymbolicVariableTerm(variable.Name, variable.Kind);
+                    return true;
+                default:
+                    term = null!;
+                    return false;
+            }
+        }
+
+        private static bool CanCompareSymbolicTerms(SymbolicTerm left, SymbolicTerm right)
+        {
+            return left.Kind == right.Kind ||
+                left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference ||
+                right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference;
         }
 
         private static bool TryCreateReferenceBackedLengthFact(
