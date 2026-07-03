@@ -227,6 +227,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("postCfgExitResourceState"));
             Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Owned"));
             Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
+            Assert.That(source, Does.Contain("IsResourceReleased("));
+            Assert.That(source, Does.Contain("EnumerateSymbolicAliasTerms(resource, state)"));
             Assert.That(source, Does.Contain("\"resource_missing_dispose\""));
         }
 

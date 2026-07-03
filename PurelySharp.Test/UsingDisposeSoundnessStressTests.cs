@@ -443,6 +443,35 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ReturnedAliasToOwnedLocalDisposable_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        return alias;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task UseAfterUsingStatementExistingLocal_Diagnostic()
         {
             var test = @"

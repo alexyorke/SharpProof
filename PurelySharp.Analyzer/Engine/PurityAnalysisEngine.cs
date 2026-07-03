@@ -1917,6 +1917,11 @@ namespace PurelySharp.Analyzer.Engine
                     {
                         if (declarator.Initializer?.Value is { } initializer)
                         {
+                            nextState = AddAssignedAliasFact(
+                                nextState,
+                                declarator.Symbol,
+                                initializer,
+                                nextState);
                             nextState = AddOwnedDisposableLocalFacts(
                                 nextState,
                                 declarator.Symbol,
@@ -2184,7 +2189,7 @@ namespace PurelySharp.Analyzer.Engine
 
             foreach (var resource in ownedResources)
             {
-                if (releasedResources.Contains(resource.Key))
+                if (IsResourceReleased(resource.Key, releasedResources, state, new HashSet<SymbolicTerm>()))
                 {
                     continue;
                 }
@@ -2204,6 +2209,33 @@ namespace PurelySharp.Analyzer.Engine
                         symbol: resource.Value,
                         catalogSource: "symbolic_resource_lifetime"));
                 return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsResourceReleased(
+            SymbolicTerm resource,
+            HashSet<SymbolicTerm> releasedResources,
+            PurityAnalysisState state,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (releasedResources.Contains(resource))
+            {
+                return true;
+            }
+
+            if (!visitedTerms.Add(resource))
+            {
+                return false;
+            }
+
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resource, state))
+            {
+                if (IsResourceReleased(aliasTerm, releasedResources, state, visitedTerms))
+                {
+                    return true;
+                }
             }
 
             return false;
