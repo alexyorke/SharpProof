@@ -49,6 +49,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return doubleDisposeResult;
             }
 
+            if (TryCheckUseAfterDispose(invocationOperation, invokedMethodSymbol, currentState, out var useAfterDisposeResult))
+            {
+                return useAfterDisposeResult;
+            }
+
             if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
             {
                 return earlyTypeEqualityResult;
@@ -1268,6 +1273,35 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invocationOperation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(
                     "resource_double_dispose",
+                    nameof(MethodInvocationPurityRule),
+                    invocationOperation,
+                    symbol: invokedMethodSymbol,
+                    catalogSource: "symbolic_resource_lifetime"));
+            return true;
+        }
+
+        private static bool TryCheckUseAfterDispose(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol invokedMethodSymbol,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            if (PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
+                invokedMethodSymbol.IsStatic ||
+                invocationOperation.Instance == null ||
+                invokedMethodSymbol.ContainingType?.SpecialType == SpecialType.System_Object ||
+                PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol ||
+                !PurityAnalysisEngine.HasDisposedResourceFact(currentState, resourceSymbol))
+            {
+                return false;
+            }
+
+            PurityAnalysisEngine.LogDebug("  [MIR] Instance invocation uses a resource already marked disposed by symbolic ownership facts.");
+            result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                invocationOperation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "resource_use_after_dispose",
                     nameof(MethodInvocationPurityRule),
                     invocationOperation,
                     symbol: invokedMethodSymbol,
