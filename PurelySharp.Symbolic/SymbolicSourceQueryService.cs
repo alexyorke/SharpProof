@@ -7181,7 +7181,7 @@ namespace PurelySharp.Symbolic
 
         public bool IsTrivial => Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
 
-        public static SymbolicInvariantResult FromPathConditions(
+        internal static SymbolicInvariantResult FromPathConditions(
             IReadOnlyList<SmtFormula> pathConditions,
             string? mergedInvariantText = null)
         {
@@ -7280,7 +7280,7 @@ namespace PurelySharp.Symbolic
 
         public bool IsConservativeUnknown { get; }
 
-        public static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
+        internal static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
         {
             if (formula == null)
             {
@@ -7352,7 +7352,7 @@ namespace PurelySharp.Symbolic
         ConservativeFactMerge,
     }
 
-    public sealed class SymbolicProgramPointQueryResult
+    internal sealed class SymbolicProgramPointQueryResult
     {
         public SymbolicProgramPointQueryResult(
             string filePath,

@@ -23,7 +23,7 @@ namespace PurelySharp.Symbolic
         {
         }
 
-        public SymbolicQueryService(SymbolicInvariantService invariantService)
+        internal SymbolicQueryService(SymbolicInvariantService invariantService)
         {
             if (invariantService == null)
             {

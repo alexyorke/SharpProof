@@ -4,13 +4,14 @@ using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
-    public static class SymbolicReachabilityService
+    internal static class SymbolicReachabilityService
     {
         private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache> s_structuralPathConditionCache = new();
 
@@ -43,6 +44,29 @@ namespace PurelySharp.Symbolic
         {
             return IsSatisfiable(pathConditions, smtAnalysis) &&
                 PathConditionsImply(pathConditions, factFormula, smtAnalysis);
+        }
+
+        internal static SymbolicIrProofResult ClassifyStateFeasibility(
+            SymbolicState state,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyReachability(state);
+        }
+
+        internal static SymbolicIrProofResult ClassifyStateImplication(
+            SymbolicState state,
+            SymbolicFact fact,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, fact);
+        }
+
+        internal static SymbolicIrProofResult ClassifyStateImplication(
+            SymbolicState state,
+            SymbolicCondition condition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, condition);
         }
 
         public static List<SmtFormula>? TryCollectBranchConditions(
@@ -86,8 +110,7 @@ namespace PurelySharp.Symbolic
                     getSymbolVersion);
             }
 
-            var countBeforeBranchAssumptions = pathConditions.Count;
-            CSharpConditionToFormula.TryCollectBranchAssumptions(
+            var addedIrBranchFact = TryAddIrBranchConditionFact(
                 condition,
                 branchWhenTrue,
                 semanticModel,
@@ -95,9 +118,18 @@ namespace PurelySharp.Symbolic
                 pathConditions,
                 getSymbolVersion);
 
+            var countBeforeBranchAssumptions = pathConditions.Count;
+            CSharpConditionToFormula.TryCollectBranchAssumptions(
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                pathConditions,
+                    getSymbolVersion);
+
             var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
             if ((addTranslatedFormulaAlways ||
-                 addTranslatedFormulaFallback && !addedBranchFacts) &&
+                 addTranslatedFormulaFallback && !addedIrBranchFact && !addedBranchFacts) &&
                 CSharpConditionToFormula.TryTranslate(
                     condition,
                     semanticModel,
@@ -112,6 +144,37 @@ namespace PurelySharp.Symbolic
             }
 
             return pathConditions.Count != originalCount;
+        }
+
+        private static bool TryAddIrBranchConditionFact(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var context = new SymbolicLoweringContext(
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion);
+            if (!SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition))
+            {
+                return false;
+            }
+
+            if (!branchWhenTrue)
+            {
+                symbolicCondition = new SymbolicNotCondition(symbolicCondition);
+            }
+
+            if (!SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var formula))
+            {
+                return false;
+            }
+
+            pathConditions.Add(formula);
+            return true;
         }
 
         public static bool IsBranchReachable(

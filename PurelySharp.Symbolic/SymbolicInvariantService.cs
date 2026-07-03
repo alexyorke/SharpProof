@@ -10,7 +10,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
-    public sealed class SymbolicInvariantService
+    internal sealed class SymbolicInvariantService
     {
         public SymbolicInvariantSnapshot GetInvariantsAt(
             SyntaxNode site,
@@ -297,7 +297,7 @@ namespace PurelySharp.Symbolic
         }
     }
 
-    public sealed class SymbolicInvariantSnapshot
+    internal sealed class SymbolicInvariantSnapshot
     {
         public SymbolicInvariantSnapshot(int spanStart, IReadOnlyList<SmtFormula> formulas)
         {
@@ -332,7 +332,7 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
     }
 
-    public sealed class SymbolicInvariantImplicationResult
+    internal sealed class SymbolicInvariantImplicationResult
     {
         public SymbolicInvariantImplicationResult(
             int spanStart,
@@ -367,7 +367,7 @@ namespace PurelySharp.Symbolic
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
     }
 
-    public sealed class SymbolicProgramPointAnalysis
+    internal sealed class SymbolicProgramPointAnalysis
     {
         public SymbolicProgramPointAnalysis(
             int spanStart,

@@ -26,7 +26,7 @@ namespace PurelySharp.Symbolic
         {
         }
 
-        public SymbolicRuntimeHazardQueryService(SymbolicInvariantService invariantService)
+        internal SymbolicRuntimeHazardQueryService(SymbolicInvariantService invariantService)
         {
             _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
         }

@@ -1,9 +1,14 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
+using SearchLib.Smt;
 
 namespace PurelySharp.Test
 {
@@ -383,6 +388,178 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
             Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
+            Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.GreaterThan(0));
+        }
+
+        [Test]
+        public async Task SymbolicPublicFormulaSurface_IsLimitedToApprovedMigrationFiles()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            using var document = await RunPowerShellJsonScriptAsync(
+                repositoryRoot,
+                "Get-PurelySharpRawSmtHotspots.ps1");
+            var root = document.RootElement;
+            var unexpectedPaths = root.GetProperty("symbolicPublicFormulaSurfaces")
+                .EnumerateArray()
+                .Select(static surface => surface.GetProperty("path").GetString() ?? string.Empty)
+                .Distinct(StringComparer.Ordinal)
+                .Where(path => !ApprovedSymbolicPublicFormulaSurfaceFiles.Contains(path, StringComparer.Ordinal))
+                .ToArray();
+
+            Assert.That(
+                unexpectedPaths,
+                Is.Empty,
+                "New public symbolic API surfaces must expose fact/proof DTOs instead of SmtFormula.");
+        }
+
+        [Test]
+        public void SymbolicCleanBreakDtos_DoNotExposeSmtFormula()
+        {
+            var dtoTypes = new[]
+            {
+                typeof(SymbolicFactInfo),
+                typeof(SymbolicInvariantInfo),
+                typeof(SymbolicProofInfo),
+                typeof(SymbolicBudgetInfo),
+                typeof(SymbolicProofBackend),
+                typeof(SymbolicProofStatus),
+                typeof(SymbolicUnknownReason),
+            };
+
+            var offenders = dtoTypes
+                .SelectMany(static type => type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+                    .Select(member => new
+                    {
+                        Type = type,
+                        Member = member,
+                    }))
+                .Where(static item => PublicMemberReferencesSmtFormula(item.Member))
+                .Select(static item => item.Type.FullName + "." + item.Member.Name)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
+        public void ExportedSymbolicApi_SmtFormulaExposureIsLimitedToAdvancedBackend()
+        {
+            var assembly = typeof(SymbolicQueryService).Assembly;
+            var offenders = assembly
+                .GetExportedTypes()
+                .Where(static type => !AllowedExportedSmtFormulaTypes.Contains(type.FullName ?? string.Empty, StringComparer.Ordinal))
+                .SelectMany(static type => type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+                    .Select(member => new
+                    {
+                        Type = type,
+                        Member = member,
+                    }))
+                .Where(static item => PublicMemberReferencesSmtFormula(item.Member))
+                .Select(static item => item.Type.FullName + "." + item.Member.Name)
+                .ToArray();
+
+            Assert.That(
+                offenders,
+                Is.Empty,
+                "Exported symbolic APIs should expose symbolic facts/proofs, not backend SmtFormula.");
+        }
+
+        [Test]
+        public void SymbolicFactInfo_ProjectsIrFactWithoutSolverTypes()
+        {
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicVariableTerm("x", SearchLib.Smt.SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(1)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x == 1"),
+                "test.fact",
+                evidenceKey: "evidence.symbolic.fact");
+
+            var info = SymbolicFactInfo.FromFact(fact);
+
+            Assert.That(info.Kind, Is.EqualTo(nameof(SymbolicRelationAtom)));
+            Assert.That(info.Provenance, Is.EqualTo("test.fact"));
+            Assert.That(info.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact.ToString()));
+            Assert.That(info.EvidenceKey, Is.EqualTo("evidence.symbolic.fact"));
+            Assert.That(info.Text, Does.Contain(nameof(SymbolicRelationOperator.Equal)));
+        }
+
+        [Test]
+        public void SymbolicProofService_ClassifiesIrStateWithoutPublicFormulaInput()
+        {
+            var state = new SymbolicState(
+                pathConditions: new SymbolicCondition[]
+                {
+                    new SymbolicConstantCondition(false),
+                });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
+        public void SymbolicProofService_UnsupportedIrStaysConservative()
+        {
+            var unsupportedFact = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("value", SearchLib.Smt.SmtValueKind.Reference)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("value"),
+                "test.unsupported");
+            var state = new SymbolicState(new[] { unsupportedFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.None));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_TriesIrBranchFactsBeforeLegacyTranslator()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var irIndex = source.IndexOf("TryAddIrBranchConditionFact(", StringComparison.Ordinal);
+            var legacyIndex = source.IndexOf("CSharpConditionToFormula.TryCollectBranchAssumptions", StringComparison.Ordinal);
+
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irIndex, Is.LessThan(legacyIndex));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
+        {
+            const string source = "class C { void M(int x) { if (x > 0) { } } }";
+            var tree = CSharpSyntaxTree.ParseText(source);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityBranchFacts",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var ifStatement = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<IfStatementSyntax>()
+                .Single();
+            var pathConditions = new List<SmtFormula>();
+
+            var added = SymbolicReachabilityService.TryAddBranchConditionFacts(
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                semanticModel,
+                CancellationToken.None,
+                pathConditions);
+
+            Assert.That(added, Is.True);
+            Assert.That(pathConditions, Is.Not.Empty);
+            Assert.That(pathConditions.Select(static formula => formula.ToString() ?? string.Empty), Has.Some.Contains("x"));
         }
 
         [Test]
@@ -474,6 +651,61 @@ namespace PurelySharp.Test
             "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
             "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
         };
+
+        private static readonly string[] ApprovedSymbolicPublicFormulaSurfaceFiles =
+        {
+            "PurelySharp.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
+            "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs",
+            "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
+            "PurelySharp.Symbolic/Smt/SmtSyntacticClassifier.cs",
+            "PurelySharp.Symbolic/SymbolicFactFactory.cs",
+            "PurelySharp.Symbolic/SymbolicInvariantService.cs",
+            "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
+            "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
+            "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+            "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+        };
+
+        private static readonly string[] AllowedExportedSmtFormulaTypes =
+        {
+            "PurelySharp.Symbolic.Smt.SmtAnalysisService",
+        };
+
+        private static bool PublicMemberReferencesSmtFormula(MemberInfo member)
+        {
+            switch (member)
+            {
+                case PropertyInfo property:
+                    return TypeReferencesSmtFormula(property.PropertyType);
+                case FieldInfo field:
+                    return TypeReferencesSmtFormula(field.FieldType);
+                case MethodInfo method:
+                    return TypeReferencesSmtFormula(method.ReturnType) ||
+                        method.GetParameters().Any(static parameter => TypeReferencesSmtFormula(parameter.ParameterType));
+                case ConstructorInfo constructor:
+                    return constructor.GetParameters().Any(static parameter => TypeReferencesSmtFormula(parameter.ParameterType));
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TypeReferencesSmtFormula(Type type)
+        {
+            if (string.Equals(type.FullName, "SearchLib.Smt.SmtFormula", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (type.HasElementType &&
+                type.GetElementType() is { } elementType &&
+                TypeReferencesSmtFormula(elementType))
+            {
+                return true;
+            }
+
+            return type.IsGenericType &&
+                type.GetGenericArguments().Any(TypeReferencesSmtFormula);
+        }
 
         private static IReadOnlyList<(string Path, int MatchCount)> GetAnalyzerRawSmtHotspots(string repositoryRoot)
         {

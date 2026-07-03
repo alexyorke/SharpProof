@@ -1,13 +1,12 @@
 <#
 .SYNOPSIS
-Reports analyzer files that still construct raw SMT formulas or call the
-legacy C# condition translator directly.
+Reports raw SMT migration hotspots.
 
 .DESCRIPTION
-This is a read-only migration inventory. It is intentionally narrower than a
-generic text search: using SmtAnalysisService or SmtAnalysisOptions is not a
-hotspot. The remaining hotspots are places that should eventually lower to
-Symbolic IR facts and use shared proof services instead.
+This is a read-only migration inventory. Analyzer hotspots are intentionally
+narrower than a generic text search: using SmtAnalysisService or
+SmtAnalysisOptions is not a hotspot. Symbolic public surfaces identify current
+API debt where backend SmtFormula types still leak through the public .NET API.
 #>
 [CmdletBinding()]
 param(
@@ -56,8 +55,7 @@ $categories = @(
     }
 )
 
-Push-Location $repoRoot
-try
+function Get-AnalyzerHotspots
 {
     $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Analyzer') -Recurse -Filter '*.cs' |
         Where-Object {
@@ -109,12 +107,57 @@ try
         }
     }
 
+    return [pscustomobject]@{
+        totalFiles = $files.Count
+        hotspots = @($hotspots)
+    }
+}
+
+function Get-SymbolicPublicFormulaSurfaces
+{
+    $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic') -Recurse -Filter '*.cs' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/'
+        } |
+        Sort-Object FullName
+
+    $surfaces = @()
+    foreach ($file in $files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            if ($line.IndexOf('public', [System.StringComparison]::Ordinal) -ge 0 -and
+                $line.IndexOf('SmtFormula', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $surfaces += [pscustomobject]@{
+                    path = Convert-ToRepoPath $file.FullName
+                    line = $lineNumber
+                    text = $line.Trim()
+                }
+            }
+        }
+    }
+
+    return @($surfaces)
+}
+
+Push-Location $repoRoot
+try
+{
+    $analyzer = Get-AnalyzerHotspots
+    $publicFormulaSurfaces = Get-SymbolicPublicFormulaSurfaces
+
     $report = [ordered]@{
         schemaVersion = 1
         module = 'Analyzer'
-        totalFiles = $files.Count
-        hotspotCount = $hotspots.Count
-        hotspots = @($hotspots)
+        totalFiles = $analyzer.totalFiles
+        hotspotCount = $analyzer.hotspots.Count
+        hotspots = @($analyzer.hotspots)
+        symbolicPublicFormulaSurfaceCount = $publicFormulaSurfaces.Count
+        symbolicPublicFormulaSurfaces = @($publicFormulaSurfaces)
     }
 
     if ($Json)
@@ -124,8 +167,10 @@ try
     }
 
     "Analyzer raw SMT hotspots: $($report.hotspotCount) files"
+    "Symbolic public SmtFormula surfaces: $($report.symbolicPublicFormulaSurfaceCount) lines"
     ''
-    $hotspots | Format-Table -AutoSize | Out-String
+    $analyzer.hotspots | Format-Table -AutoSize | Out-String
+    $publicFormulaSurfaces | Format-Table -AutoSize | Out-String
 }
 finally
 {
