@@ -313,8 +313,11 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicTypeTestAtom"));
             Assert.That(source, Does.Contain("SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey"));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula"));
+            Assert.That(source, Does.Contain("TryCreateReferenceNullCondition("));
+            Assert.That(source, Does.Contain("\"ir.runtime-hazard.reference.non-null.guard\""));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateReferenceNullCondition"));
         }
 
         [Test]
@@ -938,7 +941,7 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
-            var helperIndex = source.IndexOf("TryCreateThrowNullCondition(", StringComparison.Ordinal);
+            var helperIndex = source.IndexOf("TryCreateReferenceNullCondition(", StringComparison.Ordinal);
             var irProofIndex = source.IndexOf("ClassifyStateImplication(\r\n                    analysis.PathState,\r\n                    nullCondition,", StringComparison.Ordinal);
             if (irProofIndex < 0)
             {

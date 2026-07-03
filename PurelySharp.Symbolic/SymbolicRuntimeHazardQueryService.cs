@@ -462,10 +462,11 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var hasIrNullCondition = TryCreateThrowNullCondition(
+            var hasIrNullCondition = TryCreateReferenceNullCondition(
                 thrownExpression,
                 semanticModel,
                 cancellationToken,
+                "ir.runtime-hazard.throw-null.trigger",
                 out var nullCondition,
                 out var irNullTrigger);
             var hasLegacyNullCondition = TryTranslateNullCondition(
@@ -498,48 +499,6 @@ namespace PurelySharp.Symbolic
 
             return hasLegacyNullCondition &&
                 SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, legacyNullTrigger, smtAnalysis);
-        }
-
-        private static bool TryCreateThrowNullCondition(
-            ExpressionSyntax thrownExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SymbolicCondition condition,
-            out SmtFormula trigger)
-        {
-            thrownExpression = UnwrapExpression(thrownExpression);
-            if (thrownExpression.IsKind(SyntaxKind.NullLiteralExpression))
-            {
-                condition = new SymbolicConstantCondition(true);
-                trigger = new SmtBooleanConstant(true);
-                return true;
-            }
-
-            if (thrownExpression is DefaultExpressionSyntax defaultExpression &&
-                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
-            {
-                condition = new SymbolicConstantCondition(true);
-                trigger = new SmtBooleanConstant(true);
-                return true;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(thrownExpression, context, out var thrownTerm) ||
-                thrownTerm.Kind != SmtValueKind.Reference)
-            {
-                condition = null!;
-                trigger = null!;
-                return false;
-            }
-
-            condition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    thrownTerm,
-                    new SymbolicNullTerm()),
-                thrownExpression,
-                "ir.runtime-hazard.throw-null.trigger"));
-            return SymbolicIrFormulaEncoder.TryEncode(condition, out trigger);
         }
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(

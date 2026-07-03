@@ -1908,6 +1908,17 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            if (TryCreateReferenceNullCondition(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.runtime-hazard.reference.non-null.guard",
+                    out _,
+                    out var irNullTrigger))
+            {
+                return new SmtUnaryFormula(SmtUnaryOperator.Not, irNullTrigger);
+            }
+
             return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
                 ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
                 : CreateUnknownTrigger(site, "cast_operand_not_null");

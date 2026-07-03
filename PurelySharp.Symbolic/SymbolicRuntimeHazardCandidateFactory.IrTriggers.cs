@@ -1,5 +1,6 @@
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Symbolic.Ir;
@@ -605,6 +606,49 @@ namespace PurelySharp.Symbolic
 
             trigger = default;
             return false;
+        }
+
+        private static bool TryCreateReferenceNullCondition(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenance,
+            out SymbolicCondition condition,
+            out SmtFormula trigger)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression.IsKind(SyntaxKind.NullLiteralExpression))
+            {
+                condition = new SymbolicConstantCondition(true);
+                trigger = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (expression is DefaultExpressionSyntax defaultExpression &&
+                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+            {
+                condition = new SymbolicConstantCondition(true);
+                trigger = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) ||
+                term.Kind != SmtValueKind.Reference)
+            {
+                condition = null!;
+                trigger = null!;
+                return false;
+            }
+
+            condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    term,
+                    new SymbolicNullTerm()),
+                expression,
+                provenance));
+            return SymbolicIrFormulaEncoder.TryEncode(condition, out trigger);
         }
     }
 }
