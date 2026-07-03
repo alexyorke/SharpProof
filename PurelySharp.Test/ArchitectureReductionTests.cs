@@ -536,18 +536,7 @@ namespace PurelySharp.Test
         [Test]
         public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
         {
-            const string source = "class C { void M(int x) { if (x > 0) { } } }";
-            var tree = CSharpSyntaxTree.ParseText(source);
-            var compilation = CSharpCompilation.Create(
-                "SymbolicReachabilityBranchFacts",
-                new[] { tree },
-                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(tree);
-            var ifStatement = tree.GetRoot()
-                .DescendantNodes()
-                .OfType<IfStatementSyntax>()
-                .Single();
+            var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");
             var pathConditions = new List<SmtFormula>();
 
             var added = SymbolicReachabilityService.TryAddBranchConditionFacts(
@@ -560,6 +549,47 @@ namespace PurelySharp.Test
             Assert.That(added, Is.True);
             Assert.That(pathConditions, Is.Not.Empty);
             Assert.That(pathConditions.Select(static formula => formula.ToString() ?? string.Empty), Has.Some.Contains("x"));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_CollectsIrBranchStateBeforeFormulaProjection()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x <= 10) { } } }");
+            var initialState = new SymbolicState();
+
+            var added = SymbolicReachabilityService.TryCollectBranchState(
+                initialState,
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                semanticModel,
+                CancellationToken.None,
+                out var branchState);
+            var encoded = SymbolicReachabilityService.TryEncodeStatePathConditions(
+                branchState,
+                out var pathConditions);
+
+            Assert.That(added, Is.True);
+            Assert.That(branchState.PathConditions, Has.Length.EqualTo(1));
+            Assert.That(encoded, Is.True);
+            Assert.That(pathConditions, Has.Length.EqualTo(1));
+            Assert.That(pathConditions[0].ToString(), Does.Contain("x"));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_CollectsNegatedIrBranchState()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x == 0) { } } }");
+
+            var added = SymbolicReachabilityService.TryCollectBranchState(
+                new SymbolicState(),
+                ifStatement.Condition,
+                branchWhenTrue: false,
+                semanticModel,
+                CancellationToken.None,
+                out var branchState);
+
+            Assert.That(added, Is.True);
+            Assert.That(branchState.PathConditions.Single(), Is.TypeOf<SymbolicNotCondition>());
         }
 
         [Test]
@@ -661,6 +691,7 @@ namespace PurelySharp.Test
             "PurelySharp.Symbolic/SymbolicFactFactory.cs",
             "PurelySharp.Symbolic/SymbolicInvariantService.cs",
             "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
+            "PurelySharp.Symbolic/SymbolicProofService.cs",
             "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
             "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
             "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
@@ -705,6 +736,22 @@ namespace PurelySharp.Test
 
             return type.IsGenericType &&
                 type.GetGenericArguments().Any(TypeReferencesSmtFormula);
+        }
+
+        private static (SemanticModel SemanticModel, IfStatementSyntax IfStatement) CreateSingleIfStatement(string source)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityBranchFacts",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var ifStatement = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<IfStatementSyntax>()
+                .Single();
+            return (semanticModel, ifStatement);
         }
 
         private static IReadOnlyList<(string Path, int MatchCount)> GetAnalyzerRawSmtHotspots(string repositoryRoot)

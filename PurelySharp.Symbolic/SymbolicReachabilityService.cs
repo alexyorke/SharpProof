@@ -69,6 +69,38 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, condition);
         }
 
+        internal static bool TryCollectBranchState(
+            SymbolicState state,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicState branchState,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            if (!TryCreateIrBranchCondition(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out var symbolicCondition))
+            {
+                branchState = state;
+                return false;
+            }
+
+            branchState = state.AddPathCondition(symbolicCondition);
+            return true;
+        }
+
+        internal static bool TryEncodeStatePathConditions(
+            SymbolicState state,
+            out ImmutableArray<SmtFormula> pathConditions)
+        {
+            return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
+        }
+
         public static List<SmtFormula>? TryCollectBranchConditions(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,
@@ -154,11 +186,35 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
+            if (!TryCreateIrBranchCondition(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out var symbolicCondition) ||
+                !SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var formula))
+            {
+                return false;
+            }
+
+            pathConditions.Add(formula);
+            return true;
+        }
+
+        private static bool TryCreateIrBranchCondition(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicCondition symbolicCondition)
+        {
             var context = new SymbolicLoweringContext(
                 semanticModel,
                 cancellationToken,
                 getSymbolVersion);
-            if (!SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition))
+            if (!SymbolicIrLowerer.TryLowerCondition(condition, context, out symbolicCondition))
             {
                 return false;
             }
@@ -168,12 +224,6 @@ namespace PurelySharp.Symbolic
                 symbolicCondition = new SymbolicNotCondition(symbolicCondition);
             }
 
-            if (!SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var formula))
-            {
-                return false;
-            }
-
-            pathConditions.Add(formula);
             return true;
         }
 

@@ -28,6 +28,11 @@ namespace PurelySharp.Symbolic
             return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
         }
 
+        public bool TryEncode(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
+        {
+            return TryEncodeState(state, out pathConditions, out _);
+        }
+
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)
         {
             if (!TryEncodeState(state, out var pathConditions, out var unknownReason) ||
