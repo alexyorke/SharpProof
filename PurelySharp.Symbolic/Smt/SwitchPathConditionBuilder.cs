@@ -90,7 +90,7 @@ namespace PurelySharp.Symbolic.Smt
             formula = null!;
             var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
             var domainFacts = new List<SmtFormula>();
-            CSharpConditionToFormula.TryCollectDomainFacts(
+            CSharpSmtFormulaTranslator.TryCollectDomainFacts(
                 governingExpression,
                 semanticModel,
                 cancellationToken,
@@ -250,7 +250,7 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     governingExpression,
                     semanticModel,
                     cancellationToken,
@@ -283,7 +283,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpConditionToFormula.TryTranslateValue(
+                CSharpSmtFormulaTranslator.TryTranslateValue(
                     caseLabel.Value,
                     semanticModel,
                     cancellationToken,
@@ -329,7 +329,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var domainFacts = new List<SmtFormula>();
-            CSharpConditionToFormula.TryCollectDomainFacts(
+            CSharpSmtFormulaTranslator.TryCollectDomainFacts(
                 governingExpression,
                 semanticModel,
                 cancellationToken,
@@ -337,7 +337,7 @@ namespace PurelySharp.Symbolic.Smt
                 getSymbolVersion);
 
             if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpConditionToFormula.TryTranslateValue(
+                CSharpSmtFormulaTranslator.TryTranslateValue(
                     caseLabel.Value,
                     semanticModel,
                     cancellationToken,
@@ -446,7 +446,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var conditions = new List<SmtFormula> { patternFormula };
             var bindingFacts = new List<SmtFormula>();
-            CSharpConditionToFormula.TryCollectPatternBindingFacts(
+            CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
                 governingValue,
                 governingType,
                 pattern,
@@ -457,7 +457,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (whenClause != null)
             {
-                if (!CSharpConditionToFormula.TryTranslate(
+                if (!CSharpSmtFormulaTranslator.TryTranslate(
                         whenClause.Condition,
                         semanticModel,
                         cancellationToken,
@@ -632,7 +632,7 @@ namespace PurelySharp.Symbolic.Smt
             formula = null;
 
             if (CanUseTranslatedPatternForSelection(pattern, valueType, semanticModel, cancellationToken) &&
-                CSharpConditionToFormula.TryTranslatePattern(
+                CSharpSmtFormulaTranslator.TryTranslatePattern(
                     value,
                     pattern,
                     semanticModel,
@@ -1175,7 +1175,7 @@ namespace PurelySharp.Symbolic.Smt
             var conditions = initialConditions == null
                 ? new List<SmtFormula>()
                 : new List<SmtFormula>(initialConditions);
-            if (CSharpConditionToFormula.TryTranslatePattern(
+            if (CSharpSmtFormulaTranslator.TryTranslatePattern(
                     governingValue,
                     pattern,
                     semanticModel,
@@ -1211,7 +1211,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (includePatternBindings)
             {
-                CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
                     governingValue,
                     governingType,
                     pattern,
@@ -1224,7 +1224,7 @@ namespace PurelySharp.Symbolic.Smt
             if (whenClause != null)
             {
                 var bindingFacts = new List<SmtFormula>();
-                CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
                     governingValue,
                     governingType,
                     pattern,
@@ -1233,7 +1233,7 @@ namespace PurelySharp.Symbolic.Smt
                     bindingFacts,
                     getSymbolVersion);
 
-                CSharpConditionToFormula.TryCollectDomainFacts(
+                CSharpSmtFormulaTranslator.TryCollectDomainFacts(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
@@ -1241,7 +1241,7 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion);
 
                 var branchAssumptions = new List<SmtFormula>();
-                if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+                if (CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
                         whenClause.Condition,
                         branchWhenTrue: true,
                         semanticModel,
@@ -1255,7 +1255,7 @@ namespace PurelySharp.Symbolic.Smt
                     }
                 }
 
-                if (CSharpConditionToFormula.TryTranslate(
+                if (CSharpSmtFormulaTranslator.TryTranslate(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
@@ -1281,7 +1281,7 @@ namespace PurelySharp.Symbolic.Smt
             bool includeWholePatternTranslation = true)
         {
             if (includeWholePatternTranslation &&
-                CSharpConditionToFormula.TryTranslatePattern(
+                CSharpSmtFormulaTranslator.TryTranslatePattern(
                     value,
                     pattern,
                     semanticModel,

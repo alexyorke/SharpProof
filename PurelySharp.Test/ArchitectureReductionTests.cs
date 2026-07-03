@@ -502,6 +502,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SwitchPathConditionBuilder_UsesTranslatorShimForLegacyPatternFallbacks()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Smt",
+                "SwitchPathConditionBuilder.cs"));
+
+            Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslatePattern("));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
+        }
+
+        [Test]
         public void SymbolicCleanBreakDtos_DoNotExposeSmtFormula()
         {
             var dtoTypes = new[]
