@@ -183,7 +183,7 @@ namespace PurelySharp.Symbolic
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 
-        public static SmtFormula ConjoinPathConditions(IReadOnlyList<SmtFormula> pathConditions)
+        internal static SmtFormula ConjoinPathConditions(IReadOnlyList<SmtFormula> pathConditions)
         {
             if (pathConditions.Count == 0)
             {
@@ -199,7 +199,7 @@ namespace PurelySharp.Symbolic
             return merged;
         }
 
-        public static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
+        internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
         {
             return pathConditions.Count == 0
                 ? "true"
