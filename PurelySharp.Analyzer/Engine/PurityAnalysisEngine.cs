@@ -1938,6 +1938,32 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
+            foreach (var deconstructionAssignment in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IDeconstructionAssignmentOperation>())
+            {
+                if (!IsStraightLineUsingStatement(deconstructionAssignment.Syntax))
+                {
+                    continue;
+                }
+
+                nextState = AddDeconstructedResourceAcquisitionFacts(
+                    nextState,
+                    deconstructionAssignment,
+                    semanticModel);
+            }
+
+            foreach (var assignmentSyntax in methodBodyOperation.Syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (!IsStraightLineUsingStatement(assignmentSyntax))
+                {
+                    continue;
+                }
+
+                nextState = AddDeconstructedResourceAcquisitionFacts(
+                    nextState,
+                    assignmentSyntax,
+                    semanticModel);
+            }
+
             foreach (var invocation in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IInvocationOperation>())
             {
                 if (!IsStraightLineUsingStatement(invocation.Syntax))
@@ -1949,6 +1975,169 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             nextState = AddFinallyResourceDisposeFacts(nextState, methodBodyOperation, semanticModel);
+            return nextState;
+        }
+
+        private static PurityAnalysisState AddDeconstructedResourceAcquisitionFacts(
+            PurityAnalysisState nextState,
+            AssignmentExpressionSyntax assignmentSyntax,
+            SemanticModel semanticModel)
+        {
+            if (!IsDeconstructionAssignmentSyntax(assignmentSyntax.Left))
+            {
+                return nextState;
+            }
+
+            foreach (var assignment in EnumerateDeconstructionSyntaxAssignments(
+                         assignmentSyntax.Left,
+                         assignmentSyntax.Right,
+                         semanticModel))
+            {
+                var valueOperation = semanticModel.GetOperation(assignment.Value);
+                if (valueOperation == null)
+                {
+                    continue;
+                }
+
+                nextState = AddAssignedAliasFact(
+                    nextState,
+                    assignment.Local,
+                    valueOperation,
+                    nextState);
+                nextState = AddOwnedDisposableLocalFacts(
+                    nextState,
+                    assignment.Local,
+                    valueOperation,
+                    semanticModel.Compilation);
+            }
+
+            return nextState;
+        }
+
+        private static bool IsDeconstructionAssignmentSyntax(ExpressionSyntax target)
+        {
+            target = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target);
+            return target is TupleExpressionSyntax ||
+                target is DeclarationExpressionSyntax { Designation: ParenthesizedVariableDesignationSyntax };
+        }
+
+        private static IEnumerable<DeconstructionSyntaxAssignmentElement> EnumerateDeconstructionSyntaxAssignments(
+            ExpressionSyntax target,
+            ExpressionSyntax value,
+            SemanticModel semanticModel)
+        {
+            target = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target);
+            value = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(value);
+            if (target is DeclarationExpressionSyntax declarationExpression)
+            {
+                foreach (var assignment in EnumerateDeconstructionDesignationAssignments(
+                             declarationExpression.Designation,
+                             value,
+                             semanticModel))
+                {
+                    yield return assignment;
+                }
+
+                yield break;
+            }
+
+            if (target is TupleExpressionSyntax targetTuple &&
+                value is TupleExpressionSyntax valueTuple)
+            {
+                var count = Math.Min(targetTuple.Arguments.Count, valueTuple.Arguments.Count);
+                for (var i = 0; i < count; i++)
+                {
+                    foreach (var nested in EnumerateDeconstructionSyntaxAssignments(
+                                 targetTuple.Arguments[i].Expression,
+                                 valueTuple.Arguments[i].Expression,
+                                 semanticModel))
+                    {
+                        yield return nested;
+                    }
+                }
+
+                yield break;
+            }
+
+            if (target is IdentifierNameSyntax identifierName &&
+                semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol)
+            {
+                yield return new DeconstructionSyntaxAssignmentElement(localSymbol, value);
+            }
+        }
+
+        private static IEnumerable<DeconstructionSyntaxAssignmentElement> EnumerateDeconstructionDesignationAssignments(
+            VariableDesignationSyntax designation,
+            ExpressionSyntax value,
+            SemanticModel semanticModel)
+        {
+            value = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(value);
+            if (designation is SingleVariableDesignationSyntax singleVariable &&
+                semanticModel.GetDeclaredSymbol(singleVariable) is ILocalSymbol localSymbol)
+            {
+                yield return new DeconstructionSyntaxAssignmentElement(localSymbol, value);
+                yield break;
+            }
+
+            if (designation is ParenthesizedVariableDesignationSyntax parenthesized &&
+                value is TupleExpressionSyntax tuple)
+            {
+                var count = Math.Min(parenthesized.Variables.Count, tuple.Arguments.Count);
+                for (var i = 0; i < count; i++)
+                {
+                    foreach (var nested in EnumerateDeconstructionDesignationAssignments(
+                                 parenthesized.Variables[i],
+                                 tuple.Arguments[i].Expression,
+                                 semanticModel))
+                    {
+                        yield return nested;
+                    }
+                }
+            }
+        }
+
+        private readonly struct DeconstructionSyntaxAssignmentElement
+        {
+            public DeconstructionSyntaxAssignmentElement(ILocalSymbol local, ExpressionSyntax value)
+            {
+                Local = local;
+                Value = value;
+            }
+
+            public ILocalSymbol Local { get; }
+
+            public ExpressionSyntax Value { get; }
+        }
+
+        private static PurityAnalysisState AddDeconstructedResourceAcquisitionFacts(
+            PurityAnalysisState nextState,
+            IDeconstructionAssignmentOperation deconstructionAssignment,
+            SemanticModel semanticModel)
+        {
+            foreach (var assignment in EnumerateDeconstructionAssignments(
+                         deconstructionAssignment.Target,
+                         deconstructionAssignment.Value))
+            {
+                if (TryResolveDeconstructionTargetSymbol(
+                        assignment.Target,
+                        nextState,
+                        semanticModel) is not ILocalSymbol localSymbol)
+                {
+                    continue;
+                }
+
+                nextState = AddAssignedAliasFact(
+                    nextState,
+                    localSymbol,
+                    assignment.Value,
+                    nextState);
+                nextState = AddOwnedDisposableLocalFacts(
+                    nextState,
+                    localSymbol,
+                    assignment.Value,
+                    semanticModel.Compilation);
+            }
+
             return nextState;
         }
 
@@ -4963,6 +5152,15 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+                else if (operationToTrack is IDeconstructionAssignmentOperation deconstructionAssignmentOperation)
+                {
+                    nextState = ApplyDeconstructionAssignmentStateUpdates(
+                        nextState,
+                        deconstructionAssignmentOperation,
+                        currentState,
+                        context);
+                }
+
                 else if (operationToTrack is IAssignmentOperation assignmentOperation)
                 {
                     var targetOperation = assignmentOperation.Target;
@@ -5185,6 +5383,136 @@ namespace PurelySharp.Analyzer.Engine
 
 
             return nextState;
+        }
+
+        private static PurityAnalysisState ApplyDeconstructionAssignmentStateUpdates(
+            PurityAnalysisState nextState,
+            IDeconstructionAssignmentOperation deconstructionAssignmentOperation,
+            PurityAnalysisState currentState,
+            Rules.PurityAnalysisContext context)
+        {
+            foreach (var assignment in EnumerateDeconstructionAssignments(
+                         deconstructionAssignmentOperation.Target,
+                         deconstructionAssignmentOperation.Value))
+            {
+                var targetSymbol = TryResolveDeconstructionTargetSymbol(
+                    assignment.Target,
+                    currentState,
+                    context.SemanticModel);
+                if (targetSymbol is ILocalSymbol localSymbol)
+                {
+                    var writtenLocalSymbols = EnumerateWrittenLocalSymbols(localSymbol, context).ToArray();
+                    nextState = ApplyWrittenLocalStateUpdates(
+                        nextState,
+                        writtenLocalSymbols,
+                        assignment.Value,
+                        currentState,
+                        context.SemanticModel,
+                        context.SemanticModel.Compilation);
+                    nextState = ApplyAssignedDelegateTargets(
+                        nextState,
+                        targetSymbol,
+                        assignment.Target.Type,
+                        assignment.Value,
+                        writtenLocalSymbols,
+                        currentState,
+                        "[ATF-DEL-DECONSTRUCT]",
+                        "deconstructed value targets are unresolved");
+                }
+                else if (targetSymbol is IParameterSymbol parameterSymbol)
+                {
+                    nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
+                    nextState = AddAssignedValueFact(
+                        nextState,
+                        parameterSymbol,
+                        assignment.Value,
+                        currentState,
+                        context.SemanticModel);
+                }
+
+                nextState = AddCallerVisibleMutationFact(
+                    nextState,
+                    assignment.Target,
+                    currentState,
+                    deconstructionAssignmentOperation.Syntax);
+            }
+
+            return nextState;
+        }
+
+        private static IEnumerable<DeconstructionAssignmentElement> EnumerateDeconstructionAssignments(
+            IOperation target,
+            IOperation value)
+        {
+            target = SkipImplicitConversions(target) ?? target;
+            value = SkipImplicitConversions(value) ?? value;
+            if (target is ITupleOperation targetTuple &&
+                value is ITupleOperation valueTuple)
+            {
+                var count = Math.Min(targetTuple.Elements.Length, valueTuple.Elements.Length);
+                for (var i = 0; i < count; i++)
+                {
+                    foreach (var nested in EnumerateDeconstructionAssignments(
+                                 targetTuple.Elements[i],
+                                 valueTuple.Elements[i]))
+                    {
+                        yield return nested;
+                    }
+                }
+
+                yield break;
+            }
+
+            yield return new DeconstructionAssignmentElement(target, value);
+        }
+
+        private static ISymbol? TryResolveDeconstructionTargetSymbol(
+            IOperation targetOperation,
+            PurityAnalysisState currentState,
+            SemanticModel semanticModel)
+        {
+            targetOperation = SkipImplicitConversions(targetOperation) ?? targetOperation;
+            if (TryResolveTrackedSymbol(targetOperation, currentState) is { } trackedSymbol)
+            {
+                return trackedSymbol;
+            }
+
+            if (targetOperation is IDeclarationExpressionOperation declarationExpression)
+            {
+                if (TryResolveTrackedSymbol(declarationExpression.Expression, currentState) is { } declaredTrackedSymbol)
+                {
+                    return declaredTrackedSymbol;
+                }
+
+                if (declarationExpression.Syntax is DeclarationExpressionSyntax { Designation: SingleVariableDesignationSyntax designation } &&
+                    semanticModel.GetDeclaredSymbol(designation) is { } declaredSymbol)
+                {
+                    return declaredSymbol;
+                }
+            }
+
+            if (targetOperation.Syntax is SingleVariableDesignationSyntax singleVariable &&
+                semanticModel.GetDeclaredSymbol(singleVariable) is { } singleVariableSymbol)
+            {
+                return singleVariableSymbol;
+            }
+
+            return targetOperation.Syntax is IdentifierNameSyntax identifier
+                ? semanticModel.GetSymbolInfo(identifier).Symbol
+                : null;
+        }
+
+        private readonly struct DeconstructionAssignmentElement
+        {
+            public DeconstructionAssignmentElement(IOperation target, IOperation value)
+            {
+                Target = target;
+                Value = value;
+            }
+
+            public IOperation Target { get; }
+
+            public IOperation Value { get; }
         }
 
         private static PurityAnalysisState AddReturnedOwnedResourceFacts(
