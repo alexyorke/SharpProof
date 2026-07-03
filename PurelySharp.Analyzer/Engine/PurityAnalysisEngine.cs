@@ -2743,7 +2743,15 @@ namespace PurelySharp.Analyzer.Engine
                 SmtBinaryOperator.Equal,
                 valueFormula,
                 new SmtNullConstant()));
-            if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, smtAnalysis))
+            var nullPathState = TryCreateReferenceNullPathState(
+                currentState,
+                value,
+                valueFormula,
+                isNull: true,
+                out var symbolicNullProbeState)
+                    ? symbolicNullProbeState
+                    : currentState.PathState;
+            if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState, smtAnalysis))
             {
                 isNull = false;
                 return true;
@@ -2753,7 +2761,15 @@ namespace PurelySharp.Analyzer.Engine
                 SmtBinaryOperator.NotEqual,
                 valueFormula,
                 new SmtNullConstant()));
-            if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, smtAnalysis))
+            var nonNullPathState = TryCreateReferenceNullPathState(
+                currentState,
+                value,
+                valueFormula,
+                isNull: false,
+                out var symbolicNonNullProbeState)
+                    ? symbolicNonNullProbeState
+                    : currentState.PathState;
+            if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState, smtAnalysis))
             {
                 isNull = true;
                 return true;

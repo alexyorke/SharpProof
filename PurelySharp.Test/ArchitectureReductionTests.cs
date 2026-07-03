@@ -706,6 +706,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerNullPathProbes_CarrySymbolicNullStateBeforeFeasibility()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var nullProbeIndex = source.IndexOf("var nullPathState = TryCreateReferenceNullPathState(", StringComparison.Ordinal);
+            var nullFeasibilityIndex = source.IndexOf("ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState", StringComparison.Ordinal);
+            var nonNullProbeIndex = source.IndexOf("var nonNullPathState = TryCreateReferenceNullPathState(", StringComparison.Ordinal);
+            var nonNullFeasibilityIndex = source.IndexOf("ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState", StringComparison.Ordinal);
+
+            Assert.That(nullProbeIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nullFeasibilityIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nullProbeIndex, Is.LessThan(nullFeasibilityIndex));
+            Assert.That(nonNullProbeIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nonNullFeasibilityIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nonNullProbeIndex, Is.LessThan(nonNullFeasibilityIndex));
+        }
+
+        [Test]
         public void AnalyzerStateMerge_PreservesCommonSymbolicPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
