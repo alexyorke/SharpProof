@@ -321,6 +321,8 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("HasSymbolicOwnedFactForSymbol("));
             Assert.That(engineSource, Does.Contain("SymbolicOwnershipAtom { Escaped: false }"));
             Assert.That(engineSource, Does.Contain("SymbolicResourceLifetimeState.Owned"));
+            Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms("));
+            Assert.That(engineSource, Does.Contain("SymbolicAliasAtom { MayAlias: true }"));
             Assert.That(returnSource, Does.Contain("HasSymbolicOwnedFactForSymbol(trackedLocal, currentState)"));
         }
 

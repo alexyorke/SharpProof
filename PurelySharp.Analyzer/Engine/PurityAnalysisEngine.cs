@@ -4986,6 +4986,22 @@ namespace PurelySharp.Analyzer.Engine
             PurityAnalysisState currentState)
         {
             var symbolTerm = CreateSymbolicReferenceTerm(symbol, currentState);
+            return HasSymbolicOwnedFactForTerm(
+                symbolTerm,
+                currentState,
+                new HashSet<SymbolicTerm>());
+        }
+
+        private static bool HasSymbolicOwnedFactForTerm(
+            SymbolicTerm symbolTerm,
+            PurityAnalysisState currentState,
+            HashSet<SymbolicTerm> visitedTerms)
+        {
+            if (!visitedTerms.Add(symbolTerm))
+            {
+                return false;
+            }
+
             foreach (var fact in currentState.PathState.Facts)
             {
                 if (!fact.Polarity ||
@@ -5007,7 +5023,40 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
+            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(symbolTerm, currentState))
+            {
+                if (HasSymbolicOwnedFactForTerm(aliasTerm, currentState, visitedTerms))
+                {
+                    return true;
+                }
+            }
+
             return false;
+        }
+
+        private static IEnumerable<SymbolicTerm> EnumerateSymbolicAliasTerms(
+            SymbolicTerm symbolTerm,
+            PurityAnalysisState currentState)
+        {
+            foreach (var fact in currentState.PathState.Facts)
+            {
+                if (!fact.Polarity ||
+                    fact.Confidence != SymbolicFactConfidence.Exact ||
+                    fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
+                {
+                    continue;
+                }
+
+                if (Equals(alias.Target, symbolTerm))
+                {
+                    yield return alias.Source;
+                }
+
+                if (Equals(alias.Source, symbolTerm))
+                {
+                    yield return alias.Target;
+                }
+            }
         }
 
         private static PurityAnalysisState AddAssignedValueFact(
