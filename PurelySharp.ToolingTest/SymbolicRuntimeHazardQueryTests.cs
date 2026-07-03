@@ -3688,6 +3688,55 @@ public class TestClass
                 Assert.That(hazard.GetProperty("Kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
                 Assert.That(hazard.GetProperty("Status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
                 Assert.That(hazard.GetProperty("ExceptionType").GetString(), Is.EqualTo("System.DivideByZeroException"));
+                var triggerPrecondition = hazard.GetProperty("TriggerPrecondition");
+                Assert.That(triggerPrecondition.GetProperty("Kind").GetString(), Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+                Assert.That(triggerPrecondition.GetProperty("Provenance").GetString(), Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazardsCompactJson_EmitsTriggerPrecondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicRuntimeHazardsCompact-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "return 10 / divisor;").ToString(),
+                    "--runtime-hazards",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+                var hazard = root.GetProperty("hazards")[0];
+                var triggerPrecondition = hazard.GetProperty("triggerPrecondition");
+                Assert.That(triggerPrecondition.GetProperty("kind").GetString(), Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+                Assert.That(triggerPrecondition.GetProperty("provenance").GetString(), Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+                Assert.That(triggerPrecondition.GetProperty("confidence").GetString(), Is.EqualTo("Exact"));
             }
             finally
             {

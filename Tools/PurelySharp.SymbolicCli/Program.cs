@@ -1935,6 +1935,7 @@ internal sealed class CompactRuntimeHazardResult
         string nodeKind,
         string operationText,
         string triggerCondition,
+        SymbolicFactInfo? triggerPrecondition,
         string mergedInvariantText,
         int pathConditionCount,
         IReadOnlyList<string> pathConditions,
@@ -1960,6 +1961,7 @@ internal sealed class CompactRuntimeHazardResult
         NodeKind = nodeKind;
         OperationText = operationText;
         TriggerCondition = triggerCondition;
+        TriggerPrecondition = triggerPrecondition;
         MergedInvariantText = mergedInvariantText;
         PathConditionCount = pathConditionCount;
         PathConditions = pathConditions;
@@ -2004,6 +2006,8 @@ internal sealed class CompactRuntimeHazardResult
 
     public string TriggerCondition { get; }
 
+    public SymbolicFactInfo? TriggerPrecondition { get; }
+
     public string MergedInvariantText { get; }
 
     public int PathConditionCount { get; }
@@ -2042,6 +2046,7 @@ internal sealed class CompactRuntimeHazardResult
             hazard.NodeKind,
             hazard.OperationText,
             hazard.TriggerCondition,
+            hazard.TriggerPrecondition,
             hazard.MergedInvariantText,
             hazard.PathConditionCount,
             pathConditions,
