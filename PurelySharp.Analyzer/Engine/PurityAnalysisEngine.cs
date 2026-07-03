@@ -5348,12 +5348,17 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (TryResolveTrackedSymbol(resourceOperation, currentState) is not { } resourceSymbol ||
-                !WasResourceDisposedByEarlierUsingStatement(
-                    resourceSymbol,
-                    useOperation.Syntax,
-                    currentState,
-                    semanticModel,
-                    cancellationToken))
+                (!WasResourceDisposedByEarlierUsingStatement(
+                     resourceSymbol,
+                     useOperation.Syntax,
+                     currentState,
+                     semanticModel,
+                     cancellationToken) &&
+                 !WasResourceDisposedByEarlierRelatedLocal(
+                     resourceSymbol,
+                     useOperation.Syntax,
+                     semanticModel,
+                     cancellationToken)))
             {
                 evidence = PurityEvidence.None;
                 return false;
@@ -5387,6 +5392,11 @@ namespace PurelySharp.Analyzer.Engine
                      resourceSymbol,
                      invocationOperation.Syntax,
                      currentState,
+                     semanticModel,
+                     cancellationToken) &&
+                 !WasResourceDisposedByEarlierRelatedLocal(
+                     resourceSymbol,
+                     invocationOperation.Syntax,
                      semanticModel,
                      cancellationToken)))
             {
@@ -5466,6 +5476,168 @@ namespace PurelySharp.Analyzer.Engine
                     {
                         return true;
                     }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool WasResourceDisposedByEarlierRelatedLocal(
+            ISymbol resourceSymbol,
+            SyntaxNode useSyntax,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var containingBlock = useSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var relatedSymbols = GetRelatedLocalAliases(
+                resourceSymbol,
+                useSyntax,
+                containingBlock,
+                semanticModel,
+                cancellationToken);
+            foreach (var invocation in containingBlock.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                if (invocation.SpanStart >= useSyntax.SpanStart ||
+                    invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                    memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
+                    semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } disposedSymbol ||
+                    !relatedSymbols.Contains(disposedSymbol) ||
+                    IsStaleRelatedLocalDisposal(
+                        resourceSymbol,
+                        disposedSymbol,
+                        invocation.SpanStart,
+                        useSyntax.SpanStart,
+                        containingBlock,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsStaleRelatedLocalDisposal(
+            ISymbol usedResourceSymbol,
+            ISymbol disposedSymbol,
+            int disposeSpanStart,
+            int useSpanStart,
+            BlockSyntax containingBlock,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (SymbolEqualityComparer.Default.Equals(usedResourceSymbol, disposedSymbol))
+            {
+                return HasLocalReassignmentBetween(
+                    disposedSymbol,
+                    disposeSpanStart,
+                    useSpanStart,
+                    containingBlock,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (declarator.SpanStart >= disposeSpanStart ||
+                    declarator.Initializer?.Value == null ||
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not { } declaredSymbol ||
+                    !SymbolEqualityComparer.Default.Equals(declaredSymbol, usedResourceSymbol) ||
+                    semanticModel.GetSymbolInfo(declarator.Initializer.Value, cancellationToken).Symbol is not { } initializerSymbol ||
+                    !SymbolEqualityComparer.Default.Equals(initializerSymbol, disposedSymbol))
+                {
+                    continue;
+                }
+
+                return HasLocalReassignmentBetween(
+                    disposedSymbol,
+                    declarator.SpanStart,
+                    disposeSpanStart,
+                    containingBlock,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            return false;
+        }
+
+        private static HashSet<ISymbol> GetRelatedLocalAliases(
+            ISymbol resourceSymbol,
+            SyntaxNode useSyntax,
+            BlockSyntax containingBlock,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var relatedSymbols = new HashSet<ISymbol>(SymbolEqualityComparer.Default)
+            {
+                resourceSymbol
+            };
+
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+                {
+                    if (declarator.SpanStart >= useSyntax.SpanStart ||
+                        declarator.Initializer?.Value == null ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not { } declaredSymbol ||
+                        semanticModel.GetSymbolInfo(declarator.Initializer.Value, cancellationToken).Symbol is not { } initializerSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (relatedSymbols.Contains(declaredSymbol) && relatedSymbols.Add(initializerSymbol))
+                    {
+                        changed = true;
+                    }
+
+                    if (relatedSymbols.Contains(initializerSymbol) &&
+                        !HasLocalReassignmentBetween(
+                            initializerSymbol,
+                            declarator.SpanStart,
+                            useSyntax.SpanStart,
+                            containingBlock,
+                            semanticModel,
+                            cancellationToken) &&
+                        relatedSymbols.Add(declaredSymbol))
+                    {
+                        changed = true;
+                    }
+                }
+            }
+
+            return relatedSymbols;
+        }
+
+        private static bool HasLocalReassignmentBetween(
+            ISymbol symbol,
+            int start,
+            int end,
+            BlockSyntax containingBlock,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart <= start ||
+                    assignment.SpanStart >= end ||
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol)
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, symbol))
+                {
+                    return true;
                 }
             }
 

@@ -573,6 +573,9 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
             Assert.That(engineSource, Does.Contain("TryCreateDoubleDisposeEvidence("));
             Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierUsingStatement("));
+            Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierRelatedLocal("));
+            Assert.That(engineSource, Does.Contain("GetRelatedLocalAliases("));
+            Assert.That(engineSource, Does.Contain("IsStaleRelatedLocalDisposal("));
             Assert.That(engineSource, Does.Contain("LocalDeclarationStatementSyntax"));
             Assert.That(engineSource, Does.Contain("UsingKeyword.IsKind(SyntaxKind.UsingKeyword)"));
             Assert.That(engineSource, Does.Contain("\"resource_double_dispose\""));
