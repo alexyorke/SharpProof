@@ -47,19 +47,6 @@ namespace PurelySharp.Symbolic
             return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis);
         }
 
-        public SymbolicInvariantSnapshot GetForInitialEntryInvariants(
-            ForStatementSyntax forStatement,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
-        {
-            var formulas = SymbolicReachabilityService.CollectForInitialEntryPathConditions(
-                forStatement,
-                semanticModel,
-                cancellationToken);
-
-            return new SymbolicInvariantSnapshot(forStatement.SpanStart, formulas);
-        }
-
         public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
