@@ -582,6 +582,117 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task FinallyDisposeThroughAliasSatisfiesOwnedLocalDisposal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        try
+        {
+        }
+        finally
+        {
+            alias.Dispose();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task TryReturnOwnedLocalWithFinally_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod()
+    {
+        var resource = new PureDisposable();
+        try
+        {
+            return resource;
+        }
+        finally
+        {
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task UseAfterFinallyDispose_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}()
+    {
+        var resource = new PureDisposable();
+        try
+        {
+        }
+        finally
+        {
+            resource.Dispose();
+        }
+
+        return resource.Use();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task UseAfterConditionalDisposeBothBranches_Diagnostic()
         {
             var test = @"

@@ -602,6 +602,12 @@ namespace PurelySharp.Test
             Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierRelatedLocal("));
             Assert.That(engineSource, Does.Contain("GetRelatedLocalAliases("));
             Assert.That(engineSource, Does.Contain("IsStaleRelatedLocalDisposal("));
+            Assert.That(engineSource, Does.Contain("AddFinallyResourceDisposeFacts("));
+            Assert.That(engineSource, Does.Contain("\"analyzer.resource.finally.dispose\""));
+            Assert.That(engineSource, Does.Contain("FinallyBlockReleasesResource("));
+            Assert.That(engineSource, Does.Contain("HasDisposedResourceFactBefore("));
+            Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTermBefore("));
+            Assert.That(engineSource, Does.Contain("fact.SourceSpan.Start < observationSpanStart"));
             Assert.That(engineSource, Does.Contain("LocalDeclarationStatementSyntax"));
             Assert.That(engineSource, Does.Contain("UsingKeyword.IsKind(SyntaxKind.UsingKeyword)"));
             Assert.That(engineSource, Does.Contain("\"resource_double_dispose\""));
