@@ -488,7 +488,7 @@ namespace PurelySharp.Analyzer
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
             return IsDefinitelyFalseAtUse(
                 binaryExpression,
-                CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -507,7 +507,7 @@ namespace PurelySharp.Analyzer
                 var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
                 return IsDefinitelyFalseAtUse(
                     unaryExpression,
-                    CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                    SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
                     semanticModel,
                     cancellationToken,
                     smtAnalysis);
@@ -559,7 +559,7 @@ namespace PurelySharp.Analyzer
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
             return IsDefinitelyFalseAtUse(
                 updateExpression,
-                CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -580,7 +580,7 @@ namespace PurelySharp.Analyzer
 
             return IsDefinitelyFalseAtUse(
                 castExpression,
-                CreateIntegralInRangeFormula(operandFormula, minValue, maxValue),
+                SmtFormulaFactory.CreateIntegerInRange(operandFormula, minValue, maxValue),
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -599,10 +599,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var negativeLength = new SmtBinaryFormula(
-                    SmtBinaryOperator.LessThan,
-                    lengthFormula,
-                    new SmtIntegerConstant(0));
+                var negativeLength = SmtFormulaFactory.CreateIntegerLessThanZero(lengthFormula);
                 if (IsDefinitelyTrueAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis))
                 {
                     return true;
@@ -779,19 +776,6 @@ namespace PurelySharp.Analyzer
             out long maxValue)
         {
             return SymbolicTypeFacts.TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
-        }
-
-        private static SmtFormula CreateIntegralInRangeFormula(SmtFormula resultFormula, long minValue, long maxValue)
-        {
-            var lowerBound = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThanOrEqual,
-                resultFormula,
-                new SmtIntegerConstant(minValue));
-            var upperBound = new SmtBinaryFormula(
-                SmtBinaryOperator.LessThanOrEqual,
-                resultFormula,
-                new SmtIntegerConstant(maxValue));
-            return new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
         }
 
         private static bool IsDefinitelyUnboxNullCast(

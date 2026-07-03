@@ -2633,10 +2633,7 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
-            var nullComparison = new SmtBinaryFormula(
-                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
-                valueFormula,
-                new SmtNullConstant());
+            var nullComparison = SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull);
             var nextPathConditions = currentState.PathConditions.Add(nullComparison);
             var nextPathState = TryCreateReferenceNullPathState(
                 currentState,
@@ -2702,10 +2699,8 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            var nullPathConditions = currentState.PathConditions.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                valueFormula,
-                new SmtNullConstant()));
+            var nullPathConditions = currentState.PathConditions.Add(
+                SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull: true));
             var nullPathState = TryCreateReferenceNullPathState(
                 currentState,
                 value,
@@ -2720,10 +2715,8 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
-            var nonNullPathConditions = currentState.PathConditions.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                valueFormula,
-                new SmtNullConstant()));
+            var nonNullPathConditions = currentState.PathConditions.Add(
+                SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull: false));
             var nonNullPathState = TryCreateReferenceNullPathState(
                 currentState,
                 value,
@@ -2814,10 +2807,7 @@ namespace PurelySharp.Analyzer.Engine
             if (branchValue is IIsNullOperation isNullOperation &&
                 TryCreateReferenceVariableFormula(isNullOperation.Operand, currentState, out var operandFormula))
             {
-                formula = new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    operandFormula,
-                    new SmtNullConstant());
+                formula = SmtFormulaFactory.CreateReferenceNullComparison(operandFormula, isNull: true);
                 return true;
             }
 
@@ -2873,10 +2863,9 @@ namespace PurelySharp.Analyzer.Engine
                     continue;
                 }
 
-                builder.Add(new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
+                builder.Add(SmtFormulaFactory.CreateReferenceNullComparison(
                     new SmtVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference),
-                    new SmtNullConstant()));
+                    isNull: true));
             }
 
             return builder.ToImmutable();
@@ -4295,7 +4284,7 @@ namespace PurelySharp.Analyzer.Engine
                     out var valueLengthFormula))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
+                    SmtFormulaFactory.CreateEquality(targetLengthFormula, valueLengthFormula)));
                 nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
                     targetLengthFormula,
@@ -4349,7 +4338,7 @@ namespace PurelySharp.Analyzer.Engine
                 valueStringFormula != null)
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
+                    SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula)));
                 nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
                     targetStringFormula,
@@ -4407,11 +4396,10 @@ namespace PurelySharp.Analyzer.Engine
                     valueState.GetSmtSymbolVersion) &&
                 valueNonNullFormula != null)
             {
-                var targetNonNullFormula = new SmtBinaryFormula(
-                    SmtBinaryOperator.NotEqual,
+                var targetNonNullFormula = SmtFormulaFactory.CreateReferenceNullComparison(
                     targetReferenceFormula,
-                    new SmtNullConstant());
-                var stringNonNullFact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetNonNullFormula, valueNonNullFormula);
+                    isNull: false);
+                var stringNonNullFact = SmtFormulaFactory.CreateEquality(targetNonNullFormula, valueNonNullFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringNonNullFact));
                 nextState = AddSymbolicConditionFromFormula(
                     nextState,

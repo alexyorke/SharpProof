@@ -1341,10 +1341,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                facts.Add(new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
-                    sizeFormula,
-                    new SmtIntegerConstant(0)));
+                facts.Add(SmtFormulaFactory.CreateIntegerGreaterThanOrEqualZero(sizeFormula));
             }
         }
 
@@ -1358,10 +1355,7 @@ namespace PurelySharp.Analyzer
                 return;
             }
 
-            facts.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                formula,
-                new SmtNullConstant()));
+            facts.Add(SmtFormulaFactory.CreateReferenceNullComparison(formula, isNull: false));
         }
 
         private static void AddCompletedIfStatementFacts(
@@ -1471,7 +1465,7 @@ namespace PurelySharp.Analyzer
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 TryCreateBuiltInLengthValueFormula(effectiveValueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
             {
-                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
+                facts.Add(SmtFormulaFactory.CreateEquality(targetLengthFormula, valueLengthFormula));
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
@@ -1506,7 +1500,7 @@ namespace PurelySharp.Analyzer
                     getSymbolVersion: null) &&
                 valueStringFormula != null)
             {
-                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula));
+                facts.Add(SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula));
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
@@ -1526,12 +1520,8 @@ namespace PurelySharp.Analyzer
                     out var valueNonNullFormula) &&
                 valueNonNullFormula != null)
             {
-                facts.Add(new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtBinaryFormula(
-                        SmtBinaryOperator.NotEqual,
-                        targetReferenceFormula,
-                        new SmtNullConstant()),
+                facts.Add(SmtFormulaFactory.CreateEquality(
+                    SmtFormulaFactory.CreateReferenceNullComparison(targetReferenceFormula, isNull: false),
                     valueNonNullFormula));
             }
 
@@ -1877,10 +1867,7 @@ namespace PurelySharp.Analyzer
                 return;
             }
 
-            facts.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                formula,
-                new SmtNullConstant()));
+            facts.Add(SmtFormulaFactory.CreateReferenceNullComparison(formula, isNull: false));
         }
 
         private static void RemoveFactsInvalidatedByNestedMutations(
@@ -2362,10 +2349,7 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
-                factFormula = new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    valueFormula,
-                    new SmtNullConstant());
+                factFormula = SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull: true);
                 return true;
             }
 
@@ -2374,10 +2358,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            factFormula = new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                valueFormula,
-                new SmtIntegerConstant(0));
+            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(valueFormula);
             return true;
         }
 
@@ -2395,10 +2376,9 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
-                factFormula = new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
+                factFormula = SmtFormulaFactory.CreateReferenceNullComparison(
                     new SmtVariable(variableName, SmtValueKind.Reference),
-                    new SmtNullConstant());
+                    isNull: true);
                 return true;
             }
 
@@ -2408,10 +2388,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            factFormula = new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtVariable(variableName, SmtValueKind.Int),
-                new SmtIntegerConstant(0));
+            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(new SmtVariable(variableName, SmtValueKind.Int));
             return true;
         }
 
