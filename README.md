@@ -11,6 +11,29 @@ whole-program proof. When it cannot prove a fact within the implemented rules
 and budgets, it stays conservative: purity falls back to `PS0002` for methods
 marked pure, and SMT/exceptions fall back to unknown or no proof.
 
+## Platform Direction
+
+PurelySharp is moving toward one bounded symbolic C# analysis platform, not a
+set of unrelated analyzer rules. The intended spine is:
+
+```text
+Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service -> Z3-backed conclusions -> analyzer/API/CLI outputs
+```
+
+Purity diagnostics, runtime-hazard detection, invariant queries, and SDK/BCL
+effect-summary consumption should all flow through that shared pipeline.
+`PurelySharp.Symbolic.Ir` owns C#/Roslyn semantic facts, terms, atoms,
+exceptional preconditions, ownership/freshness/mutation facts, type tests,
+string/regex facts, and bounds. `SearchLib` remains the backend SMT/Z3 layer.
+The analyzer should consume symbolic services instead of growing new local
+path, reachability, hazard, or raw `SmtFormula` proof logic.
+
+The long-term goal is maximum eligible Z3 usage through shared facts and proof
+obligations, not direct translation of arbitrary C# into solver calls. Cheap
+syntactic proofs can still short-circuit, but unresolved eligible obligations
+should go through the bounded proof service with caching, cancellation, timeout
+and method budgets, native-load fallback, and conservative unknown results.
+
 ## Current State
 
 - Current package metadata: `PurelySharp` `0.0.4` and
@@ -320,9 +343,11 @@ keeps only the product-facing summary.
 - [x] External additional-file summary support with identity validation.
 - [x] Bounded Z3/SMT service with cache, timeout, budget, and fallback behavior.
 - [x] Symbolic invariant library and CLI.
+- [~] Shared symbolic platform spine across analyzer diagnostics, invariant queries, runtime hazards, and summary-backed reasoning.
 - [~] Broader SMT path facts for branch pruning, exception hazards, string, and regex conditions.
 - [~] Standalone symbolic runtime-hazard query API and CLI.
 - [x] Runtime type-test atoms for Z3-backed invariants and invalid-cast pruning.
+- [~] Migration from analyzer-local raw SMT/path logic into symbolic IR facts and shared proof orchestration.
 - [~] Deeper exception-flow summaries and metadata/library effect-summary consumption.
 - [~] Better dispatch, delegate, LINQ, and enumerator precision.
 - [~] Better fresh-object, fresh-array, alias, escape, and local ownership modeling.

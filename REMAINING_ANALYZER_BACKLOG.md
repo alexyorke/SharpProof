@@ -35,9 +35,15 @@ Not backlog files:
 
 ## What still remains, at a high level
 
+- Make the shared symbolic platform spine dominant:
+  `Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service ->
+  Z3-backed conclusions -> analyzer/API/CLI outputs`.
 - Close evidence-backed analyzer precision gaps that still show up as
   `unknown_external_call`, `dynamic_dispatch`, `unsupported_operation`, or
   deliberately conservative test expectations.
+- Retire analyzer-local path, reachability, runtime-hazard, and raw SMT formula
+  construction only after equivalent symbolic IR/proof-service behavior is
+  locked by tests.
 - Expand trusted effect-summary coverage so metadata and hidden-runtime methods
   can be classified from concrete evidence instead of broad catalogs.
 - Use the new report-only implementation-derived classifier as the gate for
@@ -48,6 +54,11 @@ Not backlog files:
 
 ## Immediate next actions
 
+- [ ] Keep routing analysis consumers through the symbolic platform spine:
+      purity diagnostics, runtime hazards, invariant queries, and
+      effect-summary-derived facts should share IR facts and proof services.
+- [ ] Burn down approved analyzer raw-SMT migration hotspots reported by
+      `scripts/Get-PurelySharpRawSmtHotspots.ps1` without adding new ones.
 - [ ] Continue expanding trusted effect-summary coverage for metadata-only or
       hidden implementation methods.
 - [ ] Use the report-only purity classifier output to choose the first narrow
@@ -56,6 +67,54 @@ Not backlog files:
       behind narrow regressions.
 
 ## P0 - Real correctness and precision gaps
+
+### 0. Symbolic platform spine and raw SMT retirement
+
+Evidence:
+
+- `PurelySharp.Symbolic/Ir`
+- `PurelySharp.Symbolic/SymbolicReachabilityService.cs`
+- `PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs`
+- `PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs`
+- `PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs`
+- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs`
+- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs`
+- `PurelySharp.Test/ArchitectureReductionTests.cs`
+
+Current state:
+
+- `PurelySharp.Symbolic.Ir` is the intended owner of C#/Roslyn semantic facts,
+  terms, atoms, exceptional preconditions, ownership/freshness/mutation facts,
+  type tests, string/regex facts, and bounds.
+- `SearchLib` is backend SMT/Z3 infrastructure and should not absorb Roslyn or
+  analyzer-specific semantics.
+- Runtime hazards have started moving through IR exception-precondition atoms,
+  but analyzer exception flow and purity state merging still contain legacy raw
+  SMT construction and direct `CSharpConditionToFormula` calls.
+- Architecture tests now prevent new analyzer files from becoming raw-SMT
+  hotspots outside the approved migration list.
+
+Remaining:
+
+- [ ] Route analyzer exception-site diagnostics through shared symbolic hazard
+      results where equivalent, keeping exception-summary propagation separate
+      until locked.
+- [ ] Move analyzer path-condition collection and state merging to
+      `SymbolicState` or equivalent normalized IR facts before encoding to SMT.
+- [ ] Replace direct `CSharpConditionToFormula*` recognizer branches with
+      declarative IR lowerings for string/regex, nullable, bounds, type tests,
+      numeric ranges, and exceptional preconditions.
+- [ ] Split large purity rules so invocation effect resolution, receiver
+      dispatch, mutation/ownership, generated summaries, BCL fallback guesses,
+      and evidence formatting can be tested and retired independently.
+- [ ] Keep unsupported translation, SMT timeout, method budget exhaustion,
+      cancellation, and native Z3 load failure conservative.
+
+Done when:
+
+- Analyzer diagnostics, symbolic invariant queries, runtime hazards, and
+  summary-backed reasoning all consume shared IR/proof services, and analyzer
+  code no longer creates C#/Roslyn-specific raw SMT formulas directly.
 
 ### 1. Opaque external calls and effect-summary coverage
 

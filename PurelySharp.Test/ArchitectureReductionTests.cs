@@ -350,10 +350,48 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerRawSmtUsage_IsLimitedToApprovedMigrationHotspots()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var hotspots = GetAnalyzerRawSmtHotspots(repositoryRoot);
+            var approved = ApprovedAnalyzerRawSmtHotspots;
+            var offenders = hotspots
+                .Select(static hotspot => hotspot.Path)
+                .Where(path => !approved.Contains(path, StringComparer.Ordinal))
+                .ToArray();
+
+            Assert.That(
+                offenders,
+                Is.Empty,
+                "New analyzer raw-SMT hotspots must lower to PurelySharp.Symbolic.Ir and use shared proof services.");
+        }
+
+        [Test]
+        public async Task RawSmtHotspotInventoryScript_ReportsApprovedAnalyzerMigrationHotspots()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            using var document = await RunPowerShellJsonScriptAsync(
+                repositoryRoot,
+                "Get-PurelySharpRawSmtHotspots.ps1");
+            var root = document.RootElement;
+            var hotspotPaths = root.GetProperty("hotspots")
+                .EnumerateArray()
+                .Select(static hotspot => hotspot.GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
+
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
+            Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
+        }
+
+        [Test]
         public async Task ProductionMetricsScript_ReportsProductionModulesAndExcludesTests()
         {
             var repositoryRoot = FindRepositoryRoot();
-            using var document = await RunProductionMetricsJsonAsync(repositoryRoot);
+            using var document = await RunPowerShellJsonScriptAsync(
+                repositoryRoot,
+                "Get-PurelySharpProductionMetrics.ps1");
             var root = document.RootElement;
             var moduleNames = root.GetProperty("modules")
                 .EnumerateArray()
@@ -373,7 +411,9 @@ namespace PurelySharp.Test
             Assert.That(largestPaths, Has.None.StartsWith("PurelySharp.Test/"));
         }
 
-        private static async Task<JsonDocument> RunProductionMetricsJsonAsync(string repositoryRoot)
+        private static async Task<JsonDocument> RunPowerShellJsonScriptAsync(
+            string repositoryRoot,
+            string scriptName)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -393,10 +433,10 @@ namespace PurelySharp.Test
             }
 
             startInfo.ArgumentList.Add("-File");
-            startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Get-PurelySharpProductionMetrics.ps1"));
+            startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", scriptName));
             startInfo.ArgumentList.Add("-Json");
 
-            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start production metrics script.");
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start script.");
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
             try
@@ -415,7 +455,7 @@ namespace PurelySharp.Test
             {
                 throw new AssertionException(string.Join(
                     Environment.NewLine,
-                    "Production metrics script failed.",
+                    scriptName + " failed.",
                     "Exit code: " + process.ExitCode,
                     "stdout:",
                     output,
@@ -425,6 +465,83 @@ namespace PurelySharp.Test
 
             Assert.That(error, Is.Empty);
             return JsonDocument.Parse(output);
+        }
+
+        private static readonly string[] ApprovedAnalyzerRawSmtHotspots =
+        {
+            "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
+            "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
+            "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
+            "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
+        };
+
+        private static IReadOnlyList<(string Path, int MatchCount)> GetAnalyzerRawSmtHotspots(string repositoryRoot)
+        {
+            var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
+            var files = Directory.GetFiles(analyzerDirectory, "*.cs", SearchOption.AllDirectories)
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .ToArray();
+            var hotspots = new List<(string Path, int MatchCount)>();
+
+            foreach (var file in files)
+            {
+                var source = File.ReadAllText(file);
+                var matchCount = CountOrdinalOccurrences(source, "CSharpConditionToFormula.");
+                foreach (var constructionNeedle in RawSmtConstructionNeedles)
+                {
+                    matchCount += CountOrdinalOccurrences(source, constructionNeedle);
+                }
+
+                if (matchCount > 0)
+                {
+                    hotspots.Add((
+                        Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/'),
+                        matchCount));
+                }
+            }
+
+            return hotspots;
+        }
+
+        private static readonly string[] RawSmtConstructionNeedles =
+        {
+            "new SmtBinaryFormula",
+            "new SmtUnaryFormula",
+            "new SmtIntegerConstant",
+            "new SmtNullConstant",
+            "new SmtBooleanConstant",
+            "new SmtVariable",
+            "new SmtIntegerBinaryTerm",
+            "new SmtIntegerUnaryTerm",
+            "new SmtStringLengthTerm",
+            "new SmtStringConcatTerm",
+            "new SmtStringContainsFormula",
+            "new SmtStringStartsWithFormula",
+            "new SmtStringEndsWithFormula",
+            "new SmtRegexMatchFormula",
+            "new SmtRuntimeTypeTestFormula",
+            "new SmtConditionalFormula",
+        };
+
+        private static int CountOrdinalOccurrences(string source, string needle)
+        {
+            var count = 0;
+            var index = 0;
+            while (index < source.Length)
+            {
+                var found = source.IndexOf(needle, index, StringComparison.Ordinal);
+                if (found < 0)
+                {
+                    return count;
+                }
+
+                count++;
+                index = found + needle.Length;
+            }
+
+            return count;
         }
 
         private static string FindRepositoryRoot()
