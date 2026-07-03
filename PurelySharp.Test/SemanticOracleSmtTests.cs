@@ -1659,6 +1659,41 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsOrdinalIgnoreCaseStringPredicateReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (input.Contains(""sku"", StringComparison.OrdinalIgnoreCase) &&
+            input.StartsWith(""pre"", StringComparison.OrdinalIgnoreCase) &&
+            input.EndsWith(""tail"", StringComparison.OrdinalIgnoreCase))
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains("sku", StringComparison.Ordinal) &&
+                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\Apre", StringComparison.Ordinal) &&
+                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains(@"tail\z", StringComparison.Ordinal) &&
+                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsStringConcatAssignmentFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -7780,6 +7815,39 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StringContainsOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.Contains(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"BBB\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringStartsWithOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.StartsWith(\"ab\", StringComparison.OrdinalIgnoreCase) && text == \"zzAB\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringEndsWithOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.EndsWith(\"xy\", StringComparison.OrdinalIgnoreCase) && text == \"XYzz\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringIndexOfCharFoundContradictsStringEquality()
         {
             Assert.That(
@@ -10383,6 +10451,43 @@ public class TestClass
     public void TestMethod(string text)
     {
         if (string.Equals(text, ""a"", StringComparison.OrdinalIgnoreCase) && text == ""B"")
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringPredicatesOrdinalIgnoreCaseContradictoryImpureCalls_DoNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (text.Contains(""a"", StringComparison.OrdinalIgnoreCase) && text == ""BBB"")
+        {
+            Console.WriteLine(text);
+        }
+
+        if (text.StartsWith(""ab"", StringComparison.OrdinalIgnoreCase) && text == ""zzAB"")
+        {
+            Console.WriteLine(text);
+        }
+
+        if (text.EndsWith(""xy"", StringComparison.OrdinalIgnoreCase) && text == ""XYzz"")
         {
             Console.WriteLine(text);
         }

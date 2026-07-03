@@ -452,16 +452,19 @@ namespace PurelySharp.Symbolic.Smt
 
             var firstParameterType = method.Parameters[0].Type;
             var isCharPredicateArgument = firstParameterType.SpecialType == SpecialType.System_Char;
+            var hasOrdinalIgnoreCaseComparison = HasOrdinalIgnoreCaseStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
             if (method.Name is "StartsWith" or "EndsWith")
             {
                 if (!isCharPredicateArgument &&
-                    !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+                    !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken) &&
+                    !hasOrdinalIgnoreCaseComparison)
                 {
                     return false;
                 }
             }
             else if (invocationOperation.Arguments.Length > 1 &&
-                     !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+                     !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken) &&
+                     !hasOrdinalIgnoreCaseComparison)
             {
                 return false;
             }
@@ -482,6 +485,25 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (hasOrdinalIgnoreCaseComparison)
+            {
+                if (!TryGetConstantStringPredicateArgument(
+                        searchExpression,
+                        invocationOperation.Arguments[0].Parameter?.Type,
+                        semanticModel,
+                        cancellationToken,
+                        out var constantSearch))
+                {
+                    return false;
+                }
+
+                formula = new SmtRegexMatchFormula(
+                    receiverFormula,
+                    CreateOrdinalIgnoreCasePredicatePattern(method.Name, constantSearch),
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                return true;
+            }
+
             formula = method.Name switch
             {
                 "Contains" => new SmtStringContainsFormula(receiverFormula, searchFormula),
@@ -490,6 +512,17 @@ namespace PurelySharp.Symbolic.Smt
                 _ => null
             };
             return formula != null;
+        }
+
+        private static string CreateOrdinalIgnoreCasePredicatePattern(string methodName, string constantSearch)
+        {
+            var escapedSearch = Regex.Escape(constantSearch);
+            return methodName switch
+            {
+                "StartsWith" => "\\A" + escapedSearch,
+                "EndsWith" => escapedSearch + "\\z",
+                _ => escapedSearch
+            };
         }
 
         private static bool TryTranslateStringPredicateArgument(
