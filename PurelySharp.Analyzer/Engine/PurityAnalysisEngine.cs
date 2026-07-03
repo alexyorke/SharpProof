@@ -2201,6 +2201,12 @@ namespace PurelySharp.Analyzer.Engine
                     continue;
                 }
 
+                if (resource.Value != null &&
+                    IsOwnedResourceReleasedOnAllSyntaxPaths(containingMethodSymbol, resource.Value, semanticModel))
+                {
+                    continue;
+                }
+
                 var syntax = containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                 if (syntax == null)
                 {
@@ -2236,6 +2242,197 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return false;
+        }
+
+        private static bool IsOwnedResourceReleasedOnAllSyntaxPaths(
+            IMethodSymbol containingMethodSymbol,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            foreach (var syntaxReference in containingMethodSymbol.DeclaringSyntaxReferences)
+            {
+                if (syntaxReference.GetSyntax() is not MethodDeclarationSyntax { Body: { } body } methodDeclaration)
+                {
+                    continue;
+                }
+
+                var methodSemanticModel = semanticModel.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree);
+                for (var index = 0; index < body.Statements.Count; index++)
+                {
+                    if (!DeclaresSymbol(body.Statements[index], resourceSymbol, methodSemanticModel))
+                    {
+                        continue;
+                    }
+
+                    var remainingStatements = body.Statements.Skip(index + 1).ToArray();
+                    var summary = AnalyzeResourceReleaseStatements(
+                        remainingStatements,
+                        initiallyReleased: false,
+                        endIsTerminal: true,
+                        resourceSymbol,
+                        methodSemanticModel);
+                    return summary.AllTerminalPathsReleased;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool DeclaresSymbol(
+            StatementSyntax statement,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            foreach (var declarator in statement.DescendantNodesAndSelf().OfType<VariableDeclaratorSyntax>())
+            {
+                if (semanticModel.GetDeclaredSymbol(declarator) is { } declaredSymbol &&
+                    SymbolEqualityComparer.Default.Equals(declaredSymbol, resourceSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static ResourceReleasePathSummary AnalyzeResourceReleaseStatements(
+            IReadOnlyList<StatementSyntax> statements,
+            bool initiallyReleased,
+            bool endIsTerminal,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            var allTerminalPathsReleased = true;
+            var currentStates = new List<bool> { initiallyReleased };
+
+            foreach (var statement in statements)
+            {
+                if (currentStates.Count == 0)
+                {
+                    break;
+                }
+
+                var nextStates = new List<bool>();
+                foreach (var released in currentStates)
+                {
+                    var summary = AnalyzeResourceReleaseStatement(
+                        statement,
+                        released,
+                        resourceSymbol,
+                        semanticModel);
+                    allTerminalPathsReleased &= summary.AllTerminalPathsReleased;
+                    nextStates.AddRange(summary.FallthroughReleasedStates);
+                }
+
+                currentStates = nextStates;
+            }
+
+            if (endIsTerminal)
+            {
+                allTerminalPathsReleased &= currentStates.All(static released => released);
+                currentStates.Clear();
+            }
+
+            return new ResourceReleasePathSummary(
+                allTerminalPathsReleased,
+                currentStates.ToImmutableArray());
+        }
+
+        private static ResourceReleasePathSummary AnalyzeResourceReleaseStatement(
+            StatementSyntax statement,
+            bool initiallyReleased,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            if (statement is ReturnStatementSyntax returnStatement)
+            {
+                return new ResourceReleasePathSummary(
+                    initiallyReleased || IsReturnedSymbol(returnStatement, resourceSymbol, semanticModel),
+                    ImmutableArray<bool>.Empty);
+            }
+
+            if (statement is IfStatementSyntax ifStatement)
+            {
+                var thenSummary = AnalyzeResourceReleaseStatements(
+                    GetStatementList(ifStatement.Statement),
+                    initiallyReleased,
+                    endIsTerminal: false,
+                    resourceSymbol,
+                    semanticModel);
+                var elseSummary = ifStatement.Else == null
+                    ? new ResourceReleasePathSummary(true, ImmutableArray.Create(initiallyReleased))
+                    : AnalyzeResourceReleaseStatements(
+                        GetStatementList(ifStatement.Else.Statement),
+                        initiallyReleased,
+                        endIsTerminal: false,
+                        resourceSymbol,
+                        semanticModel);
+
+                return new ResourceReleasePathSummary(
+                    thenSummary.AllTerminalPathsReleased && elseSummary.AllTerminalPathsReleased,
+                    thenSummary.FallthroughReleasedStates.AddRange(elseSummary.FallthroughReleasedStates));
+            }
+
+            var released = initiallyReleased ||
+                DisposesSymbol(statement, resourceSymbol, semanticModel);
+            return new ResourceReleasePathSummary(
+                true,
+                ImmutableArray.Create(released));
+        }
+
+        private static IReadOnlyList<StatementSyntax> GetStatementList(StatementSyntax statement)
+        {
+            return statement is BlockSyntax block
+                ? block.Statements.ToArray()
+                : new[] { statement };
+        }
+
+        private static bool IsReturnedSymbol(
+            ReturnStatementSyntax returnStatement,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            return returnStatement.Expression != null &&
+                semanticModel.GetSymbolInfo(returnStatement.Expression).Symbol is { } returnedSymbol &&
+                SymbolEqualityComparer.Default.Equals(returnedSymbol, resourceSymbol);
+        }
+
+        private static bool DisposesSymbol(
+            StatementSyntax statement,
+            ISymbol resourceSymbol,
+            SemanticModel semanticModel)
+        {
+            foreach (var invocation in statement.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
+            {
+                if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                    memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
+                    semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } disposedSymbol)
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(disposedSymbol, resourceSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private readonly struct ResourceReleasePathSummary
+        {
+            public ResourceReleasePathSummary(
+                bool allTerminalPathsReleased,
+                ImmutableArray<bool> fallthroughReleasedStates)
+            {
+                AllTerminalPathsReleased = allTerminalPathsReleased;
+                FallthroughReleasedStates = fallthroughReleasedStates;
+            }
+
+            public bool AllTerminalPathsReleased { get; }
+
+            public ImmutableArray<bool> FallthroughReleasedStates { get; }
         }
 
         private static bool TryFindAliasedOwnedResourceLostByReassignment(
@@ -5220,6 +5417,11 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+            if (HasReleasedResourceFact(term, nextState))
+            {
+                return nextState;
+            }
+
             var pathState = nextState.PathState;
             var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwned(
                 term,
@@ -5241,6 +5443,34 @@ namespace PurelySharp.Analyzer.Engine
                 "evidence.resource.acquire"));
 
             return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        }
+
+        private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
+        {
+            var releasedResources = new HashSet<SymbolicTerm>();
+            foreach (var fact in state.PathState.Facts)
+            {
+                if (!fact.Polarity ||
+                    fact.Confidence != SymbolicFactConfidence.Exact)
+                {
+                    continue;
+                }
+
+                switch (fact.Atom)
+                {
+                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
+                        releasedResources.Add(lifetime.Resource);
+                        break;
+                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
+                        releasedResources.Add(lifetime.Resource);
+                        break;
+                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
+                        releasedResources.Add(disposal.Resource);
+                        break;
+                }
+            }
+
+            return IsResourceReleased(term, releasedResources, state, new HashSet<SymbolicTerm>());
         }
 
         private static bool IsOwnedDisposableObjectCreationValue(

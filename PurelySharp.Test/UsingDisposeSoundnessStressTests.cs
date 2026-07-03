@@ -482,6 +482,139 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ConditionalDisposeOnlyOneBranch_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(bool dispose)
+    {
+        var resource = new PureDisposable();
+        if (dispose)
+        {
+            resource.Dispose();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalDisposeBothBranches_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool dispose)
+    {
+        var resource = new PureDisposable();
+        if (dispose)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            resource.Dispose();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalReturnOrDispose_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod(bool giveAway)
+    {
+        var resource = new PureDisposable();
+        if (giveAway)
+        {
+            return resource;
+        }
+
+        resource.Dispose();
+        return new PureDisposable();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalReturnOnlyOneBranch_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable {|PS0002:TestMethod|}(bool giveAway)
+    {
+        var resource = new PureDisposable();
+        if (giveAway)
+        {
+            return resource;
+        }
+
+        return null;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task MissingDisposeForAliasedOwnedLocalAfterOwnerReassignment_Diagnostic()
         {
             var test = @"

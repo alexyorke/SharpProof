@@ -210,6 +210,7 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
+            commonFacts = AddAllPathResourceReleaseFacts(commonFacts, states);
             return new SymbolicState(commonFacts, commonConditions);
         }
 
@@ -225,13 +226,102 @@ namespace PurelySharp.Analyzer.Engine
             var builder = ImmutableArray.CreateBuilder<SymbolicFact>();
             foreach (var fact in first)
             {
-                if (second.Contains(fact))
+                if (second.Any(secondFact => AreMergeEquivalentSymbolicFacts(fact, secondFact)))
                 {
                     builder.Add(fact);
                 }
             }
 
             return builder.ToImmutable();
+        }
+
+        private static bool AreMergeEquivalentSymbolicFacts(SymbolicFact first, SymbolicFact second)
+        {
+            return first.Polarity == second.Polarity &&
+                first.Confidence == second.Confidence &&
+                Equals(first.Atom, second.Atom) &&
+                SymbolEqualityComparer.Default.Equals(first.Symbol, second.Symbol) &&
+                string.Equals(first.EvidenceKey, second.EvidenceKey, StringComparison.Ordinal);
+        }
+
+        private static ImmutableArray<SymbolicFact> AddAllPathResourceReleaseFacts(
+            ImmutableArray<SymbolicFact> commonFacts,
+            IReadOnlyList<PurityAnalysisState> states)
+        {
+            if (states.Count == 0)
+            {
+                return commonFacts;
+            }
+
+            var builder = commonFacts.ToBuilder();
+            foreach (var representative in states[0].PathState.Facts)
+            {
+                if (!TryGetExactResourceRelease(representative, out var resource, out var symbol))
+                {
+                    continue;
+                }
+
+                if (states.Skip(1).All(state => HasExactResourceRelease(state, resource, symbol)))
+                {
+                    var mergedFact = representative with
+                    {
+                        Atom = new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Released),
+                        Provenance = "analyzer.resource.merge.all-path-release",
+                        EvidenceKey = representative.EvidenceKey ?? "evidence.resource.released",
+                    };
+
+                    if (!builder.Any(fact => AreMergeEquivalentSymbolicFacts(fact, mergedFact)))
+                    {
+                        builder.Add(mergedFact);
+                    }
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static bool HasExactResourceRelease(
+            PurityAnalysisState state,
+            SymbolicTerm resource,
+            ISymbol? symbol)
+        {
+            return state.PathState.Facts.Any(fact =>
+                TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol) &&
+                (symbol != null
+                    ? SymbolEqualityComparer.Default.Equals(symbol, releasedSymbol)
+                    : Equals(resource, releasedResource)));
+        }
+
+        private static bool TryGetExactResourceRelease(
+            SymbolicFact fact,
+            out SymbolicTerm resource,
+            out ISymbol? symbol)
+        {
+            resource = null!;
+            symbol = null;
+            if (!fact.Polarity ||
+                fact.Confidence != SymbolicFactConfidence.Exact)
+            {
+                return false;
+            }
+
+            switch (fact.Atom)
+            {
+                case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
+                    resource = lifetime.Resource;
+                    symbol = fact.Symbol;
+                    return true;
+                case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
+                    resource = lifetime.Resource;
+                    symbol = fact.Symbol;
+                    return true;
+                case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
+                    resource = disposal.Resource;
+                    symbol = fact.Symbol;
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static ImmutableArray<SymbolicCondition> IntersectSymbolicConditions(
