@@ -926,7 +926,6 @@ namespace PurelySharp.Test
         {
             "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
             "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
-            "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
             "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
         };
 
