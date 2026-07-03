@@ -17,10 +17,10 @@
     <RepositoryUrl>https://github.com/alexyorke/PurelySharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Description>Roslyn analyzer and code fix package for enforcing and documenting method purity in C# projects.</Description>
-    <PackageReleaseNotes>Add explainable PS0002 diagnostics, corpus reporting, PS0004 controls, baseline suppression, purity boundary attributes, and targeted correctness fixes.</PackageReleaseNotes>
+    <Description>Bounded symbolic C# analysis platform delivered as a Roslyn analyzer and code fix package for purity, side effects, invariants, runtime hazards, ownership facts, and Z3-backed proofs.</Description>
+    <PackageReleaseNotes>Position PurelySharp as a bounded symbolic C# analysis platform while preserving compatibility package IDs, diagnostics, attributes, config keys, and effect-summary conventions.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>PurelySharp;Roslyn;Analyzer;CodeFix;Purity</PackageTags>
+    <PackageTags>PurelySharp;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <DevelopmentDependency>true</DevelopmentDependency>
     <NoPackageAnalysis>true</NoPackageAnalysis>

@@ -1,10 +1,10 @@
-# PurelySharp - C# Roslyn Purity Analyzer with Z3 SMT
+# PurelySharp - Bounded Symbolic C# Analysis with Z3 SMT
 
 PurelySharp is a conservative .NET static analysis tool and C# Roslyn analyzer
-for method purity, side-effect detection, symbolic invariants, and
-exception-flow checks. It ships an analyzer, code fixes, attributes, bounded
-Z3/SMT reasoning, build-time generated effect-summary data, and a standalone
-symbolic invariant query library/CLI.
+for bounded symbolic C# analysis. It includes method purity checking,
+side-effect detection, symbolic invariants, runtime-hazard and exception-flow
+checks, build-time generated effect-summary data, Z3/SMT reasoning, code
+fixes, attributes, and a standalone symbolic query library/CLI.
 
 The analyzer does not execute user code and does not attempt an unbounded
 whole-program proof. When it cannot prove a fact within the implemented rules
@@ -14,7 +14,8 @@ marked pure, and SMT/exceptions fall back to unknown or no proof.
 ## Platform Direction
 
 PurelySharp is moving toward one bounded symbolic C# analysis platform, not a
-set of unrelated analyzer rules. The intended spine is:
+set of unrelated analyzer rules and not only a purity analyzer. Purity is one
+consumer of the shared platform. The intended spine is:
 
 ```text
 Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service -> Z3-backed conclusions -> analyzer/API/CLI outputs
@@ -34,10 +35,28 @@ syntactic proofs can still short-circuit, but unresolved eligible obligations
 should go through the bounded proof service with caching, cancellation, timeout
 and method budgets, native-load fallback, and conservative unknown results.
 
+## Naming Direction
+
+The current package, namespace, diagnostic, configuration, additional-file, and
+summary-artifact identity remains `PurelySharp` for compatibility. The project
+is being positioned as a symbolic analysis platform, and `SharpProof` is only a
+working codename for a possible future rebrand. It is not final: exact NuGet
+registration and the `SharpProof/SharpProof` GitHub repository were not found
+during the July 2026 check, but a similarly named public web presence exists,
+so formal package, repository, and trademark clearance is still required before
+any hard rename.
+
+Suggested GitHub repository metadata for the current staged rebrand:
+
+- About: `Bounded symbolic C# analysis platform for purity, invariants, runtime hazards, ownership/resource facts, and Z3-backed proofs.`
+- Topics: `csharp`, `roslyn-analyzer`, `static-analysis`, `symbolic-execution`, `smt`, `z3`, `purity`, `runtime-hazards`, `invariants`, `dotnet`.
+
 ## Current State
 
 - Current package metadata: `PurelySharp` `0.0.4` and
   `PurelySharp.Attributes` `0.0.4`.
+- Product positioning is broader than the compatibility package name: the
+  analyzer is one delivery surface for the symbolic analysis platform.
 - Analyzer and symbolic library target `netstandard2.0`; the symbolic CLI
   targets `net8.0`.
 - Public diagnostics in active use are `PS0002` through `PS0012`.
@@ -65,6 +84,8 @@ the entire test surface.
   purity gaps during build or in the IDE.
 - Use Z3 SMT solving to prove bounded path facts such as null guards, numeric
   ranges, branch reachability, string predicates, and regex constraints.
+- Inspect symbolic facts, proof outcomes, unknown reasons, and runtime-hazard
+  preconditions as first-class query results.
 - Query symbolic invariants at a source line or syntax position from a
   standalone .NET library or CLI.
 - Audit runtime-failure risks such as uncaught throws, divide-by-zero,

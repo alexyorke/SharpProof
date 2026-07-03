@@ -56,7 +56,7 @@ try
             $repoPath = Convert-ToRepoPath $_.FullName
             $repoPath -notmatch '(^|/)(bin|obj)/' -and
             $repoPath -notmatch '(^|/)\.[^/]+/' -and
-            $repoPath -notmatch '^PurelySharp\.Test/' -and
+            $repoPath -notmatch '^PurelySharp\.(Test|ToolingTest)/' -and
             $repoPath -notmatch '^PurelySharp\.(Demo|Smoke\.Net472)/'
         } |
         ForEach-Object {

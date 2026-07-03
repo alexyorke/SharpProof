@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -1085,6 +1086,85 @@ namespace PurelySharp.Test
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
             Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(0));
             Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(0));
+            Assert.That(root.GetProperty("symbolicDirectTranslatorUsageCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(
+                root.GetProperty("symbolicDirectTranslatorUsages")
+                    .EnumerateArray()
+                    .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
+                    .Distinct(StringComparer.Ordinal),
+                Is.EquivalentTo(new[] { "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs" }));
+            Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(
+                root.GetProperty("irKnownApiLoweringLocations")
+                    .EnumerateArray()
+                    .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
+                    .All(static path => path.StartsWith("PurelySharp.Symbolic/Ir/", StringComparison.Ordinal)),
+                Is.True);
+        }
+
+        [Test]
+        public async Task ProductionMetricsScript_TracksSymbolicPlatformPressureFiles()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            using var document = await RunPowerShellJsonScriptAsync(
+                repositoryRoot,
+                "Get-PurelySharpProductionMetrics.ps1");
+            var root = document.RootElement;
+            var modules = root.GetProperty("modules")
+                .EnumerateArray()
+                .Select(static module => module.GetProperty("module").GetString() ?? string.Empty)
+                .ToArray();
+            var largestFiles = root.GetProperty("largestFiles")
+                .EnumerateArray()
+                .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
+
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(100));
+            Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(100000));
+            Assert.That(modules, Does.Contain("Symbolic"));
+            Assert.That(modules, Does.Contain("Analyzer"));
+            Assert.That(modules, Does.Contain("Tools"));
+            Assert.That(modules, Does.Contain("SearchLib"));
+            Assert.That(modules, Does.Not.Contain("Other"));
+            Assert.That(largestFiles, Does.Contain("PurelySharp.Symbolic/SymbolicProgramPointFacts.cs"));
+            Assert.That(largestFiles, Does.Contain("PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs"));
+            Assert.That(largestFiles, Does.Contain("PurelySharp.Symbolic/SymbolicSourceQueryService.cs"));
+            Assert.That(largestFiles, Does.Contain("PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs"));
+            Assert.That(largestFiles, Does.Contain("Tools/PurelySharp.EffectSummary/Program.cs"));
+        }
+
+        [Test]
+        public void PackageMetadata_UsesPlatformPositioningWithoutBreakingCompatibilityIdentity()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packageMetadata = XDocument.Load(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Package",
+                "PurelySharp.Package.csproj"));
+            var attributesMetadata = XDocument.Load(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Attributes",
+                "PurelySharp.Attributes.csproj"));
+            var vsixManifest = XDocument.Load(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Vsix",
+                "source.extension.vsixmanifest"));
+            var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
+
+            Assert.That(ReadProjectElement(packageMetadata, "PackageId"), Is.EqualTo("PurelySharp"));
+            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("Bounded symbolic C# analysis platform"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("RuntimeHazards"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageId"), Is.EqualTo("PurelySharp.Attributes"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("compatibility attributes"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
+            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("PurelySharp"));
+            Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("bounded symbolic C# analysis"));
+            Assert.That(readme, Does.Contain("SharpProof"));
+            Assert.That(readme, Does.Contain("working codename"));
+            Assert.That(readme, Does.Contain("package, namespace, diagnostic, configuration, additional-file, and"));
+            Assert.That(readme, Does.Contain("summary-artifact identity remains `PurelySharp`"));
         }
 
         [Test]
@@ -2175,6 +2255,15 @@ namespace PurelySharp.Test
         private static readonly string[] ApprovedSymbolicCompatibilitySurfaceFiles = Array.Empty<string>();
 
         private static readonly string[] AllowedExportedSmtFormulaTypes = Array.Empty<string>();
+
+        private static string ReadProjectElement(XDocument document, string elementName)
+        {
+            return document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, elementName, StringComparison.Ordinal))
+                .Select(static element => element.Value)
+                .FirstOrDefault() ?? string.Empty;
+        }
 
         private static bool PublicMemberReferencesSmtFormula(MemberInfo member)
         {

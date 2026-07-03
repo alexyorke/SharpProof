@@ -200,12 +200,76 @@ function Get-SymbolicCompatibilitySurfaces
     return @($surfaces)
 }
 
+function Get-SymbolicDirectTranslatorUsage
+{
+    $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic') -Recurse -Filter '*.cs' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/' -and
+                $repoPath -notmatch '^PurelySharp\.Symbolic/Smt/CSharpConditionToFormula' -and
+                $repoPath -notmatch '^PurelySharp\.Symbolic/Smt/CSharpSmtFormulaTranslator\.cs$'
+        } |
+        Sort-Object FullName
+
+    $usages = @()
+    foreach ($file in $files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            if ($line.IndexOf('CSharpConditionToFormula.', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $usages += [pscustomobject]@{
+                    path = Convert-ToRepoPath $file.FullName
+                    line = $lineNumber
+                    text = $line.Trim()
+                }
+            }
+        }
+    }
+
+    return @($usages)
+}
+
+function Get-IrKnownApiLoweringLocations
+{
+    $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic\Ir') -Recurse -Filter '*.cs' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/'
+        } |
+        Sort-Object FullName
+
+    $locations = @()
+    foreach ($file in $files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $locations += [pscustomobject]@{
+                    path = Convert-ToRepoPath $file.FullName
+                    line = $lineNumber
+                    text = $line.Trim()
+                }
+            }
+        }
+    }
+
+    return @($locations)
+}
+
 Push-Location $repoRoot
 try
 {
     $analyzer = Get-AnalyzerHotspots
     $publicFormulaSurfaces = @(Get-SymbolicPublicFormulaSurfaces)
     $compatibilitySurfaces = @(Get-SymbolicCompatibilitySurfaces)
+    $symbolicDirectTranslatorUsages = @(Get-SymbolicDirectTranslatorUsage)
+    $irKnownApiLoweringLocations = @(Get-IrKnownApiLoweringLocations)
 
     $report = [ordered]@{
         schemaVersion = 1
@@ -217,6 +281,10 @@ try
         symbolicPublicFormulaSurfaces = @($publicFormulaSurfaces)
         symbolicCompatibilitySurfaceCount = $compatibilitySurfaces.Count
         symbolicCompatibilitySurfaces = @($compatibilitySurfaces)
+        symbolicDirectTranslatorUsageCount = $symbolicDirectTranslatorUsages.Count
+        symbolicDirectTranslatorUsages = @($symbolicDirectTranslatorUsages)
+        irKnownApiLoweringCount = $irKnownApiLoweringLocations.Count
+        irKnownApiLoweringLocations = @($irKnownApiLoweringLocations)
     }
 
     if ($Json)
@@ -228,10 +296,14 @@ try
     "Analyzer raw SMT hotspots: $($report.hotspotCount) files"
     "Symbolic public SmtFormula surfaces: $($report.symbolicPublicFormulaSurfaceCount) lines"
     "Symbolic formula-shaped compatibility surfaces: $($report.symbolicCompatibilitySurfaceCount) lines"
+    "Symbolic direct CSharpConditionToFormula usages: $($report.symbolicDirectTranslatorUsageCount) lines"
+    "IR known API lowering descriptors: $($report.irKnownApiLoweringCount) entries"
     ''
     $analyzer.hotspots | Format-Table -AutoSize | Out-String
     $publicFormulaSurfaces | Format-Table -AutoSize | Out-String
     $compatibilitySurfaces | Format-Table -AutoSize | Out-String
+    $symbolicDirectTranslatorUsages | Format-Table -AutoSize | Out-String
+    $irKnownApiLoweringLocations | Format-Table -AutoSize | Out-String
 }
 finally
 {

@@ -1,6 +1,9 @@
-# Remaining PurelySharp Analyzer Backlog
+# Remaining PurelySharp Symbolic Platform Backlog
 
-This is the single canonical backlog file for remaining analyzer work.
+This is the single canonical backlog file for remaining symbolic platform and
+analyzer work. PurelySharp remains the compatibility identity, but the product
+direction is a bounded symbolic C# analysis platform where purity is one
+consumer of shared facts and proofs.
 
 Merged here and expected to stay deleted:
 
@@ -32,12 +35,20 @@ Not backlog files:
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
 - Last confirmed full `PurelySharp.Test` baseline: `2149/2149` green.
+- Staged rebrand direction:
+  - current compatibility identity remains `PurelySharp`
+  - `SharpProof` is only a working codename pending formal availability review
+  - package IDs, namespaces, diagnostics, config keys, attributes, and
+    additional-file conventions are intentionally unchanged in the current
+    tranche
 
 ## What still remains, at a high level
 
 - Make the shared symbolic platform spine dominant:
   `Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service ->
   Z3-backed conclusions -> analyzer/API/CLI outputs`.
+- Keep docs and package metadata aligned with the broader symbolic-platform
+  direction rather than describing the project as only a purity analyzer.
 - Close evidence-backed analyzer precision gaps that still show up as
   `unknown_external_call`, `dynamic_dispatch`, `unsupported_operation`, or
   deliberately conservative test expectations.
@@ -57,8 +68,11 @@ Not backlog files:
 - [ ] Keep routing analysis consumers through the symbolic platform spine:
       purity diagnostics, runtime hazards, invariant queries, and
       effect-summary-derived facts should share IR facts and proof services.
-- [ ] Burn down approved analyzer raw-SMT migration hotspots reported by
-      `scripts/Get-PurelySharpRawSmtHotspots.ps1` without adding new ones.
+- [ ] Keep analyzer raw-SMT migration hotspots at zero and burn down symbolic
+      direct `CSharpConditionToFormula` usage reported by
+      `scripts/Get-PurelySharpRawSmtHotspots.ps1`.
+- [ ] Keep `scripts/Get-PurelySharpProductionMetrics.ps1` and the raw-SMT
+      inventory aligned with the architecture debt list before major refactors.
 - [ ] Continue expanding trusted effect-summary coverage for metadata-only or
       hidden implementation methods.
 - [ ] Use the report-only purity classifier output to choose the first narrow
@@ -93,6 +107,10 @@ Current state:
   SMT construction and direct `CSharpConditionToFormula` calls.
 - Architecture tests now prevent new analyzer files from becoming raw-SMT
   hotspots outside the approved migration list.
+- The current approved analyzer raw-SMT hotspot list is empty.
+- `scripts/Get-PurelySharpRawSmtHotspots.ps1` also tracks symbolic direct
+  translator usage and IR known-API lowering descriptors so migration progress
+  is measurable.
 
 Remaining:
 

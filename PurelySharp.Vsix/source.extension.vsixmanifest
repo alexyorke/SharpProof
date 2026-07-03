@@ -3,7 +3,7 @@
   <Metadata>
     <Identity Id="PurelySharp.5f57415b-24e0-451e-ba61-76fed9639cd4" Version="0.0.4" Language="en-US" Publisher="Alex Yorke"/>
     <DisplayName>PurelySharp</DisplayName>
-    <Description xml:space="preserve">Enforces method purity in C# using the [EnforcePure] attribute. Provides real-time Roslyn analysis and code fixes.</Description>
+    <Description xml:space="preserve">Provides bounded symbolic C# analysis in Visual Studio, including purity diagnostics, side-effect detection, runtime-hazard checks, and code fixes.</Description>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,)">
