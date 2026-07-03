@@ -1190,13 +1190,14 @@ namespace PurelySharp.Symbolic.Smt
                 namedType.TypeArguments.Any(ContainsTypeParameter);
         }
 
-        private static bool TryCreateNotNullIfNotNullResultNonNullFormula(
+        internal static bool TryCreateNotNullIfNotNullResultNonNullFormula(
             ExpressionSyntax resultExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
+            int inlineDepth,
+            bool requireLocalOrParameterSource = false)
         {
             formula = null!;
             resultExpression = UnwrapExpression(resultExpression);
@@ -1210,7 +1211,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out var sourceFormula,
                     getSymbolVersion,
-                    inlineDepth))
+                    inlineDepth,
+                    requireLocalOrParameterSource))
             {
                 return false;
             }
@@ -1229,7 +1231,8 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
+            int inlineDepth,
+            bool requireLocalOrParameterSource)
         {
             formula = null!;
             var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
@@ -1242,7 +1245,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out formula,
                     getSymbolVersion,
-                    inlineDepth))
+                    inlineDepth,
+                    requireLocalOrParameterSource))
             {
                 return true;
             }
@@ -1256,7 +1260,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out formula,
                     getSymbolVersion,
-                    inlineDepth))
+                    inlineDepth,
+                    requireLocalOrParameterSource))
             {
                 return true;
             }
@@ -1271,7 +1276,8 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
+            int inlineDepth,
+            bool requireLocalOrParameterSource)
         {
             formula = null!;
             for (var parameterIndex = 0; parameterIndex < invocationOperation.TargetMethod.Parameters.Length; parameterIndex++)
@@ -1291,7 +1297,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out formula,
                     getSymbolVersion,
-                    inlineDepth);
+                    inlineDepth,
+                    requireLocalOrParameterSource);
             }
 
             return false;
@@ -1304,7 +1311,8 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
+            int inlineDepth,
+            bool requireLocalOrParameterSource)
         {
             formula = null!;
             if (string.Equals(parameterName, ImplicitThisVariableName, StringComparison.Ordinal) &&
@@ -1316,7 +1324,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out formula,
                     getSymbolVersion,
-                    inlineDepth);
+                    inlineDepth,
+                    requireLocalOrParameterSource);
             }
 
             for (var parameterIndex = 0; parameterIndex < propertyReferenceOperation.Property.Parameters.Length; parameterIndex++)
@@ -1336,7 +1345,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out formula,
                     getSymbolVersion,
-                    inlineDepth);
+                    inlineDepth,
+                    requireLocalOrParameterSource);
             }
 
             return false;
@@ -1348,8 +1358,16 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
+            int inlineDepth,
+            bool requireLocalOrParameterSource)
         {
+            if (requireLocalOrParameterSource &&
+                !IsLocalOrParameterExpression(expression, semanticModel, cancellationToken))
+            {
+                formula = null!;
+                return false;
+            }
+
             if (TryCreateNotNullWhenArgumentFormula(
                     expression,
                     semanticModel,

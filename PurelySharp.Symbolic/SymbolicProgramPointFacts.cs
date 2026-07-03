@@ -5648,6 +5648,11 @@ namespace PurelySharp.Symbolic
                     valueNonNullFormula));
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                AddNotNullIfNotNullAssignedNullStateFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
                 TryCreateBuiltInLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
             {
@@ -5725,6 +5730,33 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddNotNullIfNotNullAssignedNullStateFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
+                targetFormula is not { Kind: SmtValueKind.Reference } ||
+                !CSharpConditionToFormula.TryCreateNotNullIfNotNullResultNonNullFormula(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueNonNullFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0,
+                    requireLocalOrParameterSource: true))
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                CreateReferenceNonNullFormula(targetFormula),
+                valueNonNullFormula));
         }
 
         private static void AddSwitchExpressionAssignedValueFacts(

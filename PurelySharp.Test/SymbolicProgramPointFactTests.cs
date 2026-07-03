@@ -1084,6 +1084,156 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_NotNullIfNotNullAssignedMethodReturnProvesLocalNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    [return: NotNullIfNotNull(nameof(value))]
+    public static string? Echo(string? value)
+    {
+        return value;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        var copy = Guard.Echo(value);
+        if (value != null)
+        {
+            return copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return copy.Length;");
+            var proof = ProveAtMarker(source, marker, "copy != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullIfNotNullAssignedNullSourceRemainsUnknown()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    [return: NotNullIfNotNull(nameof(value))]
+    public static string? Echo(string? value)
+    {
+        return value;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        var copy = Guard.Echo(value);
+        if (value == null)
+        {
+            return copy == null ? 0 : copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return copy == null");
+            var proof = ProveAtMarker(source, marker, "copy != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullIfNotNullAssignedFactDoesNotSurviveReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    [return: NotNullIfNotNull(nameof(value))]
+    public static string? Echo(string? value)
+    {
+        return value;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        var copy = Guard.Echo(value);
+        if (value != null)
+        {
+            copy = null;
+            return copy == null ? 0 : copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return copy == null");
+            var proof = ProveAtMarker(source, marker, "copy != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullIfNotNullAssignedMemberSourceRemainsConservative()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    [return: NotNullIfNotNull(nameof(value))]
+    public static string? Echo(string? value)
+    {
+        return value;
+    }
+}
+
+public sealed class Box
+{
+    public string? Value;
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        var copy = Guard.Echo(box.Value);
+        if (box.Value != null)
+        {
+            return copy == null ? 0 : copy.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return copy == null");
+            var proof = ProveAtMarker(source, marker, "copy != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_NotNullWhenOutArgumentProvesAssignedLocalNonNull()
         {
             const string source = @"
