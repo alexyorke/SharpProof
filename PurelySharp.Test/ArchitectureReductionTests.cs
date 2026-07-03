@@ -223,6 +223,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeLength"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NegativeStackAllocLength"));
             Assert.That(source, Does.Contain("SymbolicRelationOperator.LessThan"));
+            Assert.That(source, Does.Contain("CreateAggregateExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("TryGetExceptionPrecondition"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.array.negative-length.aggregate"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.stackalloc.negative-length.aggregate"));
             Assert.That(source, Does.Contain("TryTranslateNegativeCondition(lengthExpression"));
             Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
         }

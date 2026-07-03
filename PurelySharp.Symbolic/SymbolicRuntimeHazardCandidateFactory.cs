@@ -1260,7 +1260,10 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardCandidate candidate)
         {
             candidate = default;
-            var trigger = default(SmtFormula);
+            var triggerFormula = default(SmtFormula);
+            var triggerCondition = default(SymbolicCondition);
+            var subject = default(SymbolicTerm);
+            var allTriggersAreIr = true;
             foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
             {
                 if (!TryCreateNegativeLengthTrigger(
@@ -1274,12 +1277,26 @@ namespace PurelySharp.Symbolic
                     continue;
                 }
 
-                trigger = trigger == null
+                triggerFormula = triggerFormula == null
                     ? negativeLength.Condition
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength.Condition);
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+                if (TryGetExceptionPrecondition(
+                        negativeLength,
+                        SymbolicExceptionPreconditionKind.NegativeLength,
+                        out var precondition))
+                {
+                    triggerCondition = triggerCondition == null
+                        ? precondition.Trigger
+                        : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
+                    subject ??= precondition.Subject;
+                }
+                else
+                {
+                    allTriggersAreIr = false;
+                }
             }
 
-            if (trigger == null)
+            if (triggerFormula == null)
             {
                 return false;
             }
@@ -1287,7 +1304,14 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 arrayCreation,
                 SymbolicRuntimeHazardKind.NegativeArrayLength,
-                trigger,
+                CreateAggregateExceptionPreconditionTrigger(
+                    arrayCreation,
+                    SymbolicExceptionPreconditionKind.NegativeLength,
+                    subject,
+                    triggerCondition,
+                    triggerFormula,
+                    allTriggersAreIr,
+                    "ir.runtime-hazard.array.negative-length.aggregate"),
                 ExceptionTypes.OverflowException,
                 ExceptionCategories.DefiniteNegativeArrayLength);
             return true;
@@ -1300,7 +1324,10 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardCandidate candidate)
         {
             candidate = default;
-            var trigger = default(SmtFormula);
+            var triggerFormula = default(SmtFormula);
+            var triggerCondition = default(SymbolicCondition);
+            var subject = default(SymbolicTerm);
+            var allTriggersAreIr = true;
             foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
             {
                 if (!TryCreateNegativeLengthTrigger(
@@ -1314,12 +1341,26 @@ namespace PurelySharp.Symbolic
                     continue;
                 }
 
-                trigger = trigger == null
+                triggerFormula = triggerFormula == null
                     ? negativeLength.Condition
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength.Condition);
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+                if (TryGetExceptionPrecondition(
+                        negativeLength,
+                        SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                        out var precondition))
+                {
+                    triggerCondition = triggerCondition == null
+                        ? precondition.Trigger
+                        : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
+                    subject ??= precondition.Subject;
+                }
+                else
+                {
+                    allTriggersAreIr = false;
+                }
             }
 
-            if (trigger == null)
+            if (triggerFormula == null)
             {
                 return false;
             }
@@ -1327,10 +1368,54 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 stackAllocCreation,
                 SymbolicRuntimeHazardKind.NegativeStackAllocLength,
-                trigger,
+                CreateAggregateExceptionPreconditionTrigger(
+                    stackAllocCreation,
+                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                    subject,
+                    triggerCondition,
+                    triggerFormula,
+                    allTriggersAreIr,
+                    "ir.runtime-hazard.stackalloc.negative-length.aggregate"),
                 ExceptionTypes.OverflowException,
                 ExceptionCategories.DefiniteNegativeStackAllocLength);
             return true;
+        }
+
+        private static RuntimeHazardTrigger CreateAggregateExceptionPreconditionTrigger(
+            SyntaxNode site,
+            SymbolicExceptionPreconditionKind kind,
+            SymbolicTerm? subject,
+            SymbolicCondition? triggerCondition,
+            SmtFormula triggerFormula,
+            bool allTriggersAreIr,
+            string provenance)
+        {
+            if (!allTriggersAreIr || triggerCondition == null)
+            {
+                return new RuntimeHazardTrigger(triggerFormula);
+            }
+
+            var precondition = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
+                site,
+                provenance);
+            return new RuntimeHazardTrigger(triggerFormula, precondition);
+        }
+
+        private static bool TryGetExceptionPrecondition(
+            RuntimeHazardTrigger trigger,
+            SymbolicExceptionPreconditionKind kind,
+            out SymbolicExceptionPreconditionAtom precondition)
+        {
+            if (trigger.IrPrecondition?.Atom is SymbolicExceptionPreconditionAtom candidate &&
+                candidate.Kind == kind)
+            {
+                precondition = candidate;
+                return true;
+            }
+
+            precondition = null!;
+            return false;
         }
 
         private static bool TryCreateSwitchExpressionNoMatchCandidate(
