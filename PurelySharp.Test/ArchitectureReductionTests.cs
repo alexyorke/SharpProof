@@ -262,6 +262,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
             Assert.That(source, Does.Contain("IsResourceReleased("));
             Assert.That(source, Does.Contain("EnumerateSymbolicAliasTerms(resource, state)"));
+            Assert.That(source, Does.Contain("TryFindAliasedOwnedResourceLostByReassignment("));
+            Assert.That(source, Does.Contain("AddPreservedOwnedDisposableAliasFacts("));
+            Assert.That(source, Does.Contain("\"analyzer.resource.alias-preserve\""));
             Assert.That(source, Does.Contain("\"resource_missing_dispose\""));
         }
 

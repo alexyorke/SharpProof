@@ -482,6 +482,67 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task MissingDisposeForAliasedOwnedLocalAfterOwnerReassignment_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        resource = new PureDisposable();
+        resource.Dispose();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DisposeAliasAfterOwnerReassignment_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        resource = new PureDisposable();
+        alias.Dispose();
+        resource.Dispose();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ReturnedOwnedLocalDisposable_NoDiagnostic()
         {
             var test = @"
