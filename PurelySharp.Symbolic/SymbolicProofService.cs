@@ -124,18 +124,12 @@ namespace PurelySharp.Symbolic
                 : proven;
         }
 
-        internal PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
+        private PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
         {
             return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
         }
 
-        internal SymbolicIrProofResult ClassifyFormulaReachability(IEnumerable<SmtFormula> pathConditions)
-        {
-            var result = ClassifyFormulaPathFeasibility(pathConditions);
-            return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
-        }
-
-        internal PurityProofResult ClassifyFormulaImplication(
+        private PurityProofResult ClassifyFormulaImplication(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula)
         {
@@ -145,61 +139,6 @@ namespace PurelySharp.Symbolic
             }
 
             return ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, factFormula));
-        }
-
-        internal SymbolicIrProofResult ClassifyFormulaConditionTruth(
-            IEnumerable<SmtFormula> pathConditions,
-            SmtFormula conditionFormula)
-        {
-            if (conditionFormula == null)
-            {
-                throw new ArgumentNullException(nameof(conditionFormula));
-            }
-
-            var trueProof = ClassifyFormulaImplication(pathConditions, conditionFormula);
-            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
-            {
-                var status = string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
-                    ? SymbolicProofStatus.Unreachable
-                    : SymbolicProofStatus.ProvenTrue;
-                return SymbolicIrProofResult.FromConditionTruth(
-                    trueProof,
-                    status,
-                    CreateBudgetInfo());
-            }
-
-            var falseProof = ClassifyFormulaImplication(
-                pathConditions,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
-            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
-            {
-                var status = string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
-                    ? SymbolicProofStatus.Unreachable
-                    : SymbolicProofStatus.ProvenFalse;
-                return SymbolicIrProofResult.FromConditionTruth(
-                    falseProof,
-                    status,
-                    CreateBudgetInfo());
-            }
-
-            return SymbolicIrProofResult.FromConditionTruth(
-                trueProof,
-                SymbolicProofStatus.Unknown,
-                CreateBudgetInfo());
-        }
-
-        internal PurityProofResult ClassifyFormulaBranchReachability(
-            IEnumerable<SmtFormula> pathConditions,
-            SmtFormula branchCondition)
-        {
-            if (branchCondition == null)
-            {
-                throw new ArgumentNullException(nameof(branchCondition));
-            }
-
-            return ClassifyWithFallback(service => service.Classify(new PurityProofQuery(
-                pathConditions.ToArray(),
-                new PurityHazard(PurityHazardKind.BranchReachability, branchCondition))));
         }
 
         private PurityProofResult ClassifyWithFallback(Func<SmtAnalysisService, PurityProofResult> classify)

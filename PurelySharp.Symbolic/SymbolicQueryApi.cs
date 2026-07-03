@@ -436,10 +436,11 @@ namespace PurelySharp.Symbolic
                 options.ImpliedConditions,
                 options.SmtAnalysis,
                 cancellationToken);
-            var mergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(analysis.PathConditions);
-            var invariant = SymbolicInvariantResult.FromPathConditions(
-                analysis.PathConditions,
-                mergedInvariantText);
+            var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(analysis.PathConditions);
+            var invariant = SymbolicInvariantResult.FromFacts(
+                analysis.Facts,
+                mergedInvariantText,
+                SymbolicInvariantMergeKind.Conjunction);
             return new SymbolicSourceQueryResult(
                 node.SyntaxTree.FilePath,
                 linePosition.Line,

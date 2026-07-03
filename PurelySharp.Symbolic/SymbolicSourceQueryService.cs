@@ -630,6 +630,7 @@ namespace PurelySharp.Symbolic
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
+                query.Node,
                 query.Analysis,
                 impliedConditions,
                 smtAnalysis,
@@ -691,6 +692,7 @@ namespace PurelySharp.Symbolic
                     var conditionProofs = ProveConditions(
                         query.SemanticModel,
                         query.Position,
+                        query.Node,
                         query.Analysis,
                         impliedConditions,
                         smtAnalysis,
@@ -772,6 +774,7 @@ namespace PurelySharp.Symbolic
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
+                query.Node,
                 query.Analysis,
                 impliedConditions,
                 smtAnalysis,
@@ -838,6 +841,7 @@ namespace PurelySharp.Symbolic
                     var conditionProofs = ProveConditions(
                         query.SemanticModel,
                         query.Position,
+                        query.Node,
                         query.Analysis,
                         impliedConditions,
                         smtAnalysis,
@@ -985,6 +989,7 @@ namespace PurelySharp.Symbolic
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
+                query.Node,
                 query.Analysis,
                 impliedConditions,
                 smtAnalysis,
@@ -1171,6 +1176,7 @@ namespace PurelySharp.Symbolic
             return ProveCondition(
                 query.SemanticModel,
                 query.Position,
+                query.Node,
                 query.Analysis,
                 conditionText,
                 smtAnalysis,
@@ -1234,6 +1240,7 @@ namespace PurelySharp.Symbolic
         private static IReadOnlyList<SymbolicConditionProofResult> ProveConditions(
             SemanticModel semanticModel,
             int position,
+            SyntaxNode sourceNode,
             SymbolicProgramPointAnalysis analysis,
             IEnumerable<string>? conditionTexts,
             SmtAnalysisService? smtAnalysis,
@@ -1249,6 +1256,7 @@ namespace PurelySharp.Symbolic
                 .Select(condition => ProveCondition(
                     semanticModel,
                     position,
+                    sourceNode,
                     analysis,
                     condition,
                     smtAnalysis,
@@ -1260,6 +1268,7 @@ namespace PurelySharp.Symbolic
         private static SymbolicConditionProofResult ProveCondition(
             SemanticModel semanticModel,
             int position,
+            SyntaxNode sourceNode,
             SymbolicProgramPointAnalysis analysis,
             string conditionText,
             SmtAnalysisService? smtAnalysis,
@@ -1309,10 +1318,13 @@ namespace PurelySharp.Symbolic
                     "condition_not_supported");
             }
 
-            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
+            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
                 analysis.PathConditions,
                 conditionFormula,
-                smtAnalysis);
+                sourceNode,
+                smtAnalysis,
+                "source.query.condition",
+                "source-query-condition");
             if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
             {
                 return new SymbolicConditionProofResult(
@@ -1342,7 +1354,8 @@ namespace PurelySharp.Symbolic
 
             if (analysis.Reachability == SymbolicReachability.NotChecked)
             {
-                var reachabilityProof = SymbolicReachabilityService.ClassifyFormulaReachability(
+                var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
+                    analysis.PathState,
                     analysis.PathConditions,
                     smtAnalysis);
                 if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
@@ -1641,9 +1654,10 @@ namespace PurelySharp.Symbolic
                 query.Node.Span,
                 cancellationToken);
             var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);
-            var invariant = SymbolicInvariantResult.FromPathConditions(
-                query.Analysis.PathConditions,
-                mergedInvariantText);
+            var invariant = SymbolicInvariantResult.FromFacts(
+                query.Analysis.Facts,
+                mergedInvariantText,
+                SymbolicInvariantMergeKind.Conjunction);
             return new SymbolicSourceQueryResult(
                 syntaxTree.FilePath,
                 line,
@@ -2205,7 +2219,7 @@ namespace PurelySharp.Symbolic
             return new SymbolicInvariantQueryView(
                 result.MergedInvariantText,
                 result.Invariant.MergeKind,
-                result.PathConditions.Select(static condition => condition.Text).ToArray(),
+                result.Invariant.Conditions.Select(static condition => condition.Text).ToArray(),
                 Array.Empty<string>(),
                 result.Invariant.Conditions
                     .Where(static condition => condition.IsConservativeUnknown)
@@ -2793,7 +2807,7 @@ namespace PurelySharp.Symbolic
                 }
 
                 var pointTargets = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var condition in point.PathConditions)
+                foreach (var condition in point.Invariant.Conditions)
                 {
                     var builder = GetBuilder(builders, condition.Target);
                     builder.AddCondition(condition);
@@ -4604,7 +4618,7 @@ namespace PurelySharp.Symbolic
                 null,
                 options);
             var focusedPathConditions = SymbolicInvariantTargetFilter.ApplyToConditions(
-                result.PathConditions,
+                result.Invariant.Conditions,
                 options);
             var focusedFacts = options.HasInvariantTargetFilter
                 ? focusedPathConditions
@@ -5949,7 +5963,7 @@ namespace PurelySharp.Symbolic
             foreach (var point in candidatePoints)
             {
                 var conditionSet = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var condition in point.PathConditions)
+                foreach (var condition in point.Invariant.Conditions)
                 {
                     if (string.IsNullOrWhiteSpace(condition.Text))
                     {
@@ -6217,21 +6231,21 @@ namespace PurelySharp.Symbolic
             }
 
             if (ConditionTargets.Count != 0 &&
-                !result.PathConditions.Any(condition =>
+                !result.Invariant.Conditions.Any(condition =>
                     ConditionTargets.Any(target => string.Equals(target, condition.Target, StringComparison.OrdinalIgnoreCase))))
             {
                 return false;
             }
 
             if (ConditionTexts.Count != 0 &&
-                !result.PathConditions.Any(condition =>
+                !result.Invariant.Conditions.Any(condition =>
                     ConditionTexts.Any(text => string.Equals(text, condition.Text, StringComparison.Ordinal))))
             {
                 return false;
             }
 
             if (ConditionTextContains.Count != 0 &&
-                !result.PathConditions.Any(condition =>
+                !result.Invariant.Conditions.Any(condition =>
                     ConditionTextContains.Any(text => condition.Text.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)))
             {
                 return false;
@@ -7326,8 +7340,6 @@ namespace PurelySharp.Symbolic
 
         public SymbolicInvariantInfo InvariantInfo { get; }
 
-        internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
-
         public int PathConditionCount => InvariantInfo.ConditionCount;
 
         public SymbolicReachability Reachability { get; }
@@ -7425,23 +7437,6 @@ namespace PurelySharp.Symbolic
 
         public bool IsTrivial => Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
 
-        internal static SymbolicInvariantResult FromPathConditions(
-            IReadOnlyList<SmtFormula> pathConditions,
-            string? mergedInvariantText = null)
-        {
-            if (pathConditions == null)
-            {
-                throw new ArgumentNullException(nameof(pathConditions));
-            }
-
-            return new SymbolicInvariantResult(
-                pathConditions
-                    .Select(static (condition, index) => SymbolicInvariantCondition.FromFormula(index, condition))
-                    .ToArray(),
-                mergedInvariantText ?? SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions),
-                SymbolicInvariantMergeKind.Conjunction);
-        }
-
         public static SymbolicInvariantResult FromFacts(
             IReadOnlyList<string> facts,
             string? mergedInvariantText = null,
@@ -7527,23 +7522,6 @@ namespace PurelySharp.Symbolic
 
         public bool IsConservativeUnknown { get; }
 
-        internal static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
-        {
-            if (formula == null)
-            {
-                throw new ArgumentNullException(nameof(formula));
-            }
-
-            return new SymbolicInvariantCondition(
-                index,
-                SymbolicFormulaDisplay.Format(formula),
-                GetFormulaKind(formula),
-                formula.Kind.ToString(),
-                isSolverBacked: true,
-                SymbolicFormulaDisplay.GetMergeTarget(formula),
-                isConservativeUnknown: false);
-        }
-
         public static SymbolicInvariantCondition FromText(int index, string text)
         {
             return new SymbolicInvariantCondition(
@@ -7567,14 +7545,6 @@ namespace PurelySharp.Symbolic
                 isSolverBacked: false,
                 target,
                 isConservativeUnknown: true);
-        }
-
-        private static string GetFormulaKind(SmtFormula formula)
-        {
-            var name = formula.GetType().Name;
-            return name.EndsWith("Formula", StringComparison.Ordinal)
-                ? name.Substring(0, name.Length - "Formula".Length)
-                : name;
         }
 
         private static string ExtractConservativeUnknownTarget(string? text)

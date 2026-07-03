@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Symbolic;
-using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -43,12 +42,13 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
             return pathConditions.Count > 0 &&
-                (SymbolicPathConditionsAllowAndImply(
+                SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
                     pathConditions,
                     factFormula,
                     useNode,
-                    smtAnalysis) ||
-                 SymbolicReachabilityService.PathConditionsAllowAndImply(pathConditions, factFormula, smtAnalysis));
+                    smtAnalysis,
+                    "exception.path.query",
+                    "exception.path.query");
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -658,116 +658,17 @@ namespace PurelySharp.Analyzer
                 cancellationToken);
         }
 
-        private static bool SymbolicPathConditionsAllowAndImply(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SmtFormula factFormula,
-            SyntaxNode sourceNode,
-            SmtAnalysisService smtAnalysis)
-        {
-            if (!TryCreateSymbolicPathState(pathConditions, sourceNode, out var pathState) ||
-                !SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    factFormula,
-                    sourceNode,
-                    "exception.path.query",
-                    "exception.path.query",
-                    out var factCondition))
-            {
-                return false;
-            }
-
-            var truth = SymbolicReachabilityService.ClassifyStateConditionTruth(
-                pathState,
-                factCondition,
-                smtAnalysis);
-            return truth.Info.Status == SymbolicProofStatus.ProvenTrue;
-        }
-
         private static bool SymbolicPathConditionsAreSatisfiable(
             IReadOnlyCollection<SmtFormula> pathConditions,
             SyntaxNode sourceNode,
             SmtAnalysisService smtAnalysis)
         {
-            if (TryClassifySymbolicPathFeasibility(
-                    pathConditions,
-                    sourceNode,
-                    smtAnalysis,
-                    out var status))
-            {
-                return status != SymbolicProofStatus.Unreachable;
-            }
-
-            return SymbolicReachabilityService.IsSatisfiable(pathConditions, smtAnalysis);
-        }
-
-        private static bool SymbolicPathConditionsImplyBranch(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            ExpressionSyntax condition,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            if (!TryCreateSymbolicPathState(pathConditions, condition, out var pathState) ||
-                !SymbolicIrLowerer.TryLowerCondition(
-                    condition,
-                    new SymbolicLoweringContext(semanticModel, cancellationToken),
-                    out var symbolicCondition))
-            {
-                return false;
-            }
-
-            if (!branchWhenTrue)
-            {
-                symbolicCondition = new SymbolicNotCondition(symbolicCondition);
-            }
-
-            var truth = SymbolicReachabilityService.ClassifyStateConditionTruth(
-                pathState,
-                symbolicCondition,
-                smtAnalysis);
-            return truth.Info.Status == SymbolicProofStatus.ProvenTrue;
-        }
-
-        private static bool TryClassifySymbolicPathFeasibility(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SyntaxNode sourceNode,
-            SmtAnalysisService smtAnalysis,
-            out SymbolicProofStatus status)
-        {
-            status = SymbolicProofStatus.Unknown;
-            if (!TryCreateSymbolicPathState(pathConditions, sourceNode, out var pathState))
-            {
-                return false;
-            }
-
-            var feasibility = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-            status = feasibility.Info.Status;
-            return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
-        }
-
-        private static bool TryCreateSymbolicPathState(
-            IReadOnlyCollection<SmtFormula> pathConditions,
-            SyntaxNode sourceNode,
-            out SymbolicState pathState)
-        {
-            pathState = new SymbolicState();
-            foreach (var pathCondition in pathConditions)
-            {
-                if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                        pathCondition,
-                        sourceNode,
-                        "exception.path.condition",
-                        "exception.path.condition",
-                        out var symbolicCondition))
-                {
-                    pathState = new SymbolicState();
-                    return false;
-                }
-
-                pathState = pathState.AddPathCondition(symbolicCondition);
-            }
-
-            return true;
+            return SymbolicReachabilityService.PathConditionsAreSatisfiableWithIrFirst(
+                pathConditions,
+                sourceNode,
+                smtAnalysis,
+                "exception.path.condition",
+                "exception.path.condition");
         }
 
         internal static bool IsShadowedByPathSensitiveThrowingFinally(
@@ -907,20 +808,15 @@ namespace PurelySharp.Analyzer
             if (ifStatement.Else?.Statement is not { } elseStatement)
             {
                 return trueReachable && trueExits &&
-                    (SymbolicPathConditionsImplyBranch(
-                            pathConditions,
-                            ifStatement.Condition,
-                            branchWhenTrue: true,
-                            semanticModel,
-                            cancellationToken,
-                            smtAnalysis) ||
-                        SymbolicReachabilityService.PathConditionsImplyBranch(
-                            pathConditions,
-                            ifStatement.Condition,
-                            branchWhenTrue: true,
-                            semanticModel,
-                            cancellationToken,
-                            smtAnalysis));
+                    SymbolicReachabilityService.PathConditionsImplyBranchWithIrFirst(
+                        pathConditions,
+                        ifStatement.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis,
+                        "exception.path.condition",
+                        "exception.path.condition");
             }
 
             var falseConditions = SymbolicReachabilityService.TryCollectBranchConditions(
@@ -1066,7 +962,7 @@ namespace PurelySharp.Analyzer
                 SmtFormula? previousAssignedValue = null;
                 if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out var assignedSymbol))
                 {
-                    TryGetCurrentSymbolValue(facts, assignedSymbol, out previousAssignedValue);
+                    SymbolicReachabilityService.TryGetCurrentSymbolValue(facts, assignedSymbol, out previousAssignedValue);
                 }
 
                 RemoveFactsInvalidatedByNestedMutations(assignment.Left, semanticModel, cancellationToken, facts);
@@ -1080,12 +976,13 @@ namespace PurelySharp.Analyzer
                         AddAssignedValueFacts(assignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
                     }
                     else if (previousAssignedValue != null &&
-                             TryCreateCompoundAssignmentFact(
+                             SymbolicReachabilityService.TryCreateCompoundAssignmentFact(
                                  assignedSymbol,
                                  previousAssignedValue,
                                  assignment,
                                  semanticModel,
                                  cancellationToken,
+                                 ExpressionReferencesSymbol(assignment.Right, assignedSymbol, semanticModel, cancellationToken),
                                  out var compoundAssignmentFact))
                     {
                         facts.Add(compoundAssignmentFact);
@@ -1120,10 +1017,14 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     out var incrementedSymbol,
                     out var delta) &&
-                TryGetCurrentSymbolValue(facts, incrementedSymbol, out var previousIncrementedValue))
+                SymbolicReachabilityService.TryGetCurrentSymbolValue(facts, incrementedSymbol, out var previousIncrementedValue))
             {
                 RemoveFactsReferencingSymbol(facts, incrementedSymbol);
-                if (TryCreateIncrementOrDecrementFact(incrementedSymbol, previousIncrementedValue, delta, out var mutationFact))
+                if (SymbolicReachabilityService.TryCreateIncrementOrDecrementFact(
+                        incrementedSymbol,
+                        previousIncrementedValue,
+                        delta,
+                        out var mutationFact))
                 {
                     facts.Add(mutationFact);
                 }
@@ -1324,18 +1225,16 @@ namespace PurelySharp.Analyzer
             foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolMutatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
-                    !CSharpSmtFormulaTranslator.TryTranslateValue(
+                    !SymbolicReachabilityService.TryCreateExpressionNonNegativeComparison(
                         sizeExpression,
                         semanticModel,
                         cancellationToken,
-                        out var sizeFormula,
-                        getSymbolVersion: null) ||
-                    sizeFormula is not { Kind: SmtValueKind.Int })
+                        out var nonNegativeSizeFormula))
                 {
                     continue;
                 }
 
-                facts.Add(SmtFormulaFactory.CreateIntegerGreaterThanOrEqualZero(sizeFormula));
+                facts.Add(nonNegativeSizeFormula);
             }
         }
 
@@ -1343,13 +1242,15 @@ namespace PurelySharp.Analyzer
             ISymbol symbol,
             ICollection<SmtFormula> facts)
         {
-            if (!TryCreateSymbolSmtValue(symbol, out var formula) ||
-                formula is not { Kind: SmtValueKind.Reference })
+            if (!SymbolicReachabilityService.TryCreateSymbolReferenceNullComparison(
+                    symbol,
+                    equalToNull: false,
+                    out var formula))
             {
                 return;
             }
 
-            facts.Add(SmtFormulaFactory.CreateReferenceNullComparison(formula, isNull: false));
+            facts.Add(formula);
         }
 
         private static void AddCompletedIfStatementFacts(
@@ -1436,87 +1337,109 @@ namespace PurelySharp.Analyzer
                 hasThrowGuard &&
                 ExpressionMatchesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken);
 
-            if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
-                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                SymbolicReachabilityService.TryCreateAssignedValueFact(
+                    targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueFormula,
-                    getSymbolVersion: null) &&
-                valueFormula != null &&
-                SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
+                    out var assignedValueFact))
             {
-                facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
+                facts.Add(assignedValueFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
-                AddNullableAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
-            }
-
-            if (TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
-                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateBuiltInLengthValueFormula(effectiveValueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
-            {
-                facts.Add(SmtFormulaFactory.CreateEquality(targetLengthFormula, valueLengthFormula));
+                SymbolicReachabilityService.AddNullableAssignedValueFacts(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateReferenceBackedLengthFact(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceLengthFact))
+                SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var builtInLengthFact))
+            {
+                facts.Add(builtInLengthFact);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var referenceLengthFact))
             {
                 facts.Add(referenceLengthFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateCollectionExpressionLengthLowerBoundFact(targetSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
+                SymbolicReachabilityService.TryCreateCollectionExpressionLengthLowerBoundFact(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    out var lowerBoundLengthFact))
             {
                 facts.Add(lowerBoundLengthFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
-                AddArrayDimensionLengthAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                SymbolicReachabilityService.AddArrayDimensionLengthAssignedValueFacts(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
-                AddReferenceBackedArrayDimensionLengthFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
-            }
-
-            if (TryCreateStringContentFormula(targetSymbol, out var targetStringFormula) &&
-                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpSmtFormulaTranslator.TryTranslateStringValue(
+                SymbolicReachabilityService.AddReferenceBackedArrayDimensionLengthFacts(
+                    targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueStringFormula,
-                    getSymbolVersion: null) &&
-                valueStringFormula != null)
-            {
-                facts.Add(SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula));
+                    facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateReferenceBackedStringContentFact(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceStringFact))
+                SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var stringContentFact))
+            {
+                facts.Add(stringContentFact);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
+                    targetSymbol,
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var referenceStringFact))
             {
                 facts.Add(referenceStringFact);
             }
 
-            if (TryCreateSymbolSmtValue(targetSymbol, out var targetReferenceFormula) &&
-                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
-                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
+                    targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueNonNullFormula) &&
-                valueNonNullFormula != null)
+                    out var stringNonNullFact))
             {
-                facts.Add(SmtFormulaFactory.CreateEquality(
-                    SmtFormulaFactory.CreateReferenceNullComparison(targetReferenceFormula, isNull: false),
-                    valueNonNullFormula));
+                facts.Add(stringNonNullFact);
             }
 
             if (hasThrowGuard &&
@@ -1543,244 +1466,6 @@ namespace PurelySharp.Analyzer
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
             }
-        }
-
-        private static void AddNullableAssignedValueFacts(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (!TryCreateNullableHasValueFormula(targetSymbol, out var targetHasValue) ||
-                !TryCreateNullableValueFormula(targetSymbol, out var targetValue))
-            {
-                return;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var parts,
-                    getSymbolVersion: null,
-                    inlineDepth: 0))
-            {
-                facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetHasValue, parts.HasValue));
-
-                if (parts.Value != null &&
-                    SymbolicFactFactory.CanCompareSmtValues(targetValue, parts.Value))
-                {
-                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
-                }
-            }
-            else if (TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(targetSymbol), out var underlyingType) &&
-                     TryTranslateNullableWrappedValueForUnderlyingType(
-                         valueExpression,
-                         underlyingType,
-                         semanticModel,
-                         cancellationToken,
-                         out var wrappedValueFormula))
-            {
-                facts.Add(targetHasValue);
-
-                if (SymbolicFactFactory.CanCompareSmtValues(targetValue, wrappedValueFormula))
-                {
-                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, wrappedValueFormula));
-                }
-            }
-        }
-
-        private static bool TryTranslateNullableWrappedValueForUnderlyingType(
-            ExpressionSyntax valueExpression,
-            ITypeSymbol underlyingType,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula valueFormula)
-        {
-            valueExpression = UnwrapFactExpression(valueExpression);
-            var typeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
-            if (!SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, underlyingType) &&
-                !SymbolEqualityComparer.Default.Equals(typeInfo.Type, underlyingType))
-            {
-                valueFormula = null!;
-                return false;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedValue,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                translatedValue != null)
-            {
-                valueFormula = translatedValue;
-                return true;
-            }
-
-            valueFormula = null!;
-            return false;
-        }
-
-        private static bool TryCreateNullableHasValueFormula(ISymbol symbol, out SmtFormula formula)
-        {
-            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out _))
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = SmtFormulaFactory.CreateBoolVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".HasValue");
-            return true;
-        }
-
-        private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
-        {
-            if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out var underlyingType) ||
-                !TryGetValueKind(underlyingType, out var kind))
-            {
-                formula = null!;
-                return false;
-            }
-
-            formula = SmtFormulaFactory.CreateVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".Value", kind);
-            return true;
-        }
-
-        private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
-        {
-            return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
-        }
-
-        private static bool TryCreateReferenceBackedLengthFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapFactExpression(valueExpression),
-                    semanticModel,
-                    cancellationToken,
-                    (expression, model, token) =>
-                        TryCreateBuiltInLengthValueFormula(expression, model, token, out var formula)
-                            ? formula
-                            : null,
-                    out fact);
-        }
-
-        private static void AddReferenceBackedArrayDimensionLengthFacts(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetReference))
-            {
-                return;
-            }
-
-            SymbolicFactFactory.AddReferenceBackedArrayDimensionLengthFacts(
-                targetReference,
-                valueExpression,
-                UnwrapFactExpression(valueExpression),
-                semanticModel,
-                cancellationToken,
-                (expression, dimension, model, token) =>
-                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
-                        expression,
-                        dimension,
-                        model,
-                        token,
-                        out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
-                        ? valueDimensionLength
-                        : null,
-                facts.Add);
-        }
-
-        private static bool TryCreateReferenceBackedStringContentFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapFactExpression(valueExpression),
-                    semanticModel,
-                    cancellationToken,
-                    (expression, model, token) =>
-                        CSharpSmtFormulaTranslator.TryTranslateStringValue(
-                            expression,
-                            model,
-                            token,
-                            out var valueString,
-                            getSymbolVersion: null) &&
-                        valueString != null
-                            ? valueString
-                            : null,
-                    out fact);
-        }
-
-        private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
-                SymbolicFactFactory.TryCreateCollectionExpressionLengthLowerBoundFact(
-                    targetLengthFormula,
-                    UnwrapFactExpression(valueExpression),
-                    out fact);
-        }
-
-        private static void AddArrayDimensionLengthAssignedValueFacts(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol targetArrayType)
-            {
-                return;
-            }
-
-            SymbolicFactFactory.AddArrayDimensionLengthAssignedValueFacts(
-                targetArrayType,
-                dimension => TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength)
-                    ? targetDimensionLength
-                    : null,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                (expression, dimension, model, token) =>
-                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
-                        expression,
-                        dimension,
-                        model,
-                        token,
-                        out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
-                        ? valueDimensionLength
-                        : null,
-                facts.Add);
         }
 
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
@@ -1850,18 +1535,18 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
                     expression,
                     semanticModel,
                     cancellationToken,
+                    equalToNull: false,
                     out var formula,
-                    getSymbolVersion: null) ||
-                formula is not { Kind: SmtValueKind.Reference })
+                    getSymbolVersion: null))
             {
                 return;
             }
 
-            facts.Add(SmtFormulaFactory.CreateReferenceNullComparison(formula, isNull: false));
+            facts.Add(formula);
         }
 
         private static void RemoveFactsInvalidatedByNestedMutations(
@@ -1878,82 +1563,6 @@ namespace PurelySharp.Analyzer
                     RemoveFactsReferencingSymbol(facts, mutatedSymbol);
                 }
             }
-        }
-
-        private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
-        {
-            return SymbolicFactFactory.TryCreateSymbolVariableFormula(
-                SymbolicFactFactory.GetSmtVariableName(symbol),
-                SymbolicFactFactory.GetTrackedSymbolType(symbol),
-                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-                IsReferenceType,
-                out formula);
-        }
-
-        private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
-        {
-            return SymbolicFactFactory.TryGetValueKind(
-                type,
-                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-                IsReferenceType,
-                out kind);
-        }
-
-        private static bool TryCreateStringContentFormula(ISymbol symbol, out SmtFormula formula)
-        {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
-
-            return SymbolicFactFactory.TryCreateStringContentFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
-        }
-
-        private static bool TryCreateBuiltInLengthFormula(ISymbol symbol, out SmtFormula formula)
-        {
-            var type = symbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
-
-            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
-        }
-
-        private static bool TryCreateArrayDimensionLengthFormula(
-            ISymbol symbol,
-            int dimension,
-            out SmtFormula formula)
-        {
-            if (dimension < 0 ||
-                SymbolicFactFactory.GetTrackedSymbolType(symbol) is not IArrayTypeSymbol arrayType)
-            {
-                formula = null!;
-                return false;
-            }
-
-            return SymbolicFactFactory.TryCreateArrayDimensionLengthFormula(
-                SymbolicFactFactory.GetSmtVariableName(symbol),
-                arrayType,
-                dimension,
-                out formula);
-        }
-
-        private static bool TryCreateBuiltInLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out formula,
-                getSymbolVersion: null);
         }
 
         private static bool TryHandleTupleDeconstructionDeclaration(
@@ -2042,100 +1651,6 @@ namespace PurelySharp.Analyzer
             }
 
             return true;
-        }
-
-        private static bool TryCreateCompoundAssignmentFact(
-            ISymbol targetSymbol,
-            SmtFormula previousValue,
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken,
-                    out var rightValue,
-                    getSymbolVersion: null,
-                    inlineDepth: 0))
-            {
-                return false;
-            }
-
-            return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
-                targetFormula,
-                previousValue,
-                SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                    previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken),
-                assignment.Kind(),
-                rightValue,
-                out fact);
-        }
-
-        private static bool TryCreateIncrementOrDecrementFact(
-            ISymbol targetSymbol,
-            SmtFormula previousValue,
-            int delta,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula))
-            {
-                return false;
-            }
-
-            return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
-                targetFormula,
-                previousValue,
-                SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                    previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                delta,
-                out fact);
-        }
-
-        private static bool TryGetCurrentSymbolValue(
-            List<SmtFormula> facts,
-            ISymbol symbol,
-            out SmtFormula value)
-        {
-            value = null!;
-            if (!TryCreateSymbolSmtValue(symbol, out var targetFormula))
-            {
-                return false;
-            }
-
-            for (var index = facts.Count - 1; index >= 0; index--)
-            {
-                if (facts[index] is not SmtBinaryFormula
-                    {
-                        Operator: SmtBinaryOperator.Equal,
-                        Left: var left,
-                        Right: var right
-                    })
-                {
-                    continue;
-                }
-
-                if (Equals(left, targetFormula) && right.Kind == targetFormula.Kind)
-                {
-                    value = right;
-                    return true;
-                }
-
-                if (Equals(right, targetFormula) && left.Kind == targetFormula.Kind)
-                {
-                    value = left;
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool TryGetIncrementedOrDecrementedSymbol(
@@ -2303,17 +1818,17 @@ namespace PurelySharp.Analyzer
             PathFactKind factKind,
             out SmtFormula? factFormula)
         {
-            factFormula = null;
-            var variableName = SymbolicFactFactory.GetSmtVariableName(symbol);
-            switch (symbol)
+            if (factKind == PathFactKind.Null)
             {
-                case ILocalSymbol localSymbol:
-                    return TryCreateFactFormula(localSymbol.Type, variableName, factKind, out factFormula);
-                case IParameterSymbol parameterSymbol:
-                    return TryCreateFactFormula(parameterSymbol.Type, variableName, factKind, out factFormula);
-                default:
-                    return false;
+                return SymbolicReachabilityService.TryCreateSymbolReferenceNullComparison(
+                    symbol,
+                    equalToNull: true,
+                    out factFormula);
             }
+
+            return SymbolicReachabilityService.TryCreateSymbolNumericZeroComparison(
+                symbol,
+                out factFormula);
         }
 
         private static bool TryCreateFactFormula(
@@ -2324,66 +1839,35 @@ namespace PurelySharp.Analyzer
             out SmtFormula? factFormula)
         {
             factFormula = null;
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var valueFormula,
-                    getSymbolVersion: null) ||
-                valueFormula == null)
+            if (factKind == PathFactKind.Null)
             {
+                if (SymbolicReachabilityService.TryCreateReferenceNullComparison(
+                        expression,
+                        semanticModel,
+                        cancellationToken,
+                        equalToNull: true,
+                        out var nullFormula))
+                {
+                    factFormula = nullFormula;
+                    return true;
+                }
+
                 var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
                 return symbol != null && TryCreateFactFormula(symbol, factKind, out factFormula);
             }
 
-            if (factKind == PathFactKind.Null)
+            if (SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var zeroFormula))
             {
-                if (valueFormula.Kind != SmtValueKind.Reference)
-                {
-                    return false;
-                }
-
-                factFormula = SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull: true);
+                factFormula = zeroFormula;
                 return true;
             }
 
-            if (valueFormula.Kind != SmtValueKind.Int)
-            {
-                return false;
-            }
-
-            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(valueFormula);
-            return true;
-        }
-
-        private static bool TryCreateFactFormula(
-            ITypeSymbol typeSymbol,
-            string variableName,
-            PathFactKind factKind,
-            out SmtFormula? factFormula)
-        {
-            factFormula = null;
-            if (factKind == PathFactKind.Null)
-            {
-                if (!IsReferenceType(typeSymbol))
-                {
-                    return false;
-                }
-
-                factFormula = SmtFormulaFactory.CreateReferenceNullComparison(
-                    SmtFormulaFactory.CreateReferenceVariable(variableName),
-                    isNull: true);
-                return true;
-            }
-
-            if (!SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol) &&
-                typeSymbol.SpecialType != SpecialType.System_Decimal)
-            {
-                return false;
-            }
-
-            factFormula = SmtFormulaFactory.CreateIntegerEqualsZero(SmtFormulaFactory.CreateIntVariable(variableName));
-            return true;
+            var fallbackSymbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
+            return fallbackSymbol != null && TryCreateFactFormula(fallbackSymbol, factKind, out factFormula);
         }
 
         private static void TryAddPathCondition(
@@ -2412,7 +1896,7 @@ namespace PurelySharp.Analyzer
             {
                 if (isNull != isDefinitelyNull)
                 {
-                    pathConditions.Add(SmtFormulaFactory.CreateFalse());
+                    SymbolicReachabilityService.AddUnsatisfiablePathCondition(pathConditions);
                 }
 
                 return;

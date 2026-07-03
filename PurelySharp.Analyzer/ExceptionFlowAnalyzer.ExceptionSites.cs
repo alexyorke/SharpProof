@@ -458,7 +458,7 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(
+            if (!SymbolicReachabilityService.TryCreateNullableHasValueCondition(
                     memberAccess.Expression,
                     semanticModel,
                     cancellationToken,
@@ -477,18 +477,22 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (!TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken, out var smtOperator, out var minValue, out var maxValue) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftFormula, getSymbolVersion: null) ||
-                leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightFormula, getSymbolVersion: null) ||
-                rightFormula is not { Kind: SmtValueKind.Int })
+                !SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    smtOperator,
+                    semanticModel,
+                    cancellationToken,
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = SmtFormulaFactory.CreateIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
             return IsDefinitelyFalseAtUse(
                 binaryExpression,
-                SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
+                inRangeFormula,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -501,13 +505,18 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) &&
-                CSharpSmtFormulaTranslator.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) &&
-                operandFormula is { Kind: SmtValueKind.Int })
+                SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
+                    unaryExpression.Operand,
+                    SmtIntegerUnaryOperator.Negate,
+                    semanticModel,
+                    cancellationToken,
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
-                var resultFormula = SmtFormulaFactory.CreateIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
                 return IsDefinitelyFalseAtUse(
                     unaryExpression,
-                    SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
+                    inRangeFormula,
                     semanticModel,
                     cancellationToken,
                     smtAnalysis);
@@ -575,15 +584,20 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             if (!TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
-                operandFormula is not { Kind: SmtValueKind.Int })
+                !SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
             return IsDefinitelyFalseAtUse(
                 castExpression,
-                SmtFormulaFactory.CreateIntegerInRange(operandFormula, minValue, maxValue),
+                inRangeFormula,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -597,12 +611,15 @@ namespace PurelySharp.Analyzer
         {
             foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
             {
-                if (!TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out var lengthFormula))
+                if (!SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
+                        lengthExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var negativeLength))
                 {
                     continue;
                 }
 
-                var negativeLength = SmtFormulaFactory.CreateIntegerLessThanZero(lengthFormula);
                 if (IsDefinitelyTrueAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis))
                 {
                     return true;
@@ -1167,15 +1184,13 @@ namespace PurelySharp.Analyzer
 
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-            return SymbolicPathConditionsAllowAndImply(
-                    pathConditions,
-                    outOfRangeFormula,
-                    useNode,
-                    smtAnalysis) ||
-                SymbolicReachabilityService.PathConditionsAllowAndImply(
-                    pathConditions,
-                    outOfRangeFormula,
-                    smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
+                pathConditions,
+                outOfRangeFormula,
+                useNode,
+                smtAnalysis,
+                "exception.path.query",
+                "exception.path.query");
         }
 
         private static bool IsDefinitelyTrueAtUse(
@@ -1187,15 +1202,13 @@ namespace PurelySharp.Analyzer
         {
             var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-            return SymbolicPathConditionsAllowAndImply(
-                    pathConditions,
-                    formula,
-                    useNode,
-                    smtAnalysis) ||
-                SymbolicReachabilityService.PathConditionsAllowAndImply(
-                    pathConditions,
-                    formula,
-                    smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
+                pathConditions,
+                formula,
+                useNode,
+                smtAnalysis,
+                "exception.path.query",
+                "exception.path.query");
         }
 
         private static bool IsBuiltInSequenceElementAccess(

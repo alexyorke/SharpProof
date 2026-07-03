@@ -194,7 +194,7 @@ namespace PurelySharp.Analyzer.Engine
                     getSymbolVersion);
 
                 if (pathConditions.Count > originalCount &&
-                    SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis))
+                    ArePathConditionsUnsatisfiableAt(pathConditions, syntaxNode, smtAnalysis))
                 {
                     return true;
                 }
@@ -439,7 +439,20 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 cancellationToken);
             return pathConditions.Count > 0 &&
-                SymbolicReachabilityService.IsUnsatisfiable(pathConditions, smtAnalysis);
+                ArePathConditionsUnsatisfiableAt(pathConditions, syntaxNode, smtAnalysis);
+        }
+
+        private static bool ArePathConditionsUnsatisfiableAt(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SyntaxNode site,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return SymbolicReachabilityService.PathConditionsAreUnsatisfiableWithIrFirst(
+                pathConditions,
+                site,
+                smtAnalysis,
+                "execution.visibility.path",
+                "execution-visibility-path");
         }
 
         private static bool IsInReachableConstantSwitchGotoSection(SyntaxNode syntaxNode, SemanticModel semanticModel)
@@ -480,9 +493,11 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return SymbolicReachabilityService.IsFormulaAlwaysFalse(
+            return IsFormulaAlwaysFalseAt(
                 sectionCondition,
-                SymbolicReachabilityService.CollectPathConditionsAt(switchStatement, semanticModel, cancellationToken),
+                switchStatement,
+                semanticModel,
+                cancellationToken,
                 smtAnalysis);
         }
 
@@ -663,9 +678,11 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return SymbolicReachabilityService.IsFormulaAlwaysFalse(
+            return IsFormulaAlwaysFalseAt(
                 armCondition,
-                SymbolicReachabilityService.CollectPathConditionsAt(switchExpression, semanticModel, cancellationToken),
+                switchExpression,
+                semanticModel,
+                cancellationToken,
                 smtAnalysis);
         }
 
@@ -691,9 +708,11 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return SymbolicReachabilityService.IsFormulaAlwaysTrue(
+            return IsFormulaAlwaysTrueAt(
                 nullFormula,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                site,
+                semanticModel,
+                cancellationToken,
                 smtAnalysis);
         }
 
@@ -719,10 +738,46 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return SymbolicReachabilityService.IsFormulaAlwaysTrue(
+            return IsFormulaAlwaysTrueAt(
                 nonNullFormula,
-                SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                site,
+                semanticModel,
+                cancellationToken,
                 smtAnalysis);
+        }
+
+        private static bool IsFormulaAlwaysFalseAt(
+            SmtFormula formula,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
+            return SymbolicReachabilityService.IsFormulaAlwaysFalseWithIrFirst(
+                formula,
+                pathConditions,
+                site,
+                smtAnalysis,
+                "execution.visibility.query",
+                "execution-visibility-query");
+        }
+
+        private static bool IsFormulaAlwaysTrueAt(
+            SmtFormula formula,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
+            return SymbolicReachabilityService.IsFormulaAlwaysTrueWithIrFirst(
+                formula,
+                pathConditions,
+                site,
+                smtAnalysis,
+                "execution.visibility.query",
+                "execution-visibility-query");
         }
 
         private static bool TryGetConstantReferenceNullState(

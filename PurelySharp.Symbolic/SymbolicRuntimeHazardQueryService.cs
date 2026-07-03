@@ -411,6 +411,7 @@ namespace PurelySharp.Symbolic
 
             var (status, reason) = ClassifyTrigger(
                 analysis,
+                candidate.Site,
                 triggerCondition,
                 triggerPrecondition,
                 smtAnalysis);
@@ -502,7 +503,13 @@ namespace PurelySharp.Symbolic
             }
 
             return hasLegacyNullCondition &&
-                SymbolicReachabilityService.PathConditionsImply(analysis.PathConditions, legacyNullTrigger, smtAnalysis);
+                SymbolicReachabilityService.PathConditionsImplyWithIrFirst(
+                    analysis.PathConditions,
+                    legacyNullTrigger,
+                    candidate.Site,
+                    smtAnalysis,
+                    "runtime.hazard.trigger",
+                    "runtime-hazard-trigger");
         }
 
         private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)
@@ -514,6 +521,7 @@ namespace PurelySharp.Symbolic
 
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(
             SymbolicProgramPointAnalysis analysis,
+            SyntaxNode sourceNode,
             SmtFormula triggerCondition,
             SymbolicFact? triggerPrecondition,
             SmtAnalysisService smtAnalysis)
@@ -549,10 +557,13 @@ namespace PurelySharp.Symbolic
                 return irResult;
             }
 
-            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
+            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFirst(
                 analysis.PathConditions,
                 triggerCondition,
-                smtAnalysis);
+                sourceNode,
+                smtAnalysis,
+                "runtime.hazard.trigger",
+                "runtime-hazard-trigger");
             if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
                 return (SymbolicRuntimeHazardStatus.Proven, formulaTruth.Info.Reason);

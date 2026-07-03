@@ -1173,13 +1173,15 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranch(
+                pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranchWithIrFirst(
                 pathConditions,
                 filterExpression,
                 branchWhenTrue: true,
                 semanticModel,
                 cancellationToken,
-                smtAnalysis);
+                smtAnalysis,
+                "exception.path.condition",
+                "exception.path.condition");
         }
 
         private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)

@@ -45,7 +45,7 @@ namespace PurelySharp.Symbolic
                 site,
                 semanticModel,
                 cancellationToken);
-            return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis);
+            return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis, site);
         }
 
         public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
@@ -59,7 +59,7 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken);
 
-            return CreateAnalysis(forStatement.SpanStart, formulas, new SymbolicState(), smtAnalysis);
+            return CreateAnalysis(forStatement.SpanStart, formulas, new SymbolicState(), smtAnalysis, forStatement);
         }
 
         public SymbolicInvariantImplicationResult ProveImplicationAt(
@@ -159,10 +159,13 @@ namespace PurelySharp.Symbolic
 
             if (SymbolicIrFormulaEncoder.TryEncode(condition, out var conditionFormula))
             {
-                var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
+                var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
                     analysis.PathConditions,
                     conditionFormula,
-                    smtAnalysis);
+                    analysis.SourceNode,
+                    smtAnalysis,
+                    "invariant.implication",
+                    "invariant-implication");
                 if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
                 {
                     return new SymbolicInvariantImplicationResult(
@@ -309,7 +312,8 @@ namespace PurelySharp.Symbolic
             int spanStart,
             IReadOnlyList<SmtFormula> formulas,
             SymbolicState pathState,
-            SmtAnalysisService? smtAnalysis)
+            SmtAnalysisService? smtAnalysis,
+            SyntaxNode sourceNode)
         {
             var stateProof = smtAnalysis == null || !HasPathStateFacts(pathState)
                 ? null
@@ -322,7 +326,8 @@ namespace PurelySharp.Symbolic
                     pathState,
                     SymbolicReachability.Unreachable,
                     stateProof.Info.Reason,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                    sourceNode);
             }
 
             if (formulas.Count == 0)
@@ -335,7 +340,8 @@ namespace PurelySharp.Symbolic
                         pathState,
                         MapReachability(stateProof.Info.Status),
                         stateProof.Info.Reason,
-                        SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                        SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                        sourceNode);
                 }
 
                 return new SymbolicProgramPointAnalysis(
@@ -344,10 +350,16 @@ namespace PurelySharp.Symbolic
                     pathState,
                     SymbolicReachability.Reachable,
                     "no_path_conditions",
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                    sourceNode);
             }
 
-            var proof = smtAnalysis == null ? null : SymbolicReachabilityService.ClassifyFormulaReachability(formulas, smtAnalysis);
+            var proof = smtAnalysis == null
+                ? null
+                : SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
+                    pathState,
+                    formulas,
+                    smtAnalysis);
 
             return new SymbolicProgramPointAnalysis(
                 spanStart,
@@ -355,7 +367,8 @@ namespace PurelySharp.Symbolic
                 pathState,
                 proof == null ? SymbolicReachability.NotChecked : MapReachability(proof.Info.Status),
                 proof?.Info.Reason ?? "reachability_not_checked",
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                sourceNode);
         }
 
         private static bool HasPathStateFacts(SymbolicState pathState)
@@ -450,11 +463,13 @@ namespace PurelySharp.Symbolic
             SymbolicState? pathState,
             SymbolicReachability reachability,
             string reachabilityReason,
-            SymbolicSmtDiagnostics? smtDiagnostics = null)
+            SymbolicSmtDiagnostics? smtDiagnostics,
+            SyntaxNode sourceNode)
         {
             SpanStart = spanStart;
             PathConditions = pathConditions;
             PathState = pathState ?? new SymbolicState();
+            SourceNode = sourceNode ?? throw new ArgumentNullException(nameof(sourceNode));
             Facts = pathConditions.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
             MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(pathConditions);
             Reachability = reachability;
@@ -467,6 +482,8 @@ namespace PurelySharp.Symbolic
         internal IReadOnlyList<SmtFormula> PathConditions { get; }
 
         public SymbolicState PathState { get; }
+
+        internal SyntaxNode SourceNode { get; }
 
         public IReadOnlyList<string> Facts { get; }
 

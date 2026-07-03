@@ -1945,8 +1945,9 @@ namespace PurelySharp.Analyzer.Engine
                 return stateBefore;
             }
 
+            var blockSourceNode = block.Operations.FirstOrDefault()?.Syntax ?? block.BranchValue?.Syntax;
             if (stateBefore.PathConditions.Length > 0 &&
-                ArePathConditionsUnsatisfiable(stateBefore, stateBefore.PathConditions, smtAnalysis))
+                ArePathConditionsUnsatisfiable(stateBefore, stateBefore.PathConditions, smtAnalysis, blockSourceNode))
             {
                 LogDebug($"ApplyTransferFunction SKIP for Block #{block.Ordinal} - SMT path conditions are unsatisfiable.");
                 return stateBefore;
@@ -2518,7 +2519,7 @@ namespace PurelySharp.Analyzer.Engine
                 if (addedBranchAssumptions)
                 {
                     var partialPathConditions = nextPathConditionsBuilder.ToImmutable();
-                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, nextPathState, smtAnalysis))
+                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, nextPathState, smtAnalysis, expressionSyntax))
                     {
                         return false;
                     }
@@ -2550,7 +2551,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
-            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis))
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis, expressionSyntax))
             {
                 return false;
             }
@@ -2643,7 +2644,7 @@ namespace PurelySharp.Analyzer.Engine
                 out var symbolicNullState)
                     ? symbolicNullState
                     : currentState.PathState;
-            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis))
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis, value?.Syntax))
             {
                 return false;
             }
@@ -2709,7 +2710,7 @@ namespace PurelySharp.Analyzer.Engine
                 out var symbolicNullProbeState)
                     ? symbolicNullProbeState
                     : currentState.PathState;
-            if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState, smtAnalysis))
+            if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState, smtAnalysis, value?.Syntax))
             {
                 isNull = false;
                 return true;
@@ -2725,7 +2726,7 @@ namespace PurelySharp.Analyzer.Engine
                 out var symbolicNonNullProbeState)
                     ? symbolicNonNullProbeState
                     : currentState.PathState;
-            if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState, smtAnalysis))
+            if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState, smtAnalysis, value?.Syntax))
             {
                 isNull = true;
                 return true;
@@ -2766,22 +2767,24 @@ namespace PurelySharp.Analyzer.Engine
                 addTranslatedFormulaAlways: true);
 
             return addedBranchAssumptions &&
-                ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), pathState, smtAnalysis);
+                ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), pathState, smtAnalysis, expressionSyntax);
         }
 
         private static bool ArePathConditionsUnsatisfiable(
             PurityAnalysisState currentState,
             ImmutableArray<SmtFormula> pathConditions,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SyntaxNode? sourceNode = null)
         {
-            return ArePathConditionsUnsatisfiable(currentState, pathConditions, currentState.PathState, smtAnalysis);
+            return ArePathConditionsUnsatisfiable(currentState, pathConditions, currentState.PathState, smtAnalysis, sourceNode);
         }
 
         private static bool ArePathConditionsUnsatisfiable(
             PurityAnalysisState currentState,
             ImmutableArray<SmtFormula> pathConditions,
             SymbolicState pathState,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SyntaxNode? sourceNode = null)
         {
             if (!pathState.PathConditions.IsDefaultOrEmpty || !pathState.Facts.IsDefaultOrEmpty)
             {
@@ -2793,7 +2796,12 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
-            return SymbolicReachabilityService.IsUnsatisfiable(proofPathConditions, smtAnalysis);
+            return SymbolicReachabilityService.PathConditionsAreUnsatisfiableWithOptionalIrFirst(
+                proofPathConditions,
+                sourceNode,
+                smtAnalysis,
+                "analyzer.path.condition",
+                "analyzer-path-condition");
         }
 
         private static bool TryTranslateBranchValueToFormula(
@@ -2886,7 +2894,7 @@ namespace PurelySharp.Analyzer.Engine
             LogDebug($"    [CSO] Current DFA State: Impure={currentState.HasPotentialImpurity}, MapCount={currentState.DelegateTargetMap.Count}");
 
             if (currentState.PathConditions.Length > 0 &&
-                ArePathConditionsUnsatisfiable(currentState, currentState.PathConditions, context.SmtAnalysis))
+                ArePathConditionsUnsatisfiable(currentState, currentState.PathConditions, context.SmtAnalysis, operation.Syntax))
             {
                 LogDebug($"    [CSO] Current SMT path conditions are unsatisfiable. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
