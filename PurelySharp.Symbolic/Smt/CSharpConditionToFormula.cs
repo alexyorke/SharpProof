@@ -18,6 +18,7 @@ namespace PurelySharp.Symbolic.Smt
         private const int MaxConditionalPatternDistributionDepth = 4;
         private const int MaxCollectionExpressionLengthSpreads = 8;
         private const string ImplicitThisVariableName = "this";
+        private const string MemberNotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
         private const string NotNullIfNotNullAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
         private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_sourceBooleanFormulaCache = new();

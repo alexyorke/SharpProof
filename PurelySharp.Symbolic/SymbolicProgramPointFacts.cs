@@ -25,6 +25,7 @@ namespace PurelySharp.Symbolic
         private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
         private const string ImplicitThisVariableName = "this";
         private const string MemberNotNullAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute";
+        private const string MemberNotNullWhenAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
         private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -1546,6 +1547,7 @@ namespace PurelySharp.Symbolic
             var symbols = new List<ISymbol>();
             AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
             AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
+            AddMemberNotNullWhenTargetSymbols(root, semanticModel, cancellationToken, symbols);
             return symbols;
         }
 
@@ -3460,6 +3462,65 @@ namespace PurelySharp.Symbolic
                     semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol localSymbol)
                 {
                     AddSymbolIfAbsent(symbols, localSymbol.OriginalDefinition);
+                }
+            }
+        }
+
+        private static void AddMemberNotNullWhenTargetSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<ISymbol> symbols)
+        {
+            foreach (var invocation in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                         .OfType<InvocationExpressionSyntax>())
+            {
+                if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                    invocationOperation.TargetMethod.IsStatic ||
+                    !IsCurrentInstanceInvocation(invocation))
+                {
+                    continue;
+                }
+
+                foreach (var target in GetMemberNotNullWhenTargets(invocationOperation.TargetMethod))
+                {
+                    if (TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, target, out var member))
+                    {
+                        AddSymbolIfAbsent(symbols, member);
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<string> GetMemberNotNullWhenTargets(IMethodSymbol method)
+        {
+            var targets = new List<string>();
+            AddMemberNotNullWhenTargets(method, targets);
+            if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
+            {
+                AddMemberNotNullWhenTargets(method.OriginalDefinition, targets);
+            }
+
+            return targets.Distinct(StringComparer.Ordinal);
+        }
+
+        private static void AddMemberNotNullWhenTargets(IMethodSymbol method, ICollection<string> targets)
+        {
+            foreach (var attribute in method.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        MemberNotNullWhenAttributeName,
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length < 2)
+                {
+                    continue;
+                }
+
+                for (var index = 1; index < attribute.ConstructorArguments.Length; index++)
+                {
+                    AddMemberNotNullTarget(attribute.ConstructorArguments[index], targets);
                 }
             }
         }

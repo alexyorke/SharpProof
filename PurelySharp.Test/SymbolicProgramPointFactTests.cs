@@ -667,6 +667,109 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_MemberNotNullWhenTrueBranchProvesPropertyNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    public string? Value { get; private set; }
+
+    [MemberNotNullWhen(true, nameof(Value))]
+    private bool HasValue()
+    {
+        return Value is not null;
+    }
+
+    public int TestMethod()
+    {
+        if (HasValue())
+        {
+            return Value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return Value.Length;");
+            var proof = ProveAtMarker(source, marker, "Value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_MemberNotNullWhenFalseComparisonBranchProvesFieldNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    private string? _value;
+
+    [MemberNotNullWhen(false, nameof(_value))]
+    private bool MissingValue()
+    {
+        return _value is null;
+    }
+
+    public int TestMethod()
+    {
+        if (MissingValue() == false)
+        {
+            return _value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return _value.Length;");
+            var proof = ProveAtMarker(source, marker, "_value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_MemberNotNullWhenFactDoesNotSurviveMemberReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    public string? Value { get; private set; }
+
+    [MemberNotNullWhen(true, nameof(Value))]
+    private bool HasValue()
+    {
+        return Value is not null;
+    }
+
+    public int TestMethod()
+    {
+        if (HasValue())
+        {
+            Value = null;
+            return Value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return Value.Length;");
+            var proof = ProveAtMarker(source, marker, "Value != null");
+
+            Assert.That(proof.TruthValue, Is.Not.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_NotNullWhenTrueBranchProvesArgumentNonNull()
         {
             const string source = @"
