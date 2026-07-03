@@ -83,7 +83,7 @@ namespace PurelySharp.Symbolic.Smt
                     out formula,
                     getSymbolVersion,
                     inlineDepth) ||
-                TryTranslateStringIsNullOrEmptyInvocation(
+                TryTranslateStringIsNullOrEmptyOrWhiteSpaceInvocation(
                     invocationOperation,
                     semanticModel,
                     cancellationToken,
@@ -960,7 +960,7 @@ namespace PurelySharp.Symbolic.Smt
             }
         }
 
-        private static bool TryTranslateStringIsNullOrEmptyInvocation(
+        private static bool TryTranslateStringIsNullOrEmptyOrWhiteSpaceInvocation(
             IInvocationOperation invocationOperation,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -971,7 +971,7 @@ namespace PurelySharp.Symbolic.Smt
             formula = null;
             var method = invocationOperation.TargetMethod;
             if (!method.IsStatic ||
-                method.Name != "IsNullOrEmpty" ||
+                method.Name is not "IsNullOrEmpty" and not "IsNullOrWhiteSpace" ||
                 method.ContainingType?.SpecialType != SpecialType.System_String ||
                 invocationOperation.Arguments.Length != 1 ||
                 invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax valueExpression ||
@@ -988,7 +988,14 @@ namespace PurelySharp.Symbolic.Smt
                 SmtBinaryOperator.Equal,
                 new SmtStringLengthTerm(stringFormula),
                 new SmtIntegerConstant(0));
-            formula = new SmtBinaryFormula(SmtBinaryOperator.Or, isNull, isEmpty);
+            if (method.Name == "IsNullOrEmpty")
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Or, isNull, isEmpty);
+                return true;
+            }
+
+            var isWhiteSpace = new SmtRegexMatchFormula(stringFormula, @"\A\s*\z", RegexOptions.None);
+            formula = new SmtBinaryFormula(SmtBinaryOperator.Or, isNull, isWhiteSpace);
             return true;
         }
 

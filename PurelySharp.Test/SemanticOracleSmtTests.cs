@@ -8215,6 +8215,46 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceContradictsNonWhitespaceLiteral()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "string.IsNullOrWhiteSpace(text) && text == \"A\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchImpliesNonEmpty()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "!string.IsNullOrWhiteSpace(text) && text.Length == 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchRejectsWhitespaceLiteral()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "!string.IsNullOrWhiteSpace(text) && text == \" \\t\\r\\n\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceAllowsNonEmptyWhitespace()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_CustomLengthNegative_RemainsUnknown()
         {
             Assert.That(
