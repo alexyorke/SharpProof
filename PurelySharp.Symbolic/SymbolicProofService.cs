@@ -57,6 +57,16 @@ namespace PurelySharp.Symbolic
             return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
         }
 
+        public SymbolicIrProofResult ClassifyBranchFeasibility(SymbolicState state, SymbolicCondition branchCondition)
+        {
+            if (branchCondition == null)
+            {
+                throw new ArgumentNullException(nameof(branchCondition));
+            }
+
+            return ClassifyReachability(state.AddPathCondition(branchCondition));
+        }
+
         internal PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
         {
             return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));

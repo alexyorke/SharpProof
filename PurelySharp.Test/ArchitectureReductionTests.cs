@@ -768,6 +768,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ClassifiesIrBranchFeasibilityWithoutPublicFormulaInput()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var stateFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x > 0"),
+                "test.state");
+            var branchFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x <= 0"),
+                "test.branch");
+            var state = new SymbolicState(new[] { stateFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                state,
+                new SymbolicFactCondition(branchFact),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
         public void SymbolicProofService_UnsupportedIrStaysConservative()
         {
             var unsupportedFact = SymbolicFact.Exact(
@@ -811,10 +841,17 @@ namespace PurelySharp.Test
                 "SymbolicReachabilityService.cs"));
             var irIndex = source.IndexOf("EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
             var legacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(expression", StringComparison.Ordinal);
+            var helperIndex = source.IndexOf("private static bool? EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("private static SymbolicState CreateStateFromFormulaPath", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
 
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
             Assert.That(irIndex, Is.LessThan(legacyIndex));
+            Assert.That(helperSource, Does.Contain("ClassifyStateBranchFeasibility(state"));
+            Assert.That(helperSource, Does.Not.Contain("ClassifyStateImplication(state, condition"));
         }
 
         [Test]

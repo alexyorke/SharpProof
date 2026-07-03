@@ -69,6 +69,14 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis).ClassifyImplication(state, condition);
         }
 
+        internal static SymbolicIrProofResult ClassifyStateBranchFeasibility(
+            SymbolicState state,
+            SymbolicCondition branchCondition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyBranchFeasibility(state, branchCondition);
+        }
+
         internal static bool TryCollectBranchState(
             SymbolicState state,
             ExpressionSyntax condition,
@@ -392,15 +400,15 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var trueProof = ClassifyStateImplication(state, condition, smtAnalysis);
-            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            var trueBranch = ClassifyStateBranchFeasibility(state, condition, smtAnalysis);
+            if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                return true;
+                return false;
             }
 
-            var falseProof = ClassifyStateImplication(state, new SymbolicNotCondition(condition), smtAnalysis);
-            return falseProof.Info.Status == SymbolicProofStatus.ProvenTrue
-                ? false
+            var falseBranch = ClassifyStateBranchFeasibility(state, new SymbolicNotCondition(condition), smtAnalysis);
+            return falseBranch.Info.Status == SymbolicProofStatus.Unreachable
+                ? true
                 : null;
         }
 
