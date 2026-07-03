@@ -674,7 +674,7 @@ namespace PurelySharp.Symbolic
                 out var mismatchFormula)
                 ? mismatchFormula
                 : CreateUnknownTrigger(assignment, "array_type_mismatch");
-            var inRangeTrigger = CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            var inRangeTrigger = CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
                 elementAccess,
                 semanticModel,
                 cancellationToken,
@@ -1086,13 +1086,13 @@ namespace PurelySharp.Symbolic
                     out var countExpression,
                     out var oneArgumentUpperBoundIsInclusive,
                     out var category) ||
-                !CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                !CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                     sourceExpression,
                     semanticModel,
                     cancellationToken,
                     out var sourceLength) ||
                 sourceLength is not { Kind: SmtValueKind.Int } ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     startExpression,
                     semanticModel,
                     cancellationToken,
@@ -1106,7 +1106,7 @@ namespace PurelySharp.Symbolic
             SmtFormula? count = null;
             if (countExpression != null)
             {
-                if (!CSharpConditionToFormula.TryTranslateValue(
+                if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                         countExpression,
                         semanticModel,
                         cancellationToken,
@@ -1118,7 +1118,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            var inRange = CSharpConditionToFormula.CreateSubsequenceInRangeFormula(
+            var inRange = CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula(
                 sourceLength,
                 start,
                 count,
@@ -1170,7 +1170,7 @@ namespace PurelySharp.Symbolic
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
                 if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
-                    !CSharpConditionToFormula.TryTranslateValue(
+                    !CSharpSmtFormulaTranslator.TryTranslateValue(
                         indexExpression,
                         semanticModel,
                         cancellationToken,
@@ -1225,7 +1225,7 @@ namespace PurelySharp.Symbolic
         {
             if (arrayType.Rank == 1 &&
                 dimension == 0 &&
-                CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                     receiverExpression,
                     semanticModel,
                     cancellationToken,
@@ -1234,7 +1234,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+            return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
                 receiverExpression,
                 dimension,
                 semanticModel,
@@ -1391,14 +1391,14 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     binaryExpression.Left,
                     semanticModel,
                     cancellationToken,
                     out var leftFormula,
                     getSymbolVersion: null) ||
                 leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     binaryExpression.Right,
                     semanticModel,
                     cancellationToken,
@@ -1432,7 +1432,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula trigger)
         {
             trigger = null!;
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     unaryExpression.Operand,
                     semanticModel,
                     cancellationToken,
@@ -1458,7 +1458,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula trigger)
         {
             trigger = null!;
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     operand,
                     semanticModel,
                     cancellationToken,
@@ -1484,14 +1484,14 @@ namespace PurelySharp.Symbolic
             out SmtFormula trigger)
         {
             trigger = null!;
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     assignment.Left,
                     semanticModel,
                     cancellationToken,
                     out var leftFormula,
                     getSymbolVersion: null) ||
                 leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     assignment.Right,
                     semanticModel,
                     cancellationToken,
@@ -1533,7 +1533,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     castExpression.Expression,
                     semanticModel,
                     cancellationToken,
@@ -1932,7 +1932,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -1976,7 +1976,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula trigger)
         {
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -2012,7 +2012,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,

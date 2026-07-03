@@ -77,7 +77,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -434,7 +434,7 @@ namespace PurelySharp.Symbolic
                     out trigger);
             }
 
-            if (CSharpConditionToFormula.TryTranslateNullableHasValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(
                     nullableExpression,
                     semanticModel,
                     cancellationToken,
@@ -466,14 +466,14 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
                     out var value,
                     getSymbolVersion: null) ||
                 value is not { Kind: SmtValueKind.Reference } ||
-                !CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula(value, targetType, out var runtimeTypeTest))
+                !CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula(value, targetType, out var runtimeTypeTest))
             {
                 trigger = null!;
                 return false;

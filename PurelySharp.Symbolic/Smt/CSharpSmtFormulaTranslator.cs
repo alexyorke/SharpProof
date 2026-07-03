@@ -215,6 +215,17 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        internal static bool TryCreateRuntimeTypeTestFormula(
+            SmtFormula value,
+            ITypeSymbol targetType,
+            out SmtFormula formula)
+        {
+            return CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula(
+                value,
+                targetType,
+                out formula);
+        }
+
         internal static SmtFormula CreateSubsequenceInRangeFormula(
             SmtFormula sourceLength,
             SmtFormula start,

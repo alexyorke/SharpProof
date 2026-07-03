@@ -187,7 +187,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
-            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange"));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange"));
         }
 
         [Test]
@@ -238,7 +238,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow"));
             Assert.That(source, Does.Contain("IsSignedDivisionOverflowOperator"));
-            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateValue"));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue"));
         }
 
         [Test]
@@ -289,7 +289,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateNullableValueWithoutValueTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullableValueWithoutValue"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
-            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryTranslateNullableHasValue"));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue"));
             Assert.That(source, Does.Contain("!TryCreateNullableValueWithoutValueTrigger("));
         }
 
@@ -311,7 +311,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.InvalidCast"));
             Assert.That(source, Does.Contain("new SymbolicTypeTestAtom"));
             Assert.That(source, Does.Contain("SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey"));
-            Assert.That(source, Does.Contain("CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula"));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
         }
@@ -355,6 +355,16 @@ namespace PurelySharp.Test
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
+        }
+
+        [Test]
+        public void RuntimeHazardCandidates_UseTranslatorShimForLegacyFallbacks()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
+            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator."));
         }
 
         [Test]
