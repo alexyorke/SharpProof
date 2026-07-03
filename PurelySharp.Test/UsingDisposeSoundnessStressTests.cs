@@ -548,6 +548,204 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task UseAfterConditionalDisposeBothBranches_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(bool dispose)
+    {
+        var resource = new PureDisposable();
+        if (dispose)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            resource.Dispose();
+        }
+
+        return resource.Use();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DoubleDisposeAfterConditionalDisposeBothBranches_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(bool dispose)
+    {
+        var resource = new PureDisposable();
+        if (dispose)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            resource.Dispose();
+        }
+
+        resource.Dispose();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalDisposeThroughOwnerOrAlias_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool disposeOwner)
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        if (disposeOwner)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            alias.Dispose();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task UseAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(bool disposeOwner)
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        if (disposeOwner)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            alias.Dispose();
+        }
+
+        return resource.Use();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DoubleDisposeAfterConditionalDisposeThroughOwnerOrAlias_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(bool disposeOwner)
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        if (disposeOwner)
+        {
+            resource.Dispose();
+        }
+        else
+        {
+            alias.Dispose();
+        }
+
+        resource.Dispose();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConditionalReturnOrDispose_NoDiagnostic()
         {
             var test = @"

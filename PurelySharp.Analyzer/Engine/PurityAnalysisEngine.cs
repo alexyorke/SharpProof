@@ -2392,9 +2392,17 @@ namespace PurelySharp.Analyzer.Engine
             ISymbol resourceSymbol,
             SemanticModel semanticModel)
         {
-            return returnStatement.Expression != null &&
-                semanticModel.GetSymbolInfo(returnStatement.Expression).Symbol is { } returnedSymbol &&
-                SymbolEqualityComparer.Default.Equals(returnedSymbol, resourceSymbol);
+            if (returnStatement.Expression == null ||
+                semanticModel.GetSymbolInfo(returnStatement.Expression).Symbol is not { } returnedSymbol)
+            {
+                return false;
+            }
+
+            return GetResourceSymbolsVisibleAt(
+                    resourceSymbol,
+                    returnStatement,
+                    semanticModel)
+                .Contains(returnedSymbol);
         }
 
         private static bool DisposesSymbol(
@@ -2402,6 +2410,10 @@ namespace PurelySharp.Analyzer.Engine
             ISymbol resourceSymbol,
             SemanticModel semanticModel)
         {
+            var relatedSymbols = GetResourceSymbolsVisibleAt(
+                resourceSymbol,
+                statement,
+                semanticModel);
             foreach (var invocation in statement.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
             {
                 if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
@@ -2411,13 +2423,38 @@ namespace PurelySharp.Analyzer.Engine
                     continue;
                 }
 
-                if (SymbolEqualityComparer.Default.Equals(disposedSymbol, resourceSymbol))
+                if (relatedSymbols.Contains(disposedSymbol))
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private static HashSet<ISymbol> GetResourceSymbolsVisibleAt(
+            ISymbol resourceSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = observationSyntax
+                .AncestorsAndSelf()
+                .OfType<BlockSyntax>()
+                .LastOrDefault();
+            if (containingBlock == null)
+            {
+                return new HashSet<ISymbol>(SymbolEqualityComparer.Default)
+                {
+                    resourceSymbol
+                };
+            }
+
+            return GetRelatedLocalAliases(
+                resourceSymbol,
+                observationSyntax,
+                containingBlock,
+                semanticModel,
+                CancellationToken.None);
         }
 
         private readonly struct ResourceReleasePathSummary
