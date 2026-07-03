@@ -4448,7 +4448,7 @@ namespace PurelySharp.Symbolic
             InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
             MergedInvariantText = ConservativeInvariant.Text;
             PathConditionCount = pathConditionCount;
-            PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
+            InvariantConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
             Reachability = reachability ?? string.Empty;
             ReachabilityReason = reachabilityReason ?? string.Empty;
             ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
@@ -4511,7 +4511,9 @@ namespace PurelySharp.Symbolic
 
         public int PathConditionCount { get; }
 
-        public IReadOnlyList<SymbolicInvariantCondition> PathConditions { get; }
+        public IReadOnlyList<SymbolicInvariantCondition> InvariantConditions { get; }
+
+        internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => InvariantConditions;
 
         public string Reachability { get; }
 

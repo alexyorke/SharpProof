@@ -204,8 +204,8 @@ Push-Location $repoRoot
 try
 {
     $analyzer = Get-AnalyzerHotspots
-    $publicFormulaSurfaces = Get-SymbolicPublicFormulaSurfaces
-    $compatibilitySurfaces = Get-SymbolicCompatibilitySurfaces
+    $publicFormulaSurfaces = @(Get-SymbolicPublicFormulaSurfaces)
+    $compatibilitySurfaces = @(Get-SymbolicCompatibilitySurfaces)
 
     $report = [ordered]@{
         schemaVersion = 1
