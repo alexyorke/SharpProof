@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -410,6 +411,7 @@ namespace PurelySharp.Symbolic
             var (status, reason) = ClassifyTrigger(
                 analysis,
                 triggerCondition,
+                triggerPrecondition,
                 smtAnalysis);
             var lineColumn = SymbolicSourceLocation.GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
             var sourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
@@ -464,6 +466,7 @@ namespace PurelySharp.Symbolic
         private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(
             SymbolicProgramPointAnalysis analysis,
             SmtFormula triggerCondition,
+            SymbolicFact? triggerPrecondition,
             SmtAnalysisService smtAnalysis)
         {
             if (analysis.Reachability == SymbolicReachability.Unreachable)
@@ -491,6 +494,12 @@ namespace PurelySharp.Symbolic
                 return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false");
             }
 
+            if (triggerPrecondition != null &&
+                TryClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis, out var irResult))
+            {
+                return irResult;
+            }
+
             var proven = SymbolicReachabilityService.ClassifyImplication(
                 analysis.PathConditions,
                 triggerCondition,
@@ -510,6 +519,37 @@ namespace PurelySharp.Symbolic
             }
 
             return (SymbolicRuntimeHazardStatus.Unknown, proven.Reason);
+        }
+
+        private static bool TryClassifyIrTrigger(
+            SymbolicProgramPointAnalysis analysis,
+            SymbolicFact triggerPrecondition,
+            SmtAnalysisService smtAnalysis,
+            out (SymbolicRuntimeHazardStatus Status, string Reason) result)
+        {
+            var proven = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                triggerPrecondition,
+                smtAnalysis);
+            if (proven.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                result = (SymbolicRuntimeHazardStatus.Proven, proven.Info.Reason);
+                return true;
+            }
+
+            var negatedTrigger = new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition));
+            var disproven = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                negatedTrigger,
+                smtAnalysis);
+            if (disproven.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                result = (SymbolicRuntimeHazardStatus.Unreachable, disproven.Info.Reason);
+                return true;
+            }
+
+            result = default;
+            return false;
         }
 
     }

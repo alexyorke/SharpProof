@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -397,6 +398,182 @@ namespace PurelySharp.Symbolic
             }
 
             return builder.ToImmutable();
+        }
+
+        public static SymbolicState CollectAncestorReachabilityState(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var state = new SymbolicState();
+
+            foreach (var ancestor in syntaxNode.Ancestors())
+            {
+                if (ancestor is IfStatementSyntax ifStatementSyntax)
+                {
+                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            ifStatementSyntax.Condition,
+                            ifStatementSyntax.Statement,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        AddReachabilityCondition(ref state, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (ifStatementSyntax.Else?.Statement is { } elseStatement &&
+                             elseStatement.Span.Contains(syntaxNode.Span) &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 ifStatementSyntax.Condition,
+                                 elseStatement,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
+                    {
+                        AddReachabilityCondition(ref state, ifStatementSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax)
+                {
+                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span) &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            conditionalExpressionSyntax.Condition,
+                            conditionalExpressionSyntax.WhenTrue,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        AddReachabilityCondition(ref state, conditionalExpressionSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span) &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 conditionalExpressionSyntax.Condition,
+                                 conditionalExpressionSyntax.WhenFalse,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
+                    {
+                        AddReachabilityCondition(ref state, conditionalExpressionSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is BinaryExpressionSyntax binaryExpressionSyntax &&
+                         binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
+                {
+                    if (AnyReferencedSymbolAssignedBeforeUse(
+                            binaryExpressionSyntax.Left,
+                            binaryExpressionSyntax.Right,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalAndExpression))
+                    {
+                        AddReachabilityCondition(ref state, binaryExpressionSyntax.Left, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalOrExpression))
+                    {
+                        AddReachabilityCondition(ref state, binaryExpressionSyntax.Left, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                    else if (binaryExpressionSyntax.IsKind(SyntaxKind.CoalesceExpression))
+                    {
+                        AddReferenceNullCondition(ref state, binaryExpressionSyntax.Left, isNull: true, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax &&
+                         conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             conditionalAccessExpressionSyntax.Expression,
+                             conditionalAccessExpressionSyntax.WhenNotNull,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReferenceNullCondition(ref state, conditionalAccessExpressionSyntax.Expression, isNull: false, semanticModel, cancellationToken);
+                }
+                else if (ancestor is LockStatementSyntax lockStatementSyntax &&
+                         lockStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         IsLocalOrParameterReference(lockStatementSyntax.Expression, semanticModel, cancellationToken) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             lockStatementSyntax.Expression,
+                             lockStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReferenceNullCondition(ref state, lockStatementSyntax.Expression, isNull: false, semanticModel, cancellationToken);
+                }
+                else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
+                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             whileStatementSyntax.Condition,
+                             whileStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReachabilityCondition(ref state, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                }
+                else if (ancestor is ForStatementSyntax forStatementSyntax &&
+                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         forStatementSyntax.Condition != null &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             forStatementSyntax.Condition,
+                             forStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReachabilityCondition(ref state, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                }
+            }
+
+            return state;
+        }
+
+        private static void AddReachabilityCondition(
+            ref SymbolicState state,
+            ExpressionSyntax condition,
+            bool mustBeTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (SymbolicReachabilityService.TryCollectBranchState(
+                    state,
+                    condition,
+                    mustBeTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var branchState))
+            {
+                state = branchState;
+            }
+        }
+
+        private static void AddReferenceNullCondition(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            bool isNull,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var subject) ||
+                subject.Kind != SmtValueKind.Reference)
+            {
+                return;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                    subject,
+                    new SymbolicNullTerm()),
+                expression,
+                isNull ? "ir.path.reference-null" : "ir.path.reference-not-null");
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
 
         public static IEnumerable<SmtFormula> CollectForInitializerFacts(

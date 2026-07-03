@@ -594,6 +594,50 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrAncestorState()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement(
+                "class C { int M(int divisor) { if (divisor == 0) { return 10 / divisor; } return 0; } }");
+            var returnStatement = ifStatement.Statement
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+
+            Assert.That(analysis.PathState.PathConditions, Has.Length.EqualTo(1));
+            var condition = (SymbolicFactCondition)analysis.PathState.PathConditions.Single();
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition.Fact,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void RuntimeHazardClassification_TriesIrProofBeforeLegacyFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardQueryService.cs"));
+            var irIndex = source.IndexOf("TryClassifyIrTrigger(", StringComparison.Ordinal);
+            var legacyIndex = source.LastIndexOf("SymbolicReachabilityService.ClassifyImplication(", StringComparison.Ordinal);
+
+            Assert.That(source, Does.Contain("ClassifyStateImplication("));
+            Assert.That(source, Does.Contain("analysis.PathState"));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irIndex, Is.LessThan(legacyIndex));
+        }
+
+        [Test]
         public async Task ProductionMetricsScript_ReportsProductionModulesAndExcludesTests()
         {
             var repositoryRoot = FindRepositoryRoot();

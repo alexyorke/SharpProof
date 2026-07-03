@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -39,7 +40,11 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 includeCurrentStatementCompletionFacts);
-            return CreateAnalysis(site.SpanStart, formulas, smtAnalysis);
+            var pathState = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+                site,
+                semanticModel,
+                cancellationToken);
+            return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis);
         }
 
         public SymbolicInvariantSnapshot GetForInitialEntryInvariants(
@@ -66,7 +71,7 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken);
 
-            return CreateAnalysis(forStatement.SpanStart, formulas, smtAnalysis);
+            return CreateAnalysis(forStatement.SpanStart, formulas, new SymbolicState(), smtAnalysis);
         }
 
         public SymbolicInvariantImplicationResult ProveImplicationAt(
@@ -267,6 +272,7 @@ namespace PurelySharp.Symbolic
         private static SymbolicProgramPointAnalysis CreateAnalysis(
             int spanStart,
             IReadOnlyList<SmtFormula> formulas,
+            SymbolicState pathState,
             SmtAnalysisService? smtAnalysis)
         {
             if (formulas.Count == 0)
@@ -274,6 +280,7 @@ namespace PurelySharp.Symbolic
                 return new SymbolicProgramPointAnalysis(
                     spanStart,
                     formulas,
+                    pathState,
                     SymbolicReachability.Reachable,
                     "no_path_conditions",
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -291,6 +298,7 @@ namespace PurelySharp.Symbolic
             return new SymbolicProgramPointAnalysis(
                 spanStart,
                 formulas,
+                pathState,
                 reachability,
                 proof?.Reason ?? "reachability_not_checked",
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -372,12 +380,14 @@ namespace PurelySharp.Symbolic
         public SymbolicProgramPointAnalysis(
             int spanStart,
             IReadOnlyList<SmtFormula> pathConditions,
+            SymbolicState? pathState,
             SymbolicReachability reachability,
             string reachabilityReason,
             SymbolicSmtDiagnostics? smtDiagnostics = null)
         {
             SpanStart = spanStart;
             PathConditions = pathConditions;
+            PathState = pathState ?? new SymbolicState();
             Facts = pathConditions.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
             MergedInvariant = SymbolicInvariantService.ConjoinPathConditions(pathConditions);
             MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(pathConditions);
@@ -389,6 +399,8 @@ namespace PurelySharp.Symbolic
         public int SpanStart { get; }
 
         public IReadOnlyList<SmtFormula> PathConditions { get; }
+
+        public SymbolicState PathState { get; }
 
         public IReadOnlyList<string> Facts { get; }
 
