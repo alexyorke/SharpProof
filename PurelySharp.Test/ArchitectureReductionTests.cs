@@ -175,6 +175,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerDisposableLocalAcquisition_ProjectsOwnershipFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddOwnedDisposableLocalFacts("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwned("));
+            Assert.That(source, Does.Contain("\"analyzer.resource.acquire\""));
+            Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
+            Assert.That(source, Does.Contain("IsUsingResourceDeclarator("));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();

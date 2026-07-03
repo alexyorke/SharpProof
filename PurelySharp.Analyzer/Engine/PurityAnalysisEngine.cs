@@ -4325,6 +4325,14 @@ namespace PurelySharp.Analyzer.Engine
                                     initializerValue,
                                     nextState,
                                     context.SemanticModel);
+                                if (!IsUsingResourceDeclarator(declarator))
+                                {
+                                    nextState = AddOwnedDisposableLocalFacts(
+                                        nextState,
+                                        declaredSymbol,
+                                        initializerValue,
+                                        context.SemanticModel.Compilation);
+                                }
                             }
                         }
                     }
@@ -4365,6 +4373,82 @@ namespace PurelySharp.Analyzer.Engine
             return nextState.WithPathConditionsAndState(
                 nextState.PathConditions,
                 nextState.PathState.AddFact(disposedFact).AddFact(releasedFact));
+        }
+
+        private static PurityAnalysisState AddOwnedDisposableLocalFacts(
+            PurityAnalysisState nextState,
+            ISymbol localSymbol,
+            IOperation valueOperation,
+            Compilation compilation)
+        {
+            if (!IsOwnedDisposableObjectCreationValue(valueOperation, compilation))
+            {
+                return nextState;
+            }
+
+            var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+            var pathState = nextState.PathState;
+            var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+                term,
+                valueOperation.Syntax,
+                "analyzer.resource.acquire",
+                localSymbol,
+                "evidence.resource.acquire");
+            foreach (var fact in ownershipFacts)
+            {
+                pathState = pathState.AddFact(fact);
+            }
+
+            pathState = pathState.AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
+                term,
+                SymbolicDisposalState.NotDisposed,
+                valueOperation.Syntax,
+                "analyzer.resource.acquire.disposal",
+                localSymbol,
+                "evidence.resource.acquire"));
+
+            return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        }
+
+        private static bool IsOwnedDisposableObjectCreationValue(
+            IOperation valueOperation,
+            Compilation compilation)
+        {
+            var unwrappedValue = SkipImplicitConversions(valueOperation);
+            return unwrappedValue is IObjectCreationOperation objectCreationOperation &&
+                objectCreationOperation.Type is { } createdType &&
+                IsDisposableResourceType(createdType, compilation);
+        }
+
+        private static bool IsDisposableResourceType(ITypeSymbol type, Compilation compilation)
+        {
+            if (type.SpecialType == SpecialType.System_IDisposable ||
+                type.ToDisplayString() == "System.IAsyncDisposable")
+            {
+                return true;
+            }
+
+            return type.AllInterfaces.Any(static interfaceType =>
+                interfaceType.SpecialType == SpecialType.System_IDisposable ||
+                interfaceType.ToDisplayString() == "System.IAsyncDisposable");
+        }
+
+        private static bool IsUsingResourceDeclarator(IVariableDeclaratorOperation declarator)
+        {
+            foreach (var ancestor in declarator.Syntax.AncestorsAndSelf())
+            {
+                if (ancestor is UsingStatementSyntax)
+                {
+                    return true;
+                }
+
+                if (ancestor is LocalDeclarationStatementSyntax { UsingKeyword.RawKind: not 0 })
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
@@ -4892,6 +4976,12 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     nextState = nextState.WithoutOwnedLocalArray(writtenLocalSymbol);
                 }
+
+                nextState = AddOwnedDisposableLocalFacts(
+                    nextState,
+                    writtenLocalSymbol,
+                    valueOperation,
+                    compilation);
             }
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
