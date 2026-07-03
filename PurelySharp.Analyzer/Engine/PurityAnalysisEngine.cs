@@ -4314,6 +4314,12 @@ namespace PurelySharp.Analyzer.Engine
                         nextState = nextState.WithIncrementedSmtSymbolVersion(compoundParameterSymbol);
                     }
 
+                    nextState = AddCallerVisibleMutationFact(
+                        nextState,
+                        targetOperation,
+                        currentState,
+                        operationToTrack.Syntax);
+
                     if (targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
                     {
                         if (compoundAssignmentOperation.OperatorKind == BinaryOperatorKind.Add)
@@ -4375,8 +4381,8 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
-                  else if (operationToTrack is IAssignmentOperation assignmentOperation)
-                  {
+                else if (operationToTrack is IAssignmentOperation assignmentOperation)
+                {
                     var targetOperation = assignmentOperation.Target;
                     var valueOperation = assignmentOperation.Value;
                     var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
@@ -4401,6 +4407,11 @@ namespace PurelySharp.Analyzer.Engine
                         currentState,
                         context.SemanticModel,
                         context.SemanticModel.Compilation);
+                    nextState = AddCallerVisibleMutationFact(
+                        nextState,
+                        targetOperation,
+                        currentState,
+                        operationToTrack.Syntax);
                     nextState = ApplyAssignedDelegateTargets(
                         nextState,
                         targetSymbol,
@@ -4412,7 +4423,16 @@ namespace PurelySharp.Analyzer.Engine
                         "assigned value targets are unresolved");
                 }
 
-                  else if (operationToTrack is IInvocationOperation invocationOperation)
+                else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
+                {
+                    nextState = AddCallerVisibleMutationFact(
+                        nextState,
+                        incrementOrDecrementOperation.Target,
+                        currentState,
+                        operationToTrack.Syntax);
+                }
+
+                else if (operationToTrack is IInvocationOperation invocationOperation)
                 {
                     nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
 
@@ -4680,6 +4700,75 @@ namespace PurelySharp.Analyzer.Engine
             return nextState.WithPathConditionsAndState(
                 nextState.PathConditions,
                 nextState.PathState.AddFact(disposedFact).AddFact(releasedFact));
+        }
+
+        private static PurityAnalysisState AddCallerVisibleMutationFact(
+            PurityAnalysisState nextState,
+            IOperation targetOperation,
+            PurityAnalysisState currentState,
+            SyntaxNode syntax)
+        {
+            if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
+            {
+                return nextState;
+            }
+
+            var mutationFact = SymbolicOwnershipFactFactory.CreateMutation(
+                term,
+                callerVisible: true,
+                syntax,
+                "analyzer.mutation.caller-visible",
+                symbol,
+                "evidence.mutation.caller-visible");
+
+            return nextState.WithPathConditionsAndState(
+                nextState.PathConditions,
+                nextState.PathState.AddFact(mutationFact));
+        }
+
+        private static bool TryCreateCallerVisibleMutationTerm(
+            IOperation targetOperation,
+            PurityAnalysisState currentState,
+            out SymbolicTerm term,
+            out ISymbol? symbol)
+        {
+            var unwrappedTargetOperation = SkipImplicitConversions(targetOperation);
+            if (unwrappedTargetOperation == null)
+            {
+                symbol = null;
+                term = null!;
+                return false;
+            }
+
+            targetOperation = unwrappedTargetOperation;
+            switch (targetOperation)
+            {
+                case IParameterReferenceOperation parameterReference:
+                    symbol = parameterReference.Parameter;
+                    term = CreateSymbolicReferenceTerm(parameterReference.Parameter, currentState);
+                    return true;
+
+                case IFieldReferenceOperation fieldReference:
+                    symbol = fieldReference.Field;
+                    term = CreateSymbolicReferenceTerm(fieldReference.Field, currentState);
+                    return true;
+
+                case IPropertyReferenceOperation propertyReference:
+                    symbol = propertyReference.Property;
+                    term = CreateSymbolicReferenceTerm(propertyReference.Property, currentState);
+                    return true;
+
+                case IArrayElementReferenceOperation arrayElementReference
+                    when TryResolveTrackedSymbol(arrayElementReference.ArrayReference, currentState) is IParameterSymbol parameterSymbol:
+                    symbol = parameterSymbol;
+                    term = CreateSymbolicReferenceTerm(parameterSymbol, currentState);
+                    return true;
+
+                default:
+                    symbol = null;
+                    term = null!;
+                    return false;
+            }
         }
 
         private static PurityAnalysisState AddOwnedDisposableLocalFacts(

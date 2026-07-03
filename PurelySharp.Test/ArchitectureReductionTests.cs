@@ -231,6 +231,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerCallerVisibleMutation_ProjectsMutationFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddCallerVisibleMutationFact("));
+            Assert.That(source, Does.Contain("TryCreateCallerVisibleMutationTerm("));
+            Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateMutation("));
+            Assert.That(source, Does.Contain("\"analyzer.mutation.caller-visible\""));
+            Assert.That(source, Does.Contain("\"evidence.mutation.caller-visible\""));
+        }
+
+        [Test]
         public void MethodInvocationRule_UsesSymbolicDisposalFactsForDoubleDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
