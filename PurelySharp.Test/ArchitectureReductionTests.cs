@@ -688,6 +688,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerPathFeasibility_TriesSymbolicStateBeforeLegacyFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var symbolicProofIndex = source.IndexOf("ClassifyStateFeasibility(pathState", StringComparison.Ordinal);
+            var legacyFallbackIndex = source.IndexOf("SymbolicReachabilityService.IsUnsatisfiable(proofPathConditions", StringComparison.Ordinal);
+
+            Assert.That(symbolicProofIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyFallbackIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(symbolicProofIndex, Is.LessThan(legacyFallbackIndex));
+            Assert.That(source, Does.Contain("proof.Info.Status == SymbolicProofStatus.Unreachable"));
+        }
+
+        [Test]
         public void AnalyzerStateMerge_PreservesCommonSymbolicPathState()
         {
             var repositoryRoot = FindRepositoryRoot();

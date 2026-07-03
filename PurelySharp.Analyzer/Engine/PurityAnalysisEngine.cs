@@ -2561,7 +2561,7 @@ namespace PurelySharp.Analyzer.Engine
                 if (addedBranchAssumptions)
                 {
                     var partialPathConditions = nextPathConditionsBuilder.ToImmutable();
-                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, smtAnalysis))
+                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, nextPathState, smtAnalysis))
                     {
                         return false;
                     }
@@ -2587,7 +2587,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
-            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, smtAnalysis))
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis))
             {
                 return false;
             }
@@ -2675,11 +2675,6 @@ namespace PurelySharp.Analyzer.Engine
                 valueFormula,
                 new SmtNullConstant());
             var nextPathConditions = currentState.PathConditions.Add(nullComparison);
-            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, smtAnalysis))
-            {
-                return false;
-            }
-
             var nextPathState = TryCreateReferenceNullPathState(
                 currentState,
                 value,
@@ -2688,6 +2683,11 @@ namespace PurelySharp.Analyzer.Engine
                 out var symbolicNullState)
                     ? symbolicNullState
                     : currentState.PathState;
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis))
+            {
+                return false;
+            }
+
             branchState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
             return true;
         }
@@ -2769,6 +2769,19 @@ namespace PurelySharp.Analyzer.Engine
             SemanticModel semanticModel,
             SmtAnalysisService smtAnalysis)
         {
+            var pathState = currentState.PathState;
+            if (SymbolicReachabilityService.TryCollectBranchState(
+                    currentState.PathState,
+                    expressionSyntax,
+                    branchWhenTrue,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var branchPathState,
+                    currentState.GetSmtSymbolVersion))
+            {
+                pathState = branchPathState;
+            }
+
             var pathConditionsBuilder = currentState.PathConditions.ToBuilder();
             var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
                 expressionSyntax,
@@ -2781,7 +2794,7 @@ namespace PurelySharp.Analyzer.Engine
                 addTranslatedFormulaAlways: true);
 
             return addedBranchAssumptions &&
-                ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), smtAnalysis);
+                ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), pathState, smtAnalysis);
         }
 
         private static bool ArePathConditionsUnsatisfiable(
@@ -2789,6 +2802,24 @@ namespace PurelySharp.Analyzer.Engine
             ImmutableArray<SmtFormula> pathConditions,
             SmtAnalysisService smtAnalysis)
         {
+            return ArePathConditionsUnsatisfiable(currentState, pathConditions, currentState.PathState, smtAnalysis);
+        }
+
+        private static bool ArePathConditionsUnsatisfiable(
+            PurityAnalysisState currentState,
+            ImmutableArray<SmtFormula> pathConditions,
+            SymbolicState pathState,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!pathState.PathConditions.IsDefaultOrEmpty || !pathState.Facts.IsDefaultOrEmpty)
+            {
+                var proof = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
+                if (proof.Info.Status == SymbolicProofStatus.Unreachable)
+                {
+                    return true;
+                }
+            }
+
             var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
             return SymbolicReachabilityService.IsUnsatisfiable(proofPathConditions, smtAnalysis);
         }
