@@ -668,6 +668,42 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerPurityState_CarriesSymbolicPathStateBesideLegacyFormulas()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+            var branchStateIndex = source.IndexOf("TryCollectBranchState(", StringComparison.Ordinal);
+            var legacyBranchIndex = source.IndexOf("TryAddBranchConditionFacts(", StringComparison.Ordinal);
+
+            Assert.That(source, Does.Contain("public SymbolicState PathState { get; }"));
+            Assert.That(source, Does.Contain("WithPathConditionsAndState("));
+            Assert.That(source, Does.Contain("TryCreateReferenceNullPathState("));
+            Assert.That(branchStateIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyBranchIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(branchStateIndex, Is.LessThan(legacyBranchIndex));
+        }
+
+        [Test]
+        public void AnalyzerStateMerge_PreservesCommonSymbolicPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.StateMerge.cs"));
+
+            Assert.That(source, Does.Contain("MergePathStatesAcrossAll("));
+            Assert.That(source, Does.Contain("IntersectSymbolicFacts("));
+            Assert.That(source, Does.Contain("IntersectSymbolicConditions("));
+            Assert.That(source, Does.Contain("pathState: MergePathStatesAcrossAll("));
+        }
+
+        [Test]
         public void RuntimeHazardClassification_TriesIrProofBeforeLegacyFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

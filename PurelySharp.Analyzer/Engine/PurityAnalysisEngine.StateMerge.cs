@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
+using PurelySharp.Symbolic.Ir;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer.Engine
@@ -118,6 +119,7 @@ namespace PurelySharp.Analyzer.Engine
                 smtSymbolVersions: mergedSmtSymbolVersions,
                 flowCaptureConcreteTypes: mergedCaptureConcreteTypes,
                 pathConditions: MergePathConditionsAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions),
+                pathState: MergePathStatesAcrossAll(new[] { state1, state2 }),
                 flowCaptureSymbols: mergedCaptureSymbols,
                 ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
         }
@@ -183,6 +185,70 @@ namespace PurelySharp.Analyzer.Engine
             var common = GetCommonPathConditions(sets);
             var builder = common.ToBuilder();
             AddConditionalMergedPathConditions(sets, common, builder);
+            return builder.ToImmutable();
+        }
+
+        private static SymbolicState MergePathStatesAcrossAll(IReadOnlyList<PurityAnalysisState> states)
+        {
+            if (states.Count == 0)
+            {
+                return new SymbolicState();
+            }
+
+            var commonFacts = states[0].PathState.Facts;
+            var commonConditions = states[0].PathState.PathConditions;
+            for (var index = 1; index < states.Count; index++)
+            {
+                commonFacts = IntersectSymbolicFacts(commonFacts, states[index].PathState.Facts);
+                commonConditions = IntersectSymbolicConditions(commonConditions, states[index].PathState.PathConditions);
+                if (commonFacts.IsEmpty && commonConditions.IsEmpty)
+                {
+                    break;
+                }
+            }
+
+            return new SymbolicState(commonFacts, commonConditions);
+        }
+
+        private static ImmutableArray<SymbolicFact> IntersectSymbolicFacts(
+            ImmutableArray<SymbolicFact> first,
+            ImmutableArray<SymbolicFact> second)
+        {
+            if (first.IsDefaultOrEmpty || second.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SymbolicFact>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SymbolicFact>();
+            foreach (var fact in first)
+            {
+                if (second.Contains(fact))
+                {
+                    builder.Add(fact);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<SymbolicCondition> IntersectSymbolicConditions(
+            ImmutableArray<SymbolicCondition> first,
+            ImmutableArray<SymbolicCondition> second)
+        {
+            if (first.IsDefaultOrEmpty || second.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SymbolicCondition>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SymbolicCondition>();
+            foreach (var condition in first)
+            {
+                if (second.Contains(condition))
+                {
+                    builder.Add(condition);
+                }
+            }
+
             return builder.ToImmutable();
         }
 

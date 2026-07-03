@@ -12,6 +12,7 @@ using System.IO;
 using System.Globalization;
 using PurelySharp.Analyzer.Engine.Rules;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 using System.Threading;
@@ -328,6 +329,7 @@ namespace PurelySharp.Analyzer.Engine
             public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
             public ImmutableDictionary<ISymbol, int> SmtSymbolVersions { get; }
             public ImmutableArray<SmtFormula> PathConditions { get; }
+            public SymbolicState PathState { get; }
 
 
             internal PurityAnalysisState(
@@ -343,6 +345,7 @@ namespace PurelySharp.Analyzer.Engine
                 ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
                 ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
                 ImmutableArray<SmtFormula>? pathConditions = null,
+                SymbolicState? pathState = null,
                 ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
                 ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
             {
@@ -361,6 +364,7 @@ namespace PurelySharp.Analyzer.Engine
                 LocalConcreteTypes = localConcreteTypes ?? ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
                 SmtSymbolVersions = smtSymbolVersions ?? ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
                 PathConditions = pathConditions ?? ImmutableArray<SmtFormula>.Empty;
+                PathState = pathState ?? new SymbolicState();
             }
 
 
@@ -399,7 +403,7 @@ namespace PurelySharp.Analyzer.Engine
                 var mergedDefinitelyNullLocals = IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.DefinitelyNullLocalSymbols));
                 var mergedLocalConcreteTypes = IntersectLocalConcreteTypesAcrossAll(stateList.Select(s => s.LocalConcreteTypes));
                 var mergedSmtSymbolVersions = MergeSmtSymbolVersionsAcrossAll(stateList.Select(s => s.SmtSymbolVersions));
-                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, smtSymbolVersions: mergedSmtSymbolVersions, flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList, mergedSmtSymbolVersions), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
+                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, smtSymbolVersions: mergedSmtSymbolVersions, flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList, mergedSmtSymbolVersions), pathState: MergePathStatesAcrossAll(stateList), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
             }
 
 
@@ -499,6 +503,11 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+                if (!SymbolicStatesEqual(this.PathState, other.PathState))
+                {
+                    return false;
+                }
+
                 foreach (var kvp in this.LocalConcreteTypes)
                 {
                     if (!other.LocalConcreteTypes.TryGetValue(kvp.Key, out var otherType) ||
@@ -585,6 +594,16 @@ namespace PurelySharp.Analyzer.Engine
                     hash = hash * 23 + condition.GetHashCode();
                 }
 
+                foreach (var fact in PathState.Facts)
+                {
+                    hash = hash * 23 + fact.GetHashCode();
+                }
+
+                foreach (var condition in PathState.PathConditions)
+                {
+                    hash = hash * 23 + condition.GetHashCode();
+                }
+
                 foreach (var kvp in LocalConcreteTypes.OrderBy(kv => kv.Key.Name))
                 {
                     hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Key);
@@ -598,6 +617,33 @@ namespace PurelySharp.Analyzer.Engine
                 }
 
                 return hash;
+            }
+
+            private static bool SymbolicStatesEqual(SymbolicState first, SymbolicState second)
+            {
+                if (first.Facts.Length != second.Facts.Length ||
+                    first.PathConditions.Length != second.PathConditions.Length)
+                {
+                    return false;
+                }
+
+                for (var index = 0; index < first.Facts.Length; index++)
+                {
+                    if (!Equals(first.Facts[index], second.Facts[index]))
+                    {
+                        return false;
+                    }
+                }
+
+                for (var index = 0; index < first.PathConditions.Length; index++)
+                {
+                    if (!Equals(first.PathConditions[index], second.PathConditions[index]))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
 
             public static bool operator ==(PurityAnalysisState left, PurityAnalysisState right) => left.Equals(right);
@@ -617,6 +663,7 @@ namespace PurelySharp.Analyzer.Engine
                 ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
                 ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
                 ImmutableArray<SmtFormula>? pathConditions = null,
+                SymbolicState? pathState = null,
                 ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
                 ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
             {
@@ -633,6 +680,7 @@ namespace PurelySharp.Analyzer.Engine
                     smtSymbolVersions: smtSymbolVersions ?? SmtSymbolVersions,
                     flowCaptureConcreteTypes: flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
                     pathConditions: pathConditions ?? PathConditions,
+                    pathState: pathState ?? PathState,
                     flowCaptureSymbols: flowCaptureSymbols ?? FlowCaptureSymbols,
                     ownedArrayFlowCaptures: ownedArrayFlowCaptures ?? OwnedArrayFlowCaptures);
             }
@@ -819,6 +867,13 @@ namespace PurelySharp.Analyzer.Engine
                 return Copy(pathConditions: pathConditions);
             }
 
+            public PurityAnalysisState WithPathConditionsAndState(
+                ImmutableArray<SmtFormula> pathConditions,
+                SymbolicState pathState)
+            {
+                return Copy(pathConditions: pathConditions, pathState: pathState ?? new SymbolicState());
+            }
+
             public int GetSmtSymbolVersion(ISymbol symbol)
             {
                 return SmtSymbolVersions.TryGetValue(symbol.OriginalDefinition, out var version)
@@ -832,7 +887,8 @@ namespace PurelySharp.Analyzer.Engine
                 var nextVersion = GetSmtSymbolVersion(originalDefinition) + 1;
                 return Copy(
                     smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
-                    pathConditions: RemovePathConditionsReferencingSymbol(originalDefinition));
+                    pathConditions: RemovePathConditionsReferencingSymbol(originalDefinition),
+                    pathState: new SymbolicState());
             }
 
             private ImmutableArray<SmtFormula> RemovePathConditionsReferencingSymbol(ISymbol symbol)
@@ -2467,6 +2523,20 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var nextPathConditionsBuilder = currentState.PathConditions.ToBuilder();
+            var nextPathState = currentState.PathState;
+            var addedSymbolicBranchAssumption = SymbolicReachabilityService.TryCollectBranchState(
+                currentState.PathState,
+                expressionSyntax,
+                takeConditionalSuccessor,
+                semanticModel,
+                CancellationToken.None,
+                out var symbolicBranchState,
+                currentState.GetSmtSymbolVersion);
+            if (addedSymbolicBranchAssumption)
+            {
+                nextPathState = symbolicBranchState;
+            }
+
             var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
                 expressionSyntax,
                 takeConditionalSuccessor,
@@ -2496,7 +2566,13 @@ namespace PurelySharp.Analyzer.Engine
                         return false;
                     }
 
-                    successorState = currentState.WithPathConditions(partialPathConditions);
+                    successorState = currentState.WithPathConditionsAndState(partialPathConditions, nextPathState);
+                }
+                else if (addedSymbolicBranchAssumption)
+                {
+                    successorState = currentState.WithPathConditionsAndState(
+                        currentState.PathConditions,
+                        nextPathState);
                 }
 
                 return true;
@@ -2516,7 +2592,7 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            successorState = currentState.WithPathConditions(nextPathConditions);
+            successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
             return true;
         }
 
@@ -2604,7 +2680,42 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            branchState = currentState.WithPathConditions(nextPathConditions);
+            var nextPathState = TryCreateReferenceNullPathState(
+                currentState,
+                value,
+                valueFormula,
+                isNull,
+                out var symbolicNullState)
+                    ? symbolicNullState
+                    : currentState.PathState;
+            branchState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
+            return true;
+        }
+
+        private static bool TryCreateReferenceNullPathState(
+            PurityAnalysisState currentState,
+            IOperation? value,
+            SmtFormula valueFormula,
+            bool isNull,
+            out SymbolicState pathState)
+        {
+            pathState = currentState.PathState;
+            value = SkipImplicitConversions(value);
+            if (valueFormula is not SmtVariable variable ||
+                value?.Syntax is not ExpressionSyntax syntax)
+            {
+                return false;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                    new SymbolicVariableTerm(variable.Name, SmtValueKind.Reference),
+                    new SymbolicNullTerm()),
+                syntax,
+                "analyzer.null_assumption",
+                evidenceKey: isNull ? "analyzer.path.null" : "analyzer.path.not_null");
+            pathState = currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact));
             return true;
         }
 
