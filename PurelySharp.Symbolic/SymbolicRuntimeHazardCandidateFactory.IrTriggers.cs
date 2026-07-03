@@ -322,6 +322,54 @@ namespace PurelySharp.Symbolic
                 out trigger);
         }
 
+        private static bool TryCreateCheckedSignedDivisionOverflowTrigger(
+            SyntaxNode site,
+            ExpressionSyntax leftExpression,
+            ExpressionSyntax rightExpression,
+            long minValue,
+            string provenance,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardTrigger trigger)
+        {
+            trigger = default;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) ||
+                left.Kind != SmtValueKind.Int ||
+                !SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) ||
+                right.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            var leftIsMinValue = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    left,
+                    new SymbolicIntegerConstantTerm(minValue)),
+                leftExpression,
+                provenance + ".left-min"));
+            var rightIsMinusOne = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    right,
+                    new SymbolicIntegerConstantTerm(-1)),
+                rightExpression,
+                provenance + ".right-minus-one"));
+            var overflowCondition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                leftIsMinValue,
+                rightIsMinusOne);
+
+            return TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                left,
+                overflowCondition,
+                site,
+                provenance,
+                out trigger);
+        }
+
         private static bool TryCreateNullDereferenceTrigger(
             ExpressionSyntax receiver,
             SemanticModel semanticModel,

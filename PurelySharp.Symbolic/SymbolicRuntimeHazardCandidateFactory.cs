@@ -422,7 +422,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var overflowTrigger)
                 ? overflowTrigger
-                : CreateUnknownTrigger(binaryExpression, "checked_integral_overflow");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(binaryExpression, "checked_integral_overflow"));
 
             candidate = new RuntimeHazardCandidate(
                 binaryExpression,
@@ -573,7 +573,7 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 out var overflowTrigger)
                 ? overflowTrigger
-                : CreateUnknownTrigger(assignment, "checked_integral_overflow");
+                : new RuntimeHazardTrigger(CreateUnknownTrigger(assignment, "checked_integral_overflow"));
 
             candidate = new RuntimeHazardCandidate(
                 assignment,
@@ -1384,9 +1384,23 @@ namespace PurelySharp.Symbolic
             long maxValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
+            if (IsSignedDivisionOverflowOperator(smtOperator) &&
+                TryCreateCheckedSignedDivisionOverflowTrigger(
+                    binaryExpression,
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    minValue,
+                    "ir.runtime-hazard.checked-integral.signed-division-overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!IsSignedDivisionOverflowOperator(smtOperator) &&
                 TryCreateCheckedIntegralOutOfRangeTrigger(
                     binaryExpression,
@@ -1397,7 +1411,7 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var irTrigger))
             {
-                trigger = irTrigger.Condition;
+                trigger = irTrigger;
                 return true;
             }
 
@@ -1420,11 +1434,12 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            trigger = IsSignedDivisionOverflowOperator(smtOperator)
+            var triggerFormula = IsSignedDivisionOverflowOperator(smtOperator)
                 ? Conjoin(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
                 : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            trigger = new RuntimeHazardTrigger(triggerFormula);
             return true;
         }
 
@@ -1491,9 +1506,23 @@ namespace PurelySharp.Symbolic
             long maxValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula trigger)
+            out RuntimeHazardTrigger trigger)
         {
-            trigger = null!;
+            trigger = default;
+            if (IsSignedDivisionOverflowOperator(smtOperator) &&
+                TryCreateCheckedSignedDivisionOverflowTrigger(
+                    assignment,
+                    assignment.Left,
+                    assignment.Right,
+                    minValue,
+                    "ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
+                    semanticModel,
+                    cancellationToken,
+                    out trigger))
+            {
+                return true;
+            }
+
             if (!CSharpSmtFormulaTranslator.TryTranslateValue(
                     assignment.Left,
                     semanticModel,
@@ -1513,11 +1542,12 @@ namespace PurelySharp.Symbolic
             }
 
             var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            trigger = IsSignedDivisionOverflowOperator(smtOperator)
+            var triggerFormula = IsSignedDivisionOverflowOperator(smtOperator)
                 ? Conjoin(
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
                 : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            trigger = new RuntimeHazardTrigger(triggerFormula);
             return true;
         }
 

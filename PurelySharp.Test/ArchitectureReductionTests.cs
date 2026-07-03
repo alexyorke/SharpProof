@@ -237,6 +237,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow"));
+            Assert.That(source, Does.Contain("TryCreateCheckedSignedDivisionOverflowTrigger"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow"));
             Assert.That(source, Does.Contain("IsSignedDivisionOverflowOperator"));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue"));
         }
