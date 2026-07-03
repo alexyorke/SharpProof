@@ -245,6 +245,63 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConditionalFreshArrayAssignedThenReturned_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int[] {|PS0002:TestMethod|}(bool first)
+    {
+        int[] array;
+        if (first)
+        {
+            array = new int[1];
+        }
+        else
+        {
+            array = new int[2];
+        }
+
+        return array;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalFreshArrayAssignedThenMutatedLocally_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(bool first)
+    {
+        int[] array;
+        if (first)
+        {
+            array = new int[1];
+        }
+        else
+        {
+            array = new int[2];
+        }
+
+        array[0] = 42;
+        return array[0];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FreshLocalArrayAssignmentWithImpureIndex_Diagnostic()
         {
             var test = @"

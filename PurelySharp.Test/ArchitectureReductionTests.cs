@@ -160,6 +160,7 @@ namespace PurelySharp.Test
             Assert.That(classifierSource, Does.Contain("PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state)"));
             Assert.That(classifierSource, Does.Contain("IsAssignedFreshMutableObjectOnAllPaths("));
             Assert.That(classifierSource, Does.Contain("AnalyzeFreshMutableAssignments("));
+            Assert.That(classifierSource, Does.Contain("return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals);"));
             Assert.That(returnSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableLocal("));
             Assert.That(returnSource, Does.Contain("\"symbolic_fresh_mutable_object_return\""));
         }

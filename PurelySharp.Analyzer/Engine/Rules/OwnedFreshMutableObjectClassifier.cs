@@ -438,7 +438,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (initializerOperation is ILocalReferenceOperation localReference)
             {
-                return HasStableFreshMutableObjectValue(localReference.Local, initializerSyntax, semanticModel, visitedLocals);
+                return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals);
             }
 
             if (initializerOperation is IConditionalOperation conditionalOperation)

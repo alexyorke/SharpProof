@@ -223,6 +223,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task FreshMutableObjectReturnedThroughObjectAlias_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public object {|PS0002:TestMethod|}()
+    {
+        var box = new Box();
+        object alias = box;
+        return alias;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConditionalFreshMutableObjectAssignedThenReturned_Diagnostic()
         {
             var test = @"
@@ -249,6 +274,40 @@ public class TestClass
         }
 
         return box;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalFreshMutableObjectAssignedThenReturnedThroughObjectAlias_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public object {|PS0002:TestMethod|}(bool first)
+    {
+        Box box;
+        if (first)
+        {
+            box = new Box();
+        }
+        else
+        {
+            box = new Box();
+        }
+
+        object alias = box;
+        return alias;
     }
 }";
 
