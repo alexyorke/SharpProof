@@ -1951,6 +1951,13 @@ namespace SearchLib.Smt
                         return ConcreteFactPreparationStatus.Ready;
                     }
 
+                    if (!TryGetIntegerInterval(integerBinaryTerm.Left, facts, out var dividendLower, out _) ||
+                        !TryGetIntegerInterval(integerBinaryTerm.Right, facts, out var divisorLower, out _) ||
+                        !IntegerDivisionSemanticsMatchZ3(dividendLower, divisorLower))
+                    {
+                        return ConcreteFactPreparationStatus.Unknown;
+                    }
+
                     if (TryEvaluateInteger(integerBinaryTerm.Right, facts, out var denominator))
                     {
                         return denominator == 0
@@ -2209,7 +2216,7 @@ namespace SearchLib.Smt
 
                     return false;
                 case SmtIntegerBinaryOperator.Remainder:
-                    if (!RemainderHasNonNegativeDividendAndPositiveDivisor(leftLower, rightLower))
+                    if (!IntegerDivisionSemanticsMatchZ3(leftLower, rightLower))
                     {
                         return false;
                     }
@@ -2227,7 +2234,7 @@ namespace SearchLib.Smt
             }
         }
 
-        private static bool RemainderHasNonNegativeDividendAndPositiveDivisor(long? dividendLower, long? divisorLower)
+        private static bool IntegerDivisionSemanticsMatchZ3(long? dividendLower, long? divisorLower)
         {
             return dividendLower.HasValue &&
                 dividendLower.Value >= 0 &&
@@ -2693,7 +2700,7 @@ namespace SearchLib.Smt
             if (remainder.Operator != SmtIntegerBinaryOperator.Remainder ||
                 !TryGetIntegerInterval(remainder.Left, facts, out var dividendLower, out _) ||
                 !TryGetIntegerInterval(remainder.Right, facts, out var divisorLower, out _) ||
-                !RemainderHasNonNegativeDividendAndPositiveDivisor(dividendLower, divisorLower) ||
+                !IntegerDivisionSemanticsMatchZ3(dividendLower, divisorLower) ||
                 !EqualityComparer<SmtFormula>.Default.Equals(other, remainder.Right))
             {
                 return false;

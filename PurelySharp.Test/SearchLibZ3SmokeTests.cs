@@ -1581,6 +1581,72 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_NegativeDividendDivision_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var dividend = new SmtVariable("dividend", SmtValueKind.Int);
+            var division = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                dividend,
+                new SmtIntegerConstant(2));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, dividend, new SmtIntegerConstant(-2)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, dividend, new SmtIntegerConstant(0)),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, division, new SmtIntegerConstant(0)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_NegativeDividendRemainder_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var dividend = new SmtVariable("dividend", SmtValueKind.Int);
+            var remainder = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Remainder,
+                dividend,
+                new SmtIntegerConstant(2));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, dividend, new SmtIntegerConstant(-2)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, dividend, new SmtIntegerConstant(0)),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, remainder, new SmtIntegerConstant(-1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_NegativeDivisorDivision_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+            var division = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                new SmtIntegerConstant(3),
+                divisor);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, divisor, new SmtIntegerConstant(-3)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, divisor, new SmtIntegerConstant(0)),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, division, new SmtIntegerConstant(-1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_NonNegativeRemainderWithPositiveDivisor_ProvesRange()
         {
             using var solver = new SmtSolver();
