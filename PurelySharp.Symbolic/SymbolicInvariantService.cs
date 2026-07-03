@@ -160,33 +160,29 @@ namespace PurelySharp.Symbolic
 
             if (SymbolicIrFormulaEncoder.TryEncode(condition, out var conditionFormula))
             {
-                var legacyTrueProof = SymbolicReachabilityService.ClassifyImplication(
+                var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruth(
                     analysis.PathConditions,
                     conditionFormula,
                     smtAnalysis);
-                if (legacyTrueProof.Outcome == PurityProofOutcome.ProvablyPure)
+                if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
                 {
                     return new SymbolicInvariantImplicationResult(
                         analysis.SpanStart,
                         conditionText,
                         SymbolicTruthValue.ProvenTrue,
-                        legacyTrueProof.Reason,
+                        formulaTruth.Info.Reason,
                         analysis.Reachability,
                         analysis.ReachabilityReason,
                         SymbolicSmtDiagnostics.FromService(smtAnalysis));
                 }
 
-                var legacyFalseProof = SymbolicReachabilityService.ClassifyImplication(
-                    analysis.PathConditions,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula),
-                    smtAnalysis);
-                if (legacyFalseProof.Outcome == PurityProofOutcome.ProvablyPure)
+                if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
                 {
                     return new SymbolicInvariantImplicationResult(
                         analysis.SpanStart,
                         conditionText,
                         SymbolicTruthValue.ProvenFalse,
-                        legacyFalseProof.Reason,
+                        formulaTruth.Info.Reason,
                         analysis.Reachability,
                         analysis.ReachabilityReason,
                         SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -196,7 +192,7 @@ namespace PurelySharp.Symbolic
                     analysis.SpanStart,
                     conditionText,
                     SymbolicTruthValue.Unknown,
-                    legacyFalseProof.Reason,
+                    formulaTruth.Info.Reason,
                     analysis.Reachability,
                     analysis.ReachabilityReason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));

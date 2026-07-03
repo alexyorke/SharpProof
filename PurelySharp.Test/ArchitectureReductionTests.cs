@@ -612,6 +612,8 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("SymbolicCondition condition"));
             Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
+            Assert.That(source, Does.Contain("ClassifyFormulaConditionTruth("));
+            Assert.That(source, Does.Not.Contain("ClassifyImplication("));
             Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));
             Assert.That(source, Does.Not.Contain("SmtFormula condition,"));
         }
