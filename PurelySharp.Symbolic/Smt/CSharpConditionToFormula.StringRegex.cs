@@ -1030,7 +1030,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var receiver = UnwrapExpression(memberAccess.Expression);
-            if (TryGetRegexPatternFromObjectCreation(receiver, semanticModel, cancellationToken, out pattern, out options))
+            if (TryGetRegexPatternFromCreationOrGeneratedFactory(receiver, semanticModel, cancellationToken, out pattern, out options))
             {
                 return true;
             }
@@ -1049,6 +1049,17 @@ namespace PurelySharp.Symbolic.Smt
                 cancellationToken,
                 out pattern,
                 out options);
+        }
+
+        private static bool TryGetRegexPatternFromCreationOrGeneratedFactory(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            return TryGetRegexPatternFromObjectCreation(expression, semanticModel, cancellationToken, out pattern, out options) ||
+                TryGetRegexPatternFromGeneratedRegexFactory(expression, semanticModel, cancellationToken, out pattern, out options);
         }
 
         private static bool TryGetRegexPatternFromObjectCreation(
@@ -1086,6 +1097,51 @@ namespace PurelySharp.Symbolic.Smt
                 ? WrapRegexPatternWithInlineOptions(rawPattern, CreateInlineRegexOptionLetters(options))
                 : rawPattern;
             return true;
+        }
+
+        private static bool TryGetRegexPatternFromGeneratedRegexFactory(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string? pattern,
+            out RegexOptions options)
+        {
+            pattern = null;
+            options = RegexOptions.None;
+            expression = UnwrapExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod is not { } targetMethod ||
+                invocationOperation.Arguments.Length != 0 ||
+                targetMethod.Parameters.Length != 0 ||
+                targetMethod.ReturnType is not INamedTypeSymbol returnType ||
+                !IsRegexType(returnType))
+            {
+                return false;
+            }
+
+            foreach (var attribute in targetMethod.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() != "System.Text.RegularExpressions.GeneratedRegexAttribute" ||
+                    attribute.ConstructorArguments.Length < 1 ||
+                    attribute.ConstructorArguments[0].Value is not string rawPattern)
+                {
+                    continue;
+                }
+
+                if (attribute.ConstructorArguments.Length >= 2 &&
+                    attribute.ConstructorArguments[1].Value is int rawOptions)
+                {
+                    options = (RegexOptions)rawOptions;
+                }
+
+                pattern = CanEncodeRegexOptions(options)
+                    ? WrapRegexPatternWithInlineOptions(rawPattern, CreateInlineRegexOptionLetters(options))
+                    : rawPattern;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryResolveAssignedRegexObjectCreation(
@@ -1206,7 +1262,7 @@ namespace PurelySharp.Symbolic.Smt
                 writesRegexSymbol = true;
                 if (localDeclaration.Declaration.Variables.Count != 1 ||
                     variable.Initializer == null ||
-                    !TryGetRegexPatternFromObjectCreation(
+                    !TryGetRegexPatternFromCreationOrGeneratedFactory(
                         variable.Initializer.Value,
                         semanticModel,
                         cancellationToken,
@@ -1245,7 +1301,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             writesRegexSymbol = true;
-            if (!TryGetRegexPatternFromObjectCreation(
+            if (!TryGetRegexPatternFromCreationOrGeneratedFactory(
                     assignment.Right,
                     semanticModel,
                     cancellationToken,

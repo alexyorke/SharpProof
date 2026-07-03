@@ -16,6 +16,18 @@ namespace PurelySharp.Test
     [TestFixture]
     public class SemanticOracleSmtTests
     {
+        private const string GeneratedRegexFactorySource = @"
+using System.Text.RegularExpressions;
+
+public static partial class RegexFactories
+{
+    [GeneratedRegex(@""\AAB\z"")]
+    public static partial Regex Ab();
+
+    [GeneratedRegex(@""\A.\z"", RegexOptions.Singleline)]
+    public static partial Regex SinglelineAny();
+}";
+
         private const string SourcePredicateSource = @"
 public static class SourcePredicates
 {
@@ -7666,6 +7678,72 @@ public class TestClass
                     "string text",
                     @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
                     "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        public void ExecutionVisibility_GeneratedRegexFactoryLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"RegexFactories.Ab().IsMatch(text) && text != ""AB""",
+                    GeneratedRegexFactorySource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_GeneratedRegexFactoryMatchSuccessImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"RegexFactories.Ab().Match(text).Success && text.Length != 2",
+                    GeneratedRegexFactorySource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_GeneratedRegexFactoryMatchesCountImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"RegexFactories.Ab().Matches(text).Count > 0 && text.Length != 2",
+                    GeneratedRegexFactorySource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_GeneratedRegexFactorySinglelineOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!RegexFactories.SinglelineAny().IsMatch(text) && text == ""\n""",
+                    GeneratedRegexFactorySource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LocalGeneratedRegexFactoryLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsStatementUnreachable(GeneratedRegexFactorySource + @"
+
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        var regex = RegexFactories.Ab();
+        if (regex.IsMatch(text) && text != ""AB"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
                 Is.True);
         }
 
