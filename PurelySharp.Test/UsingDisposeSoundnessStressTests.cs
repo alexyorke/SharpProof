@@ -306,6 +306,7 @@ public sealed class TestClass
         resource.Dispose();
         resource = new PureDisposable();
         _ = resource.Use();
+        resource.Dispose();
         return 1;
     }
 }";
@@ -377,7 +378,36 @@ public sealed class TestClass
         var resource = new PureDisposable();
         resource.Dispose();
         resource = new PureDisposable();
-        return resource.Use();
+        var value = resource.Use();
+        resource.Dispose();
+        return value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MissingDisposeForOwnedLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        var resource = new PureDisposable();
     }
 }";
 

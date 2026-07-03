@@ -190,6 +190,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"evidence.resource.using.dispose\""));
             Assert.That(source, Does.Contain("AddResourceDisposedFacts("));
             Assert.That(source, Does.Contain("AddCompletedStraightLineUsingDisposeFacts("));
+            Assert.That(source, Does.Contain("AddScopeEndResourceDisposeFacts("));
+            Assert.That(source, Does.Contain("AddStraightLineResourceActionFacts("));
+            Assert.That(source, Does.Contain("AddUsingDeclarationDisposeFacts("));
             Assert.That(source, Does.Contain("IsStraightLineUsingStatement("));
         }
 
@@ -208,6 +211,23 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"analyzer.resource.acquire\""));
             Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
             Assert.That(source, Does.Contain("IsUsingResourceDeclarator("));
+        }
+
+        [Test]
+        public void AnalyzerMissingDisposal_UsesPostCfgSymbolicResourceFacts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateMissingOwnedResourceDisposalResult("));
+            Assert.That(source, Does.Contain("postCfgExitResourceState"));
+            Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Owned"));
+            Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
+            Assert.That(source, Does.Contain("\"resource_missing_dispose\""));
         }
 
         [Test]
