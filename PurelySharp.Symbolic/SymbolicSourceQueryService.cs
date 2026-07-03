@@ -11,7 +11,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
@@ -1343,15 +1342,15 @@ namespace PurelySharp.Symbolic
 
             if (analysis.Reachability == SymbolicReachability.NotChecked)
             {
-                var reachabilityProof = SymbolicReachabilityService.ClassifyPathFeasibility(
+                var reachabilityProof = SymbolicReachabilityService.ClassifyFormulaReachability(
                     analysis.PathConditions,
                     smtAnalysis);
-                if (reachabilityProof.PathFeasibility == Feasibility.Unsatisfiable)
+                if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
                 {
                     return new SymbolicConditionProofResult(
                         conditionText,
                         SymbolicTruthValue.Unreachable,
-                        reachabilityProof.Reason,
+                        reachabilityProof.Info.Reason,
                         conditionFormula);
                 }
             }

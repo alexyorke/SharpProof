@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
@@ -348,21 +347,14 @@ namespace PurelySharp.Symbolic
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var proof = smtAnalysis == null ? null : SymbolicReachabilityService.ClassifyPathFeasibility(formulas, smtAnalysis);
-            var reachability = proof?.PathFeasibility switch
-            {
-                Feasibility.Satisfiable => SymbolicReachability.Reachable,
-                Feasibility.Unsatisfiable => SymbolicReachability.Unreachable,
-                Feasibility.Unknown => SymbolicReachability.Unknown,
-                _ => SymbolicReachability.NotChecked,
-            };
+            var proof = smtAnalysis == null ? null : SymbolicReachabilityService.ClassifyFormulaReachability(formulas, smtAnalysis);
 
             return new SymbolicProgramPointAnalysis(
                 spanStart,
                 formulas,
                 pathState,
-                reachability,
-                proof?.Reason ?? "reachability_not_checked",
+                proof == null ? SymbolicReachability.NotChecked : MapReachability(proof.Info.Status),
+                proof?.Info.Reason ?? "reachability_not_checked",
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 

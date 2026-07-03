@@ -312,6 +312,13 @@ namespace PurelySharp.Symbolic
                 factFormula);
         }
 
+        internal static SymbolicIrProofResult ClassifyFormulaReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaReachability(pathConditions);
+        }
+
         internal static SymbolicIrProofResult ClassifyFormulaConditionTruth(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula conditionFormula,

@@ -1095,12 +1095,13 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicInvariantService.cs"));
             var stateProofIndex = source.IndexOf("ClassifyStateFeasibility(pathState", StringComparison.Ordinal);
-            var formulaProofIndex = source.IndexOf("ClassifyPathFeasibility(formulas", StringComparison.Ordinal);
+            var formulaProofIndex = source.IndexOf("ClassifyFormulaReachability(formulas", StringComparison.Ordinal);
 
             Assert.That(stateProofIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(formulaProofIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(stateProofIndex, Is.LessThan(formulaProofIndex));
             Assert.That(source, Does.Contain("stateProof?.Info.Status == SymbolicProofStatus.Unreachable"));
+            Assert.That(source, Does.Not.Contain("PathFeasibility switch"));
         }
 
         [Test]

@@ -129,6 +129,12 @@ namespace PurelySharp.Symbolic
             return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
         }
 
+        internal SymbolicIrProofResult ClassifyFormulaReachability(IEnumerable<SmtFormula> pathConditions)
+        {
+            var result = ClassifyFormulaPathFeasibility(pathConditions);
+            return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
+        }
+
         internal PurityProofResult ClassifyFormulaImplication(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula)
