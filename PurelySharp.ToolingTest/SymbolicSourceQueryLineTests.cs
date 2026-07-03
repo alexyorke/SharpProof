@@ -1230,6 +1230,11 @@ public class TestClass
                 maxFacts: 0,
                 maxConditions: 0,
                 maxProofs: 0));
+            var compactWithFacts = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxProgramPoints: 1,
+                maxFacts: 1,
+                maxConditions: 1,
+                maxProofs: 1));
 
             Assert.That(compact.Kind, Is.EqualTo("point"));
             Assert.That(compact.SchemaVersion, Is.EqualTo(1));
@@ -1279,6 +1284,10 @@ public class TestClass
             Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.Invariant.ConservativeUnknownCount));
             Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.False);
             Assert.That(compact.ConservativeInvariant.Conditions, Is.Empty);
+            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
+            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Has.Count.LessThanOrEqualTo(1));
+            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
+            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
 
             var json = JsonSerializer.Serialize(
                 compact,
@@ -2011,6 +2020,7 @@ public class TestClass
                 Assert.That(point.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
                 Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
                 Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.Zero);
+                Assert.That(point.GetProperty("symbolicFacts").GetArrayLength(), Is.Zero);
                 Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(), Is.EqualTo("value > 0"));

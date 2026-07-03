@@ -4370,6 +4370,7 @@ namespace PurelySharp.Symbolic
             string programPointKind,
             int factCount,
             IReadOnlyList<string> facts,
+            IReadOnlyList<SymbolicFactInfo> symbolicFacts,
             SymbolicCompactInvariantSummary observedInvariant,
             SymbolicCompactInvariantSummary conservativeInvariant,
             SymbolicCompactInvariantQueryView invariantQuery,
@@ -4408,6 +4409,7 @@ namespace PurelySharp.Symbolic
             ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
             FactCount = factCount;
             Facts = facts ?? throw new ArgumentNullException(nameof(facts));
+            SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
             InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
@@ -4464,6 +4466,8 @@ namespace PurelySharp.Symbolic
 
         public IReadOnlyList<string> Facts { get; }
 
+        public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+
         public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
@@ -4514,13 +4518,15 @@ namespace PurelySharp.Symbolic
                 result.ConditionProofs,
                 options);
             var facts = SymbolicCompactProjection.Take(focusedFacts, options.MaxFacts);
+            var symbolicFacts = SymbolicCompactProjection.Take(result.SymbolicFacts, options.MaxFacts);
             var pathConditions = SymbolicCompactProjection.Take(focusedPathConditions, options.MaxConditions);
             var conditionProofs = SymbolicCompactProjection.Take(focusedConditionProofs, options.MaxProofs);
             var truncation = SymbolicCompactOutputTruncation.Combine(
                 new SymbolicCompactOutputTruncation(
                     false,
                     false,
-                    focusedFacts.Count > facts.Count,
+                    focusedFacts.Count > facts.Count ||
+                    result.SymbolicFacts.Count > symbolicFacts.Count,
                     focusedPathConditions.Count > pathConditions.Count,
                     focusedConditionProofs.Count > conditionProofs.Count),
                 SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
@@ -4543,6 +4549,7 @@ namespace PurelySharp.Symbolic
                 result.ProgramPointKind,
                 focusedFacts.Count,
                 facts,
+                symbolicFacts,
                 observedInvariant,
                 conservativeInvariant,
                 SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
