@@ -175,6 +175,9 @@ public class TestClass
             Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
             Assert.That(returnProof.Proof.Reason, Is.EqualTo(returnProof.Reason));
+            Assert.That(returnProof.Proof.DisplayKind, Is.EqualTo(returnProof.FormulaKind));
+            Assert.That(returnProof.Proof.ConditionText, Is.EqualTo(returnProof.FormulaText));
+            Assert.That(returnProof.Proof.Target, Is.EqualTo(returnProof.Target));
             Assert.That(returnProof.Target, Is.EqualTo("value"));
             Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
             Assert.That(returnProof.FormulaText, Is.EqualTo("value > 0"));
@@ -189,6 +192,9 @@ public class TestClass
             Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
             Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
             Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
+            Assert.That(aggregateProof.Proof.DisplayKind, Is.EqualTo(aggregateProof.FormulaKind));
+            Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo(aggregateProof.FormulaText));
+            Assert.That(aggregateProof.Proof.Target, Is.EqualTo(aggregateProof.Target));
             Assert.That(aggregateProof.Target, Is.EqualTo("value"));
             Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
             Assert.That(aggregateProof.FormulaText, Is.EqualTo("value > 0"));

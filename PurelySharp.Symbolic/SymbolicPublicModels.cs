@@ -74,7 +74,10 @@ namespace PurelySharp.Symbolic
             SymbolicUnknownReason unknownReason,
             string reason,
             bool cacheHit,
-            SymbolicBudgetInfo? budget)
+            SymbolicBudgetInfo? budget,
+            string? target = null,
+            string? conditionText = null,
+            string? displayKind = null)
         {
             Status = status;
             Backend = backend;
@@ -82,6 +85,9 @@ namespace PurelySharp.Symbolic
             Reason = reason ?? string.Empty;
             CacheHit = cacheHit;
             Budget = budget;
+            Target = target ?? string.Empty;
+            ConditionText = conditionText ?? string.Empty;
+            DisplayKind = displayKind ?? backend.ToString();
         }
 
         public SymbolicProofStatus Status { get; }
@@ -95,6 +101,12 @@ namespace PurelySharp.Symbolic
         public bool CacheHit { get; }
 
         public SymbolicBudgetInfo? Budget { get; }
+
+        public string Target { get; }
+
+        public string ConditionText { get; }
+
+        public string DisplayKind { get; }
     }
 
     public sealed class SymbolicFactInfo

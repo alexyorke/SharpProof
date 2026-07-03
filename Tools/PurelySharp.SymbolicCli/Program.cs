@@ -551,8 +551,8 @@ static void PrintPointResult(
     {
         Console.WriteLine(
             $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
-            $"kind={proof.FormulaKind}: {proof.TruthValue}");
-        Console.WriteLine($"Implication formula: {proof.FormulaText}");
+            $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
+        Console.WriteLine($"Implication formula: {proof.Proof.ConditionText}");
         if (proof.Line.HasValue && proof.Column.HasValue)
         {
             Console.WriteLine(
@@ -641,7 +641,7 @@ static void PrintConditionProofSummaries(
     {
         Console.WriteLine(
             $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
-            $"kind={proof.FormulaKind} summary: " +
+            $"kind={proof.Proof.DisplayKind} summary: " +
             $"Status={proof.Status}, " +
             $"ProvenTrue={proof.ProvenTrueCount}, " +
             $"ProvenFalse={proof.ProvenFalseCount}, " +

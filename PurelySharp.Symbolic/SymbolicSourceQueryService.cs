@@ -6494,7 +6494,10 @@ namespace PurelySharp.Symbolic
                 ResolveUnknownReason(Status, Reasons),
                 Summary,
                 cacheHit: false,
-                budget: null);
+                budget: null,
+                Target,
+                FormulaText,
+                FormulaKind);
         }
 
         public string Condition { get; }
@@ -7664,7 +7667,10 @@ namespace PurelySharp.Symbolic
                 ResolveUnknownReason(TruthValue, Reason),
                 Reason,
                 cacheHit: false,
-                budget: null);
+                budget: null,
+                Target,
+                FormulaText,
+                FormulaKind);
         }
 
         public string Condition { get; }

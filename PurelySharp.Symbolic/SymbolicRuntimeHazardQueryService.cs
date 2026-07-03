@@ -677,7 +677,10 @@ namespace PurelySharp.Symbolic
                 ResolveUnknownReason(status, statusReason),
                 statusReason,
                 cacheHit: false,
-                budget: null);
+                budget: null,
+                category,
+                triggerCondition,
+                kind.ToString());
             InvariantInfo = new SymbolicInvariantInfo(
                 MergedInvariantText,
                 SymbolicFacts,
