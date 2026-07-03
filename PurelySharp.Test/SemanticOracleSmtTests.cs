@@ -1632,6 +1632,33 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsOrdinalIgnoreCaseStringEqualsReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (string.Equals(input, ""sku"", StringComparison.OrdinalIgnoreCase))
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\Asku\z", StringComparison.Ordinal) &&
+                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsStringConcatAssignmentFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -7824,6 +7851,28 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_InstanceStringEqualsOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.Equals(\"a\", StringComparison.OrdinalIgnoreCase) && text == \"B\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticStringEqualsOrdinalIgnoreCaseContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "string.Equals(\"a\", text, StringComparison.OrdinalIgnoreCase) && text == \"B\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringLiteralEqualityImpliesNonNull()
         {
             Assert.That(
@@ -10245,6 +10294,33 @@ public class TestClass
     public void TestMethod(string text)
     {
         if (text.IndexOf(""a"", StringComparison.OrdinalIgnoreCase) < 0 && text == ""A"")
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringEqualsOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (string.Equals(text, ""a"", StringComparison.OrdinalIgnoreCase) && text == ""B"")
         {
             Console.WriteLine(text);
         }

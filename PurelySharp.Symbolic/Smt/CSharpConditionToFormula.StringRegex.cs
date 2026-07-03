@@ -104,8 +104,14 @@ namespace PurelySharp.Symbolic.Smt
             var method = invocationOperation.TargetMethod;
             if (method.Name != "Equals" ||
                 method.ReturnType.SpecialType != SpecialType.System_Boolean ||
-                method.ContainingType?.SpecialType != SpecialType.System_String ||
-                !IsSupportedOrdinalStringEqualsInvocation(invocationOperation, semanticModel, cancellationToken))
+                method.ContainingType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            var isOrdinal = IsSupportedOrdinalStringEqualsInvocation(invocationOperation, semanticModel, cancellationToken);
+            var isOrdinalIgnoreCase = IsSupportedOrdinalIgnoreCaseStringEqualsInvocation(invocationOperation, semanticModel, cancellationToken);
+            if (!isOrdinal && !isOrdinalIgnoreCase)
             {
                 return false;
             }
@@ -123,16 +129,30 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
-                formula = CreateNullSafeStringEqualityFormula(
+                if (isOrdinal)
+                {
+                    formula = CreateNullSafeStringEqualityFormula(
+                        leftExpression,
+                        rightExpression,
+                        left,
+                        right,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        inlineDepth);
+                    return true;
+                }
+
+                return TryCreateOrdinalIgnoreCaseStringEqualityFormula(
                     leftExpression,
                     rightExpression,
                     left,
                     right,
                     semanticModel,
                     cancellationToken,
+                    out formula,
                     getSymbolVersion,
                     inlineDepth);
-                return true;
             }
 
             if (invocationOperation.Arguments.Length < 1 ||
@@ -146,6 +166,20 @@ namespace PurelySharp.Symbolic.Smt
                 receiverNonNull == null)
             {
                 return false;
+            }
+
+            if (isOrdinalIgnoreCase)
+            {
+                return TryCreateOrdinalIgnoreCaseStringEqualityFormula(
+                    receiverExpression,
+                    argumentExpression,
+                    receiver,
+                    argument,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
             }
 
             formula = new SmtBinaryFormula(
@@ -191,6 +225,84 @@ namespace PurelySharp.Symbolic.Smt
                 IsStringParameter(parameters[0]) &&
                 IsStringComparisonParameter(parameters[1]) &&
                 HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+        }
+
+        private static bool IsSupportedOrdinalIgnoreCaseStringEqualsInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var method = invocationOperation.TargetMethod;
+            if (method.ContainingType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            var parameters = method.Parameters;
+            if (method.IsStatic)
+            {
+                return parameters.Length == 3 &&
+                    IsStringParameter(parameters[0]) &&
+                    IsStringParameter(parameters[1]) &&
+                    IsStringComparisonParameter(parameters[2]) &&
+                    HasOrdinalIgnoreCaseStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+            }
+
+            return parameters.Length == 2 &&
+                IsStringParameter(parameters[0]) &&
+                IsStringComparisonParameter(parameters[1]) &&
+                HasOrdinalIgnoreCaseStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+        }
+
+        private static bool TryCreateOrdinalIgnoreCaseStringEqualityFormula(
+            ExpressionSyntax leftExpression,
+            ExpressionSyntax rightExpression,
+            SmtFormula left,
+            SmtFormula right,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            SmtFormula subject;
+            ExpressionSyntax subjectExpression;
+            string constant;
+            var rightConstant = TryGetConstantString(rightExpression, semanticModel, cancellationToken);
+            if (rightConstant != null)
+            {
+                subject = left;
+                subjectExpression = leftExpression;
+                constant = rightConstant;
+            }
+            else
+            {
+                var leftConstant = TryGetConstantString(leftExpression, semanticModel, cancellationToken);
+                if (leftConstant == null)
+                {
+                    return false;
+                }
+
+                subject = right;
+                subjectExpression = rightExpression;
+                constant = leftConstant;
+            }
+
+            if (!TryCreateStringNonNullFormula(subjectExpression, semanticModel, cancellationToken, out var subjectNonNull, getSymbolVersion, inlineDepth) ||
+                subjectNonNull == null)
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                subjectNonNull,
+                new SmtRegexMatchFormula(
+                    subject,
+                    "\\A" + Regex.Escape(constant) + "\\z",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+            return true;
         }
 
         private static bool TryTranslateRegexIsMatchInvocation(
