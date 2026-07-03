@@ -175,6 +175,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AnalyzerUsingStatements_ProjectImplicitDisposalFactsIntoPathState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("AddUsingStatementDisposeFacts("));
+            Assert.That(source, Does.Contain("EnumerateUsingStatementDisposedSymbols("));
+            Assert.That(source, Does.Contain("\"analyzer.resource.using.dispose\""));
+            Assert.That(source, Does.Contain("\"evidence.resource.using.dispose\""));
+            Assert.That(source, Does.Contain("AddResourceDisposedFacts("));
+            Assert.That(source, Does.Contain("AddCompletedStraightLineUsingDisposeFacts("));
+            Assert.That(source, Does.Contain("IsStraightLineUsingStatement("));
+        }
+
+        [Test]
         public void AnalyzerDisposableLocalAcquisition_ProjectsOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();

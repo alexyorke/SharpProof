@@ -1506,7 +1506,11 @@ namespace PurelySharp.Analyzer.Engine
                         {
                             if (returnOp.ReturnedValue != null)
                             {
-                                var returnPurity = CheckSingleOperation(returnOp, postCfgContext, postCfgReturnState);
+                                var returnState = AddCompletedStraightLineUsingDisposeFacts(
+                                    postCfgReturnState,
+                                    methodBodyIOperation,
+                                    returnOp);
+                                var returnPurity = CheckSingleOperation(returnOp, postCfgContext, returnState);
                                 if (!returnPurity.IsPure)
                                 {
                                     LogDebug($"{indent}    Post-CFG: Return value IMPURE: {returnOp.ReturnedValue.Syntax}");
@@ -1817,6 +1821,59 @@ namespace PurelySharp.Analyzer.Engine
                     semanticModel,
                     CancellationToken.None,
                     smtAnalysis);
+        }
+
+        private static PurityAnalysisState AddCompletedStraightLineUsingDisposeFacts(
+            PurityAnalysisState currentState,
+            IOperation methodBodyOperation,
+            IReturnOperation returnOperation)
+        {
+            var nextState = currentState;
+            foreach (var usingOperation in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IUsingOperation>())
+            {
+                if (usingOperation.Syntax.Span.End > returnOperation.Syntax.SpanStart ||
+                    !IsStraightLineUsingStatement(usingOperation.Syntax))
+                {
+                    continue;
+                }
+
+                nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, nextState);
+            }
+
+            return nextState;
+        }
+
+        private static bool IsStraightLineUsingStatement(SyntaxNode usingSyntax)
+        {
+            foreach (var ancestor in usingSyntax.Ancestors())
+            {
+                if (ancestor is MethodDeclarationSyntax ||
+                    ancestor is ConstructorDeclarationSyntax ||
+                    ancestor is OperatorDeclarationSyntax ||
+                    ancestor is ConversionOperatorDeclarationSyntax ||
+                    ancestor is AccessorDeclarationSyntax ||
+                    ancestor is LocalFunctionStatementSyntax)
+                {
+                    return true;
+                }
+
+                if (ancestor is IfStatementSyntax ||
+                    ancestor is ElseClauseSyntax ||
+                    ancestor is SwitchStatementSyntax ||
+                    ancestor is SwitchSectionSyntax ||
+                    ancestor is WhileStatementSyntax ||
+                    ancestor is DoStatementSyntax ||
+                    ancestor is ForStatementSyntax ||
+                    ancestor is ForEachStatementSyntax ||
+                    ancestor is ForEachVariableStatementSyntax ||
+                    ancestor is TryStatementSyntax ||
+                    ancestor is CatchClauseSyntax)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
 
@@ -4243,6 +4300,11 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+                  else if (operationToTrack is IUsingOperation usingOperation)
+                {
+                    nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
+                }
+
                   else if (operationToTrack is IFlowCaptureOperation flowCaptureOperation)
                 {
                     if (TryResolveTrackedSymbol(flowCaptureOperation.Value, currentState) is ISymbol capturedSymbol)
@@ -4355,20 +4417,87 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+            return AddResourceDisposedFacts(
+                nextState,
+                term,
+                resourceSymbol,
+                invocationOperation.Syntax,
+                "analyzer.resource.dispose",
+                "evidence.resource.dispose");
+        }
+
+        private static PurityAnalysisState AddUsingStatementDisposeFacts(
+            PurityAnalysisState nextState,
+            IUsingOperation usingOperation,
+            PurityAnalysisState currentState)
+        {
+            foreach (var resourceSymbol in EnumerateUsingStatementDisposedSymbols(usingOperation, currentState))
+            {
+                var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+                nextState = AddResourceDisposedFacts(
+                    nextState,
+                    term,
+                    resourceSymbol,
+                    usingOperation.Syntax,
+                    "analyzer.resource.using.dispose",
+                    "evidence.resource.using.dispose");
+            }
+
+            return nextState;
+        }
+
+        private static IEnumerable<ISymbol> EnumerateUsingStatementDisposedSymbols(
+            IUsingOperation usingOperation,
+            PurityAnalysisState currentState)
+        {
+            var resourceOperation = usingOperation.Resources;
+            if (TryResolveTrackedSymbol(resourceOperation, currentState) is { } resourceSymbol)
+            {
+                yield return resourceSymbol;
+                yield break;
+            }
+
+            if (resourceOperation is IVariableDeclarationGroupOperation declarationGroup)
+            {
+                foreach (var declaration in declarationGroup.Declarations)
+                {
+                    foreach (var declarator in declaration.Declarators)
+                    {
+                        yield return declarator.Symbol;
+                    }
+                }
+            }
+            else if (resourceOperation is IVariableDeclarationOperation variableDeclaration)
+            {
+                foreach (var declarator in variableDeclaration.Declarators)
+                {
+                    yield return declarator.Symbol;
+                }
+            }
+        }
+
+        private static PurityAnalysisState AddResourceDisposedFacts(
+            PurityAnalysisState nextState,
+            SymbolicTerm term,
+            ISymbol resourceSymbol,
+            SyntaxNode syntax,
+            string provenance,
+            string evidenceKey)
+        {
             var disposedFact = SymbolicOwnershipFactFactory.CreateDisposal(
                 term,
                 SymbolicDisposalState.Disposed,
-                invocationOperation.Syntax,
-                "analyzer.resource.dispose",
+                syntax,
+                provenance,
                 resourceSymbol,
-                "evidence.resource.dispose");
+                evidenceKey);
             var releasedFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
                 term,
                 SymbolicResourceLifetimeState.Released,
-                invocationOperation.Syntax,
-                "analyzer.resource.dispose.lifetime",
+                syntax,
+                provenance + ".lifetime",
                 resourceSymbol,
-                "evidence.resource.dispose");
+                evidenceKey);
 
             return nextState.WithPathConditionsAndState(
                 nextState.PathConditions,
