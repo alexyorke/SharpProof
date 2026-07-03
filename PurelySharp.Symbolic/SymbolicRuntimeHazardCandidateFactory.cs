@@ -337,6 +337,30 @@ namespace PurelySharp.Symbolic
                 IrPrecondition = irPrecondition;
             }
 
+            private RuntimeHazardTrigger(SymbolicFact irPrecondition, SmtFormula condition)
+            {
+                IrPrecondition = irPrecondition ?? throw new ArgumentNullException(nameof(irPrecondition));
+                Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+            }
+
+            internal static bool TryCreate(SymbolicFact irPrecondition, out RuntimeHazardTrigger trigger)
+            {
+                if (irPrecondition == null)
+                {
+                    trigger = default;
+                    return false;
+                }
+
+                if (!SymbolicIrFormulaEncoder.TryEncode(irPrecondition, out var condition))
+                {
+                    trigger = default;
+                    return false;
+                }
+
+                trigger = new RuntimeHazardTrigger(irPrecondition, condition);
+                return true;
+            }
+
             internal SmtFormula Condition { get; }
 
             internal SymbolicFact? IrPrecondition { get; }

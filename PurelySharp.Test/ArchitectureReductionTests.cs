@@ -89,6 +89,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardTriggers_CreateIrPreconditionTriggersBeforeFormulaProjection()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var candidateSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var triggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var helperIndex = triggerSource.IndexOf("private static bool TryEncodeIrExceptionPreconditionTrigger", StringComparison.Ordinal);
+            var helperEndIndex = triggerSource.IndexOf("private static bool TryCreateReferenceNullCondition", StringComparison.Ordinal);
+            var helperSource = triggerSource.Substring(helperIndex, helperEndIndex - helperIndex);
+            var directThrowIndex = triggerSource.IndexOf("private static bool TryCreateDirectThrowTrigger", StringComparison.Ordinal);
+            var directThrowEndIndex = triggerSource.IndexOf("private static bool TryCreateDivideByZeroTrigger", StringComparison.Ordinal);
+            var directThrowSource = triggerSource.Substring(directThrowIndex, directThrowEndIndex - directThrowIndex);
+
+            Assert.That(candidateSource, Does.Contain("internal static bool TryCreate(SymbolicFact irPrecondition"));
+            Assert.That(helperSource, Does.Contain("RuntimeHazardTrigger.TryCreate(precondition, out trigger)"));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode(precondition"));
+            Assert.That(directThrowSource, Does.Contain("RuntimeHazardTrigger.TryCreate(precondition, out trigger)"));
+            Assert.That(directThrowSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode(precondition"));
+        }
+
+        [Test]
         public void ExecutionVisibility_UsesSymbolicReachabilityForConditionProofs()
         {
             var repositoryRoot = FindRepositoryRoot();

@@ -23,14 +23,7 @@ namespace PurelySharp.Symbolic
                 throwNode,
                 "ir.runtime-hazard.direct-throw");
 
-            if (SymbolicIrFormulaEncoder.TryEncode(precondition, out var formula))
-            {
-                trigger = new RuntimeHazardTrigger(formula, precondition);
-                return true;
-            }
-
-            trigger = default;
-            return false;
+            return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
         }
 
         private static bool TryCreateDivideByZeroTrigger(
@@ -695,14 +688,7 @@ namespace PurelySharp.Symbolic
                 site,
                 provenance);
 
-            if (SymbolicIrFormulaEncoder.TryEncode(precondition, out var formula))
-            {
-                trigger = new RuntimeHazardTrigger(formula, precondition);
-                return true;
-            }
-
-            trigger = default;
-            return false;
+            return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
         }
 
         private static bool TryCreateReferenceNullCondition(
