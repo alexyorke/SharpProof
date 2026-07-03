@@ -40,18 +40,40 @@ namespace PurelySharp.Symbolic.Smt
                 SmtBinaryOperator.GreaterThanOrEqual,
                 count,
                 new SmtIntegerConstant(0));
-            var end = new SmtIntegerBinaryTerm(
-                SmtIntegerBinaryOperator.Add,
-                start,
-                count);
-            var endWithinLength = new SmtBinaryFormula(
+            var startWithinLength = new SmtBinaryFormula(
                 SmtBinaryOperator.LessThanOrEqual,
-                end,
+                start,
                 sourceLength);
+            var remainingLength = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Subtract,
+                sourceLength,
+                start);
+            var countWithinRemainingLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                count,
+                remainingLength);
+            SmtFormula additionDoesNotOverflow = count is SmtIntegerConstant { Value: 0 }
+                ? new SmtBooleanConstant(true)
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    start,
+                    new SmtIntegerBinaryTerm(
+                        SmtIntegerBinaryOperator.Subtract,
+                        new SmtIntegerConstant(int.MaxValue),
+                        count));
             return new SmtBinaryFormula(
                 SmtBinaryOperator.And,
                 startNonNegative,
-                new SmtBinaryFormula(SmtBinaryOperator.And, countNonNegative, endWithinLength));
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    countNonNegative,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.And,
+                        startWithinLength,
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.And,
+                            countWithinRemainingLength,
+                            additionDoesNotOverflow))));
         }
 
         private static bool TryTranslateBuiltInElementAccessValue(

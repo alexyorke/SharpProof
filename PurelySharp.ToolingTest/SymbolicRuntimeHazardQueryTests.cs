@@ -2009,7 +2009,7 @@ public class TestClass
         }
 
         [Test]
-        public void QuerySourceRuntimeHazardsLine_GuardedSpanSliceArgumentOutOfRangeIsPruned()
+        public void QuerySourceRuntimeHazardsLine_OverflowProneSpanSliceGuardRemainsUnknown()
         {
             const string source = @"
 using System;
@@ -2038,7 +2038,42 @@ public class TestClass
 
             var hazard = AssertSingleHazard(result);
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesSpanSliceUncheckedAddOverflowArgumentOutOfRange()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public ReadOnlySpan<int> TestMethod(ReadOnlySpan<int> values)
+    {
+        var start = int.MaxValue;
+        var length = 1;
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length);
+        }
+
+        return values;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values.Slice(start, length);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_slice_out_of_range"));
         }
 
@@ -2071,7 +2106,7 @@ public class TestClass
         }
 
         [Test]
-        public void QuerySourceRuntimeHazardsLine_GuardedStringAsSpanArgumentOutOfRangeIsPruned()
+        public void QuerySourceRuntimeHazardsLine_OverflowProneStringAsSpanGuardRemainsUnknown()
         {
             const string source = @"
 using System;
@@ -2100,7 +2135,7 @@ public class TestClass
 
             var hazard = AssertSingleHazard(result);
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_span_out_of_range"));
         }
 
@@ -2133,7 +2168,7 @@ public class TestClass
         }
 
         [Test]
-        public void QuerySourceRuntimeHazardsLine_GuardedArrayAsMemoryArgumentOutOfRangeIsPruned()
+        public void QuerySourceRuntimeHazardsLine_OverflowProneArrayAsMemoryGuardRemainsUnknown()
         {
             const string source = @"
 using System;
@@ -2162,7 +2197,42 @@ public class TestClass
 
             var hazard = AssertSingleHazard(result);
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_memory_out_of_range"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesArrayAsMemoryUncheckedAddOverflowArgumentOutOfRange()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public Memory<int> TestMethod(int[] values)
+    {
+        var start = int.MaxValue;
+        var length = 1;
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.AsMemory(start, length);
+        }
+
+        return values.AsMemory();
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values.AsMemory(start, length);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_memory_extensions_as_memory_out_of_range"));
         }
 
