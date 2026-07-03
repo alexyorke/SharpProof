@@ -76,6 +76,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicRuntimeHazardQueryService_RoutesIrTriggerProofsThroughProofService()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardQueryService.cs"));
+
+            Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
+            Assert.That(source, Does.Not.Contain("new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition))"));
+        }
+
+        [Test]
         public void ExecutionVisibility_UsesSymbolicReachabilityForConditionProofs()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -791,6 +804,44 @@ namespace PurelySharp.Test
             var result = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
                 state,
                 new SymbolicFactCondition(branchFact),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
+        public void SymbolicProofService_ClassifiesIrHazardTriggerWithoutPublicFormulaInput()
+        {
+            var divisor = new SymbolicVariableTerm("divisor", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var nonZeroFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    divisor,
+                    zero),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("divisor != 0"),
+                "test.state");
+            var triggerCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    divisor,
+                    zero),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("divisor == 0"),
+                "test.trigger.condition"));
+            var triggerPrecondition = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    divisor,
+                    triggerCondition),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("10 / divisor"),
+                "test.trigger");
+            var state = new SymbolicState(new[] { nonZeroFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateHazardTrigger(
+                state,
+                triggerPrecondition,
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));

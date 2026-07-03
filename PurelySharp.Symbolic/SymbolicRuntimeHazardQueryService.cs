@@ -576,24 +576,19 @@ namespace PurelySharp.Symbolic
             SmtAnalysisService smtAnalysis,
             out (SymbolicRuntimeHazardStatus Status, string Reason) result)
         {
-            var proven = SymbolicReachabilityService.ClassifyStateImplication(
+            var proof = SymbolicReachabilityService.ClassifyStateHazardTrigger(
                 analysis.PathState,
                 triggerPrecondition,
                 smtAnalysis);
-            if (proven.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (proof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
-                result = (SymbolicRuntimeHazardStatus.Proven, proven.Info.Reason);
+                result = (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason);
                 return true;
             }
 
-            var negatedTrigger = new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition));
-            var disproven = SymbolicReachabilityService.ClassifyStateImplication(
-                analysis.PathState,
-                negatedTrigger,
-                smtAnalysis);
-            if (disproven.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (proof.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                result = (SymbolicRuntimeHazardStatus.Unreachable, disproven.Info.Reason);
+                result = (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason);
                 return true;
             }
 

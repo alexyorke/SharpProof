@@ -77,6 +77,14 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis).ClassifyBranchFeasibility(state, branchCondition);
         }
 
+        internal static SymbolicIrProofResult ClassifyStateHazardTrigger(
+            SymbolicState state,
+            SymbolicFact triggerPrecondition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return new SymbolicProofService(smtAnalysis).ClassifyHazardTrigger(state, triggerPrecondition);
+        }
+
         internal static bool TryCollectBranchState(
             SymbolicState state,
             ExpressionSyntax condition,
