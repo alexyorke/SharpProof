@@ -281,6 +281,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("AddReturnedOwnedResourceFacts("));
             Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateReturnedOwnership("));
             Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Returned"));
+            Assert.That(source, Does.Contain("TryResolveTrackedSymbol(returnOperation.ReturnedValue, currentState)"));
             Assert.That(source, Does.Contain("\"analyzer.resource.returned\""));
             Assert.That(source, Does.Contain("\"evidence.resource.returned\""));
         }

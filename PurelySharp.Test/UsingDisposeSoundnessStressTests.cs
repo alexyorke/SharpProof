@@ -742,6 +742,68 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ReturnedOldAliasAfterOwnerReassignmentAndNewOwnerDisposed_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        resource = new PureDisposable();
+        resource.Dispose();
+        return alias;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReturnedNewOwnerAfterAliasDisposed_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public PureDisposable TestMethod()
+    {
+        var resource = new PureDisposable();
+        var alias = resource;
+        resource = new PureDisposable();
+        alias.Dispose();
+        return resource;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ExplicitDisposeAliasThenDisposeOriginal_Diagnostic()
         {
             var test = @"
