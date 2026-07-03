@@ -1409,6 +1409,10 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.invalid-cast.mismatch"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.invalid-cast.mismatch"));
         }
 
         [Test]

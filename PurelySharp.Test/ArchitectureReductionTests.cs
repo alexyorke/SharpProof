@@ -307,13 +307,14 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
 
-            Assert.That(source, Does.Contain("TryCreateIrRuntimeReferenceCastMismatchTrigger"));
+            Assert.That(source, Does.Contain("TryCreateRuntimeReferenceInvalidCastTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.InvalidCast"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.invalid-cast.non-null"));
             Assert.That(source, Does.Contain("new SymbolicTypeTestAtom"));
             Assert.That(source, Does.Contain("SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey"));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
-            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
         }
 
         [Test]

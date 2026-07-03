@@ -448,42 +448,7 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        private static bool TryCreateRuntimeReferenceCastMismatchTrigger(
-            ExpressionSyntax expression,
-            ITypeSymbol targetType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula trigger)
-        {
-            if (TryCreateIrRuntimeReferenceCastMismatchTrigger(
-                    expression,
-                    targetType,
-                    semanticModel,
-                    cancellationToken,
-                    out var irTrigger))
-            {
-                trigger = irTrigger.Condition;
-                return true;
-            }
-
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var value,
-                    getSymbolVersion: null) ||
-                value is not { Kind: SmtValueKind.Reference } ||
-                !CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula(value, targetType, out var runtimeTypeTest))
-            {
-                trigger = null!;
-                return false;
-            }
-
-            trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest);
-            return true;
-        }
-
-        private static bool TryCreateIrRuntimeReferenceCastMismatchTrigger(
+        private static bool TryCreateRuntimeReferenceInvalidCastTrigger(
             ExpressionSyntax expression,
             ITypeSymbol targetType,
             SemanticModel semanticModel,
@@ -491,29 +456,58 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardTrigger trigger)
         {
             trigger = default;
-            if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
+
+            if (SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+                if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+                    value.Kind == SmtValueKind.Reference)
+                {
+                    var nonNull = new SymbolicFactCondition(SymbolicFact.Exact(
+                        new SymbolicRelationAtom(
+                            SymbolicRelationOperator.NotEqual,
+                            value,
+                            new SymbolicNullTerm()),
+                        expression,
+                        "ir.runtime-hazard.invalid-cast.non-null"));
+
+                    var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
+                        new SymbolicTypeTestAtom(value, typeKey),
+                        expression,
+                        "ir.runtime-hazard.invalid-cast.type-test"));
+                    var invalidCast = new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        nonNull,
+                        new SymbolicNotCondition(isTargetType));
+                    if (TryEncodeIrExceptionPreconditionTrigger(
+                            SymbolicExceptionPreconditionKind.InvalidCast,
+                            value,
+                            invalidCast,
+                            expression,
+                            "ir.runtime-hazard.invalid-cast.mismatch",
+                            out trigger))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion: null) ||
+                valueFormula is not { Kind: SmtValueKind.Reference } ||
+                !CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula(valueFormula, targetType, out var runtimeTypeTest))
             {
                 return false;
             }
 
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
-                value.Kind != SmtValueKind.Reference)
-            {
-                return false;
-            }
-
-            var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicTypeTestAtom(value, typeKey),
-                expression,
-                "ir.runtime-hazard.invalid-cast.type-test"));
-            return TryEncodeIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.InvalidCast,
-                value,
-                new SymbolicNotCondition(isTargetType),
-                expression,
-                "ir.runtime-hazard.invalid-cast.mismatch",
-                out trigger);
+            trigger = new RuntimeHazardTrigger(Conjoin(
+                CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
+                new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest)));
+            return true;
         }
 
         private static bool IsStableIrReferenceSubject(

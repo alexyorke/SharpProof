@@ -836,24 +836,34 @@ namespace PurelySharp.Symbolic
                     return false;
                 }
 
-                mismatchTrigger = SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                    castExpression.Expression,
-                    castExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var exactRuntimeType)
-                    ? new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
-                        exactRuntimeType,
-                        targetType,
-                        semanticModel.Compilation))
-                    : TryCreateRuntimeReferenceCastMismatchTrigger(
+                if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                        castExpression.Expression,
+                        castExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var exactRuntimeType) &&
+                    TryCreateRuntimeReferenceInvalidCastTrigger(
                         castExpression.Expression,
                         targetType,
                         semanticModel,
                         cancellationToken,
-                        out var runtimeMismatchTrigger)
-                        ? runtimeMismatchTrigger
-                        : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
+                        out var irInvalidCastTrigger))
+                {
+                    candidate = new RuntimeHazardCandidate(
+                        castExpression,
+                        SymbolicRuntimeHazardKind.InvalidCast,
+                        irInvalidCastTrigger,
+                        ExceptionTypes.InvalidCastException,
+                        ExceptionCategories.DefiniteInvalidCast);
+                    return true;
+                }
+
+                mismatchTrigger = exactRuntimeType != null
+                    ? new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
+                        exactRuntimeType,
+                        targetType,
+                        semanticModel.Compilation))
+                    : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
             }
 
             if (mismatchTrigger is SmtBooleanConstant { Value: false })
