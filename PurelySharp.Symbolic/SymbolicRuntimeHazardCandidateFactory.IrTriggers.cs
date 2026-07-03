@@ -426,7 +426,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
             {
-                trigger = new RuntimeHazardTrigger(formula);
+                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                    receiver,
+                    SymbolicExceptionPreconditionKind.NullDereference,
+                    subject: null,
+                    formula,
+                    "ir.runtime-hazard.null-dereference.formula-fallback");
                 return true;
             }
 
@@ -456,7 +461,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
             {
-                trigger = new RuntimeHazardTrigger(formula);
+                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                    expression,
+                    SymbolicExceptionPreconditionKind.UnboxNull,
+                    subject: null,
+                    formula,
+                    "ir.runtime-hazard.unbox-null.formula-fallback");
                 return true;
             }
 
@@ -486,7 +496,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
             {
-                trigger = new RuntimeHazardTrigger(formula);
+                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                    expression,
+                    SymbolicExceptionPreconditionKind.ArgumentNull,
+                    subject: null,
+                    formula,
+                    "ir.runtime-hazard.argument-null.formula-fallback");
                 return true;
             }
 
