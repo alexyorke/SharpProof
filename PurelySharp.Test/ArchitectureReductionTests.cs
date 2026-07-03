@@ -861,6 +861,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicInvariantService.cs"));
+            var stateProofIndex = source.IndexOf("ClassifyStateFeasibility(pathState", StringComparison.Ordinal);
+            var formulaProofIndex = source.IndexOf("ClassifyPathFeasibility(formulas", StringComparison.Ordinal);
+
+            Assert.That(stateProofIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(formulaProofIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(stateProofIndex, Is.LessThan(formulaProofIndex));
+            Assert.That(source, Does.Contain("stateProof?.Info.Status == SymbolicProofStatus.Unreachable"));
+        }
+
+        [Test]
         public void AnalyzerPurityState_CarriesSymbolicPathStateBesideLegacyFormulas()
         {
             var repositoryRoot = FindRepositoryRoot();

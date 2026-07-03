@@ -262,8 +262,33 @@ namespace PurelySharp.Symbolic
             SymbolicState pathState,
             SmtAnalysisService? smtAnalysis)
         {
+            var stateProof = smtAnalysis == null || !HasPathStateFacts(pathState)
+                ? null
+                : SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
+            if (stateProof?.Info.Status == SymbolicProofStatus.Unreachable)
+            {
+                return new SymbolicProgramPointAnalysis(
+                    spanStart,
+                    formulas,
+                    pathState,
+                    SymbolicReachability.Unreachable,
+                    stateProof.Info.Reason,
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
             if (formulas.Count == 0)
             {
+                if (stateProof != null)
+                {
+                    return new SymbolicProgramPointAnalysis(
+                        spanStart,
+                        formulas,
+                        pathState,
+                        MapReachability(stateProof.Info.Status),
+                        stateProof.Info.Reason,
+                        SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                }
+
                 return new SymbolicProgramPointAnalysis(
                     spanStart,
                     formulas,
@@ -289,6 +314,22 @@ namespace PurelySharp.Symbolic
                 reachability,
                 proof?.Reason ?? "reachability_not_checked",
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        private static bool HasPathStateFacts(SymbolicState pathState)
+        {
+            return pathState.Facts.Length != 0 || pathState.PathConditions.Length != 0;
+        }
+
+        private static SymbolicReachability MapReachability(SymbolicProofStatus status)
+        {
+            return status switch
+            {
+                SymbolicProofStatus.Reachable => SymbolicReachability.Reachable,
+                SymbolicProofStatus.Unreachable => SymbolicReachability.Unreachable,
+                SymbolicProofStatus.Unknown => SymbolicReachability.Unknown,
+                _ => SymbolicReachability.NotChecked,
+            };
         }
     }
 
