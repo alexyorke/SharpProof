@@ -611,7 +611,7 @@ namespace PurelySharp.Test
                 "SymbolicInvariantService.cs"));
 
             Assert.That(source, Does.Contain("SymbolicCondition condition"));
-            Assert.That(source, Does.Contain("ClassifyStateImplication("));
+            Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
             Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));
             Assert.That(source, Does.Not.Contain("SmtFormula condition,"));
         }
@@ -649,6 +649,9 @@ namespace PurelySharp.Test
                 "SymbolicSourceQueryService.cs"));
 
             Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
+            Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
+            Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
+            Assert.That(source, Does.Not.Contain("new SymbolicNotCondition(symbolicCondition)"));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
         }
 

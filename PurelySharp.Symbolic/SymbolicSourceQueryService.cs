@@ -1422,41 +1422,36 @@ namespace PurelySharp.Symbolic
             SmtAnalysisService smtAnalysis,
             out SymbolicConditionProofResult proofResult)
         {
-            var trueProof = SymbolicReachabilityService.ClassifyStateImplication(
+            var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
                 pathState,
                 symbolicCondition,
                 smtAnalysis);
-            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (truthProof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
                 proofResult = CreateConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenTrue,
-                    trueProof,
+                    truthProof,
                     conditionFormula);
                 return true;
             }
 
-            var falseProof = SymbolicReachabilityService.ClassifyStateImplication(
-                pathState,
-                new SymbolicNotCondition(symbolicCondition),
-                smtAnalysis);
-            if (falseProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (truthProof.Info.Status == SymbolicProofStatus.ProvenFalse)
             {
                 proofResult = CreateConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
-                    falseProof,
+                    truthProof,
                     conditionFormula);
                 return true;
             }
 
-            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-            if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
+            if (truthProof.Info.Status == SymbolicProofStatus.Unreachable)
             {
                 proofResult = CreateConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.Unreachable,
-                    reachabilityProof,
+                    truthProof,
                     conditionFormula);
                 return true;
             }

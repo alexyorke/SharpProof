@@ -130,34 +130,29 @@ namespace PurelySharp.Symbolic
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var trueProof = SymbolicReachabilityService.ClassifyStateImplication(
+            var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
                 analysis.PathState,
                 condition,
                 smtAnalysis);
-            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (truthProof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
                 return new SymbolicInvariantImplicationResult(
                     analysis.SpanStart,
                     conditionText,
                     SymbolicTruthValue.ProvenTrue,
-                    trueProof.Info.Reason,
+                    truthProof.Info.Reason,
                     analysis.Reachability,
                     analysis.ReachabilityReason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
             }
 
-            var negatedCondition = new SymbolicNotCondition(condition);
-            var falseProof = SymbolicReachabilityService.ClassifyStateImplication(
-                analysis.PathState,
-                negatedCondition,
-                smtAnalysis);
-            if (falseProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            if (truthProof.Info.Status == SymbolicProofStatus.ProvenFalse)
             {
                 return new SymbolicInvariantImplicationResult(
                     analysis.SpanStart,
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
-                    falseProof.Info.Reason,
+                    truthProof.Info.Reason,
                     analysis.Reachability,
                     analysis.ReachabilityReason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis));
@@ -211,7 +206,7 @@ namespace PurelySharp.Symbolic
                 analysis.SpanStart,
                 conditionText,
                 SymbolicTruthValue.Unknown,
-                falseProof.Info.Reason,
+                truthProof.Info.Reason,
                 analysis.Reachability,
                 analysis.ReachabilityReason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
