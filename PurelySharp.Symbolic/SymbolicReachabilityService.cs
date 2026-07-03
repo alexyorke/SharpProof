@@ -319,6 +319,16 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula>? pathConditions = null)
         {
             var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
+            if (EvaluateConditionTruthWithIr(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    basePathConditions) is { } irTruth)
+            {
+                return irTruth;
+            }
+
             if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
@@ -360,6 +370,59 @@ namespace PurelySharp.Symbolic
             }
 
             return null;
+        }
+
+        private static bool? EvaluateConditionTruthWithIr(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis,
+            IReadOnlyCollection<SmtFormula> pathConditions)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerCondition(expression, context, out var condition))
+            {
+                return null;
+            }
+
+            var state = CreateStateFromFormulaPath(pathConditions, expression);
+            var reachability = ClassifyStateFeasibility(state, smtAnalysis);
+            if (reachability.Info.Status == SymbolicProofStatus.Unreachable)
+            {
+                return false;
+            }
+
+            var trueProof = ClassifyStateImplication(state, condition, smtAnalysis);
+            if (trueProof.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                return true;
+            }
+
+            var falseProof = ClassifyStateImplication(state, new SymbolicNotCondition(condition), smtAnalysis);
+            return falseProof.Info.Status == SymbolicProofStatus.ProvenTrue
+                ? false
+                : null;
+        }
+
+        private static SymbolicState CreateStateFromFormulaPath(
+            IEnumerable<SmtFormula> pathConditions,
+            SyntaxNode sourceNode)
+        {
+            var state = new SymbolicState();
+            foreach (var pathCondition in pathConditions)
+            {
+                if (SymbolicSmtFormulaLowerer.TryLowerCondition(
+                        pathCondition,
+                        sourceNode,
+                        "legacy_path_condition",
+                        "legacy-path-condition",
+                        out var condition))
+                {
+                    state = state.AddPathCondition(condition);
+                }
+            }
+
+            return state;
         }
 
         internal static bool? EvaluateKnownConditionTruth(

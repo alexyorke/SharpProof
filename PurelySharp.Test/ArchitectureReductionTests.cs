@@ -802,6 +802,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_EvaluatesConditionTruthThroughIrBeforeLegacyTranslator()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var irIndex = source.IndexOf("EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
+            var legacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(expression", StringComparison.Ordinal);
+
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irIndex, Is.LessThan(legacyIndex));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
         {
             var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");
@@ -841,6 +857,37 @@ namespace PurelySharp.Test
             Assert.That(encoded, Is.True);
             Assert.That(pathConditions, Has.Length.EqualTo(1));
             Assert.That(pathConditions[0].ToString(), Does.Contain("x"));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_EvaluatesConditionTruthFromIrLoweredPathState()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement(
+                "class C { void M(int x) { if (x > 0) { var y = x > -1; } } }");
+            var expression = ifStatement.Statement
+                .DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>()
+                .Single()
+                .Initializer!
+                .Value;
+            var pathConditions = new List<SmtFormula>();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var added = SymbolicReachabilityService.TryAddBranchConditionFacts(
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                semanticModel,
+                CancellationToken.None,
+                pathConditions);
+            var truth = SymbolicReachabilityService.EvaluateKnownConditionTruth(
+                expression,
+                semanticModel,
+                CancellationToken.None,
+                smtAnalysis,
+                pathConditions);
+
+            Assert.That(added, Is.True);
+            Assert.That(truth, Is.True);
         }
 
         [Test]
