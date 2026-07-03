@@ -54,7 +54,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return useAfterDisposeResult;
             }
 
-            if (TryCheckByRefArgumentBorrowConflict(invocationOperation, currentState, out var byRefBorrowConflictResult))
+            if (TryCheckByRefArgumentBorrowConflict(invocationOperation, context, currentState, out var byRefBorrowConflictResult))
             {
                 return byRefBorrowConflictResult;
             }
@@ -1316,6 +1316,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryCheckByRefArgumentBorrowConflict(
             IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
@@ -1331,6 +1332,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         argument,
                         PurityAnalysisEngine.TryResolveTrackedSymbol(argument.Value, currentState),
                         currentState,
+                        context.SemanticModel,
+                        context.CancellationToken,
                         nameof(MethodInvocationPurityRule),
                         out var borrowConflictEvidence))
                 {

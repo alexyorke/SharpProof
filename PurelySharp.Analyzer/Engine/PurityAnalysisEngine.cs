@@ -5234,6 +5234,102 @@ namespace PurelySharp.Analyzer.Engine
             return true;
         }
 
+        internal static bool TryCreateMutableBorrowConflictEvidence(
+            IOperation operation,
+            ISymbol? targetSymbol,
+            PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string ruleName,
+            out PurityEvidence evidence)
+        {
+            if (TryCreateMutableBorrowConflictEvidence(
+                    operation,
+                    targetSymbol,
+                    currentState,
+                    ruleName,
+                    out evidence))
+            {
+                return true;
+            }
+
+            if (targetSymbol is ILocalSymbol targetLocal &&
+                HasActiveRefLocalBorrowAfterWrite(
+                    targetLocal,
+                    operation.Syntax,
+                    semanticModel,
+                    cancellationToken))
+            {
+                evidence = PurityEvidence.Create(
+                    "mutable_state_write",
+                    ruleName: ruleName,
+                    operation: operation,
+                    syntaxNode: operation.Syntax,
+                    symbol: targetLocal,
+                    catalogSource: "analyzer.borrow.mutable-conflict");
+                return true;
+            }
+
+            evidence = PurityEvidence.None;
+            return false;
+        }
+
+        private static bool HasActiveRefLocalBorrowAfterWrite(
+            ILocalSymbol targetLocal,
+            SyntaxNode writeSyntax,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var containingBlock = writeSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (declarator.SpanStart >= writeSyntax.SpanStart ||
+                    declarator.Initializer?.Value is not RefExpressionSyntax refExpression ||
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol refLocal ||
+                    semanticModel.GetSymbolInfo(refExpression.Expression, cancellationToken).Symbol is not ILocalSymbol sourceLocal ||
+                    !SymbolEqualityComparer.Default.Equals(sourceLocal, targetLocal))
+                {
+                    continue;
+                }
+
+                if (IsLocalUsedAfter(refLocal, writeSyntax, containingBlock, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsLocalUsedAfter(
+            ILocalSymbol localSymbol,
+            SyntaxNode writeSyntax,
+            BlockSyntax containingBlock,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var identifierName in containingBlock.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                if (identifierName.SpanStart <= writeSyntax.SpanStart)
+                {
+                    continue;
+                }
+
+                if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol usedLocal &&
+                    SymbolEqualityComparer.Default.Equals(usedLocal, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool HasSymbolicMutableBorrowerFactForTerm(
             SymbolicTerm ownerTerm,
             PurityAnalysisState currentState,

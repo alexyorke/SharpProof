@@ -112,6 +112,32 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task RefArgumentToMutablyBorrowedLocal_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(int value)
+    {
+        int local = value;
+        ref int alias = ref local;
+        Touch(ref local);
+        return alias;
+    }
+
+    [EnforcePure]
+    private static void Touch(ref int value)
+    {
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task RefLocalAliasToArrayParameterElementWrite_Diagnostic()
         {
             var test = @"
