@@ -538,6 +538,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicInvariantSnapshot_DoesNotStoreRawFormulaResults()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicInvariantService.cs"));
+            var start = source.IndexOf("internal sealed class SymbolicInvariantSnapshot", StringComparison.Ordinal);
+            var end = source.IndexOf("public sealed class SymbolicInvariantFactSummary", StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0));
+            Assert.That(end, Is.GreaterThan(start));
+            var snapshotSource = source[start..end];
+
+            Assert.That(snapshotSource, Does.Not.Contain("internal IReadOnlyList<SmtFormula> Formulas { get; }"));
+            Assert.That(snapshotSource, Does.Not.Contain("internal SmtFormula MergedInvariant { get; }"));
+            Assert.That(snapshotSource, Does.Contain("public IReadOnlyList<string> Facts { get; }"));
+            Assert.That(snapshotSource, Does.Contain("public string MergedInvariantText { get; }"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryResultConstruction_UsesSinglePathStateBridge()
         {
             var repositoryRoot = FindRepositoryRoot();

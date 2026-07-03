@@ -310,19 +310,13 @@ namespace PurelySharp.Symbolic
         internal SymbolicInvariantSnapshot(int spanStart, IReadOnlyList<SmtFormula> formulas)
         {
             SpanStart = spanStart;
-            Formulas = formulas;
             Facts = formulas.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
-            MergedInvariant = SymbolicInvariantService.ConjoinPathConditions(formulas);
             MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(formulas);
         }
 
         public int SpanStart { get; }
 
-        internal IReadOnlyList<SmtFormula> Formulas { get; }
-
         public IReadOnlyList<string> Facts { get; }
-
-        internal SmtFormula MergedInvariant { get; }
 
         public string MergedInvariantText { get; }
     }
