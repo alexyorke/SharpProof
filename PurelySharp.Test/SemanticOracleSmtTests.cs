@@ -2226,7 +2226,6 @@ public class TestClass
 
             Assert.That(analysis.PathConditions, Is.Not.Empty);
             Assert.That(analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
-            Assert.That(analysis.MergedInvariant, Is.InstanceOf<SmtBinaryFormula>());
             Assert.That(analysis.MergedInvariantText, Does.Contain("GreaterThan"));
             Assert.That(analysis.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
             Assert.That(analysis.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));

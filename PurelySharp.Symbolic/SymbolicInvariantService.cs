@@ -411,7 +411,6 @@ namespace PurelySharp.Symbolic
             PathConditions = pathConditions;
             PathState = pathState ?? new SymbolicState();
             Facts = pathConditions.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
-            MergedInvariant = SymbolicInvariantService.ConjoinPathConditions(pathConditions);
             MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(pathConditions);
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
@@ -425,8 +424,6 @@ namespace PurelySharp.Symbolic
         public SymbolicState PathState { get; }
 
         public IReadOnlyList<string> Facts { get; }
-
-        internal SmtFormula MergedInvariant { get; }
 
         public string MergedInvariantText { get; }
 
