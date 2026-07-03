@@ -269,6 +269,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"analyzer.resource.acquire\""));
             Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
             Assert.That(source, Does.Contain("IsUsingResourceDeclarator("));
+            Assert.That(source, Does.Contain("type.ToDisplayString() == \"System.IAsyncDisposable\""));
+            Assert.That(source, Does.Contain("interfaceType.ToDisplayString() == \"System.IAsyncDisposable\""));
         }
 
         [Test]

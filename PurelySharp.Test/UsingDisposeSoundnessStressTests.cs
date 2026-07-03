@@ -482,6 +482,133 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ExplicitDisposeAsyncSatisfiesOwnedLocalDisposal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public sealed class PureAsyncDisposable : IAsyncDisposable
+{
+    [EnforcePure]
+    public ValueTask DisposeAsync()
+    {
+        return default;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var resource = new PureAsyncDisposable();
+        resource.DisposeAsync();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MissingDisposeForOwnedAsyncLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public sealed class PureAsyncDisposable : IAsyncDisposable
+{
+    [EnforcePure]
+    public ValueTask DisposeAsync()
+    {
+        return default;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        var resource = new PureAsyncDisposable();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ExplicitDoubleDisposeAsyncSameLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public sealed class PureAsyncDisposable : IAsyncDisposable
+{
+    [EnforcePure]
+    public ValueTask DisposeAsync()
+    {
+        return default;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        var resource = new PureAsyncDisposable();
+        resource.DisposeAsync();
+        resource.DisposeAsync();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ExplicitUseAfterDisposeAsyncSameLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public sealed class PureAsyncDisposable : IAsyncDisposable
+{
+    [EnforcePure]
+    public ValueTask DisposeAsync()
+    {
+        return default;
+    }
+
+    [EnforcePure]
+    public int Use()
+    {
+        return 1;
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}()
+    {
+        var resource = new PureAsyncDisposable();
+        resource.DisposeAsync();
+        return resource.Use();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConditionalDisposeOnlyOneBranch_Diagnostic()
         {
             var test = @"
