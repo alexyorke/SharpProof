@@ -221,12 +221,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
                     if (fieldSymbol.IsReadOnly &&
-                        IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel))
+                        OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel))
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Readonly field '{fieldSymbol.Name}' on stable local wrapper carries an owned fresh mutable object. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
-                    if (IsOwnedFreshMutableObjectReference(instanceOperation, fieldReferenceOperation.Syntax, context))
+                    if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(instanceOperation, fieldReferenceOperation.Syntax, context))
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance field '{fieldSymbol.Name}' on fresh local object receiver. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -383,8 +383,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 _ => false
             };
         }
+    }
 
-        private static bool IsOwnedFreshMutableObjectReference(
+    internal static class OwnedFreshMutableObjectClassifier
+    {
+        internal static bool IsOwnedFreshMutableObjectReference(
             IOperation? operation,
             SyntaxNode observationSyntax,
             PurityAnalysisContext context)
@@ -410,7 +413,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                    IsOwnedFreshMutableStablePropertyReference(propertyReference, observationSyntax, context.SemanticModel);
         }
 
-        private static bool IsOwnedFreshMutableReadonlyFieldReference(
+        internal static bool IsOwnedFreshMutableReadonlyFieldReference(
             IFieldReferenceOperation fieldReferenceOperation,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel)
