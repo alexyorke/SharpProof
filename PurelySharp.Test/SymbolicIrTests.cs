@@ -1496,6 +1496,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayGetLongLengthInvocationUsesDimensionLengthTerm()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix, long columns",
+                "matrix.GetLongLength(1) == columns");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            var dimensionLength = (SymbolicArrayDimensionLengthTerm)term;
+            Assert.That(dimensionLength.Dimension, Is.EqualTo(1));
+            Assert.That(dimensionLength.Value, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)dimensionLength.Value).Name, Does.StartWith("matrix#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+        }
+
+        [Test]
         public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression()
         {
             var context = CreateExpressionContext(

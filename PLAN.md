@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 113,152 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,168 lines,
+- Production inventory currently reports 113,156 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 54,172 lines,
   `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -36,7 +36,7 @@ path-fact, hazard, and ownership flows.
   currently reports 0 analyzer-side and 20 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
-- IR known-API inventory now distinguishes 8 condition lowerings from 2
+- IR known-API inventory now distinguishes 8 condition lowerings from 3
   value-term lowering. Term lowerings are intentionally tracked separately
   because value-returning APIs such as `Nullable<T>.GetValueOrDefault` should
   lower to `SymbolicTerm` rather than boolean path conditions.
@@ -96,9 +96,9 @@ path-fact, hazard, and ownership flows.
   expression in `SymbolicIrLowerer.Indexing`, reducing reliance on
   formula-first translation for new multidimensional array facts while keeping
   the compatibility fallback for tuple/member and other harder shapes.
-- Constant-dimension `Array.GetLength(int)` calls now flow through the
-  declarative known-API term lowering registry and the indexing partial before
-  formula fallback.
+- Constant-dimension `Array.GetLength(int)` and `Array.GetLongLength(int)`
+  calls now flow through the declarative known-API term lowering registry and
+  the indexing partial before formula fallback.
 - Simple integer range proofs now use
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable

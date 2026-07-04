@@ -1008,6 +1008,11 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Indexing.cs"));
+            var knownApisSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.KnownApis.cs"));
 
             Assert.That(coreSource, Does.Contain("TryLowerElementAccessTerm(elementAccess"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerElementAccessTerm"));
@@ -1019,6 +1024,8 @@ namespace PurelySharp.Test
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
             Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
+            Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLength)"));
+            Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLongLength)"));
         }
 
         [Test]

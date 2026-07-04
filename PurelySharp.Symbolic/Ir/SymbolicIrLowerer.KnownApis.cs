@@ -28,6 +28,10 @@ namespace PurelySharp.Symbolic.Ir
                 new KnownApiTermLoweringDescriptor(
                     SpecialType.System_Array,
                     nameof(Array.GetLength),
+                    TryLowerArrayGetLengthInvocation),
+                new KnownApiTermLoweringDescriptor(
+                    SpecialType.System_Array,
+                    nameof(Array.GetLongLength),
                     TryLowerArrayGetLengthInvocation));
 
         private static bool TryLowerKnownApiInvocation(
