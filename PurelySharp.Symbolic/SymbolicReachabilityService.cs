@@ -1105,13 +1105,33 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax condition,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula? formula)
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
         {
-            return CSharpSmtFormulaTranslator.TryTranslate(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out formula);
+            SmtFormula? irFormula = null;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
+            {
+                irFormula = encodedFormula;
+            }
+
+            if (CSharpSmtFormulaTranslator.TryTranslate(
+                    condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                translatedFormula != null)
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = irFormula;
+            return formula != null;
         }
 
         internal static bool TryCreateArrayLengthCountAliasFact(
@@ -1603,6 +1623,39 @@ namespace PurelySharp.Symbolic
                     getSymbolVersion) &&
                 translatedFormula is { } &&
                 translatedFormula.Kind == kind)
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = irFormula!;
+            return formula != null;
+        }
+
+        internal static bool TryTranslateValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            SmtFormula? irFormula = null;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
+            {
+                irFormula = encodedFormula;
+            }
+
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                translatedFormula != null)
             {
                 formula = translatedFormula;
                 return true;

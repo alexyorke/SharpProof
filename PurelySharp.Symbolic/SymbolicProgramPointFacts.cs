@@ -9440,29 +9440,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            SmtFormula? irFormula = null;
-            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerTerm(valueExpression, loweringContext, out var term) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
-            {
-                irFormula = encodedFormula;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                translatedFormula != null)
-            {
-                formula = translatedFormula;
-                return true;
-            }
-
-            formula = irFormula!;
-            return formula != null;
+            return SymbolicReachabilityService.TryTranslateValue(
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                out formula);
         }
 
         private static bool TryCreateConditionFormula(
@@ -9471,29 +9453,19 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            SmtFormula? irFormula = null;
-            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerCondition(condition, loweringContext, out var symbolicCondition) &&
-                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
-            {
-                irFormula = encodedFormula;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslate(
+            if (SymbolicReachabilityService.TryTranslateConditionFormula(
                     condition,
                     semanticModel,
                     cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    out var translatedFormula) &&
                 translatedFormula != null)
             {
                 formula = translatedFormula;
                 return true;
             }
 
-            formula = irFormula!;
-            return formula != null;
+            formula = null!;
+            return false;
         }
 
         private static bool TryCollectBranchAssumptionFacts(

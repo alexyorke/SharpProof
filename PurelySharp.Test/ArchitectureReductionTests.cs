@@ -2034,21 +2034,23 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
 
-            var valueIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal);
-            var valueLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal);
-            var conditionIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal);
-            var conditionLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal);
+            var valueHelperIndex = source.IndexOf("private static bool TryCreateValueFormula(", StringComparison.Ordinal);
+            var conditionHelperIndex = source.IndexOf("private static bool TryCreateConditionFormula(", StringComparison.Ordinal);
+            var branchHelperIndex = source.IndexOf("private static bool TryCollectBranchAssumptionFacts(", StringComparison.Ordinal);
+            var valueHelperSource = source.Substring(valueHelperIndex, conditionHelperIndex - valueHelperIndex);
+            var conditionHelperSource = source.Substring(conditionHelperIndex, branchHelperIndex - conditionHelperIndex);
 
-            Assert.That(valueIrIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(valueLegacyIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(conditionIrIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(conditionLegacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(valueHelperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(conditionHelperIndex, Is.GreaterThan(valueHelperIndex));
+            Assert.That(branchHelperIndex, Is.GreaterThan(conditionHelperIndex));
+            Assert.That(valueHelperSource, Does.Contain("SymbolicReachabilityService.TryTranslateValue("));
+            Assert.That(valueHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
+            Assert.That(conditionHelperSource, Does.Contain("SymbolicReachabilityService.TryTranslateConditionFormula("));
+            Assert.That(conditionHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateStringValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
-            Assert.That(valueIrIndex, Is.LessThan(valueLegacyIndex));
-            Assert.That(conditionIrIndex, Is.LessThan(conditionLegacyIndex));
         }
 
         [Test]
