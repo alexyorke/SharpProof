@@ -1348,6 +1348,11 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
             var helperStart = reachabilitySource.IndexOf(
                 "internal static bool TryCreateBuiltInElementAccessInRangeCondition(",
                 StringComparison.Ordinal);
@@ -1367,9 +1372,11 @@ namespace PurelySharp.Test
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(fallbackIndex, Is.GreaterThan(irIndex));
             Assert.That(reachabilitySource, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessInRangeCondition("));
-            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
             Assert.That(reachabilitySource, Does.Contain("ir.element-access.multidimensional-bounds.in-range"));
-            Assert.That(reachabilitySource, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
+            Assert.That(lowererSource, Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
+            Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         }
 
         [Test]
@@ -1403,14 +1410,20 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.bounds.in-range"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
-            Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
-            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+            Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(lowererSource, Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
             Assert.That(coreSource, Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
             Assert.That(coreSource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(reachabilitySource, Does.Contain("private static bool TryTranslateArrayGetValueDimensionLength("));
@@ -1428,13 +1441,19 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(source, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-bounds.in-range"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-out-of-range"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
-            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
-            Assert.That(source, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+            Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
+            Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
             Assert.That(irTriggerSource, Does.Contain("GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol { Rank: > 1 }"));
             Assert.That(irTriggerSource, Does.Contain("return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger("));
         }

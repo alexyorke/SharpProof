@@ -1586,44 +1586,19 @@ namespace PurelySharp.Symbolic
             }
 
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            SmtFormula? combined = null;
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-            {
-                if (!SymbolicIrLowerer.TryLowerTerm(
-                        elementAccess.ArgumentList.Arguments[dimension].Expression,
-                        context,
-                        out var index) ||
-                    index.Kind != SmtValueKind.Int ||
-                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
-                        elementAccess.Expression,
-                        dimension,
-                        context,
-                        out var length) ||
-                    !SymbolicIrFormulaEncoder.TryEncode(
-                        SymbolicFact.Exact(
-                            new SymbolicBoundsAtom(
-                                index,
-                                length,
-                                IncludeLowerBound: true,
-                                IncludeUpperBound: true),
-                            elementAccess,
-                            "ir.element-access.multidimensional-bounds.in-range"),
-                        out var dimensionInRange))
-                {
-                    return false;
-                }
-
-                combined = combined == null
-                    ? dimensionInRange
-                    : new SmtBinaryFormula(SmtBinaryOperator.And, combined, dimensionInRange);
-            }
-
-            if (combined == null)
+            if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+                    elementAccess.Expression,
+                    elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
+                    elementAccess,
+                    "ir.element-access.multidimensional-bounds.in-range",
+                    context,
+                    out var condition,
+                    out _) ||
+                !SymbolicIrFormulaEncoder.TryEncode(condition, out formula))
             {
                 return false;
             }
 
-            formula = combined;
             return true;
         }
 

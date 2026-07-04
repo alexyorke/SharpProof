@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
@@ -62,6 +63,61 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
+            return true;
+        }
+
+        public static bool TryCreateArrayElementBoundsCondition(
+            ExpressionSyntax arrayExpression,
+            IReadOnlyList<ExpressionSyntax> indexExpressions,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition,
+            out SymbolicTerm? subject)
+        {
+            condition = null!;
+            subject = null;
+            var arrayType = context.SemanticModel.GetTypeInfo(arrayExpression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(arrayExpression, context.CancellationToken).Type;
+            if (arrayType is not IArrayTypeSymbol { Rank: > 0 } typedArray ||
+                indexExpressions.Count != typedArray.Rank)
+            {
+                return false;
+            }
+
+            SymbolicCondition? combined = null;
+            for (var dimension = 0; dimension < typedArray.Rank; dimension++)
+            {
+                if (!TryLowerTerm(indexExpressions[dimension], context, out var index) ||
+                    index.Kind != SmtValueKind.Int ||
+                    !TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length))
+                {
+                    return false;
+                }
+
+                subject ??= index;
+                var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(
+                        index,
+                        length,
+                        IncludeLowerBound: true,
+                        IncludeUpperBound: true),
+                    source,
+                    provenance));
+                combined = combined == null
+                    ? dimensionInRange
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        combined,
+                        dimensionInRange);
+            }
+
+            if (combined == null)
+            {
+                return false;
+            }
+
+            condition = combined;
             return true;
         }
     }

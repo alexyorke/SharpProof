@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -265,42 +267,14 @@ namespace PurelySharp.Symbolic
             }
 
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            SymbolicCondition? inRangeCondition = null;
-            SymbolicTerm? subject = null;
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-            {
-                if (!SymbolicIrLowerer.TryLowerTerm(
-                        elementAccess.ArgumentList.Arguments[dimension].Expression,
-                        context,
-                        out var index) ||
-                    index.Kind != SmtValueKind.Int ||
-                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
-                        elementAccess.Expression,
-                        dimension,
-                        context,
-                        out var length))
-                {
-                    return false;
-                }
-
-                subject ??= index;
-                var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicBoundsAtom(
-                        index,
-                        length,
-                        IncludeLowerBound: true,
-                        IncludeUpperBound: true),
+            if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+                    elementAccess.Expression,
+                    elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
                     elementAccess,
-                    "ir.runtime-hazard.index.multidimensional-bounds.in-range"));
-                inRangeCondition = inRangeCondition == null
-                    ? dimensionInRange
-                    : new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.And,
-                        inRangeCondition,
-                        dimensionInRange);
-            }
-
-            if (inRangeCondition == null)
+                    "ir.runtime-hazard.index.multidimensional-bounds.in-range",
+                    context,
+                    out var inRangeCondition,
+                    out var subject))
             {
                 return false;
             }
@@ -383,45 +357,29 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            SymbolicCondition? inRangeCondition = null;
-            SymbolicTerm? subject = null;
+            var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
                 if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
-                    GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Int32 ||
-                    !SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
-                    index.Kind != SmtValueKind.Int ||
-                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
-                        receiverExpression,
-                        dimension,
-                        context,
-                        out var length))
+                    GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Int32)
                 {
                     return false;
                 }
 
-                subject ??= index;
-                var provenance = arrayType.Rank == 1
-                    ? "ir.runtime-hazard.array-get-value.bounds.in-range"
-                    : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range";
-                var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicBoundsAtom(
-                        index,
-                        length,
-                        IncludeLowerBound: true,
-                        IncludeUpperBound: true),
-                    invocation,
-                    provenance));
-                inRangeCondition = inRangeCondition == null
-                    ? dimensionInRange
-                    : new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.And,
-                        inRangeCondition,
-                        dimensionInRange);
+                indexExpressions.Add(indexExpression);
             }
 
-            if (inRangeCondition == null)
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+                    receiverExpression,
+                    indexExpressions,
+                    invocation,
+                    arrayType.Rank == 1
+                        ? "ir.runtime-hazard.array-get-value.bounds.in-range"
+                        : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range",
+                    context,
+                    out var inRangeCondition,
+                    out var subject))
             {
                 return false;
             }
