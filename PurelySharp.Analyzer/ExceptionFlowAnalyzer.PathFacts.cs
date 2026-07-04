@@ -397,8 +397,133 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
+                AddCatchFilterPreTryPathConditions(
+                    catchClause,
+                    filterExpression,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions);
                 TryAddPathCondition(filterExpression, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
             }
+        }
+
+        private static void AddCatchFilterPreTryPathConditions(
+            CatchClauseSyntax catchClause,
+            ExpressionSyntax filterExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            if (catchClause.Parent is not TryStatementSyntax tryStatement ||
+                tryStatement.Parent is not BlockSyntax outerBlock)
+            {
+                return;
+            }
+
+            TryGetSimpleBooleanFilterAliasSymbol(
+                filterExpression,
+                semanticModel,
+                cancellationToken,
+                out var filterAliasSymbol);
+
+            var preTryFacts = new List<SmtFormula>();
+            foreach (var statement in outerBlock.Statements)
+            {
+                if (ReferenceEquals(statement, tryStatement))
+                {
+                    break;
+                }
+
+                if (AnyConditionSymbolMutatedInStatement(filterExpression, statement, semanticModel, cancellationToken))
+                {
+                    preTryFacts.Clear();
+                }
+
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, preTryFacts);
+                AddSimpleBooleanAliasConditionFacts(
+                    statement,
+                    filterAliasSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    preTryFacts);
+            }
+
+            foreach (var fact in preTryFacts)
+            {
+                pathConditions.Add(fact);
+            }
+        }
+
+        private static bool TryGetSimpleBooleanFilterAliasSymbol(
+            ExpressionSyntax filterExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ISymbol? symbol)
+        {
+            symbol = null;
+            if (GetExpressionType(filterExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Boolean ||
+                GetLocalOrParameterSymbol(filterExpression, semanticModel, cancellationToken) is not { } candidate ||
+                SymbolicFactFactory.GetTrackedSymbolType(candidate)?.SpecialType != SpecialType.System_Boolean)
+            {
+                return false;
+            }
+
+            symbol = candidate;
+            return true;
+        }
+
+        private static void AddSimpleBooleanAliasConditionFacts(
+            StatementSyntax statement,
+            ISymbol? filterAliasSymbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            if (filterAliasSymbol == null)
+            {
+                return;
+            }
+
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var declarator in localDeclaration.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
+                        !SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, filterAliasSymbol))
+                    {
+                        continue;
+                    }
+
+                    TryAddPathCondition(
+                        declarator.Initializer.Value,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions);
+                }
+
+                return;
+            }
+
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                GetLocalOrParameterSymbol(assignment.Left, semanticModel, cancellationToken) is not { } assignedSymbol ||
+                !SymbolEqualityComparer.Default.Equals(assignedSymbol, filterAliasSymbol) ||
+                ExpressionReferencesSymbol(assignment.Right, filterAliasSymbol, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            TryAddPathCondition(
+                assignment.Right,
+                branchWhenTrue: true,
+                semanticModel,
+                cancellationToken,
+                pathConditions);
         }
 
         private static void AddPrecedingGuardConditions(
