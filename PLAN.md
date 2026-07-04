@@ -39,6 +39,11 @@ path-fact, hazard, and ownership flows.
   The hotspot inventory now also groups those 7 reachability shims into 5
   seam families: 2 branch-fact shims, 2 pattern shims, 1 condition shim,
   1 value shim, and 1 path-fact-aware value shim.
+  Pattern translation now also tries lowering the incoming SMT value back to a
+  `SymbolicTerm` and routes supported non-binding pattern conditions through
+  `SymbolicIrLowerer.TryLowerPatternCondition` before the legacy translator
+  fallback. Declaration/binding-heavy pattern shapes still stay on the legacy
+  path for now.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped

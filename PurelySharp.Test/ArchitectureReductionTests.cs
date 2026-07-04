@@ -2404,6 +2404,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TranslatesPatternsThroughIrBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf("internal static bool TryTranslatePattern(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static void AddUnsatisfiablePathCondition(", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+            var irValueIndex = helperSource.IndexOf("SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue)", StringComparison.Ordinal);
+            var irPatternIndex = helperSource.IndexOf("SymbolicIrLowerer.TryLowerPatternCondition(", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslatePattern(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(irValueIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irPatternIndex, Is.GreaterThan(irValueIndex));
+            Assert.That(legacyIndex, Is.GreaterThan(irPatternIndex));
+            Assert.That(helperSource, Does.Contain("CanUseIrPatternTranslation(pattern)"));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula)"));
+            Assert.That(helperSource, Does.Contain("formula = encodedFormula;"));
+        }
+
+        [Test]
         public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
         {
             var repositoryRoot = FindRepositoryRoot();

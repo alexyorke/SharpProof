@@ -441,6 +441,23 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? valueType = null,
             int inlineDepth = 0)
         {
+            if (CanUseIrPatternTranslation(pattern))
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+                if (SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue) &&
+                    SymbolicIrLowerer.TryLowerPatternCondition(
+                        symbolicValue,
+                        pattern,
+                        pattern,
+                        context,
+                        out var symbolicCondition) &&
+                    SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
+                {
+                    formula = encodedFormula;
+                    return true;
+                }
+            }
+
             return CSharpSmtFormulaTranslator.TryTranslatePattern(
                 value,
                 pattern,
@@ -450,6 +467,36 @@ namespace PurelySharp.Symbolic
                 getSymbolVersion,
                 valueType,
                 inlineDepth);
+        }
+
+        private static bool CanUseIrPatternTranslation(PatternSyntax pattern)
+        {
+            pattern = UnwrapPattern(pattern);
+            return pattern switch
+            {
+                ConstantPatternSyntax => true,
+                RelationalPatternSyntax => true,
+                TypePatternSyntax => true,
+                RecursivePatternSyntax recursivePattern =>
+                    recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                    recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 },
+                UnaryPatternSyntax unaryPattern when unaryPattern.IsKind(SyntaxKind.NotPattern) =>
+                    CanUseIrPatternTranslation(unaryPattern.Pattern),
+                BinaryPatternSyntax binaryPattern =>
+                    CanUseIrPatternTranslation(binaryPattern.Left) &&
+                    CanUseIrPatternTranslation(binaryPattern.Right),
+                _ => false,
+            };
+        }
+
+        private static PatternSyntax UnwrapPattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern;
         }
 
         internal static void AddUnsatisfiablePathCondition(ICollection<SmtFormula> pathConditions)
