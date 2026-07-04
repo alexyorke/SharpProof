@@ -3803,6 +3803,10 @@ namespace PurelySharp.Test
             Assert.That(
                 stringHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
                 Is.LessThan(stringHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateStringValue(", StringComparison.Ordinal)));
+            Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
+            Assert.That(source, Does.Contain("TryCreateStringContentTerm("));
+            Assert.That(source, Does.Contain("new SymbolicLengthTerm(new SymbolicStringContentTerm(reference))"));
+            Assert.That(source, Does.Contain("new SymbolicStringContentTerm(reference)"));
         }
 
         [Test]

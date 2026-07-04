@@ -1883,10 +1883,11 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             fact = null!;
-            if (!SymbolicFactFactory.TryCreateBuiltInLengthFormula(
-                    GetVersionedSmtVariableName(targetSymbol, getTargetSymbolVersion),
-                    SymbolicFactFactory.GetTrackedSymbolType(targetSymbol),
-                    out var targetLengthFormula) ||
+            if (!TryCreateBuiltInLengthTerm(
+                    targetSymbol,
+                    getTargetSymbolVersion,
+                    out var targetLengthTerm) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(targetLengthTerm, out var targetLengthFormula) ||
                 !TryTranslateBuiltInLengthValue(
                     valueExpression,
                     semanticModel,
@@ -1911,10 +1912,11 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             fact = null!;
-            if (!SymbolicFactFactory.TryCreateStringContentFormula(
-                    GetVersionedSmtVariableName(targetSymbol, getTargetSymbolVersion),
-                    SymbolicFactFactory.GetTrackedSymbolType(targetSymbol),
-                    out var targetStringFormula) ||
+            if (!TryCreateStringContentTerm(
+                    targetSymbol,
+                    getTargetSymbolVersion,
+                    out var targetStringTerm) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(targetStringTerm, out var targetStringFormula) ||
                 !TryTranslateStringValue(
                     valueExpression,
                     semanticModel,
@@ -1927,6 +1929,75 @@ namespace PurelySharp.Symbolic
             }
 
             fact = SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula);
+            return true;
+        }
+
+        private static bool TryCreateBuiltInLengthTerm(
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicTerm term)
+        {
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
+            if (type == null ||
+                type.SpecialType != SpecialType.System_String &&
+                type is not IArrayTypeSymbol { Rank: 1 } &&
+                !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
+            {
+                term = null!;
+                return false;
+            }
+
+            var reference = new SymbolicVariableTerm(
+                GetVersionedSmtVariableName(symbol, getSymbolVersion),
+                SmtValueKind.Reference);
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
+            {
+                term = new SymbolicLengthTerm(reference);
+                return true;
+            }
+
+            term = null!;
+            return false;
+        }
+
+        private static bool TryCreateStringContentTerm(
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicTerm term)
+        {
+            if (SymbolicFactFactory.GetTrackedSymbolType(symbol)?.SpecialType != SpecialType.System_String ||
+                !TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var reference))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicStringContentTerm(reference);
+            return true;
+        }
+
+        private static bool TryCreateReferenceSymbolTerm(
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicTerm term)
+        {
+            if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
+                !SymbolicTypeFacts.IsReferenceType(type))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicVariableTerm(
+                GetVersionedSmtVariableName(symbol, getSymbolVersion),
+                SmtValueKind.Reference);
             return true;
         }
 
