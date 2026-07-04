@@ -53,6 +53,33 @@ namespace PurelySharp.Symbolic.Ir
                     provenance + ".upper-bound"));
         }
 
+        public static SymbolicCondition CreateReferenceNullCondition(
+            SymbolicTerm value,
+            bool equalToNull,
+            SyntaxNode node,
+            string provenance)
+        {
+            return CreateRelationCondition(
+                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                value,
+                new SymbolicNullTerm(),
+                node,
+                provenance);
+        }
+
+        public static SymbolicCondition CreateIntegerZeroCondition(
+            SymbolicTerm value,
+            SyntaxNode node,
+            string provenance)
+        {
+            return CreateRelationCondition(
+                SymbolicRelationOperator.Equal,
+                value,
+                new SymbolicIntegerConstantTerm(0),
+                node,
+                provenance);
+        }
+
         public static SymbolicCondition CreateSignedDivisionOverflowCondition(
             SymbolicTerm left,
             SymbolicTerm right,

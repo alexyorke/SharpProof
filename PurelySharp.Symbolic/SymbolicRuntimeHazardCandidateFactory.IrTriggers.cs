@@ -99,26 +99,14 @@ namespace PurelySharp.Symbolic
                 term.Kind == SmtValueKind.Int)
             {
                 subject = term;
-                condition = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicRelationAtom(
-                        SymbolicRelationOperator.Equal,
-                        term,
-                        new SymbolicIntegerConstantTerm(0)),
-                    expression,
-                    provenance));
+                condition = SymbolicIrLowerer.CreateIntegerZeroCondition(term, expression, provenance);
                 return true;
             }
 
             if (TryCreateDecimalZeroComparableTerm(expression, semanticModel, cancellationToken, out var decimalTerm))
             {
                 subject = decimalTerm;
-                condition = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicRelationAtom(
-                        SymbolicRelationOperator.Equal,
-                        decimalTerm,
-                        new SymbolicIntegerConstantTerm(0)),
-                    expression,
-                    provenance));
+                condition = SymbolicIrLowerer.CreateIntegerZeroCondition(decimalTerm, expression, provenance);
                 return true;
             }
 
@@ -936,13 +924,11 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            condition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    term,
-                    new SymbolicNullTerm()),
+            condition = SymbolicIrLowerer.CreateReferenceNullCondition(
+                term,
+                true,
                 expression,
-                provenance));
+                provenance);
             return true;
         }
     }

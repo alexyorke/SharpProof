@@ -1277,7 +1277,7 @@ namespace PurelySharp.Test
             Assert.That(fallbackIndex, Is.GreaterThan(helperIndex));
             Assert.That(translatedIndex, Is.GreaterThan(fallbackIndex));
             Assert.That(formulaFallbackIndex, Is.GreaterThan(translatedIndex));
-            Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.CreateIntegerZeroCondition("));
             Assert.That(source, Does.Contain("new SymbolicConstantCondition(true)"));
             Assert.That(source, Does.Contain("new SymbolicConstantCondition(false)"));
             Assert.That(source, Does.Contain("TryCreateDecimalZeroComparableTerm("));
@@ -1878,7 +1878,8 @@ namespace PurelySharp.Test
             Assert.That(helperSource, Does.Not.Contain("out SmtFormula trigger"));
             Assert.That(helperSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode("));
             Assert.That(helperSource, Does.Contain("new SymbolicConstantCondition(true)"));
-            Assert.That(helperSource, Does.Contain("new SymbolicRelationAtom("));
+            Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.CreateReferenceNullCondition("));
+            Assert.That(helperSource, Does.Not.Contain("new SymbolicRelationAtom("));
         }
 
         [Test]
