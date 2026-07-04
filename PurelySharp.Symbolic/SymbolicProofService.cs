@@ -309,6 +309,13 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Unreachable,
+                    "ir_state_contradictory");
+            }
+
             return ClassifyWithIrCache(
                 "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
                 () =>
