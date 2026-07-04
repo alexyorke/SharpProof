@@ -3815,6 +3815,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrNullableValuePartsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static bool TryTranslateNullableValueParts(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal readonly struct NullableValueParts",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(", StringComparison.Ordinal)));
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableValueTerm(expression", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm"));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrStringNonNullBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

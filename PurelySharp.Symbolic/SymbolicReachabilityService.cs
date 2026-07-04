@@ -2508,6 +2508,21 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula))
+            {
+                SmtFormula? valueFormula = null;
+                if (SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
+                    SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var encodedValue))
+                {
+                    valueFormula = encodedValue;
+                }
+
+                parts = new NullableValueParts(hasValueFormula, valueFormula);
+                return true;
+            }
+
             if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
                     expression,
                     semanticModel,
