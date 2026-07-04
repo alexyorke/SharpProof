@@ -516,10 +516,15 @@ namespace PurelySharp.Symbolic
                     SymbolicState.CreateProofFactKey(candidate),
                     factKey,
                     StringComparison.Ordinal)) ||
-                state.PathConditions.Any(candidate => string.Equals(
-                    SymbolicState.CreateProofConditionKey(candidate),
-                    factConditionKey,
-                    StringComparison.Ordinal));
+                state.PathConditions.Any(candidate =>
+                    string.Equals(
+                        SymbolicState.CreateProofConditionKey(candidate),
+                        factConditionKey,
+                        StringComparison.Ordinal) ||
+                    SymbolicState.EnumerateProofConditionFactKeys(candidate).Any(conditionFactKey => string.Equals(
+                        conditionFactKey,
+                        factKey,
+                        StringComparison.Ordinal)));
         }
 
         private static bool StateContradictsFact(SymbolicState state, SymbolicFact fact)

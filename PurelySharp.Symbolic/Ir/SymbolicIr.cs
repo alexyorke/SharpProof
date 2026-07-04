@@ -638,6 +638,11 @@ namespace PurelySharp.Symbolic.Ir
             return CreateConditionKey(condition);
         }
 
+        internal static IEnumerable<string> EnumerateProofConditionFactKeys(SymbolicCondition condition)
+        {
+            return EnumerateConditionFacts(condition).Select(CreateFactKey);
+        }
+
         private static string CreateFactKey(SymbolicFact fact)
         {
             var key = CreateFactCoreKey(fact);

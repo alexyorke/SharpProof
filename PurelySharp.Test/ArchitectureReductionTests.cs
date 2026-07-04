@@ -3077,6 +3077,47 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_CompositePathConditionFactsImplyWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x");
+            var yPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y");
+            var state = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    new SymbolicFactCondition(xPositive),
+                    new SymbolicFactCondition(yPositive)),
+            });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var implication = SymbolicReachabilityService.ClassifyStateImplication(state, xPositive, smtAnalysis);
+            var truth = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicFactCondition(xPositive),
+                smtAnalysis);
+
+            Assert.That(implication.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(implication.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(truth.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(truth.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_NegativeStateConditionProvesConditionFalseWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
