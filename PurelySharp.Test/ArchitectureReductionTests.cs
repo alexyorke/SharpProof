@@ -3834,6 +3834,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrNullableTargetValueParts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "private static bool TryCreateNullableHasValueFormula(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal static bool TryCreateReferenceBackedLengthFact(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(helperSource, Does.Contain("new SymbolicNullableHasValueTerm("));
+            Assert.That(helperSource, Does.Contain("new SymbolicNullableValueTerm("));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm("));
+            Assert.That(helperSource, Does.Not.Contain("SmtFormulaFactory.CreateBoolVariable("));
+            Assert.That(helperSource, Does.Not.Contain("SmtFormulaFactory.CreateVariable("));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrNullableValuePartsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
