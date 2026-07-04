@@ -2024,27 +2024,26 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(10));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(9));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 10,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 9,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                 }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));

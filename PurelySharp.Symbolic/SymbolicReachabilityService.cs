@@ -364,7 +364,7 @@ namespace PurelySharp.Symbolic
             var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
             if ((addTranslatedFormulaAlways ||
                  addTranslatedFormulaFallback && !addedIrBranchFact && !addedBranchFacts) &&
-                CSharpSmtFormulaTranslator.TryTranslate(
+                TryTranslateConditionFormula(
                     condition,
                     semanticModel,
                     cancellationToken,

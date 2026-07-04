@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 10 symbolic-side
+  currently reports 0 analyzer-side and 9 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
   Comparable-value reachability now routes through the shared typed value
