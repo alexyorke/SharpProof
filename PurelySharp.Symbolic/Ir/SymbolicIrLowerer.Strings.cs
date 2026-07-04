@@ -111,8 +111,26 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicCondition condition)
         {
             condition = null!;
-            if (!method.IsStatic ||
-                invocation.ArgumentList.Arguments.Count is not 2 and not 3 ||
+            if (!method.IsStatic)
+            {
+                if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                    invocation.ArgumentList.Arguments.Count != 1 ||
+                    method.Parameters.Length != 1 ||
+                    method.Parameters[0].Type.SpecialType != SpecialType.System_String)
+                {
+                    return false;
+                }
+
+                return TryCreateStringEqualityCondition(
+                    memberAccess.Expression,
+                    invocation.ArgumentList.Arguments[0].Expression,
+                    invocation,
+                    context,
+                    "ir.known-api.string.instance-equals",
+                    out condition);
+            }
+
+            if (invocation.ArgumentList.Arguments.Count is not 2 and not 3 ||
                 method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
                 method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
                 method.Parameters[1].Type.SpecialType != SpecialType.System_String)

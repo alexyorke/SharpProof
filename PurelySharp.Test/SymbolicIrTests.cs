@@ -494,6 +494,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void KnownApiLowering_InstanceStringEqualsUsesSharedEqualityFacts()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "left.Equals(right)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_InstanceStringEqualsObjectFallsBackToLegacyTranslator()
+        {
+            var context = CreateExpressionContext(
+                "string left, object right",
+                "left.Equals(right)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
+        }
+
+        [Test]
         public void KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath()
         {
             var context = CreateExpressionContext(
