@@ -7874,17 +7874,18 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             formula = null!;
-            if (!TryCreateSymbolSmtValue(arraySymbol, out var receiverFormula) ||
-                receiverFormula.Kind != SmtValueKind.Reference ||
+            if (!TryCreateSymbolTerm(arraySymbol, out var receiver) ||
+                receiver.Kind != SmtValueKind.Reference ||
                 !TryGetValueKind(elementType, out var elementKind))
             {
                 return false;
             }
 
-            formula = new SmtVariable(
-                SymbolicFactFactory.GetSmtVariableName(arraySymbol) + "[" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]",
+            var element = new SymbolicElementTerm(
+                receiver,
+                new SymbolicIntegerConstantTerm(index),
                 elementKind);
-            return true;
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(element, out formula);
         }
 
         private static void AddElementAssignmentFact(

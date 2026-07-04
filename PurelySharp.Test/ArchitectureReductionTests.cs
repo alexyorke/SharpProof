@@ -3687,6 +3687,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateStringValue("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateValueWithPathFacts("));
+            Assert.That(source, Does.Contain("new SymbolicElementTerm("));
+            Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(element"));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));

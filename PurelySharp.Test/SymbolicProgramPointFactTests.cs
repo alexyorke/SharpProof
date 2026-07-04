@@ -427,6 +427,26 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_FiniteArrayElementAssignmentUsesElementTerm()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 7, 11 };
+        var divisor = values[0];
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 7");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_DeconstructionDeclarationDiscardPreservesVisibleTupleSlotFact()
         {
             const string source = @"
