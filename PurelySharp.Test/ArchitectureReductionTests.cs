@@ -6875,6 +6875,55 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_ContainsNativeCompoundAssignmentStateBuilder()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateCompoundAssignmentStateTerm("));
+            Assert.That(source, Does.Contain("ir.path.prior-statement.compound-assignment"));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrCompoundAssignmentState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int divisor = 4; divisor += 1; return 10 / divisor; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicCompoundAssignmentState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var condition = analysis.PathState.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.prior-statement.compound-assignment",
+                    StringComparison.Ordinal));
+
+            Assert.That(condition, Is.Not.Null);
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!.Fact,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

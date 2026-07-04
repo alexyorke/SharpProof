@@ -143,6 +143,11 @@ path-fact, hazard, and ownership flows.
   native `SymbolicState` when the previous integer value term is recoverable,
   and the legacy formula path now reuses the shared reachability helper
   instead of a duplicate local increment/decrement builder.
+  Prior-assignment simple integer compound assignments such as `+=`, `-=`, and
+  `*=` now also project into native `SymbolicState` when the previous integer
+  value term and the right-hand side term are both recoverable without
+  self-reference, reducing reliance on the legacy formula shadow for that
+  bounded family.
   `for` initializer state collection now also projects declaration
   initializers and simple local or parameter assignments into
   `SymbolicState` before the legacy formula shadow is merged, so initial-entry
@@ -379,9 +384,12 @@ path-fact, hazard, and ownership flows.
   declarations and simple local or parameter assignments now also emit native
   IR equality, string-content, string-non-null, and built-in-length facts.
   Recoverable unary increment/decrement updates now also emit native integer
-  progression facts. The remaining work is to replace the other lowered
-  formula families, especially coalesce, compound, tuple, completion, and
-  self-referential assignment shapes, with native IR construction.
+  progression facts. Recoverable simple integer compound assignments now also
+  emit native progression facts for bounded non-self-referential `+=`, `-=`,
+  and `*=` shapes. The remaining work is to replace the other lowered formula
+  families, especially coalesce, tuple, completion, division or remainder
+  compound assignments, and self-referential assignment shapes, with native IR
+  construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.

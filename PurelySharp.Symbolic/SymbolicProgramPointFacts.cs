@@ -2152,6 +2152,70 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateCompoundAssignmentStateTerm(
+            SymbolicTerm previousValue,
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ISymbol targetSymbol,
+            out SymbolicTerm updatedValue)
+        {
+            updatedValue = null!;
+            if (previousValue.Kind != SmtValueKind.Int ||
+                !TryGetCompoundAssignmentStateOperator(assignment.Kind(), out var binaryOperator) ||
+                !SymbolicIrLowerer.TryLowerTerm(
+                    assignment.Right,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var rightTerm) ||
+                rightTerm.Kind != SmtValueKind.Int ||
+                ReferencesStateSymbol(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)) ||
+                ReferencesStateSymbol(rightTerm, SymbolicFactFactory.GetSmtVariableName(targetSymbol)))
+            {
+                return false;
+            }
+
+            if (previousValue is SymbolicIntegerConstantTerm leftConstant &&
+                rightTerm is SymbolicIntegerConstantTerm rightConstant)
+            {
+                switch (binaryOperator)
+                {
+                    case SymbolicBinaryTermOperator.Add:
+                        updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value + rightConstant.Value);
+                        return true;
+                    case SymbolicBinaryTermOperator.Subtract:
+                        updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value - rightConstant.Value);
+                        return true;
+                    case SymbolicBinaryTermOperator.Multiply:
+                        updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value * rightConstant.Value);
+                        return true;
+                }
+            }
+
+            updatedValue = new SymbolicBinaryTerm(binaryOperator, previousValue, rightTerm);
+            return true;
+        }
+
+        private static bool TryGetCompoundAssignmentStateOperator(
+            SyntaxKind kind,
+            out SymbolicBinaryTermOperator binaryOperator)
+        {
+            switch (kind)
+            {
+                case SyntaxKind.AddAssignmentExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Add;
+                    return true;
+                case SyntaxKind.SubtractAssignmentExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Subtract;
+                    return true;
+                case SyntaxKind.MultiplyAssignmentExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Multiply;
+                    return true;
+                default:
+                    binaryOperator = default;
+                    return false;
+            }
+        }
+
         private static void AddForeachBodyEntryStateFacts(
             ref SymbolicState state,
             ExpressionSyntax expressionSyntax,
@@ -3944,6 +4008,19 @@ namespace PurelySharp.Symbolic
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol != null)
+                {
+                    assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
+                }
+
+                SymbolicTerm? previousAssignedValueTerm = null;
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                    TryGetCurrentStateSymbolValueTerm(state, assignedSymbol.OriginalDefinition, out var previousStateValueTerm))
+                {
+                    previousAssignedValueTerm = previousStateValueTerm;
+                }
+
                 RemoveStateFactsInvalidatedByNestedMutations(
                     ref state,
                     assignment.Left,
@@ -3957,12 +4034,6 @@ namespace PurelySharp.Symbolic
 
                 if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                 {
-                    var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-                    if (assignedSymbol != null)
-                    {
-                        assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
-                    }
-
                     if (assignedSymbol is ILocalSymbol or IParameterSymbol)
                     {
                         AddAssignedValueStateFacts(
@@ -3973,6 +4044,29 @@ namespace PurelySharp.Symbolic
                             cancellationToken,
                             "ir.path.prior-statement");
                     }
+                }
+                else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                         previousAssignedValueTerm != null &&
+                         TryCreateCompoundAssignmentStateTerm(
+                             previousAssignedValueTerm,
+                             assignment,
+                             semanticModel,
+                             cancellationToken,
+                             assignedSymbol.OriginalDefinition,
+                             out var compoundAssignmentValueTerm) &&
+                         TryCreateSymbolTerm(assignedSymbol.OriginalDefinition, out var targetTerm) &&
+                         targetTerm.Kind == SmtValueKind.Int &&
+                         !ReferencesStateSymbol(
+                             compoundAssignmentValueTerm,
+                             SymbolicFactFactory.GetSmtVariableName(assignedSymbol.OriginalDefinition)))
+                {
+                    AddRelationPathFact(
+                        ref state,
+                        SymbolicRelationOperator.Equal,
+                        targetTerm,
+                        compoundAssignmentValueTerm,
+                        assignment,
+                        "ir.path.prior-statement.compound-assignment");
                 }
 
                 return;
