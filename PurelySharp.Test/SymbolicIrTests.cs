@@ -195,6 +195,58 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_IntegerConstantPatternUsesSharedRelation()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is 42");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
+            Assert.That(CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None, out var legacyFormula), Is.True);
+            Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        }
+
+        [Test]
+        public void LowerCondition_NegatedIntegerConstantPatternUsesSharedRelation()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is not 42");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_BooleanConstantPatternUsesSharedRelation()
+        {
+            var context = CreateExpressionContext(
+                "bool value",
+                "value is true");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.EqualTo(new SymbolicBooleanConstantTerm(true)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(

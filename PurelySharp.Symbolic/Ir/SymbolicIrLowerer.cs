@@ -95,6 +95,7 @@ namespace PurelySharp.Symbolic.Ir
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
                 (TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerTypePatternCondition(isPatternExpression, context, out condition)))
             {
                 return true;
@@ -161,6 +162,56 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            return false;
+        }
+
+        private static bool TryLowerConstantPatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerConstantPattern(expression.Pattern, out var constantExpression, out var negate) ||
+                !TryLowerTerm(expression.Expression, context, out var value) ||
+                !TryLowerTerm(constantExpression, context, out var constant) ||
+                !CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
+            {
+                return false;
+            }
+
+            condition = CreateRelationCondition(
+                negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
+                value,
+                constant,
+                expression,
+                "ir.pattern.constant");
+            return true;
+        }
+
+        private static bool TryLowerConstantPattern(
+            PatternSyntax pattern,
+            out ExpressionSyntax constantExpression,
+            out bool negate)
+        {
+            pattern = UnwrapPattern(pattern);
+            negate = false;
+
+            if (pattern is ConstantPatternSyntax constantPattern &&
+                !constantPattern.Expression.IsKind(SyntaxKind.NullLiteralExpression))
+            {
+                constantExpression = constantPattern.Expression;
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryLowerConstantPattern(unaryPattern.Pattern, out constantExpression, out var nestedNegate))
+            {
+                negate = !nestedNegate;
+                return true;
+            }
+
+            constantExpression = null!;
             return false;
         }
 
