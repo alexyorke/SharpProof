@@ -434,6 +434,17 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
+            if (TryCollectIrSimplePatternBranchAssumptions(
+                    expression,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion))
+            {
+                return true;
+            }
+
             return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
                 expression,
                 branchWhenTrue,
@@ -469,8 +480,99 @@ namespace PurelySharp.Symbolic
                 pattern,
                 semanticModel,
                 cancellationToken,
-            formulas,
-            getSymbolVersion);
+                formulas,
+                getSymbolVersion);
+        }
+
+        private static bool TryCollectIrSimplePatternBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            expression = UnwrapExpression(expression);
+            if (!branchWhenTrue ||
+                expression is not IsPatternExpressionSyntax isPatternExpression ||
+                !CanUseIrSimplePatternBindingFacts(isPatternExpression.Pattern) ||
+                !TryTranslateValue(
+                    isPatternExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var matchedValue,
+                    getSymbolVersion))
+            {
+                return false;
+            }
+
+            var originalCount = formulas.Count;
+            var matchedValueType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
+
+            TryCollectPatternBindingFacts(
+                matchedValue,
+                matchedValueType,
+                isPatternExpression.Pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+
+            TryCollectIrPatternMatchedValueAssumptions(
+                matchedValue,
+                isPatternExpression.Pattern,
+                isPatternExpression.Expression,
+                formulas);
+
+            if (TryTranslatePattern(
+                    matchedValue,
+                    isPatternExpression.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var patternFormula,
+                    getSymbolVersion,
+                    matchedValueType) &&
+                patternFormula != null)
+            {
+                formulas.Add(patternFormula);
+            }
+
+            return formulas.Count > originalCount;
+        }
+
+        private static void TryCollectIrPatternMatchedValueAssumptions(
+            SmtFormula matchedValue,
+            PatternSyntax pattern,
+            ExpressionSyntax matchedExpression,
+            ICollection<SmtFormula> formulas)
+        {
+            if (!PatternMatchImpliesReferenceNonNull(pattern) ||
+                !SymbolicProofService.TryEncodeDerivedFormulaFacts(
+                    matchedValue,
+                    (SymbolicTerm matchedTerm, ICollection<SymbolicFact> facts) =>
+                    {
+                        if (matchedTerm.Kind != SmtValueKind.Reference)
+                        {
+                            return false;
+                        }
+
+                        facts.Add(SymbolicFact.Exact(
+                            new SymbolicRelationAtom(SymbolicRelationOperator.NotEqual, matchedTerm, new SymbolicNullTerm()),
+                            matchedExpression,
+                            "ir.pattern-branch.matched-non-null",
+                            evidenceKey: "ir.pattern-branch.matched-non-null"));
+                        return true;
+                    },
+                    out var encodedFacts))
+            {
+                return;
+            }
+
+            foreach (var encodedFact in encodedFacts)
+            {
+                formulas.Add(encodedFact);
+            }
         }
 
         private static bool TryCollectIrPatternBindingFacts(
@@ -574,6 +676,49 @@ namespace PurelySharp.Symbolic
                 default:
                     return false;
             }
+        }
+
+        private static bool CanUseIrSimplePatternBindingFacts(PatternSyntax pattern)
+        {
+            pattern = UnwrapPattern(pattern);
+            return pattern switch
+            {
+                VarPatternSyntax => true,
+                DeclarationPatternSyntax => true,
+                RecursivePatternSyntax recursivePattern =>
+                    recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                    recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 },
+                BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword) =>
+                    CanUseIrSimplePatternBindingFacts(binaryPattern.Left) &&
+                    CanUseIrSimplePatternBindingFacts(binaryPattern.Right),
+                _ => false,
+            };
+        }
+
+        private static bool PatternMatchImpliesReferenceNonNull(PatternSyntax pattern)
+        {
+            pattern = UnwrapPattern(pattern);
+            if (pattern is DeclarationPatternSyntax or TypePatternSyntax or RecursivePatternSyntax)
+            {
+                return true;
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern)
+            {
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+                {
+                    return PatternMatchImpliesReferenceNonNull(binaryPattern.Left) ||
+                        PatternMatchImpliesReferenceNonNull(binaryPattern.Right);
+                }
+
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
+                {
+                    return PatternMatchImpliesReferenceNonNull(binaryPattern.Left) &&
+                        PatternMatchImpliesReferenceNonNull(binaryPattern.Right);
+                }
+            }
+
+            return false;
         }
 
         private static bool TryAddIrDesignationBindingFacts(

@@ -50,6 +50,11 @@ path-fact, hazard, and ownership flows.
   equality, string-content equality, and reference non-null facts through IR;
   recursive property, positional, list, and nullable-specialized bindings
   still fall back to the legacy binder.
+  Positive simple `is pattern` branch assumptions now also try an IR-first
+  path before the legacy branch collector. For the same simple pattern subset,
+  reachability now emits binding facts, matched-expression non-null facts when
+  the pattern implies them, and the translated pattern formula before falling
+  back to legacy branch assumption collection.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped

@@ -5776,6 +5776,102 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TriesIrSimplePatternBranchAssumptionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf("internal static bool TryCollectBranchAssumptions(", StringComparison.Ordinal);
+            var nestedHelperIndex = source.IndexOf("private static bool TryCollectIrSimplePatternBranchAssumptions(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static bool TryCollectPatternBindingFacts(", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+            var nestedHelperEndIndex = source.IndexOf("private static void TryCollectIrPatternMatchedValueAssumptions(", StringComparison.Ordinal);
+            var nestedHelperSource = source.Substring(nestedHelperIndex, nestedHelperEndIndex - nestedHelperIndex);
+            var irIndex = helperSource.IndexOf("TryCollectIrSimplePatternBranchAssumptions(", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("LegacyFormulaCompatibility.TryCollectBranchAssumptions(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nestedHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(nestedHelperEndIndex, Is.GreaterThan(nestedHelperIndex));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThan(irIndex));
+            Assert.That(nestedHelperSource, Does.Contain("TryCollectPatternBindingFacts("));
+            Assert.That(nestedHelperSource, Does.Contain("TryCollectIrPatternMatchedValueAssumptions("));
+            Assert.That(nestedHelperSource, Does.Contain("TryTranslatePattern("));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_CollectsIrSimplePatternBranchAssumptions()
+        {
+            static bool IsVariableEquality(SmtFormula formula, string leftName, string rightName)
+            {
+                return formula is SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.Equal,
+                    Left: SmtVariable { Name: var left, Kind: SmtValueKind.Reference },
+                    Right: SmtVariable { Name: var right, Kind: SmtValueKind.Reference },
+                } &&
+                ((left == leftName && right == rightName) || (left == rightName && right == leftName));
+            }
+
+            static bool IsReferenceNonNullComparison(SmtFormula formula, string variableName)
+            {
+                return formula is SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.NotEqual,
+                    Left: SmtVariable { Name: var name, Kind: SmtValueKind.Reference },
+                    Right: SmtNullConstant,
+                } && name == variableName;
+            }
+
+            var tree = CSharpSyntaxTree.ParseText("""
+                class C
+                {
+                    bool M(object x)
+                    {
+                        return x is string s;
+                    }
+                }
+                """);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityPatternBranchAssumptions",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var isPatternExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<IsPatternExpressionSyntax>()
+                .Single();
+            var localDesignation = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<SingleVariableDesignationSyntax>()
+                .Single();
+            var parameter = semanticModel.GetDeclaredSymbol(
+                tree.GetRoot().DescendantNodes().OfType<ParameterSyntax>().Single(),
+                CancellationToken.None)!;
+            var local = semanticModel.GetDeclaredSymbol(localDesignation, CancellationToken.None)!;
+            var parameterName = SymbolicFactFactory.GetSmtVariableName(parameter);
+            var localName = SymbolicFactFactory.GetSmtVariableName(local);
+            var formulas = new List<SmtFormula>();
+
+            Assert.That(
+                SymbolicReachabilityService.TryCollectBranchAssumptions(
+                    isPatternExpression,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    CancellationToken.None,
+                    formulas),
+                Is.True);
+            Assert.That(formulas.Any(formula => IsVariableEquality(formula, localName, parameterName)), Is.True);
+            Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, localName)), Is.True);
+            Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, parameterName)), Is.True);
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_DelegatesBranchAssumptionsToSharedReachabilityService()
         {
             var repositoryRoot = FindRepositoryRoot();
