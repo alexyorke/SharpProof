@@ -294,6 +294,64 @@ function Get-SymbolicTranslatorShimUsage
     return @($usages)
 }
 
+function Get-SymbolicTranslatorShimFamilies
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Usages
+    )
+
+    function Get-FamilyName
+    {
+        param([Parameter(Mandatory = $true)][string]$Text)
+
+        if ($Text.IndexOf('TryCollectDomainFacts(', [System.StringComparison]::Ordinal) -ge 0 -or
+            $Text.IndexOf('TryCollectBranchAssumptions(', [System.StringComparison]::Ordinal) -ge 0)
+        {
+            return 'branch-facts'
+        }
+
+        if ($Text.IndexOf('TryCollectPatternBindingFacts(', [System.StringComparison]::Ordinal) -ge 0 -or
+            $Text.IndexOf('TryTranslatePattern(', [System.StringComparison]::Ordinal) -ge 0)
+        {
+            return 'pattern'
+        }
+
+        if ($Text.IndexOf('TryTranslateValueWithPathFacts(', [System.StringComparison]::Ordinal) -ge 0)
+        {
+            return 'path-fact-value'
+        }
+
+        if ($Text.IndexOf('TryTranslateValue(', [System.StringComparison]::Ordinal) -ge 0)
+        {
+            return 'value'
+        }
+
+        if ($Text.IndexOf('TryTranslate(', [System.StringComparison]::Ordinal) -ge 0)
+        {
+            return 'condition'
+        }
+
+        return 'other'
+    }
+
+    return @(
+        $Usages |
+            Group-Object -Property { Get-FamilyName $_.Text } |
+            Sort-Object Name |
+            ForEach-Object {
+                [pscustomobject]@{
+                    family = $_.Name
+                    count = $_.Count
+                    paths = @(
+                        $_.Group |
+                            ForEach-Object { $_.path } |
+                            Sort-Object -Unique
+                    )
+                }
+            })
+}
+
 function Get-IrKnownApiLoweringLocations
 {
     $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic\Ir') -Recurse -Filter '*.cs' |
@@ -377,6 +435,7 @@ try
     $compatibilitySurfaces = @(Get-SymbolicCompatibilitySurfaces)
     $symbolicDirectTranslatorUsages = @(Get-SymbolicDirectTranslatorUsage)
     $symbolicTranslatorShimUsages = @(Get-SymbolicTranslatorShimUsage)
+    $symbolicTranslatorShimFamilies = @(Get-SymbolicTranslatorShimFamilies -Usages $symbolicTranslatorShimUsages)
     $irKnownApiLoweringLocations = @(Get-IrKnownApiLoweringLocations)
     $irKnownApiConditionLoweringLocations = @($irKnownApiLoweringLocations | Where-Object { $_.kind -eq 'condition' })
     $irKnownApiTermLoweringLocations = @($irKnownApiLoweringLocations | Where-Object { $_.kind -eq 'term' })
@@ -398,6 +457,8 @@ try
         symbolicDirectTranslatorUsages = @($symbolicDirectTranslatorUsages)
         symbolicTranslatorShimUsageCount = $symbolicTranslatorShimUsages.Count
         symbolicTranslatorShimUsages = @($symbolicTranslatorShimUsages)
+        symbolicTranslatorShimFamilyCount = $symbolicTranslatorShimFamilies.Count
+        symbolicTranslatorShimFamilies = @($symbolicTranslatorShimFamilies)
         irKnownApiLoweringCount = $irKnownApiLoweringLocations.Count
         irKnownApiConditionLoweringCount = $irKnownApiConditionLoweringLocations.Count
         irKnownApiTermLoweringCount = $irKnownApiTermLoweringLocations.Count
@@ -418,6 +479,7 @@ try
     "Symbolic formula-shaped compatibility surfaces: $($report.symbolicCompatibilitySurfaceCount) lines"
     "Symbolic direct CSharpConditionToFormula usages: $($report.symbolicDirectTranslatorUsageCount) lines"
     "Symbolic CSharpSmtFormulaTranslator shim usages: $($report.symbolicTranslatorShimUsageCount) lines"
+    "Symbolic CSharpSmtFormulaTranslator shim families: $($report.symbolicTranslatorShimFamilyCount)"
     "IR known API lowering descriptors: $($report.irKnownApiLoweringCount) entries ($($report.irKnownApiConditionLoweringCount) condition, $($report.irKnownApiTermLoweringCount) term)"
     "Runtime-hazard formula fallback provenances: $($report.runtimeHazardFormulaFallbackCount) lines"
     ''
@@ -427,6 +489,7 @@ try
     $compatibilitySurfaces | Format-Table -AutoSize | Out-String
     $symbolicDirectTranslatorUsages | Format-Table -AutoSize | Out-String
     $symbolicTranslatorShimUsages | Format-Table -AutoSize | Out-String
+    $symbolicTranslatorShimFamilies | Format-Table -AutoSize | Out-String
     $irKnownApiLoweringLocations | Format-Table -AutoSize | Out-String
     $runtimeHazardFormulaFallbackLocations | Format-Table -AutoSize | Out-String
 }

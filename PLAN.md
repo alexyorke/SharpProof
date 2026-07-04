@@ -36,6 +36,9 @@ path-fact, hazard, and ownership flows.
   currently reports 0 analyzer-side and 7 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
+  The hotspot inventory now also groups those 7 reachability shims into 5
+  seam families: 2 branch-fact shims, 2 pattern shims, 1 condition shim,
+  1 value shim, and 1 path-fact-aware value shim.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped

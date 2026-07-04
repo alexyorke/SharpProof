@@ -2032,8 +2032,15 @@ namespace PurelySharp.Test
             var symbolicTranslatorShimCountsByText = symbolicTranslatorShimUsages
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+            var symbolicTranslatorShimFamilyCounts = root.GetProperty("symbolicTranslatorShimFamilies")
+                .EnumerateArray()
+                .ToDictionary(
+                    static family => family.GetProperty("family").GetString() ?? string.Empty,
+                    static family => family.GetProperty("count").GetInt32(),
+                    StringComparer.Ordinal);
 
             Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(7));
+            Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(5));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
@@ -2051,6 +2058,16 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
+                }));
+            Assert.That(
+                symbolicTranslatorShimFamilyCounts,
+                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
+                {
+                    ["branch-facts"] = 2,
+                    ["condition"] = 1,
+                    ["path-fact-value"] = 1,
+                    ["pattern"] = 2,
+                    ["value"] = 1,
                 }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
