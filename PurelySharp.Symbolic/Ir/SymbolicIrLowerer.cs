@@ -97,6 +97,7 @@ namespace PurelySharp.Symbolic.Ir
                 (TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerTypePatternCondition(isPatternExpression, context, out condition)))
             {
                 return true;
@@ -288,6 +289,51 @@ namespace PurelySharp.Symbolic.Ir
                 SyntaxKind.GreaterThanEqualsToken or
                 SyntaxKind.LessThanToken or
                 SyntaxKind.LessThanEqualsToken;
+        }
+
+        private static bool TryLowerEmptyRecursivePatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerEmptyRecursivePattern(expression.Pattern, out var negate) ||
+                !TryLowerTerm(expression.Expression, context, out var value) ||
+                value.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            condition = CreateRelationCondition(
+                negate ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                value,
+                new SymbolicNullTerm(),
+                expression,
+                "ir.pattern.recursive.empty");
+            return true;
+        }
+
+        private static bool TryLowerEmptyRecursivePattern(PatternSyntax pattern, out bool negate)
+        {
+            pattern = UnwrapPattern(pattern);
+            negate = false;
+
+            if (pattern is RecursivePatternSyntax recursivePattern &&
+                recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 })
+            {
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryLowerEmptyRecursivePattern(unaryPattern.Pattern, out var nestedNegate))
+            {
+                negate = !nestedNegate;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryLowerTypePatternCondition(
