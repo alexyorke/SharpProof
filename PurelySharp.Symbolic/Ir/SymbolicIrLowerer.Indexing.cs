@@ -219,7 +219,7 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
-        private static bool TryLowerBuiltInLengthTerm(
+        public static bool TryLowerBuiltInLengthTerm(
             ExpressionSyntax expression,
             SymbolicLoweringContext context,
             out SymbolicTerm term)

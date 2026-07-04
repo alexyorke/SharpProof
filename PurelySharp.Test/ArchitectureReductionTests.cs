@@ -1387,6 +1387,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ElementAccessLengthTerms_AreLoweredBySharedIrLowerer()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
+
+            Assert.That(lowererSource, Does.Contain("public static bool TryLowerBuiltInLengthTerm("));
+            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(new SymbolicStringContentTerm(reference))"));
+            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);"));
+            Assert.That(irTriggerSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)"));
+            Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
+        }
+
+        [Test]
         public void RuntimeHazardSlicing_PreservesIrExceptionPreconditionWhenFormulaLowers()
         {
             var repositoryRoot = FindRepositoryRoot();

@@ -1556,37 +1556,7 @@ namespace PurelySharp.Symbolic
             SymbolicLoweringContext context,
             out SymbolicTerm length)
         {
-            length = null!;
-            if (!SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver))
-            {
-                return false;
-            }
-
-            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (receiverType?.SpecialType == SpecialType.System_String)
-            {
-                length = receiver.Kind == SmtValueKind.String
-                    ? new SymbolicLengthTerm(receiver)
-                    : receiver.Kind == SmtValueKind.Reference
-                        ? new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver))
-                        : null!;
-                return length != null;
-            }
-
-            if (receiverType is IArrayTypeSymbol { Rank: 1 } ||
-                SymbolicTypeFacts.IsBuiltInSpanType(receiverType))
-            {
-                if (receiver.Kind != SmtValueKind.Reference)
-                {
-                    return false;
-                }
-
-                length = new SymbolicLengthTerm(receiver);
-                return true;
-            }
-
-            return false;
+            return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);
         }
 
         private static bool TryCreateIrMultidimensionalArrayElementAccessInRangeCondition(

@@ -298,37 +298,18 @@ namespace PurelySharp.Symbolic
             SymbolicLoweringContext context,
             out SymbolicTerm length)
         {
-            length = null!;
-            var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver))
+            if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length))
             {
-                return false;
-            }
-
-            if (receiverType?.SpecialType == SpecialType.System_String)
-            {
-                length = receiver.Kind == SmtValueKind.String
-                    ? new SymbolicLengthTerm(receiver)
-                    : receiver.Kind == SmtValueKind.Reference
-                        ? new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver))
-                        : null!;
-                return length != null;
-            }
-
-            if (receiverType is IArrayTypeSymbol { Rank: 1 } ||
-                IsBuiltInSpanType(receiverType))
-            {
-                if (receiver.Kind != SmtValueKind.Reference)
-                {
-                    return false;
-                }
-
-                length = new SymbolicLengthTerm(receiver);
                 return true;
             }
 
             if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
             {
+                if (!SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver))
+                {
+                    return false;
+                }
+
                 if (receiver.Kind != SmtValueKind.Reference)
                 {
                     return false;
