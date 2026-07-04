@@ -2186,6 +2186,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_StateFactImpliesItselfWithoutSmt()
+        {
+            var target = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("resource", SmtValueKind.Reference)),
+                SyntaxFactory.ParseExpression("resource"),
+                "test.unsupported");
+            var state = new SymbolicState(new[] { target });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, target, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_ClassifiesIrStateWithoutPublicFormulaInput()
         {
             var state = new SymbolicState(
@@ -2322,6 +2339,27 @@ namespace PurelySharp.Test
             Assert.That(notFalseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(notFalseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(executedAfterTrue, Is.EqualTo(0));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_StateConditionImpliesItselfWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.condition"));
+            var state = new SymbolicState(pathConditions: new SymbolicCondition[] { condition });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, condition, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 

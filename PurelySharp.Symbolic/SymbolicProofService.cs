@@ -89,6 +89,13 @@ namespace PurelySharp.Symbolic
                     "ir_state_contradictory");
             }
 
+            if (StateContainsFact(state, fact))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_state_contains_fact");
+            }
+
             return ClassifyWithIrCache(
                 "implication-fact:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(fact),
                 () =>
@@ -134,6 +141,13 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.ProvenTrue,
                     "ir_condition_syntactic_truth");
+            }
+
+            if (StateContainsCondition(state, condition))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_state_contains_condition");
             }
 
             return ClassifyWithIrCache(
@@ -419,6 +433,29 @@ namespace PurelySharp.Symbolic
                     status = SymbolicProofStatus.Unknown;
                     return false;
             }
+        }
+
+        private static bool StateContainsFact(SymbolicState state, SymbolicFact fact)
+        {
+            var factKey = SymbolicState.CreateProofFactKey(fact);
+            var factConditionKey = "fact-condition:" + factKey;
+            return state.Facts.Any(candidate => string.Equals(
+                    SymbolicState.CreateProofFactKey(candidate),
+                    factKey,
+                    StringComparison.Ordinal)) ||
+                state.PathConditions.Any(candidate => string.Equals(
+                    SymbolicState.CreateProofConditionKey(candidate),
+                    factConditionKey,
+                    StringComparison.Ordinal));
+        }
+
+        private static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
+        {
+            var conditionKey = SymbolicState.CreateProofConditionKey(condition);
+            return state.PathConditions.Any(candidate => string.Equals(
+                SymbolicState.CreateProofConditionKey(candidate),
+                conditionKey,
+                StringComparison.Ordinal));
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()
