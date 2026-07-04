@@ -1462,6 +1462,29 @@ namespace PurelySharp.Symbolic
             return new RuntimeHazardTrigger(triggerFormula, precondition);
         }
 
+        private static RuntimeHazardTrigger CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            SyntaxNode site,
+            SymbolicExceptionPreconditionKind kind,
+            SymbolicTerm? subject,
+            SmtFormula triggerFormula,
+            string translatedProvenance,
+            string fallbackProvenance)
+        {
+            return TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    site,
+                    kind,
+                    triggerFormula,
+                    translatedProvenance,
+                    out var trigger)
+                ? trigger
+                : CreateFormulaBackedExceptionPreconditionTrigger(
+                    site,
+                    kind,
+                    subject,
+                    triggerFormula,
+                    fallbackProvenance);
+        }
+
         private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
             BinaryExpressionSyntax binaryExpression,
             SmtIntegerBinaryOperator smtOperator,
@@ -1513,21 +1536,12 @@ namespace PurelySharp.Symbolic
                     return false;
                 }
 
-                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                         binaryExpression,
                         SymbolicExceptionPreconditionKind.CheckedOverflow,
+                        subject: null,
                         signedDivisionOverflow,
                         "ir.runtime-hazard.checked-integral.signed-division-overflow.translated",
-                        out trigger))
-                {
-                    return true;
-                }
-
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                    binaryExpression,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    signedDivisionOverflow,
                     "ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback");
                 return true;
             }
@@ -1546,21 +1560,12 @@ namespace PurelySharp.Symbolic
             }
 
             var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     binaryExpression,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
                     outOfRangeFormula,
                     "ir.runtime-hazard.checked-integral.binary-overflow.translated",
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                binaryExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                subject: null,
-                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
             return true;
         }
@@ -1604,21 +1609,12 @@ namespace PurelySharp.Symbolic
             }
 
             var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     unaryExpression,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
                     outOfRangeFormula,
                     "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated",
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                unaryExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                subject: null,
-                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
             return true;
         }
@@ -1665,21 +1661,12 @@ namespace PurelySharp.Symbolic
             var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
                 ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
                 : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
-            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     site,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
                     outOfRangeFormula,
                     translatedProvenance,
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                site,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                subject: null,
-                outOfRangeFormula,
                 smtOperator == SmtIntegerBinaryOperator.Add
                     ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
                     : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
@@ -1723,21 +1710,12 @@ namespace PurelySharp.Symbolic
                     return false;
                 }
 
-                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                         assignment,
                         SymbolicExceptionPreconditionKind.CheckedOverflow,
+                        subject: null,
                         signedDivisionOverflow,
                         "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated",
-                        out trigger))
-                {
-                    return true;
-                }
-
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                    assignment,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    signedDivisionOverflow,
                     "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback");
                 return true;
             }
@@ -1756,21 +1734,12 @@ namespace PurelySharp.Symbolic
             }
 
             var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     assignment,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
                     outOfRangeFormula,
                     "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated",
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                assignment,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                subject: null,
-                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
             return true;
         }
@@ -1809,21 +1778,12 @@ namespace PurelySharp.Symbolic
             }
 
             var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     castExpression,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
                     outOfRangeFormula,
                     "ir.runtime-hazard.checked-conversion.overflow.translated",
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
-                castExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                subject: null,
-                outOfRangeFormula,
                 "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
             return true;
         }

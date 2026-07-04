@@ -359,21 +359,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
             {
-                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
-                        lengthExpression,
-                        kind,
-                        formula,
-                        provenance + ".translated",
-                        out trigger))
-                {
-                    return true;
-                }
-
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     lengthExpression,
                     kind,
                     subject: null,
                     formula,
+                    provenance + ".translated",
                     provenance + ".formula-fallback");
                 return true;
             }
