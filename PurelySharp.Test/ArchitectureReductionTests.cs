@@ -3833,13 +3833,16 @@ namespace PurelySharp.Test
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
             Assert.That(
-                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression", StringComparison.Ordinal),
+                helperSource.IndexOf("TryTranslateIrNullableValueParts(expression", StringComparison.Ordinal),
                 Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression"));
             Assert.That(
-                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableValueTerm(expression", StringComparison.Ordinal),
-                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(", StringComparison.Ordinal)));
+                helperSource,
+                Does.Contain("SymbolicIrLowerer.TryLowerNullableValueTerm(expression"));
+            Assert.That(helperSource, Does.Contain("TryTranslateIrNullableCoalesceValueParts("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm"));
+            Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm)"));
         }
 
         [Test]

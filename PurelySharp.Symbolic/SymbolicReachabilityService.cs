@@ -2648,18 +2648,9 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula))
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (TryTranslateIrNullableValueParts(expression, context, out parts))
             {
-                SmtFormula? valueFormula = null;
-                if (SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
-                    SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var encodedValue))
-                {
-                    valueFormula = encodedValue;
-                }
-
-                parts = new NullableValueParts(hasValueFormula, valueFormula);
                 return true;
             }
 
@@ -2677,6 +2668,76 @@ namespace PurelySharp.Symbolic
 
             parts = default;
             return false;
+        }
+
+        private static bool TryTranslateIrNullableValueParts(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            expression = StripParentheses(expression);
+            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula))
+            {
+                SmtFormula? valueFormula = null;
+                if (SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
+                    SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var encodedValue))
+                {
+                    valueFormula = encodedValue;
+                }
+
+                parts = new NullableValueParts(hasValueFormula, valueFormula);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateIrNullableCoalesceValueParts(coalesceExpression, context, out parts))
+            {
+                return true;
+            }
+
+            parts = default;
+            return false;
+        }
+
+        private static bool TryTranslateIrNullableCoalesceValueParts(
+            BinaryExpressionSyntax coalesceExpression,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            parts = default;
+            if (!SymbolicIrLowerer.TryLowerNullableHasValueTerm(coalesceExpression.Left, context, out var leftHasValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableHasValueTerm(coalesceExpression.Right, context, out var rightHasValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableValueTerm(coalesceExpression.Left, context, out var leftValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableValueTerm(coalesceExpression.Right, context, out var rightValueTerm) ||
+                leftValueTerm.Kind != rightValueTerm.Kind)
+            {
+                return false;
+            }
+
+            var leftHasValue = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(leftHasValueTerm),
+                coalesceExpression.Left,
+                "ir.nullable.coalesce.left-has-value"));
+            var rightHasValue = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(rightHasValueTerm),
+                coalesceExpression.Right,
+                "ir.nullable.coalesce.right-has-value"));
+            var hasValueCondition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                leftHasValue,
+                rightHasValue);
+            var valueTerm = new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm);
+
+            if (!SymbolicIrFormulaEncoder.TryEncode(hasValueCondition, out var hasValueFormula) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
+            {
+                return false;
+            }
+
+            parts = new NullableValueParts(hasValueFormula, valueFormula);
+            return true;
         }
 
         internal readonly struct NullableValueParts
