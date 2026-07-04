@@ -2082,6 +2082,37 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrAssignedValueHelpersBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var lengthHelperIndex = source.IndexOf(
+                "private static bool TryTranslateBuiltInLengthValue(",
+                StringComparison.Ordinal);
+            var stringHelperIndex = source.IndexOf(
+                "private static bool TryTranslateStringValue(",
+                StringComparison.Ordinal);
+            var stringNonNullIndex = source.IndexOf(
+                "internal static bool TryCreateStringNonNullAssignedValueFact(",
+                StringComparison.Ordinal);
+            var lengthHelperSource = source.Substring(lengthHelperIndex, stringHelperIndex - lengthHelperIndex);
+            var stringHelperSource = source.Substring(stringHelperIndex, stringNonNullIndex - stringHelperIndex);
+
+            Assert.That(lengthHelperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(stringHelperIndex, Is.GreaterThan(lengthHelperIndex));
+            Assert.That(stringNonNullIndex, Is.GreaterThan(stringHelperIndex));
+            Assert.That(
+                lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
+                Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
+            Assert.That(
+                stringHelperSource.IndexOf("SymbolicIrLowerer.TryLowerStringTerm(valueExpression", StringComparison.Ordinal),
+                Is.LessThan(stringHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateStringValue(", StringComparison.Ordinal)));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
         {
             var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");
