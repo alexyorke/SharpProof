@@ -1083,6 +1083,33 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsTypeAndValueKindHelpersInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var typeSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Types.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryGetSymbolType(symbol"));
+            Assert.That(coreSource, Does.Contain("TryGetValueKind(symbolType"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetSymbolType"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetValueKind"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsIntegerSmtType"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsSupportedTupleCarrierType"));
+            Assert.That(typeSource, Does.Contain("private static bool TryGetSymbolType"));
+            Assert.That(typeSource, Does.Contain("private static bool TryGetValueKind"));
+            Assert.That(typeSource, Does.Contain("private static bool IsIntegerSmtType"));
+            Assert.That(typeSource, Does.Contain("private static bool IsSupportedTupleCarrierType"));
+        }
+
+        [Test]
         public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
