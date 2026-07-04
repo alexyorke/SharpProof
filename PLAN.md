@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 109,549 C# production lines across
-  168 files. The largest modules are `PurelySharp.Symbolic` at 50,804 lines,
+- Production inventory currently reports 109,567 C# production lines across
+  168 files. The largest modules are `PurelySharp.Symbolic` at 50,822 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
