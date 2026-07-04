@@ -1187,6 +1187,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsConditionFactoriesInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var conditionSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Conditions.cs"));
+
+            Assert.That(coreSource, Does.Contain("CreateFactCondition("));
+            Assert.That(coreSource, Does.Contain("CreateRelationCondition("));
+            Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateFactCondition"));
+            Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateRelationCondition"));
+            Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateReferenceIsNullCondition"));
+            Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateFactCondition"));
+            Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateRelationCondition"));
+            Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateReferenceIsNullCondition"));
+            Assert.That(conditionSource, Does.Contain("SymbolicFact.Exact(atom, node, provenance)"));
+        }
+
+        [Test]
         public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
