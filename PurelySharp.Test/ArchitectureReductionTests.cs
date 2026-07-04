@@ -5772,6 +5772,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_DelegatesFormulaPathLoweringToProofService()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var helperIndex = source.IndexOf("private static void AddFormulaPathCondition(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static IEnumerable<SmtFormula> CollectForInitializerFacts(", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(helperSource, Does.Contain("SymbolicProofService.AddLoweredFormulaPathCondition("));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_TriesIrHelpersBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();

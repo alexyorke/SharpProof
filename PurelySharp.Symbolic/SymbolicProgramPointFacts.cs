@@ -1655,15 +1655,12 @@ namespace PurelySharp.Symbolic
             SyntaxNode source,
             string provenance)
         {
-            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    formula,
-                    source,
-                    provenance,
-                    evidenceKey: provenance,
-                    out var condition))
-            {
-                state = state.AddPathCondition(condition);
-            }
+            state = SymbolicProofService.AddLoweredFormulaPathCondition(
+                state,
+                formula,
+                source,
+                provenance,
+                provenance);
         }
 
         internal static IEnumerable<SmtFormula> CollectForInitializerFacts(

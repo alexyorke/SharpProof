@@ -101,6 +101,9 @@ path-fact, hazard, and ownership flows.
   `SymbolicProofService.CreateStateFromFormulaPath` and
   `TryCreateStateFromFormulaPath`, so reachability no longer owns its own
   lowered-path helper copies.
+  `SymbolicProgramPointFacts` formula-path condition addition now also
+  delegates through `SymbolicProofService.AddLoweredFormulaPathCondition`
+  instead of lowering raw SMT conditions at that call site.
   IR-first formula proof orchestration now also lives behind
   `SymbolicProofService` helpers for condition truth, formula-path
   feasibility, and branch-condition truth, with reachability remaining only as
