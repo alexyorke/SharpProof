@@ -938,9 +938,14 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Tuples.cs"));
+            var memberSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Members.cs"));
 
             Assert.That(coreSource, Does.Contain("TryLowerTupleEqualityCondition(binaryExpression"));
-            Assert.That(coreSource, Does.Contain("TryLowerTupleElementMemberTerm(memberAccess"));
+            Assert.That(memberSource, Does.Contain("TryLowerTupleElementMemberTerm(memberAccess"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleEqualityCondition"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementMemberTerm"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementTerms"));
@@ -964,9 +969,14 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Nullable.cs"));
+            var memberSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Members.cs"));
 
-            Assert.That(coreSource, Does.Contain("TryLowerNullableHasValueTerm(memberAccess.Expression"));
-            Assert.That(coreSource, Does.Contain("TryLowerNullableValueTerm(memberAccess.Expression"));
+            Assert.That(memberSource, Does.Contain("TryLowerNullableHasValueTerm(memberAccess.Expression"));
+            Assert.That(memberSource, Does.Contain("TryLowerNullableValueTerm(memberAccess.Expression"));
             Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableHasValueTerm"));
             Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableValueTerm"));
             Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableHasValueTerm"));
@@ -1022,6 +1032,32 @@ namespace PurelySharp.Test
             Assert.That(conversionSource, Does.Contain("private static bool TryLowerIdentityPreservingAsTerm"));
             Assert.That(conversionSource, Does.Contain("private static bool IsIdentityPreservingReferenceConversion"));
             Assert.That(conversionSource, Does.Contain("private static bool TryLowerSupportedConversionTerm"));
+        }
+
+        [Test]
+        public void SymbolicIrLowerer_KeepsMemberLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var memberSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Members.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerMemberTerm(memberAccess"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerMemberTerm"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetInstanceMemberValueKind"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsBuiltInSpanOrMemoryType"));
+            Assert.That(memberSource, Does.Contain("private static bool TryLowerMemberTerm"));
+            Assert.That(memberSource, Does.Contain("private static bool TryGetInstanceMemberValueKind"));
+            Assert.That(memberSource, Does.Contain("private static bool IsBuiltInSpanOrMemoryType"));
+            Assert.That(memberSource, Does.Contain("new SymbolicLengthTerm"));
+            Assert.That(memberSource, Does.Contain("new SymbolicCountTerm"));
         }
 
         [Test]
