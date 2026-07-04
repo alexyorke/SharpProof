@@ -1670,6 +1670,25 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!ContainsDivisionOrModulo(leftExpression) &&
+                !ContainsDivisionOrModulo(rightExpression) &&
+                SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) &&
+                SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) &&
+                left.Kind == SmtValueKind.Int &&
+                right.Kind == SmtValueKind.Int &&
+                SymbolicIrFormulaEncoder.TryEncode(
+                    SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
+                        left,
+                        right,
+                        minValue,
+                        leftExpression,
+                        "ir.integer.signed-division-overflow"),
+                    out formula))
+            {
+                return true;
+            }
+
             if (!TryTranslateIntegerValue(
                     leftExpression,
                     semanticModel,

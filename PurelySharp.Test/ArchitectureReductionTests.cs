@@ -1595,9 +1595,14 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("\"ir.integer.unary.in-range\""));
             Assert.That(reachabilitySource, Does.Contain("binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract"));
             Assert.That(reachabilitySource, Does.Contain("\"ir.integer.update.in-range\""));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.CreateSignedDivisionOverflowCondition("));
+            Assert.That(reachabilitySource, Does.Contain("\"ir.integer.signed-division-overflow\""));
             Assert.That(lowererSource, Does.Contain("public static SymbolicCondition CreateIntegerInRangeCondition("));
+            Assert.That(lowererSource, Does.Contain("public static SymbolicCondition CreateSignedDivisionOverflowCondition("));
             Assert.That(lowererSource, Does.Contain("provenance + \".lower-bound\""));
             Assert.That(lowererSource, Does.Contain("provenance + \".upper-bound\""));
+            Assert.That(lowererSource, Does.Contain("provenance + \".left-min\""));
+            Assert.That(lowererSource, Does.Contain("provenance + \".right-minus-one\""));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"));

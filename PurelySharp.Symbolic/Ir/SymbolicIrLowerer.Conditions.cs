@@ -52,5 +52,28 @@ namespace PurelySharp.Symbolic.Ir
                     node,
                     provenance + ".upper-bound"));
         }
+
+        public static SymbolicCondition CreateSignedDivisionOverflowCondition(
+            SymbolicTerm left,
+            SymbolicTerm right,
+            long minValue,
+            SyntaxNode node,
+            string provenance)
+        {
+            return new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                CreateRelationCondition(
+                    SymbolicRelationOperator.Equal,
+                    left,
+                    new SymbolicIntegerConstantTerm(minValue),
+                    node,
+                    provenance + ".left-min"),
+                CreateRelationCondition(
+                    SymbolicRelationOperator.Equal,
+                    right,
+                    new SymbolicIntegerConstantTerm(-1),
+                    node,
+                    provenance + ".right-minus-one"));
+        }
     }
 }
