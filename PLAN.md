@@ -30,11 +30,11 @@ path-fact, hazard, and ownership flows.
   path-fact pipeline.
 - Direct `CSharpConditionToFormula` usage outside approved shims is gone.
   Symbolic-layer `CSharpSmtFormulaTranslator` wrapper usage is now gone.
-  `PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs` routes the
+  `PurelySharp.Symbolic/SymbolicReachabilityService.cs` now routes the
   remaining legacy condition, value, branch-fact, and pattern fallback entry
-  points through the narrower
+  points directly through the narrower
   `PurelySharp.Symbolic/Smt/CSharpConditionToFormula.LegacyFormulaCompatibility.cs`
-  boundary instead of depending on the broad translator wrapper. Public
+  boundary. Public
   source-query condition proof still delegates formula fallback through
   reachability, but the legacy bridge is now smaller and easier to delete
   incrementally. The hotspot inventory now reports 0 analyzer-side and 0
