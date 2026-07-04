@@ -5822,7 +5822,7 @@ namespace PurelySharp.Symbolic
 
             var matchedType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
-            CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+            SymbolicReachabilityService.TryCollectPatternBindingFacts(
                 matchedValue,
                 matchedType,
                 matchedPattern,

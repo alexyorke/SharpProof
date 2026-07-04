@@ -446,7 +446,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var conditions = new List<SmtFormula> { patternFormula };
             var bindingFacts = new List<SmtFormula>();
-            CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+            SymbolicReachabilityService.TryCollectPatternBindingFacts(
                 governingValue,
                 governingType,
                 pattern,
@@ -632,7 +632,7 @@ namespace PurelySharp.Symbolic.Smt
             formula = null;
 
             if (CanUseTranslatedPatternForSelection(pattern, valueType, semanticModel, cancellationToken) &&
-                CSharpSmtFormulaTranslator.TryTranslatePattern(
+                SymbolicReachabilityService.TryTranslatePattern(
                     value,
                     pattern,
                     semanticModel,
@@ -1175,7 +1175,7 @@ namespace PurelySharp.Symbolic.Smt
             var conditions = initialConditions == null
                 ? new List<SmtFormula>()
                 : new List<SmtFormula>(initialConditions);
-            if (CSharpSmtFormulaTranslator.TryTranslatePattern(
+            if (SymbolicReachabilityService.TryTranslatePattern(
                     governingValue,
                     pattern,
                     semanticModel,
@@ -1211,7 +1211,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (includePatternBindings)
             {
-                CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+                SymbolicReachabilityService.TryCollectPatternBindingFacts(
                     governingValue,
                     governingType,
                     pattern,
@@ -1224,7 +1224,7 @@ namespace PurelySharp.Symbolic.Smt
             if (whenClause != null)
             {
                 var bindingFacts = new List<SmtFormula>();
-                CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+                SymbolicReachabilityService.TryCollectPatternBindingFacts(
                     governingValue,
                     governingType,
                     pattern,
@@ -1281,7 +1281,7 @@ namespace PurelySharp.Symbolic.Smt
             bool includeWholePatternTranslation = true)
         {
             if (includeWholePatternTranslation &&
-                CSharpSmtFormulaTranslator.TryTranslatePattern(
+                SymbolicReachabilityService.TryTranslatePattern(
                     value,
                     pattern,
                     semanticModel,

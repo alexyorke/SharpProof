@@ -1506,7 +1506,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SwitchPathConditionBuilder_UsesTranslatorShimForLegacyPatternFallbacks()
+        public void SwitchPathConditionBuilder_DelegatesLegacyPatternFallbacksThroughReachability()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -1520,8 +1520,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslatePattern("));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslatePattern("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslatePattern("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCollectPatternBindingFacts("));
         }
 
         [Test]

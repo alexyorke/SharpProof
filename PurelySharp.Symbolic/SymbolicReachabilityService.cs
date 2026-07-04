@@ -412,6 +412,46 @@ namespace PurelySharp.Symbolic
                 getSymbolVersion);
         }
 
+        internal static bool TryCollectPatternBindingFacts(
+            SmtFormula matchedValue,
+            ITypeSymbol? matchedValueType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+                matchedValue,
+                matchedValueType,
+                pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        internal static bool TryTranslatePattern(
+            SmtFormula value,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            ITypeSymbol? valueType = null,
+            int inlineDepth = 0)
+        {
+            return CSharpSmtFormulaTranslator.TryTranslatePattern(
+                value,
+                pattern,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                valueType,
+                inlineDepth);
+        }
+
         internal static void AddUnsatisfiablePathCondition(ICollection<SmtFormula> pathConditions)
         {
             pathConditions.Add(new SmtBooleanConstant(false));
