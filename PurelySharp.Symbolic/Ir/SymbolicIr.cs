@@ -541,9 +541,16 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicNotCondition notCondition:
                     return "not(" + CreateConditionKey(notCondition.Operand) + ")";
                 case SymbolicBinaryCondition binaryCondition:
+                    var left = CreateConditionKey(binaryCondition.Left);
+                    var right = CreateConditionKey(binaryCondition.Right);
+                    if (string.CompareOrdinal(right, left) < 0)
+                    {
+                        (left, right) = (right, left);
+                    }
+
                     return "binary:" + binaryCondition.Operator + "(" +
-                        CreateConditionKey(binaryCondition.Left) + "," +
-                        CreateConditionKey(binaryCondition.Right) + ")";
+                        left + "," +
+                        right + ")";
                 default:
                     return condition.ToString() ?? string.Empty;
             }

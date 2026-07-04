@@ -1935,6 +1935,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesCommutativeBinaryConditions()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var yPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y"));
+
+            var left = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, xPositive, yPositive),
+            });
+            var right = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, yPositive, xPositive),
+            });
+
+            Assert.That(left.PathConditions, Has.Length.EqualTo(1));
+            Assert.That(right.PathConditions, Has.Length.EqualTo(1));
+            Assert.That(left.NormalizedProofKey, Is.EqualTo(right.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicProofService_ContradictoryStateShortCircuitsWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
