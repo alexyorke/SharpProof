@@ -1939,6 +1939,7 @@ namespace PurelySharp.Test
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
             var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var z = new SymbolicVariableTerm("z", SmtValueKind.Int);
             var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.GreaterThan,
@@ -1953,14 +1954,27 @@ namespace PurelySharp.Test
                     new SymbolicIntegerConstantTerm(0)),
                 SyntaxFactory.ParseExpression("y > 0"),
                 "test.y"));
+            var zPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    z,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("z > 0"),
+                "test.z"));
 
             var left = new SymbolicState(pathConditions: new SymbolicCondition[]
             {
-                new SymbolicBinaryCondition(SymbolicConditionOperator.And, xPositive, yPositive),
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    xPositive,
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.And, yPositive, zPositive)),
             });
             var right = new SymbolicState(pathConditions: new SymbolicCondition[]
             {
-                new SymbolicBinaryCondition(SymbolicConditionOperator.And, yPositive, xPositive),
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.And, zPositive, xPositive),
+                    yPositive),
             });
 
             Assert.That(left.PathConditions, Has.Length.EqualTo(1));
