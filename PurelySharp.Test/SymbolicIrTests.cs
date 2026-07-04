@@ -1477,6 +1477,41 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayGetLengthInvocationUsesDimensionLengthTerm()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix, int columns",
+                "matrix.GetLength(1) == columns");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            var dimensionLength = (SymbolicArrayDimensionLengthTerm)term;
+            Assert.That(dimensionLength.Dimension, Is.EqualTo(1));
+            Assert.That(dimensionLength.Value, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)dimensionLength.Value).Name, Does.StartWith("matrix#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+        }
+
+        [Test]
+        public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression()
+        {
+            var context = CreateExpressionContext(
+                "int rows, int columns",
+                "new int[rows, columns].GetLength(1) == columns");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
+            var variable = (SymbolicVariableTerm)term;
+            Assert.That(variable.Name, Does.StartWith("columns#"));
+            Assert.That(variable.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
         public void SmtFormulaLowerer_ArrayDimensionLengthUsesSharedDimensionLengthAtom()
         {
             var sourceNode = SyntaxFactory.ParseExpression("matrix");

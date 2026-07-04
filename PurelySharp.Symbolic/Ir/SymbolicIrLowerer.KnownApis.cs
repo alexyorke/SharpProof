@@ -19,6 +19,17 @@ namespace PurelySharp.Symbolic.Ir
                 new KnownApiLoweringDescriptor("string", nameof(string.Equals), TryLowerStringEqualsInvocation),
                 new KnownApiLoweringDescriptor("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch), TryLowerRegexIsMatchInvocation));
 
+        private static readonly ImmutableArray<KnownApiTermLoweringDescriptor> KnownApiTermLowerings =
+            ImmutableArray.Create(
+                new KnownApiTermLoweringDescriptor(
+                    SpecialType.System_Nullable_T,
+                    nameof(Nullable<int>.GetValueOrDefault),
+                    TryLowerNullableGetValueOrDefaultInvocation),
+                new KnownApiTermLoweringDescriptor(
+                    SpecialType.System_Array,
+                    nameof(Array.GetLength),
+                    TryLowerArrayGetLengthInvocation));
+
         private static bool TryLowerKnownApiInvocation(
             InvocationExpressionSyntax invocation,
             SymbolicLoweringContext context,

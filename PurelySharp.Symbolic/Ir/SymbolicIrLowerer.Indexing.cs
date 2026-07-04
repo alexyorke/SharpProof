@@ -43,6 +43,37 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
+        private static bool TryLowerArrayGetLengthInvocation(
+            InvocationExpressionSyntax invocation,
+            IMethodSymbol method,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                invocation.ArgumentList.Arguments.Count != 1 ||
+                method.ContainingType?.SpecialType != SpecialType.System_Array ||
+                method.Parameters.Length != 1 ||
+                method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
+            {
+                return false;
+            }
+
+            var dimensionValue = context.SemanticModel.GetConstantValue(
+                invocation.ArgumentList.Arguments[0].Expression,
+                context.CancellationToken);
+            if (dimensionValue is not { HasValue: true, Value: int dimension })
+            {
+                return false;
+            }
+
+            return TryLowerArrayDimensionLengthTerm(
+                memberAccess.Expression,
+                dimension,
+                context,
+                out term);
+        }
+
         public static bool TryLowerArrayDimensionLengthTerm(
             ExpressionSyntax arrayExpression,
             int dimension,

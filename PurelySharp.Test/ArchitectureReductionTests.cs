@@ -1013,8 +1013,10 @@ namespace PurelySharp.Test
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerElementAccessTerm"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryGetElementAccessValueKind"));
             Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryGetElementAccessValueKind"));
+            Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
             Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
         }

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -8,13 +7,6 @@ namespace PurelySharp.Symbolic.Ir
 {
     internal static partial class SymbolicIrLowerer
     {
-        private static readonly ImmutableArray<KnownApiTermLoweringDescriptor> KnownApiTermLowerings =
-            ImmutableArray.Create(
-                new KnownApiTermLoweringDescriptor(
-                    SpecialType.System_Nullable_T,
-                    nameof(Nullable<int>.GetValueOrDefault),
-                    TryLowerNullableGetValueOrDefaultInvocation));
-
         private static bool TryLowerNullableGetValueOrDefaultInvocation(
             InvocationExpressionSyntax invocation,
             IMethodSymbol method,
