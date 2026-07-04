@@ -543,6 +543,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (fact.Atom is SymbolicTypeTestAtom typeTest &&
+                TryEvaluateNullTypeTest(typeTest, out value))
+            {
+                value = fact.Polarity ? value : !value;
+                return true;
+            }
+
             value = false;
             return false;
         }
@@ -764,6 +771,18 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             value = alias.MayAlias;
+            return true;
+        }
+
+        private static bool TryEvaluateNullTypeTest(SymbolicTypeTestAtom typeTest, out bool value)
+        {
+            if (typeTest.Value is not SymbolicNullTerm)
+            {
+                value = false;
+                return false;
+            }
+
+            value = false;
             return true;
         }
 

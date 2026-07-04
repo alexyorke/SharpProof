@@ -3158,6 +3158,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesNullTypeTestFacts()
+        {
+            var nullIsString = SymbolicFact.Exact(
+                new SymbolicTypeTestAtom(new SymbolicNullTerm(), "System.String"),
+                SyntaxFactory.ParseExpression("null is string"),
+                "test.null-type");
+            var notNullIsString = nullIsString.Negate();
+            var empty = new SymbolicState();
+            var tautologicalFact = new SymbolicState(new[] { notNullIsString });
+            var contradictoryFact = new SymbolicState(new[] { nullIsString });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(nullIsString),
+            });
+
+            Assert.That(tautologicalFact.Facts, Is.Empty);
+            Assert.That(tautologicalFact.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -3875,6 +3898,10 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("right")),
                 SyntaxFactory.ParseExpression("true ? \"left\" : \"right\""),
                 "test.false-conditional-target");
+            var falseTypeTestTarget = SymbolicFact.Exact(
+                new SymbolicTypeTestAtom(new SymbolicNullTerm(), "System.String"),
+                SyntaxFactory.ParseExpression("null is string"),
+                "test.false-type-test-target");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
@@ -3921,6 +3948,10 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseConditionalTarget,
                 smtAnalysis);
+            var falseTypeTestResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseTypeTestTarget,
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
@@ -3944,6 +3975,8 @@ namespace PurelySharp.Test
             Assert.That(trueConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseConditionalResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseTypeTestResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseTypeTestResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
