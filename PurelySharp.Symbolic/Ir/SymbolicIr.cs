@@ -682,7 +682,40 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateTermKey(SymbolicTerm term)
         {
-            return term.ToString() ?? string.Empty;
+            switch (term)
+            {
+                case SymbolicBooleanConstantTerm boolean:
+                    return "bool:" + (boolean.Value ? "true" : "false");
+                case SymbolicIntegerConstantTerm integer:
+                    return "int:" + integer.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                case SymbolicStringConstantTerm stringConstant:
+                    return "string:" + stringConstant.Value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + stringConstant.Value;
+                case SymbolicNullTerm:
+                    return "null";
+                case SymbolicVariableTerm variable:
+                    return "var:" + variable.ValueKind + ":" + variable.Name;
+                case SymbolicMemberTerm member:
+                    return "member:" + member.ValueKind + ":" + CreateTermKey(member.Receiver) + "." + member.MemberName;
+                case SymbolicStringContentTerm content:
+                    return "string-content:" + CreateTermKey(content.Reference);
+                case SymbolicStringConcatTerm concat:
+                    return "string-concat(" + CreateTermKey(concat.Left) + "," + CreateTermKey(concat.Right) + ")";
+                case SymbolicNullableHasValueTerm nullableHasValue:
+                    return "nullable-has-value:" + nullableHasValue.NullableName;
+                case SymbolicLengthTerm length:
+                    return "length:" + CreateTermKey(length.Value);
+                case SymbolicCountTerm count:
+                    return "count:" + CreateTermKey(count.Value);
+                case SymbolicBinaryTerm binary:
+                    return "binary-term:" + binary.Operator + "(" + CreateTermKey(binary.Left) + "," + CreateTermKey(binary.Right) + ")";
+                case SymbolicConditionalTerm conditional:
+                    return "conditional(" +
+                        CreateConditionKey(conditional.Condition) + "," +
+                        CreateTermKey(conditional.WhenTrue) + "," +
+                        CreateTermKey(conditional.WhenFalse) + ")";
+                default:
+                    return term.ToString() ?? string.Empty;
+            }
         }
 
         private static string CreateConditionKey(SymbolicCondition condition)

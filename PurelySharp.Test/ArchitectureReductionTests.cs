@@ -2133,6 +2133,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
+        {
+            var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);
+            var length = new SymbolicLengthTerm(array);
+            var count = new SymbolicCountTerm(array);
+            var binary = new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Add,
+                length,
+                new SymbolicIntegerConstantTerm(1));
+            var conditional = new SymbolicConditionalTerm(
+                new SymbolicConstantCondition(true),
+                binary,
+                count);
+            var lessThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    conditional,
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("items.Length + 1 < 10"),
+                "test.lt");
+            var greaterThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicIntegerConstantTerm(10),
+                    conditional),
+                SyntaxFactory.ParseExpression("10 > items.Length + 1"),
+                "test.gt");
+
+            Assert.That(new SymbolicState(new[] { lessThan }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { greaterThan }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
