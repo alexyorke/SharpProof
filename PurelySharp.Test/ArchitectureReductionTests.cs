@@ -1029,6 +1029,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated"));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
@@ -1041,6 +1043,26 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.formula-fallback"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+        }
+
+        [Test]
+        public void RuntimeHazardSignedDivisionOverflowFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var translatedIndex = source.IndexOf("ir.runtime-hazard.checked-integral.signed-division-overflow.translated", StringComparison.Ordinal);
+            var fallbackIndex = source.IndexOf("\"ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback\"", StringComparison.Ordinal);
+            var compoundTranslatedIndex = source.IndexOf("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated", StringComparison.Ordinal);
+            var compoundFallbackIndex = source.IndexOf("\"ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback\"", StringComparison.Ordinal);
+
+            Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex));
+            Assert.That(compoundTranslatedIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(compoundFallbackIndex, Is.GreaterThan(compoundTranslatedIndex));
+            Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
         }
 
         [Test]

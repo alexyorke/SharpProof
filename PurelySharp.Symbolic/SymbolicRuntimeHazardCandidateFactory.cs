@@ -1513,6 +1513,16 @@ namespace PurelySharp.Symbolic
                     return false;
                 }
 
+                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                        binaryExpression,
+                        SymbolicExceptionPreconditionKind.CheckedOverflow,
+                        signedDivisionOverflow,
+                        "ir.runtime-hazard.checked-integral.signed-division-overflow.translated",
+                        out trigger))
+                {
+                    return true;
+                }
+
                 trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                     binaryExpression,
                     SymbolicExceptionPreconditionKind.CheckedOverflow,
@@ -1675,6 +1685,16 @@ namespace PurelySharp.Symbolic
                         out var signedDivisionOverflow))
                 {
                     return false;
+                }
+
+                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                        assignment,
+                        SymbolicExceptionPreconditionKind.CheckedOverflow,
+                        signedDivisionOverflow,
+                        "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated",
+                        out trigger))
+                {
+                    return true;
                 }
 
                 trigger = CreateFormulaBackedExceptionPreconditionTrigger(
