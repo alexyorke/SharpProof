@@ -113,6 +113,10 @@ path-fact, hazard, and ownership flows.
   Plain reachability value and condition translation now also route safe
   divide/modulo IR encoding through `SymbolicProofService` instead of using
   blanket local `ContainsDivisionOrModulo` gates before fallback.
+  Proof-state encoding now also routes facts and path conditions through
+  proof-service safe encoding, so IR branch facts and condition-truth probes no
+  longer rely on separate local divide/modulo guards before they reach the
+  shared proof spine.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

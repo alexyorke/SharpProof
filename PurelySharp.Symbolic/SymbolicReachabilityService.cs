@@ -353,13 +353,16 @@ namespace PurelySharp.Symbolic
                 getSymbolVersion);
 
             var countBeforeBranchAssumptions = pathConditions.Count;
-            TryCollectBranchAssumptions(
-                condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                pathConditions,
+            if (!ContainsDivisionOrModulo(condition) || addedIrBranchFact)
+            {
+                TryCollectBranchAssumptions(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions,
                     getSymbolVersion);
+            }
 
             var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
             if ((addTranslatedFormulaAlways ||
@@ -512,11 +515,6 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (ContainsDivisionOrModulo(condition))
-            {
-                return false;
-            }
-
             if (!TryCreateIrBranchCondition(
                     condition,
                     branchWhenTrue,
@@ -524,7 +522,11 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     getSymbolVersion,
                     out var symbolicCondition) ||
-                !SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var formula))
+                !SymbolicProofService.TryEncodeConditionWithPathState(
+                    symbolicCondition,
+                    new SymbolicState(),
+                    condition,
+                    out var formula))
             {
                 return false;
             }
@@ -799,8 +801,7 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula>? pathConditions = null)
         {
             var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
-            if (!ContainsDivisionOrModulo(expression) &&
-                EvaluateConditionTruthWithIr(
+            if (EvaluateConditionTruthWithIr(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -1142,15 +1143,23 @@ namespace PurelySharp.Symbolic
             int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
-                SymbolicProofService.TryEncodeConditionWithPathState(
-                    symbolicCondition,
-                    new SymbolicState(),
-                    condition,
-                    out var encodedFormula))
+            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition))
             {
-                formula = encodedFormula;
-                return true;
+                if (SymbolicProofService.TryEncodeConditionWithPathState(
+                        symbolicCondition,
+                        new SymbolicState(),
+                        condition,
+                        out var encodedFormula))
+                {
+                    formula = encodedFormula;
+                    return true;
+                }
+
+                if (ContainsDivisionOrModulo(condition))
+                {
+                    formula = null;
+                    return false;
+                }
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslate(
@@ -1771,15 +1780,23 @@ namespace PurelySharp.Symbolic
             int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                SymbolicProofService.TryEncodeTermWithPathState(
-                    term,
-                    new SymbolicState(),
-                    expression,
-                    out var encodedFormula))
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term))
             {
-                formula = encodedFormula;
-                return true;
+                if (SymbolicProofService.TryEncodeTermWithPathState(
+                        term,
+                        new SymbolicState(),
+                        expression,
+                        out var encodedFormula))
+                {
+                    formula = encodedFormula;
+                    return true;
+                }
+
+                if (ContainsDivisionOrModulo(expression))
+                {
+                    formula = null!;
+                    return false;
+                }
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateValue(

@@ -1483,6 +1483,8 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicBinaryCondition binaryCondition:
                     var operandConditions = new List<SymbolicCondition>();
                     CollectBinaryConditionOperands(binaryCondition, binaryCondition.Operator, operandConditions);
+                    var supportsBooleanSimplification = operandConditions.All(
+                        static operand => !ContainsPotentiallyExceptionalArithmetic(operand));
                     var operands = operandConditions
                         .Select(CreateConditionKey)
                         .ToList();
@@ -1497,14 +1499,19 @@ namespace PurelySharp.Symbolic.Ir
                         return absorbingOperand;
                     }
 
-                    if (ContainsComplementaryConditionOperands(binaryCondition))
+                    if (supportsBooleanSimplification &&
+                        ContainsComplementaryConditionOperands(binaryCondition))
                     {
                         return absorbingOperand;
                     }
 
                     operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
                     operands = operands.Distinct(StringComparer.Ordinal).ToList();
-                    operands = RemoveAbsorbedConditionOperands(binaryCondition.Operator, operandConditions, operands);
+                    if (supportsBooleanSimplification)
+                    {
+                        operands = RemoveAbsorbedConditionOperands(binaryCondition.Operator, operandConditions, operands);
+                    }
+
                     if (operands.Count == 0)
                     {
                         return identityOperand;
@@ -1541,6 +1548,107 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             return false;
+        }
+
+        private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    return ContainsPotentiallyExceptionalArithmetic(factCondition.Fact);
+                case SymbolicNotCondition notCondition:
+                    return ContainsPotentiallyExceptionalArithmetic(notCondition.Operand);
+                case SymbolicBinaryCondition binaryCondition:
+                    return ContainsPotentiallyExceptionalArithmetic(binaryCondition.Left) ||
+                        ContainsPotentiallyExceptionalArithmetic(binaryCondition.Right);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicFact fact)
+        {
+            return ContainsPotentiallyExceptionalArithmetic(fact.Atom);
+        }
+
+        private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicAtom atom)
+        {
+            switch (atom)
+            {
+                case SymbolicTruthAtom truth:
+                    return ContainsPotentiallyExceptionalArithmetic(truth.Condition);
+                case SymbolicRelationAtom relation:
+                    return ContainsPotentiallyExceptionalArithmetic(relation.Left) ||
+                        ContainsPotentiallyExceptionalArithmetic(relation.Right);
+                case SymbolicStringPredicateAtom predicate:
+                    return ContainsPotentiallyExceptionalArithmetic(predicate.Value) ||
+                        ContainsPotentiallyExceptionalArithmetic(predicate.Argument);
+                case SymbolicBoundsAtom bounds:
+                    return ContainsPotentiallyExceptionalArithmetic(bounds.Index) ||
+                        ContainsPotentiallyExceptionalArithmetic(bounds.Length);
+                case SymbolicFreshnessAtom freshness:
+                    return ContainsPotentiallyExceptionalArithmetic(freshness.Value);
+                case SymbolicOwnershipAtom ownership:
+                    return ContainsPotentiallyExceptionalArithmetic(ownership.Value);
+                case SymbolicAliasAtom alias:
+                    return ContainsPotentiallyExceptionalArithmetic(alias.Source) ||
+                        ContainsPotentiallyExceptionalArithmetic(alias.Target);
+                case SymbolicBorrowAtom borrow:
+                    return ContainsPotentiallyExceptionalArithmetic(borrow.Owner) ||
+                        ContainsPotentiallyExceptionalArithmetic(borrow.Borrow);
+                case SymbolicEscapeAtom escape:
+                    return ContainsPotentiallyExceptionalArithmetic(escape.Value);
+                case SymbolicReturnedOwnershipAtom returnedOwnership:
+                    return ContainsPotentiallyExceptionalArithmetic(returnedOwnership.Value);
+                case SymbolicMutationAtom mutation:
+                    return ContainsPotentiallyExceptionalArithmetic(mutation.Target);
+                case SymbolicDisposalAtom disposal:
+                    return ContainsPotentiallyExceptionalArithmetic(disposal.Resource);
+                case SymbolicResourceLifetimeAtom lifetime:
+                    return ContainsPotentiallyExceptionalArithmetic(lifetime.Resource);
+                case SymbolicTypeTestAtom typeTest:
+                    return ContainsPotentiallyExceptionalArithmetic(typeTest.Value);
+                case SymbolicExceptionPreconditionAtom precondition:
+                    return (precondition.Subject != null &&
+                            ContainsPotentiallyExceptionalArithmetic(precondition.Subject)) ||
+                        ContainsPotentiallyExceptionalArithmetic(precondition.Trigger);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ContainsPotentiallyExceptionalArithmetic(SymbolicTerm term)
+        {
+            switch (term)
+            {
+                case SymbolicBinaryTerm { Operator: SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder }:
+                    return true;
+                case SymbolicBinaryTerm binary:
+                    return ContainsPotentiallyExceptionalArithmetic(binary.Left) ||
+                        ContainsPotentiallyExceptionalArithmetic(binary.Right);
+                case SymbolicConditionalTerm conditional:
+                    return ContainsPotentiallyExceptionalArithmetic(conditional.Condition) ||
+                        ContainsPotentiallyExceptionalArithmetic(conditional.WhenTrue) ||
+                        ContainsPotentiallyExceptionalArithmetic(conditional.WhenFalse);
+                case SymbolicMemberTerm member:
+                    return ContainsPotentiallyExceptionalArithmetic(member.Receiver);
+                case SymbolicElementTerm element:
+                    return ContainsPotentiallyExceptionalArithmetic(element.Receiver) ||
+                        ContainsPotentiallyExceptionalArithmetic(element.Index);
+                case SymbolicStringContentTerm stringContent:
+                    return ContainsPotentiallyExceptionalArithmetic(stringContent.Reference);
+                case SymbolicStringConcatTerm stringConcat:
+                    return ContainsPotentiallyExceptionalArithmetic(stringConcat.Left) ||
+                        ContainsPotentiallyExceptionalArithmetic(stringConcat.Right);
+                case SymbolicLengthTerm length:
+                    return ContainsPotentiallyExceptionalArithmetic(length.Value);
+                case SymbolicArrayDimensionLengthTerm arrayLength:
+                    return ContainsPotentiallyExceptionalArithmetic(arrayLength.Value);
+                case SymbolicCountTerm count:
+                    return ContainsPotentiallyExceptionalArithmetic(count.Value);
+                default:
+                    return false;
+            }
         }
 
         private static void CollectBinaryConditionOperands(
