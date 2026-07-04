@@ -20,12 +20,12 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 111,271 C# production lines across
-  168 files. The largest modules are `PurelySharp.Symbolic` at 52,526 lines,
+- Production inventory currently reports 111,794 C# production lines across
+  168 files. The largest modules are `PurelySharp.Symbolic` at 53,049 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
-  now at 8,779 lines. It routes legacy translation through
+  now at 8,882 lines. It routes legacy translation through
   `CSharpSmtFormulaTranslator` but still owns much of the formula-first
   path-fact pipeline.
 - Direct `CSharpConditionToFormula` usage outside approved shims is gone.
@@ -36,8 +36,9 @@ path-fact, hazard, and ownership flows.
   currently reports 0 analyzer-side and 21 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
-- `SymbolicProofService` exists, but it must keep growing into the only
-  internal bridge from IR facts to solver formulas.
+- `SymbolicProofService` exists, and the proof spine now normalizes many
+  exact constant/string/bounds/conditional/type-test facts before SMT. It must
+  keep growing into the only internal bridge from IR facts to solver formulas.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
