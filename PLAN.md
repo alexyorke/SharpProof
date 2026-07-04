@@ -48,7 +48,9 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.Objects.cs`, and pattern/type-test lowering now lives in
   `SymbolicIrLowerer.Patterns.cs`. String equality lowering now also lives in
   the string partial, and tuple equality/member lowering now lives in
-  `SymbolicIrLowerer.Tuples.cs`; `SymbolicIrLowerer.cs` is about 901 lines.
+  `SymbolicIrLowerer.Tuples.cs`. Nullable `HasValue`/`Value` helper lowering
+  now lives in `SymbolicIrLowerer.Nullable.cs`; `SymbolicIrLowerer.cs` is
+  about 862 lines.
 - `SymbolicProofService` exists, and the proof spine now normalizes many
   exact constant/string/bounds/conditional/type-test facts before SMT. It must
   keep growing into the only internal bridge from IR facts to solver formulas.
