@@ -750,7 +750,7 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicCountTerm count:
                     return "count:" + CreateTermKey(count.Value);
                 case SymbolicBinaryTerm binary:
-                    return "binary-term:" + binary.Operator + "(" + CreateTermKey(binary.Left) + "," + CreateTermKey(binary.Right) + ")";
+                    return CreateBinaryTermKey(binary);
                 case SymbolicConditionalTerm conditional:
                     return "conditional(" +
                         CreateConditionKey(conditional.Condition) + "," +
@@ -759,6 +759,24 @@ namespace PurelySharp.Symbolic.Ir
                 default:
                     return term.ToString() ?? string.Empty;
             }
+        }
+
+        private static string CreateBinaryTermKey(SymbolicBinaryTerm binary)
+        {
+            var left = CreateTermKey(binary.Left);
+            var right = CreateTermKey(binary.Right);
+            if (IsCommutativeBinaryTermOperator(binary.Operator) &&
+                string.CompareOrdinal(left, right) > 0)
+            {
+                (left, right) = (right, left);
+            }
+
+            return "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
+        }
+
+        private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)
+        {
+            return binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
         }
 
         private static string CreateConditionKey(SymbolicCondition condition)

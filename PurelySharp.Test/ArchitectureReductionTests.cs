@@ -2165,6 +2165,45 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesCommutativeBinaryTerms()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var one = new SymbolicIntegerConstantTerm(1);
+            var ten = new SymbolicIntegerConstantTerm(10);
+            var addLeft = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, x, one),
+                    ten),
+                SyntaxFactory.ParseExpression("x + 1 < 10"),
+                "test.add.left");
+            var addRight = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, one, x),
+                    ten),
+                SyntaxFactory.ParseExpression("1 + x < 10"),
+                "test.add.right");
+            var subtractLeft = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, x, one),
+                    ten),
+                SyntaxFactory.ParseExpression("x - 1 < 10"),
+                "test.subtract.left");
+            var subtractRight = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, one, x),
+                    ten),
+                SyntaxFactory.ParseExpression("1 - x < 10"),
+                "test.subtract.right");
+
+            Assert.That(new SymbolicState(new[] { addLeft }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { addRight }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { subtractLeft }).NormalizedProofKey, Is.Not.EqualTo(new SymbolicState(new[] { subtractRight }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNonRelationAtomKeys()
         {
             var value = new SymbolicVariableTerm("value", SmtValueKind.Reference);
@@ -2683,6 +2722,36 @@ namespace PurelySharp.Test
                     zero,
                     x),
                 SyntaxFactory.ParseExpression("0 < x"),
+                "test.queried");
+            var state = new SymbolicState(new[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_CommutativeBinaryTermFactImpliesWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var one = new SymbolicIntegerConstantTerm(1);
+            var ten = new SymbolicIntegerConstantTerm(10);
+            var stored = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, x, one),
+                    ten),
+                SyntaxFactory.ParseExpression("x + 1 < 10"),
+                "test.stored");
+            var queried = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, one, x),
+                    ten),
+                SyntaxFactory.ParseExpression("1 + x < 10"),
                 "test.queried");
             var state = new SymbolicState(new[] { stored });
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
