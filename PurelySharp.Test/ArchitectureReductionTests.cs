@@ -2354,6 +2354,13 @@ namespace PurelySharp.Test
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
             var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var guard = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.guard"));
             var trueSelected = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
@@ -2375,9 +2382,17 @@ namespace PurelySharp.Test
                     new SymbolicIntegerConstantTerm(1)),
                 SyntaxFactory.ParseExpression("x == 1"),
                 "test.direct");
+            var identicalBranches = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(guard, x, x),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("guard ? x : x"),
+                "test.conditional.same-branches");
 
             Assert.That(new SymbolicState(new[] { trueSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { falseSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { identicalBranches }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
         }
 
         [Test]

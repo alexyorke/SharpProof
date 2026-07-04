@@ -843,20 +843,27 @@ namespace PurelySharp.Symbolic.Ir
         private static string CreateConditionalTermKey(SymbolicConditionalTerm conditional)
         {
             var conditionKey = CreateConditionKey(conditional.Condition);
+            var whenTrueKey = CreateTermKey(conditional.WhenTrue);
+            var whenFalseKey = CreateTermKey(conditional.WhenFalse);
+            if (string.Equals(whenTrueKey, whenFalseKey, StringComparison.Ordinal))
+            {
+                return whenTrueKey;
+            }
+
             if (string.Equals(conditionKey, "const:true", StringComparison.Ordinal))
             {
-                return CreateTermKey(conditional.WhenTrue);
+                return whenTrueKey;
             }
 
             if (string.Equals(conditionKey, "const:false", StringComparison.Ordinal))
             {
-                return CreateTermKey(conditional.WhenFalse);
+                return whenFalseKey;
             }
 
             return "conditional(" +
                 conditionKey + "," +
-                CreateTermKey(conditional.WhenTrue) + "," +
-                CreateTermKey(conditional.WhenFalse) + ")";
+                whenTrueKey + "," +
+                whenFalseKey + ")";
         }
 
         private static string CreateStringConcatTermKey(SymbolicStringConcatTerm concat)
