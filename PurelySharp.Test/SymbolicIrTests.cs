@@ -1551,6 +1551,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerBuiltInLengthTerm_MultidimensionalArrayUsesDimensionProduct()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix, int total",
+                "matrix.Length == total");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var multiply = (SymbolicBinaryTerm)term;
+            Assert.That(multiply.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Multiply));
+            Assert.That(multiply.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(multiply.Right, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+        }
+
+        [Test]
         public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct()
         {
             var context = CreateExpressionContext(

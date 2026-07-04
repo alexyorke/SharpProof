@@ -407,6 +407,12 @@ namespace PurelySharp.Symbolic.Ir
                 }
             }
 
+            if (type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
+                TryLowerArrayTotalLengthTerm(expression, multiDimensionalArray, context, out term))
+            {
+                return true;
+            }
+
             term = null!;
             return false;
         }

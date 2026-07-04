@@ -1027,6 +1027,7 @@ namespace PurelySharp.Test
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
             Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayTotalLengthTerm"));
+            Assert.That(indexingSource, Does.Contain("TryLowerArrayTotalLengthTerm(expression, multiDimensionalArray, context, out term)"));
             Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLength)"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLongLength)"));
