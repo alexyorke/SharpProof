@@ -188,6 +188,33 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_UnaryMinusDivisorUsesIrPrecondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == 0)
+        {
+            return 10 / -value;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return 10 / -value;", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.DivideByZeroException"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.divide-by-zero");
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDivideByZeroCandidate()
         {
             const string source = @"

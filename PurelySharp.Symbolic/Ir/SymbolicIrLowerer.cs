@@ -292,6 +292,18 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
+                TryLowerTerm(prefixUnary.Operand, context, out var unaryOperand) &&
+                unaryOperand.Kind == SmtValueKind.Int)
+            {
+                term = new SymbolicBinaryTerm(
+                    SymbolicBinaryTermOperator.Subtract,
+                    new SymbolicIntegerConstantTerm(0),
+                    unaryOperand);
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binary &&
                 TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
                 TryLowerTerm(binary.Left, context, out var left) &&

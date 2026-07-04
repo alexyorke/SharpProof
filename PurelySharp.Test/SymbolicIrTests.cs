@@ -298,6 +298,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_UnaryMinusUsesSharedBinaryTerm()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "-value == 0");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+            var negation = (SymbolicBinaryTerm)relation.Left;
+
+            Assert.That(negation.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(negation.Left, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+            Assert.That(negation.Right, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms()
         {
             var context = CreateExpressionContext(
