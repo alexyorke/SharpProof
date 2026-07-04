@@ -2793,12 +2793,44 @@ namespace PurelySharp.Test
                     new SymbolicBooleanConstantTerm(true))),
                 SyntaxFactory.ParseExpression("true ? false : true"),
                 "test.conditional.false-boolean");
+            var trueFactSelectedConditional = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicFactCondition(SymbolicFact.Exact(
+                            new SymbolicRelationAtom(
+                                SymbolicRelationOperator.LessThan,
+                                new SymbolicIntegerConstantTerm(1),
+                                new SymbolicIntegerConstantTerm(2)),
+                            SyntaxFactory.ParseExpression("1 < 2"),
+                            "test.conditional.true-selector")),
+                        new SymbolicIntegerConstantTerm(10),
+                        new SymbolicIntegerConstantTerm(20)),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("1 < 2 ? 10 : 20"),
+                "test.conditional.fact-selected-true");
+            var falseFactSelectedConditional = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicFactCondition(SymbolicFact.Exact(
+                            new SymbolicRelationAtom(
+                                SymbolicRelationOperator.GreaterThan,
+                                new SymbolicIntegerConstantTerm(1),
+                                new SymbolicIntegerConstantTerm(2)),
+                            SyntaxFactory.ParseExpression("1 > 2"),
+                            "test.conditional.false-selector")),
+                        new SymbolicStringConstantTerm("left"),
+                        new SymbolicStringConstantTerm("right")),
+                    new SymbolicStringConstantTerm("right")),
+                SyntaxFactory.ParseExpression("1 > 2 ? \"left\" : \"right\""),
+                "test.conditional.fact-selected-false");
             var empty = new SymbolicState();
 
             Assert.That(new SymbolicState(new[] { trueSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { falseSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { identicalBranches }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
-            Assert.That(new SymbolicState(new[] { exactIntegerConditional, exactStringConditional, exactBooleanConditional }).NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { exactIntegerConditional, exactStringConditional, exactBooleanConditional, trueFactSelectedConditional, falseFactSelectedConditional }).NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { falseBooleanConditional }).IsContradictory, Is.True);
         }
 
@@ -3954,6 +3986,22 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("right")),
                 SyntaxFactory.ParseExpression("true ? \"left\" : \"right\""),
                 "test.false-conditional-target");
+            var trueFactSelectedConditionalTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicFactCondition(SymbolicFact.Exact(
+                            new SymbolicRelationAtom(
+                                SymbolicRelationOperator.LessThan,
+                                new SymbolicIntegerConstantTerm(1),
+                                new SymbolicIntegerConstantTerm(2)),
+                            SyntaxFactory.ParseExpression("1 < 2"),
+                            "test.true-fact-selector")),
+                        new SymbolicIntegerConstantTerm(10),
+                        new SymbolicIntegerConstantTerm(20)),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("1 < 2 ? 10 : 20"),
+                "test.true-fact-selected-conditional-target");
             var falseTypeTestTarget = SymbolicFact.Exact(
                 new SymbolicTypeTestAtom(new SymbolicNullTerm(), "System.String"),
                 SyntaxFactory.ParseExpression("null is string"),
@@ -4012,6 +4060,10 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseConditionalTarget,
                 smtAnalysis);
+            var trueFactSelectedConditionalResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueFactSelectedConditionalTarget,
+                smtAnalysis);
             var falseTypeTestResult = SymbolicReachabilityService.ClassifyStateImplication(
                 new SymbolicState(),
                 falseTypeTestTarget,
@@ -4043,6 +4095,8 @@ namespace PurelySharp.Test
             Assert.That(trueConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseConditionalResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueFactSelectedConditionalResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueFactSelectedConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseTypeTestResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseTypeTestResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));

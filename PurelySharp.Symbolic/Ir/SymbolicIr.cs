@@ -765,9 +765,16 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicConditionalTerm conditional,
             out SymbolicTerm selected)
         {
-            if (conditional.Condition is SymbolicConstantCondition constant)
+            var conditionKey = CreateConditionKey(conditional.Condition);
+            if (string.Equals(conditionKey, "const:true", StringComparison.Ordinal))
             {
-                selected = constant.Value ? conditional.WhenTrue : conditional.WhenFalse;
+                selected = conditional.WhenTrue;
+                return true;
+            }
+
+            if (string.Equals(conditionKey, "const:false", StringComparison.Ordinal))
+            {
+                selected = conditional.WhenFalse;
                 return true;
             }
 
