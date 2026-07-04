@@ -2013,6 +2013,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_DelegatesBranchAssumptionsToSharedReachabilityService()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryAddBranchConditionFacts("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_EvaluatesConditionTruthThroughIrBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();

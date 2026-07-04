@@ -9501,12 +9501,30 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            var branchFacts = new List<SmtFormula>();
+            if (!SymbolicReachabilityService.TryAddBranchConditionFacts(
                 condition,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                facts);
+                branchFacts))
+            {
+                return false;
+            }
+
+            var added = false;
+            foreach (var branchFact in branchFacts)
+            {
+                if (facts.Contains(branchFact))
+                {
+                    continue;
+                }
+
+                facts.Add(branchFact);
+                added = true;
+            }
+
+            return added;
         }
 
         private static bool TryCreateIntegerValueFormula(
