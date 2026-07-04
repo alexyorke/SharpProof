@@ -975,6 +975,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsIndexingLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var indexingSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerElementAccessTerm(elementAccess"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerElementAccessTerm"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetElementAccessValueKind"));
+            Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+            Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
+            Assert.That(indexingSource, Does.Contain("private static bool TryGetElementAccessValueKind"));
+            Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+            Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
