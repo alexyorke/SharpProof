@@ -2095,15 +2095,27 @@ namespace PurelySharp.Test
             var stringHelperIndex = source.IndexOf(
                 "private static bool TryTranslateStringValue(",
                 StringComparison.Ordinal);
+            var valueHelperIndex = source.IndexOf(
+                "private static bool TryTranslateValue(",
+                StringComparison.Ordinal);
+            var comparableHelperIndex = source.IndexOf(
+                "private static bool TryTranslateComparableValue(",
+                StringComparison.Ordinal);
             var stringNonNullIndex = source.IndexOf(
                 "internal static bool TryCreateStringNonNullAssignedValueFact(",
                 StringComparison.Ordinal);
             var lengthHelperSource = source.Substring(lengthHelperIndex, stringHelperIndex - lengthHelperIndex);
+            var valueHelperSource = source.Substring(valueHelperIndex, comparableHelperIndex - valueHelperIndex);
             var stringHelperSource = source.Substring(stringHelperIndex, stringNonNullIndex - stringHelperIndex);
 
             Assert.That(lengthHelperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(stringHelperIndex, Is.GreaterThan(lengthHelperIndex));
+            Assert.That(valueHelperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(comparableHelperIndex, Is.GreaterThan(valueHelperIndex));
             Assert.That(stringNonNullIndex, Is.GreaterThan(stringHelperIndex));
+            Assert.That(valueHelperSource, Does.Contain("!ContainsDivisionOrModulo(expression)"));
+            Assert.That(valueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
+            Assert.That(valueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(
                 lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
                 Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));

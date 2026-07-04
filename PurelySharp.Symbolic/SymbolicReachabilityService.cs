@@ -1585,6 +1585,16 @@ namespace PurelySharp.Symbolic
             SmtValueKind kind,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
+            SmtFormula? irFormula = null;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!ContainsDivisionOrModulo(expression) &&
+                SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                term.Kind == kind &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
+            {
+                irFormula = encodedFormula;
+            }
+
             if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     expression,
                     semanticModel,
@@ -1598,8 +1608,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = null!;
-            return false;
+            formula = irFormula!;
+            return formula != null;
         }
 
         private static bool TryTranslateComparableValue(
@@ -1611,17 +1621,30 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
                     out var translatedFormula,
-                    getSymbolVersion,
-                    inlineDepth) &&
-                translatedFormula is { } &&
+                    targetFormula.Kind,
+                    getSymbolVersion) &&
                 SymbolicFactFactory.CanCompareSmtValues(targetFormula, translatedFormula))
             {
                 formula = translatedFormula;
+                return true;
+            }
+
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var inlineTranslatedFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                inlineTranslatedFormula is { } &&
+                SymbolicFactFactory.CanCompareSmtValues(targetFormula, inlineTranslatedFormula))
+            {
+                formula = inlineTranslatedFormula;
                 return true;
             }
 
