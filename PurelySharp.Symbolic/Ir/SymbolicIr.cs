@@ -434,6 +434,25 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
+        private static bool ContainsDisjunctionTautology(SymbolicCondition condition)
+        {
+            if (condition is not SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or })
+            {
+                return false;
+            }
+
+            var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var fact in EnumerateDisjunctionFacts(condition))
+            {
+                if (HasOppositePolarity(polarities, fact))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool HasOppositePolarity(
             IDictionary<string, bool> polarities,
             SymbolicFact fact)
@@ -478,7 +497,9 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
                     return ContainsTrueConstant(binary.Left) && ContainsTrueConstant(binary.Right);
                 case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
-                    return ContainsTrueConstant(binary.Left) || ContainsTrueConstant(binary.Right);
+                    return ContainsTrueConstant(binary.Left) ||
+                        ContainsTrueConstant(binary.Right) ||
+                        ContainsDisjunctionTautology(condition);
                 case SymbolicNotCondition { Operand: var operand }:
                     return ContainsFalseConstant(operand);
                 default:
@@ -503,6 +524,31 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     foreach (var fact in EnumerateConditionFacts(binary.Right))
+                    {
+                        yield return fact;
+                    }
+
+                    break;
+            }
+        }
+
+        private static IEnumerable<SymbolicFact> EnumerateDisjunctionFacts(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    yield return factCondition.Fact;
+                    break;
+                case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
+                    yield return factCondition.Fact.Negate();
+                    break;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
+                    foreach (var fact in EnumerateDisjunctionFacts(binary.Left))
+                    {
+                        yield return fact;
+                    }
+
+                    foreach (var fact in EnumerateDisjunctionFacts(binary.Right))
                     {
                         yield return fact;
                     }

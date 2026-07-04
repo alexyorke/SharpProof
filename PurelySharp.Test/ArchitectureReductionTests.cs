@@ -2093,6 +2093,35 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_NegatedTautologicalDisjunctionShortCircuitsWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("x == 1"),
+                "test.fact");
+            var tautology = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicFactCondition(fact),
+                new SymbolicNotCondition(new SymbolicFactCondition(fact)));
+            var state = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(tautology),
+            });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(state.IsContradictory, Is.True);
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_UnsupportedTargetFactStaysConservative()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
