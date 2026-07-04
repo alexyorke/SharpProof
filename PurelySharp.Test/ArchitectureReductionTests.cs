@@ -1922,8 +1922,13 @@ namespace PurelySharp.Test
 
             Assert.That(first.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
             Assert.That(first.Info.CacheHit, Is.False);
+            Assert.That(first.Info.Budget, Is.Not.Null);
+            Assert.That(first.Info.Budget!.MaxPathConditions, Is.EqualTo(192));
+            Assert.That(first.Info.Budget.TimeoutMilliseconds, Is.EqualTo(750));
             Assert.That(second.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
             Assert.That(second.Info.CacheHit, Is.True);
+            Assert.That(second.Info.Budget, Is.Not.Null);
+            Assert.That(second.Info.Budget!.ExecutedQueryCount, Is.EqualTo(executedAfterFirst));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(executedAfterFirst));
         }
 
