@@ -2202,6 +2202,18 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ClassifiesEmptyStateReachabilityWithoutSmt()
+        {
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(new SymbolicState(), smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_ClassifiesIrBranchFeasibilityWithoutPublicFormulaInput()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -2229,6 +2241,28 @@ namespace PurelySharp.Test
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
+        public void SymbolicProofService_ClassifiesConstantBranchFeasibilityWithoutSmt()
+        {
+            var state = new SymbolicState();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var trueBranch = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                state,
+                new SymbolicConstantCondition(true),
+                smtAnalysis);
+            var falseBranch = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                state,
+                new SymbolicConstantCondition(false),
+                smtAnalysis);
+
+            Assert.That(trueBranch.Info.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
+            Assert.That(trueBranch.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseBranch.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(falseBranch.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -2288,6 +2322,34 @@ namespace PurelySharp.Test
             Assert.That(notFalseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(notFalseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(executedAfterTrue, Is.EqualTo(0));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_ClassifiesTrueImplicationWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var supportedStateFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.state");
+            var unsupportedStateFact = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("resource", SmtValueKind.Reference)),
+                SyntaxFactory.ParseExpression("resource"),
+                "test.unsupported");
+            var state = new SymbolicState(new[] { supportedStateFact, unsupportedStateFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(
+                state,
+                new SymbolicNotCondition(new SymbolicConstantCondition(false)),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 

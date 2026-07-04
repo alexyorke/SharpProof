@@ -37,6 +37,13 @@ namespace PurelySharp.Symbolic
                     "ir_state_contradictory");
             }
 
+            if (state.Facts.Length == 0 && state.PathConditions.Length == 0)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Reachable,
+                    "ir_state_empty");
+            }
+
             return ClassifyWithIrCache(
                 "reachability:" + state.NormalizedProofKey,
                 () =>
@@ -121,6 +128,14 @@ namespace PurelySharp.Symbolic
                     "ir_state_contradictory");
             }
 
+            if (TryClassifySyntacticConditionTruth(condition, out var syntacticStatus) &&
+                syntacticStatus == SymbolicProofStatus.ProvenTrue)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_condition_syntactic_truth");
+            }
+
             return ClassifyWithIrCache(
                 "implication-condition:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofConditionKey(condition),
                 () =>
@@ -153,6 +168,22 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Unreachable,
+                    "ir_state_contradictory");
+            }
+
+            if (TryClassifySyntacticConditionTruth(branchCondition, out var syntacticStatus))
+            {
+                return syntacticStatus == SymbolicProofStatus.ProvenTrue
+                    ? ClassifyReachability(state)
+                    : SymbolicIrProofResult.Syntactic(
+                        SymbolicProofStatus.Unreachable,
+                        "ir_branch_syntactic_false");
+            }
+
             return ClassifyReachability(state.AddPathCondition(branchCondition));
         }
 
