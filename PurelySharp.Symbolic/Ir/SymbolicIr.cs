@@ -868,21 +868,63 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateStringConcatTermKey(SymbolicStringConcatTerm concat)
         {
-            var terms = new List<string>();
-            CollectStringConcatTermKeys(concat, terms);
-            return "string-concat(" + string.Join(",", terms) + ")";
+            var terms = new List<SymbolicTerm>();
+            CollectStringConcatTerms(concat, terms);
+            var termKeys = CreateNormalizedStringConcatTermKeys(terms);
+            if (termKeys.Count == 1)
+            {
+                return termKeys[0];
+            }
+
+            return "string-concat(" + string.Join(",", termKeys) + ")";
         }
 
-        private static void CollectStringConcatTermKeys(SymbolicTerm term, ICollection<string> terms)
+        private static void CollectStringConcatTerms(SymbolicTerm term, ICollection<SymbolicTerm> terms)
         {
             if (term is SymbolicStringConcatTerm concat)
             {
-                CollectStringConcatTermKeys(concat.Left, terms);
-                CollectStringConcatTermKeys(concat.Right, terms);
+                CollectStringConcatTerms(concat.Left, terms);
+                CollectStringConcatTerms(concat.Right, terms);
                 return;
             }
 
-            terms.Add(CreateTermKey(term));
+            terms.Add(term);
+        }
+
+        private static List<string> CreateNormalizedStringConcatTermKeys(IEnumerable<SymbolicTerm> terms)
+        {
+            var termKeys = new List<string>();
+            var pendingLiteral = string.Empty;
+            foreach (var term in terms)
+            {
+                if (term is SymbolicStringConstantTerm stringConstant)
+                {
+                    pendingLiteral += stringConstant.Value;
+                    continue;
+                }
+
+                AddPendingStringLiteralKey(termKeys, ref pendingLiteral);
+                termKeys.Add(CreateTermKey(term));
+            }
+
+            AddPendingStringLiteralKey(termKeys, ref pendingLiteral);
+            if (termKeys.Count == 0)
+            {
+                termKeys.Add(CreateTermKey(new SymbolicStringConstantTerm(string.Empty)));
+            }
+
+            return termKeys;
+        }
+
+        private static void AddPendingStringLiteralKey(ICollection<string> termKeys, ref string pendingLiteral)
+        {
+            if (pendingLiteral.Length == 0)
+            {
+                return;
+            }
+
+            termKeys.Add(CreateTermKey(new SymbolicStringConstantTerm(pendingLiteral)));
+            pendingLiteral = string.Empty;
         }
 
         private static string CreateBinaryTermKey(SymbolicBinaryTerm binary)

@@ -2560,6 +2560,8 @@ namespace PurelySharp.Test
             var a = new SymbolicStringConstantTerm("a");
             var b = new SymbolicStringConstantTerm("b");
             var c = new SymbolicStringConstantTerm("c");
+            var empty = new SymbolicStringConstantTerm(string.Empty);
+            var value = new SymbolicVariableTerm("value", SmtValueKind.String);
             var leftAssociated = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
@@ -2581,9 +2583,62 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("bac")),
                 SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"bac\""),
                 "test.reordered");
+            var directValue = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    value,
+                    new SymbolicStringConstantTerm("text")),
+                SyntaxFactory.ParseExpression("value == \"text\""),
+                "test.direct-value");
+            var emptyPrefix = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(empty, value),
+                    new SymbolicStringConstantTerm("text")),
+                SyntaxFactory.ParseExpression("\"\" + value == \"text\""),
+                "test.empty-prefix");
+            var emptySuffix = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(value, empty),
+                    new SymbolicStringConstantTerm("text")),
+                SyntaxFactory.ParseExpression("value + \"\" == \"text\""),
+                "test.empty-suffix");
+            var adjacentLiteralConcat = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), value),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + value == \"target\""),
+                "test.adjacent-literals");
+            var adjacentLiteralDirect = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(new SymbolicStringConstantTerm("ab"), value),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"ab\" + value == \"target\""),
+                "test.adjacent-literal-direct");
+            var emptyOnlyConcat = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(empty, empty),
+                    empty),
+                SyntaxFactory.ParseExpression("\"\" + \"\" == \"\""),
+                "test.empty-only");
+            var directEmpty = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    empty,
+                    empty),
+                SyntaxFactory.ParseExpression("\"\" == \"\""),
+                "test.direct-empty");
 
             Assert.That(new SymbolicState(new[] { leftAssociated }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { rightAssociated }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { leftAssociated }).NormalizedProofKey, Is.Not.EqualTo(new SymbolicState(new[] { reordered }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { directValue }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { emptyPrefix }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { directValue }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { emptySuffix }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { adjacentLiteralConcat }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { adjacentLiteralDirect }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { emptyOnlyConcat }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { directEmpty }).NormalizedProofKey));
         }
 
         [Test]
