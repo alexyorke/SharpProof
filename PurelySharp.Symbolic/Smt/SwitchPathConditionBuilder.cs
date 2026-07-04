@@ -457,7 +457,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (whenClause != null)
             {
-                if (!CSharpSmtFormulaTranslator.TryTranslate(
+                if (!SymbolicReachabilityService.TryTranslateConditionFormula(
                         whenClause.Condition,
                         semanticModel,
                         cancellationToken,
@@ -1255,7 +1255,7 @@ namespace PurelySharp.Symbolic.Smt
                     }
                 }
 
-                if (CSharpSmtFormulaTranslator.TryTranslate(
+                if (SymbolicReachabilityService.TryTranslateConditionFormula(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
