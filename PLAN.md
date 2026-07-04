@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 111,958 C# production lines across
-  172 files. The largest modules are `PurelySharp.Symbolic` at 53,213 lines,
+- Production inventory currently reports 111,968 C# production lines across
+  173 files. The largest modules are `PurelySharp.Symbolic` at 53,223 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -47,7 +47,8 @@ path-fact, hazard, and ownership flows.
   in `SymbolicIrLowerer.Strings.cs`. Object API lowering now lives in
   `SymbolicIrLowerer.Objects.cs`, and pattern/type-test lowering now lives in
   `SymbolicIrLowerer.Patterns.cs`. String equality lowering now also lives in
-  the string partial; `SymbolicIrLowerer.cs` is about 995 lines.
+  the string partial, and tuple equality/member lowering now lives in
+  `SymbolicIrLowerer.Tuples.cs`; `SymbolicIrLowerer.cs` is about 901 lines.
 - `SymbolicProofService` exists, and the proof spine now normalizes many
   exact constant/string/bounds/conditional/type-test facts before SMT. It must
   keep growing into the only internal bridge from IR facts to solver formulas.
