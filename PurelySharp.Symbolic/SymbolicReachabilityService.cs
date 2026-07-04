@@ -1376,7 +1376,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula(
+            formula = SmtFormulaFactory.CreateSubsequenceInRangeFormula(
                 receiverLengthFormula,
                 startFormula,
                 sliceLengthFormula,

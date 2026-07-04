@@ -891,7 +891,7 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
-            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
+            Assert.That(reachabilitySource, Does.Contain("SmtFormulaFactory.CreateSubsequenceInRangeFormula("));
         }
 
         [Test]

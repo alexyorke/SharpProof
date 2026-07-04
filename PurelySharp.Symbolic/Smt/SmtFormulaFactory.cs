@@ -92,5 +92,67 @@ namespace PurelySharp.Symbolic.Smt
         {
             return new SmtIntegerConstant(1);
         }
+
+        internal static SmtFormula CreateSubsequenceInRangeFormula(
+            SmtFormula sourceLength,
+            SmtFormula start,
+            SmtFormula? count,
+            bool oneArgumentUpperBoundIsInclusive)
+        {
+            var startNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                start,
+                new SmtIntegerConstant(0));
+
+            if (count == null)
+            {
+                var upperBound = new SmtBinaryFormula(
+                    oneArgumentUpperBoundIsInclusive
+                        ? SmtBinaryOperator.LessThanOrEqual
+                        : SmtBinaryOperator.LessThan,
+                    start,
+                    sourceLength);
+                return new SmtBinaryFormula(SmtBinaryOperator.And, startNonNegative, upperBound);
+            }
+
+            var countNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                count,
+                new SmtIntegerConstant(0));
+            var startWithinLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                start,
+                sourceLength);
+            var remainingLength = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Subtract,
+                sourceLength,
+                start);
+            var countWithinRemainingLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                count,
+                remainingLength);
+            SmtFormula additionDoesNotOverflow = count is SmtIntegerConstant { Value: 0 }
+                ? new SmtBooleanConstant(true)
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    start,
+                    new SmtIntegerBinaryTerm(
+                        SmtIntegerBinaryOperator.Subtract,
+                        new SmtIntegerConstant(int.MaxValue),
+                        count));
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                startNonNegative,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    countNonNegative,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.And,
+                        startWithinLength,
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.And,
+                            countWithinRemainingLength,
+                            additionDoesNotOverflow))));
+        }
     }
 }

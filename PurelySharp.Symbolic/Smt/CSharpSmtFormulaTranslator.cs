@@ -319,17 +319,5 @@ namespace PurelySharp.Symbolic.Smt
                 out formula);
         }
 
-        internal static SmtFormula CreateSubsequenceInRangeFormula(
-            SmtFormula sourceLength,
-            SmtFormula start,
-            SmtFormula? count,
-            bool oneArgumentUpperBoundIsInclusive)
-        {
-            return CSharpConditionToFormula.CreateSubsequenceInRangeFormula(
-                sourceLength,
-                start,
-                count,
-                oneArgumentUpperBoundIsInclusive);
-        }
     }
 }
