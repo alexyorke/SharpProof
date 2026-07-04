@@ -2204,6 +2204,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyFlattensStringConcatTerms()
+        {
+            var a = new SymbolicStringConstantTerm("a");
+            var b = new SymbolicStringConstantTerm("b");
+            var c = new SymbolicStringConstantTerm("c");
+            var leftAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), c),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"abc\""),
+                "test.left");
+            var rightAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(a, new SymbolicStringConcatTerm(b, c)),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"abc\""),
+                "test.right");
+            var reordered = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(b, a), c),
+                    new SymbolicStringConstantTerm("bac")),
+                SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"bac\""),
+                "test.reordered");
+
+            Assert.That(new SymbolicState(new[] { leftAssociated }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { rightAssociated }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { leftAssociated }).NormalizedProofKey, Is.Not.EqualTo(new SymbolicState(new[] { reordered }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNonRelationAtomKeys()
         {
             var value = new SymbolicVariableTerm("value", SmtValueKind.Reference);
@@ -2752,6 +2784,36 @@ namespace PurelySharp.Test
                     new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, one, x),
                     ten),
                 SyntaxFactory.ParseExpression("1 + x < 10"),
+                "test.queried");
+            var state = new SymbolicState(new[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_AssociativeStringConcatFactImpliesWithoutSmt()
+        {
+            var a = new SymbolicStringConstantTerm("a");
+            var b = new SymbolicStringConstantTerm("b");
+            var c = new SymbolicStringConstantTerm("c");
+            var stored = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), c),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"abc\""),
+                "test.stored");
+            var queried = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(a, new SymbolicStringConcatTerm(b, c)),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"abc\""),
                 "test.queried");
             var state = new SymbolicState(new[] { stored });
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);

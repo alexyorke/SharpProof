@@ -742,7 +742,7 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicStringContentTerm content:
                     return "string-content:" + CreateTermKey(content.Reference);
                 case SymbolicStringConcatTerm concat:
-                    return "string-concat(" + CreateTermKey(concat.Left) + "," + CreateTermKey(concat.Right) + ")";
+                    return CreateStringConcatTermKey(concat);
                 case SymbolicNullableHasValueTerm nullableHasValue:
                     return "nullable-has-value:" + nullableHasValue.NullableName;
                 case SymbolicLengthTerm length:
@@ -759,6 +759,25 @@ namespace PurelySharp.Symbolic.Ir
                 default:
                     return term.ToString() ?? string.Empty;
             }
+        }
+
+        private static string CreateStringConcatTermKey(SymbolicStringConcatTerm concat)
+        {
+            var terms = new List<string>();
+            CollectStringConcatTermKeys(concat, terms);
+            return "string-concat(" + string.Join(",", terms) + ")";
+        }
+
+        private static void CollectStringConcatTermKeys(SymbolicTerm term, ICollection<string> terms)
+        {
+            if (term is SymbolicStringConcatTerm concat)
+            {
+                CollectStringConcatTermKeys(concat.Left, terms);
+                CollectStringConcatTermKeys(concat.Right, terms);
+                return;
+            }
+
+            terms.Add(CreateTermKey(term));
         }
 
         private static string CreateBinaryTermKey(SymbolicBinaryTerm binary)
