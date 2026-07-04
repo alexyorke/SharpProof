@@ -1704,6 +1704,7 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.index.out-of-range");
         }
 
         [Test]
@@ -1730,6 +1731,7 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_array_get_value_index_out_of_range"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.array-get-value.index-out-of-range");
         }
 
         [Test]
@@ -2667,6 +2669,7 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.signed-division-overflow");
         }
 
         [Test]
@@ -2731,6 +2734,7 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.signed-division-overflow");
         }
 
         [Test]
@@ -3119,6 +3123,7 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_negative_array_length"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.array.negative-length.aggregate");
         }
 
         [Test]
@@ -3185,6 +3190,7 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_negative_stackalloc_length"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.stackalloc.negative-length.aggregate");
         }
 
         [Test]
@@ -3368,6 +3374,7 @@ public class TestClass
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
             Assert.That(hazard.OperationText, Is.EqualTo("++value"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.increment-overflow");
         }
 
         [Test]
@@ -3396,6 +3403,7 @@ public class TestClass
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
             Assert.That(hazard.OperationText, Is.EqualTo("value--"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-integral.decrement-overflow");
         }
 
         [Test]
@@ -3500,6 +3508,7 @@ public class TestClass
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_numeric_conversion_overflow"));
             Assert.That(hazard.OperationText, Is.EqualTo("(int)value"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.checked-conversion.overflow");
         }
 
         [Test]
@@ -3885,6 +3894,16 @@ public class TestClass
         {
             Assert.That(result.Hazards, Has.Count.EqualTo(1));
             return result.Hazards.Single();
+        }
+
+        private static void AssertIrExceptionPrecondition(
+            SymbolicRuntimeHazard hazard,
+            string provenance)
+        {
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo(provenance));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain(provenance));
         }
 
         private static (MethodDeclarationSyntax Method, SemanticModel SemanticModel) CreateMethodContext(
