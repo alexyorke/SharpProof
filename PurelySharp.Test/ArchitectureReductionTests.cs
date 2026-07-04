@@ -2717,10 +2717,47 @@ namespace PurelySharp.Test
                     new SymbolicIntegerConstantTerm(1)),
                 SyntaxFactory.ParseExpression("guard ? x : x"),
                 "test.conditional.same-branches");
+            var exactIntegerConditional = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicConstantCondition(true),
+                        new SymbolicIntegerConstantTerm(1),
+                        new SymbolicIntegerConstantTerm(2)),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("true ? 1 : 2"),
+                "test.conditional.exact-integer");
+            var exactStringConditional = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicConstantCondition(false),
+                        new SymbolicStringConstantTerm("left"),
+                        new SymbolicStringConstantTerm("right")),
+                    new SymbolicStringConstantTerm("right")),
+                SyntaxFactory.ParseExpression("false ? \"left\" : \"right\""),
+                "test.conditional.exact-string");
+            var exactBooleanConditional = SymbolicFact.Exact(
+                new SymbolicTruthAtom(new SymbolicConditionalTerm(
+                    new SymbolicConstantCondition(false),
+                    new SymbolicBooleanConstantTerm(false),
+                    new SymbolicBooleanConstantTerm(true))),
+                SyntaxFactory.ParseExpression("false ? false : true"),
+                "test.conditional.exact-boolean");
+            var falseBooleanConditional = SymbolicFact.Exact(
+                new SymbolicTruthAtom(new SymbolicConditionalTerm(
+                    new SymbolicConstantCondition(true),
+                    new SymbolicBooleanConstantTerm(false),
+                    new SymbolicBooleanConstantTerm(true))),
+                SyntaxFactory.ParseExpression("true ? false : true"),
+                "test.conditional.false-boolean");
+            var empty = new SymbolicState();
 
             Assert.That(new SymbolicState(new[] { trueSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { falseSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { identicalBranches }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { exactIntegerConditional, exactStringConditional, exactBooleanConditional }).NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { falseBooleanConditional }).IsContradictory, Is.True);
         }
 
         [Test]
@@ -3821,6 +3858,23 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("suffix")),
                 SyntaxFactory.ParseExpression("\"pre\" + \"fix\" == \"suffix\""),
                 "test.false-string-concat-target");
+            var trueConditionalTarget = SymbolicFact.Exact(
+                new SymbolicTruthAtom(new SymbolicConditionalTerm(
+                    new SymbolicConstantCondition(false),
+                    new SymbolicBooleanConstantTerm(false),
+                    new SymbolicBooleanConstantTerm(true))),
+                SyntaxFactory.ParseExpression("false ? false : true"),
+                "test.true-conditional-target");
+            var falseConditionalTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(
+                        new SymbolicConstantCondition(true),
+                        new SymbolicStringConstantTerm("left"),
+                        new SymbolicStringConstantTerm("right")),
+                    new SymbolicStringConstantTerm("right")),
+                SyntaxFactory.ParseExpression("true ? \"left\" : \"right\""),
+                "test.false-conditional-target");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
@@ -3859,6 +3913,14 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseStringConcatTarget,
                 smtAnalysis);
+            var trueConditionalResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueConditionalTarget,
+                smtAnalysis);
+            var falseConditionalResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseConditionalTarget,
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
@@ -3878,6 +3940,10 @@ namespace PurelySharp.Test
             Assert.That(trueStringLengthResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseStringConcatResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseStringConcatResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueConditionalResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseConditionalResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseConditionalResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 

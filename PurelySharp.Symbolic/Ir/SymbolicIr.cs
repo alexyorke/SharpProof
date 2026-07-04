@@ -507,9 +507,10 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool TryEvaluateFact(SymbolicFact fact, out bool value)
         {
-            if (fact.Atom is SymbolicTruthAtom { Condition: SymbolicBooleanConstantTerm boolean })
+            if (fact.Atom is SymbolicTruthAtom { Condition: var truthCondition } &&
+                TryEvaluateBooleanTerm(truthCondition, out var truthValue))
             {
-                value = fact.Polarity ? boolean.Value : !boolean.Value;
+                value = fact.Polarity ? truthValue : !truthValue;
                 return true;
             }
 
@@ -652,6 +653,12 @@ namespace PurelySharp.Symbolic.Ir
                     key = CreateTermKey(term);
                     return true;
                 default:
+                    if (TryEvaluateBooleanTerm(term, out var booleanValue))
+                    {
+                        key = CreateTermKey(new SymbolicBooleanConstantTerm(booleanValue));
+                        return true;
+                    }
+
                     if (TryEvaluateIntegerTerm(term, out var integerValue))
                     {
                         key = CreateTermKey(new SymbolicIntegerConstantTerm(integerValue));
@@ -680,6 +687,9 @@ namespace PurelySharp.Symbolic.Ir
                     when TryEvaluateStringTerm(lengthValue, out var stringValue):
                     value = stringValue.Length;
                     return true;
+                case SymbolicConditionalTerm conditional
+                    when TrySelectConstantConditionalBranch(conditional, out var selected):
+                    return TryEvaluateIntegerTerm(selected, out value);
                 default:
                     value = 0;
                     return false;
@@ -703,10 +713,43 @@ namespace PurelySharp.Symbolic.Ir
 
                     value = string.Empty;
                     return false;
+                case SymbolicConditionalTerm conditional
+                    when TrySelectConstantConditionalBranch(conditional, out var selected):
+                    return TryEvaluateStringTerm(selected, out value);
                 default:
                     value = string.Empty;
                     return false;
             }
+        }
+
+        private static bool TryEvaluateBooleanTerm(SymbolicTerm term, out bool value)
+        {
+            switch (term)
+            {
+                case SymbolicBooleanConstantTerm boolean:
+                    value = boolean.Value;
+                    return true;
+                case SymbolicConditionalTerm conditional
+                    when TrySelectConstantConditionalBranch(conditional, out var selected):
+                    return TryEvaluateBooleanTerm(selected, out value);
+                default:
+                    value = false;
+                    return false;
+            }
+        }
+
+        private static bool TrySelectConstantConditionalBranch(
+            SymbolicConditionalTerm conditional,
+            out SymbolicTerm selected)
+        {
+            if (conditional.Condition is SymbolicConstantCondition constant)
+            {
+                selected = constant.Value ? conditional.WhenTrue : conditional.WhenFalse;
+                return true;
+            }
+
+            selected = conditional.WhenTrue;
+            return false;
         }
 
         private static bool TryEvaluateSelfAlias(SymbolicAliasAtom alias, out bool value)
