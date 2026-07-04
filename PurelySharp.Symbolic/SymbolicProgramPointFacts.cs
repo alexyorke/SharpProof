@@ -9454,6 +9454,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerTerm(valueExpression, loweringContext, out var term) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula))
+            {
+                return true;
+            }
+
             if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     valueExpression,
                     semanticModel,
@@ -9477,6 +9484,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerCondition(condition, loweringContext, out var symbolicCondition) &&
+                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out formula))
+            {
+                return true;
+            }
+
             if (CSharpSmtFormulaTranslator.TryTranslate(
                     condition,
                     semanticModel,

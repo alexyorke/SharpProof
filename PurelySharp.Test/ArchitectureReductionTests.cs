@@ -2026,6 +2026,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_TriesIrHelpersBeforeLegacyTranslator()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            var valueIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal);
+            var valueLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal);
+            var conditionIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal);
+            var conditionLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal);
+
+            Assert.That(valueIrIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(valueLegacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(conditionIrIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(conditionLegacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(valueIrIndex, Is.LessThan(valueLegacyIndex));
+            Assert.That(conditionIrIndex, Is.LessThan(conditionLegacyIndex));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_EvaluatesConditionTruthThroughIrBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();
