@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,088 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,343 lines,
+- Production inventory currently reports 112,100 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,355 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -61,9 +61,9 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.Utilities.cs`; `SymbolicIrLowerer.cs` is about 262 lines.
 - `SymbolicProofService` exists, and the proof spine now normalizes many
   exact constant/string/bounds/conditional/type-test facts before SMT.
-  `SymbolicState` also detects contradictory exact disposal and resource
-  lifetime states syntactically. The proof spine must keep growing into the
-  only internal bridge from IR facts to solver formulas.
+  `SymbolicState` also detects contradictory exact ownership, disposal, and
+  resource-lifetime states syntactically. The proof spine must keep growing
+  into the only internal bridge from IR facts to solver formulas.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
@@ -93,7 +93,7 @@ path-fact, hazard, and ownership flows.
 - Normalize and deduplicate `SymbolicState` facts and path conditions.
 - Add stable proof keys and symbol-version storage to `SymbolicState`.
 - Continue broadening syntactic contradiction handling; exact conflicting
-  disposal and resource-lifetime states are now covered.
+  ownership, disposal, and resource-lifetime states are now covered.
 - Make `SymbolicProofService` normalize states before encoding.
 - Keep fallback `SmtAnalysisService` construction only at the documented proof
   boundary or require a compilation-scoped service.
