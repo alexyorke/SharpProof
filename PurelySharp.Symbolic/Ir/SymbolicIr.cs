@@ -538,11 +538,27 @@ namespace PurelySharp.Symbolic.Ir
                     return "const:" + (constant.Value ? "true" : "false");
                 case SymbolicFactCondition factCondition:
                     return "fact-condition:" + CreateFactKey(factCondition.Fact);
+                case SymbolicNotCondition { Operand: SymbolicNotCondition nestedNotCondition }:
+                    return CreateConditionKey(nestedNotCondition.Operand);
                 case SymbolicNotCondition notCondition:
                     return "not(" + CreateConditionKey(notCondition.Operand) + ")";
                 case SymbolicBinaryCondition binaryCondition:
                     var operands = new List<string>();
                     CollectBinaryConditionOperandKeys(binaryCondition, binaryCondition.Operator, operands);
+                    var identityOperand = binaryCondition.Operator == SymbolicConditionOperator.And
+                        ? "const:true"
+                        : "const:false";
+                    operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
+                    if (operands.Count == 0)
+                    {
+                        return identityOperand;
+                    }
+
+                    if (operands.Count == 1)
+                    {
+                        return operands[0];
+                    }
+
                     operands.Sort(StringComparer.Ordinal);
                     return "binary:" + binaryCondition.Operator + "(" + string.Join(",", operands) + ")";
                 default:

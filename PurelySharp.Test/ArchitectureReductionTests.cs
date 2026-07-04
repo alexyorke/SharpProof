@@ -1983,6 +1983,35 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConditionIdentities()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var direct = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                xPositive,
+            });
+            var withIdentities = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(new SymbolicNotCondition(new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    new SymbolicConstantCondition(true),
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        xPositive,
+                        new SymbolicConstantCondition(false))))),
+            });
+
+            Assert.That(direct.NormalizedProofKey, Is.EqualTo(withIdentities.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicProofService_ContradictoryStateShortCircuitsWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
