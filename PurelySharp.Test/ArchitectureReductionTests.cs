@@ -126,6 +126,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ProductionDefaultSmtFallback_IsOnlyInSymbolicProofService()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var offenders = Directory.GetFiles(repositoryRoot, "*.cs", SearchOption.AllDirectories)
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}PurelySharp.Test{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}PurelySharp.ToolingTest{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(file => file.Source.Contains("new SmtAnalysisService(SmtAnalysisOptions.Default)", StringComparison.Ordinal) &&
+                    !string.Equals(file.Path, "PurelySharp.Symbolic/SymbolicProofService.cs", StringComparison.Ordinal))
+                .Select(file => file.Path)
+                .ToArray();
+            var proofServiceSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProofService.cs"));
+
+            Assert.That(offenders, Is.Empty);
+            Assert.That(proofServiceSource, Does.Contain("only ad hoc SMT service fallback boundary"));
+            Assert.That(proofServiceSource, Does.Contain("using var fallback = new SmtAnalysisService(SmtAnalysisOptions.Default);"));
+        }
+
+        [Test]
         public void SymbolicRuntimeHazardQueryService_RoutesIrTriggerProofsThroughProofService()
         {
             var repositoryRoot = FindRepositoryRoot();

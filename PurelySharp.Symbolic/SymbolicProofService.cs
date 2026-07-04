@@ -472,6 +472,7 @@ namespace PurelySharp.Symbolic
                 return classify(smtAnalysis);
             }
 
+            // This is the only ad hoc SMT service fallback boundary; callers should normally pass a compilation-scoped service.
             using var fallback = new SmtAnalysisService(SmtAnalysisOptions.Default);
             return classify(fallback);
         }
