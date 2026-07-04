@@ -445,13 +445,23 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
+            var originalCount = formulas.Count;
+            TryCollectIrNonNullBranchAssumptions(
                 expression,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
                 formulas,
                 getSymbolVersion);
+
+            return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
+                expression,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion) ||
+                formulas.Count > originalCount;
         }
 
         internal static bool TryCollectPatternBindingFacts(
@@ -539,6 +549,202 @@ namespace PurelySharp.Symbolic
             }
 
             return formulas.Count > originalCount;
+        }
+
+        private static void TryCollectIrNonNullBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (branchWhenTrue &&
+                TryCreateIrTypeTestNonNullBranchFact(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var typeTestNonNull,
+                    getSymbolVersion))
+            {
+                formulas.Add(typeTestNonNull);
+            }
+
+            if (TryCreateIrNullComparisonOperandImplication(
+                    expression,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandNonNull,
+                    getSymbolVersion))
+            {
+                formulas.Add(operandNonNull);
+            }
+        }
+
+        private static bool TryCreateIrTypeTestNonNullBranchFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null!;
+            expression = UnwrapExpression(expression);
+
+            ExpressionSyntax? testedExpression = null;
+            if (expression is BinaryExpressionSyntax binaryExpression &&
+                binaryExpression.IsKind(SyntaxKind.IsExpression) &&
+                binaryExpression.Right is TypeSyntax)
+            {
+                testedExpression = binaryExpression.Left;
+            }
+            else if (expression is IsPatternExpressionSyntax isPatternExpression &&
+                PatternMatchImpliesReferenceNonNull(isPatternExpression.Pattern))
+            {
+                testedExpression = isPatternExpression.Expression;
+            }
+
+            if (testedExpression == null ||
+                !TryTranslateValue(
+                    testedExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var testedValue,
+                    getSymbolVersion) ||
+                testedValue.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            formula = SmtFormulaFactory.CreateReferenceNullComparison(testedValue, isNull: false);
+            return true;
+        }
+
+        private static bool TryCreateIrNullComparisonOperandImplication(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null!;
+            expression = UnwrapExpression(expression);
+            if (expression is not BinaryExpressionSyntax binaryExpression ||
+                !ComparisonBranchImpliesComparedValueNonNull(binaryExpression.Kind(), branchWhenTrue))
+            {
+                return false;
+            }
+
+            if (IsNullLikeReferenceComparisonOperand(binaryExpression.Left, semanticModel, cancellationToken) &&
+                TryCreateIrOperandNonNullImplication(
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightImplication,
+                    getSymbolVersion))
+            {
+                formula = rightImplication;
+                return true;
+            }
+
+            if (IsNullLikeReferenceComparisonOperand(binaryExpression.Right, semanticModel, cancellationToken) &&
+                TryCreateIrOperandNonNullImplication(
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftImplication,
+                    getSymbolVersion))
+            {
+                formula = leftImplication;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool ComparisonBranchImpliesComparedValueNonNull(SyntaxKind comparisonKind, bool branchWhenTrue)
+        {
+            return branchWhenTrue
+                ? comparisonKind == SyntaxKind.NotEqualsExpression
+                : comparisonKind == SyntaxKind.EqualsExpression;
+        }
+
+        private static bool IsNullLikeReferenceComparisonOperand(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true, Value: null })
+            {
+                return true;
+            }
+
+            if (!expression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+                expression is not DefaultExpressionSyntax)
+            {
+                return false;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            return type?.IsReferenceType == true;
+        }
+
+        private static bool TryCreateIrOperandNonNullImplication(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null!;
+            expression = UnwrapExpression(expression);
+            ExpressionSyntax? sourceExpression = null;
+
+            if (expression is BinaryExpressionSyntax asExpression &&
+                asExpression.IsKind(SyntaxKind.AsExpression))
+            {
+                sourceExpression = asExpression.Left;
+            }
+            else if (expression is CastExpressionSyntax castExpression &&
+                IsIdentityPreservingReferenceCast(castExpression, semanticModel, cancellationToken))
+            {
+                sourceExpression = castExpression.Expression;
+            }
+            else if (expression is ConditionalAccessExpressionSyntax conditionalAccess)
+            {
+                sourceExpression = conditionalAccess.Expression;
+            }
+
+            if (sourceExpression == null ||
+                !TryTranslateValue(
+                    sourceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceFormula,
+                    getSymbolVersion) ||
+                sourceFormula.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            formula = SmtFormulaFactory.CreateReferenceNullComparison(sourceFormula, isNull: false);
+            return true;
+        }
+
+        private static bool IsIdentityPreservingReferenceCast(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
+            var targetType = semanticModel.GetTypeInfo(castExpression.Type, cancellationToken).Type;
+            return sourceType?.IsReferenceType == true &&
+                targetType?.IsReferenceType == true &&
+                semanticModel.Compilation.ClassifyConversion(sourceType, targetType).IsImplicit;
         }
 
         private static void TryCollectIrPatternMatchedValueAssumptions(

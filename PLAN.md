@@ -55,6 +55,10 @@ path-fact, hazard, and ownership flows.
   reachability now emits binding facts, matched-expression non-null facts when
   the pattern implies them, and the translated pattern formula before falling
   back to legacy branch assumption collection.
+  Branch non-null implications now also try an IR-first path before the legacy
+  collector for two bounded families: positive type tests / non-null-implying
+  patterns, and null-comparison operand implications for `as`, identity-
+  preserving reference casts, and conditional access.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped
