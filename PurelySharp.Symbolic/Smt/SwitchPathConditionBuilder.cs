@@ -250,7 +250,7 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (SymbolicReachabilityService.TryTranslateValue(
                     governingExpression,
                     semanticModel,
                     cancellationToken,
@@ -283,7 +283,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpSmtFormulaTranslator.TryTranslateValue(
+                SymbolicReachabilityService.TryTranslateValue(
                     caseLabel.Value,
                     semanticModel,
                     cancellationToken,
@@ -337,7 +337,7 @@ namespace PurelySharp.Symbolic.Smt
                 getSymbolVersion);
 
             if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpSmtFormulaTranslator.TryTranslateValue(
+                SymbolicReachabilityService.TryTranslateValue(
                     caseLabel.Value,
                     semanticModel,
                     cancellationToken,
