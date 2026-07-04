@@ -2594,19 +2594,8 @@ namespace PurelySharp.Symbolic
                 return facts.Length > 0;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
-                    valueExpression,
-                    targetFormula,
-                    semanticModel,
-                    cancellationToken,
-                    out facts,
-                    getSymbolVersion))
-            {
-                facts = ImmutableArray<SmtFormula>.Empty;
-                return false;
-            }
-
-            return facts.Length > 0;
+            facts = ImmutableArray<SmtFormula>.Empty;
+            return false;
         }
 
         private static bool TryCreateIrAsExpressionAssignmentFacts(
@@ -2688,21 +2677,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var irFacts = builder.MoveToImmutable();
-            if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
-                    valueExpression,
-                    targetFormula,
-                    semanticModel,
-                    cancellationToken,
-                    out var legacyFacts,
-                    getSymbolVersion) ||
-                !irFacts.SequenceEqual(legacyFacts))
-            {
-                facts = ImmutableArray<SmtFormula>.Empty;
-                return false;
-            }
-
-            facts = irFacts;
+            facts = builder.MoveToImmutable();
             return true;
         }
 
