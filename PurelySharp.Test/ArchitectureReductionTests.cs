@@ -2165,6 +2165,80 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyUsesStableNonRelationAtomKeys()
+        {
+            var value = new SymbolicVariableTerm("value", SmtValueKind.Reference);
+            var text = new SymbolicStringContentTerm(value);
+            var prefix = new SymbolicStringConstantTerm("pre");
+            var index = new SymbolicVariableTerm("index", SmtValueKind.Int);
+            var length = new SymbolicLengthTerm(value);
+            var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+            var trigger = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    index,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("index == 0"),
+                "test.trigger"));
+            var left = new SymbolicState(new[]
+            {
+                SymbolicFact.Exact(
+                    new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.StartsWith, text, prefix),
+                    SyntaxFactory.ParseExpression("value.StartsWith(\"pre\")"),
+                    "test.string"),
+                SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(index, length, IncludeLowerBound: true, IncludeUpperBound: true),
+                    SyntaxFactory.ParseExpression("value[index]"),
+                    "test.bounds"),
+                SymbolicFact.Exact(
+                    new SymbolicTypeTestAtom(value, "System.String"),
+                    SyntaxFactory.ParseExpression("value is string"),
+                    "test.type"),
+                SymbolicFact.Exact(
+                    new SymbolicOwnershipAtom(resource, Escaped: false),
+                    SyntaxFactory.ParseExpression("resource"),
+                    "test.ownership"),
+                SymbolicFact.Exact(
+                    new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned),
+                    SyntaxFactory.ParseExpression("resource"),
+                    "test.resource"),
+                SymbolicFact.Exact(
+                    new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.IndexOutOfRange, value, trigger),
+                    SyntaxFactory.ParseExpression("value[index]"),
+                    "test.exception"),
+            });
+            var right = new SymbolicState(new[]
+            {
+                SymbolicFact.Exact(
+                    new SymbolicExceptionPreconditionAtom(SymbolicExceptionPreconditionKind.IndexOutOfRange, value, trigger),
+                    SyntaxFactory.ParseExpression("value[index]"),
+                    "other.exception"),
+                SymbolicFact.Exact(
+                    new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Owned),
+                    SyntaxFactory.ParseExpression("resource"),
+                    "other.resource"),
+                SymbolicFact.Exact(
+                    new SymbolicOwnershipAtom(resource, Escaped: false),
+                    SyntaxFactory.ParseExpression("resource"),
+                    "other.ownership"),
+                SymbolicFact.Exact(
+                    new SymbolicTypeTestAtom(value, "System.String"),
+                    SyntaxFactory.ParseExpression("value is string"),
+                    "other.type"),
+                SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(index, length, IncludeLowerBound: true, IncludeUpperBound: true),
+                    SyntaxFactory.ParseExpression("value[index]"),
+                    "other.bounds"),
+                SymbolicFact.Exact(
+                    new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.StartsWith, text, prefix),
+                    SyntaxFactory.ParseExpression("value.StartsWith(\"pre\")"),
+                    "other.string"),
+            });
+
+            Assert.That(left.NormalizedProofKey, Is.EqualTo(right.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

@@ -605,11 +605,54 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateAtomKey(SymbolicAtom atom)
         {
-            return atom switch
+            switch (atom)
             {
-                SymbolicRelationAtom relation => CreateRelationAtomKey(relation),
-                _ => atom.ToString() ?? string.Empty,
-            };
+                case SymbolicTruthAtom truth:
+                    return "truth:" + CreateTermKey(truth.Condition);
+                case SymbolicRelationAtom relation:
+                    return CreateRelationAtomKey(relation);
+                case SymbolicStringPredicateAtom predicate:
+                    return "string-predicate:" + predicate.Predicate + ":" +
+                        predicate.RegexOptions + "(" +
+                        CreateTermKey(predicate.Value) + "," +
+                        CreateTermKey(predicate.Argument) + ")";
+                case SymbolicBoundsAtom bounds:
+                    return "bounds:" +
+                        (bounds.IncludeLowerBound ? "lower-inclusive" : "lower-exclusive") + ":" +
+                        (bounds.IncludeUpperBound ? "upper-inclusive" : "upper-exclusive") + "(" +
+                        CreateTermKey(bounds.Index) + "," +
+                        CreateTermKey(bounds.Length) + ")";
+                case SymbolicFreshnessAtom freshness:
+                    return "fresh:" + CreateTermKey(freshness.Value);
+                case SymbolicOwnershipAtom ownership:
+                    return "ownership:" + (ownership.Escaped ? "escaped" : "owned") + ":" + CreateTermKey(ownership.Value);
+                case SymbolicAliasAtom alias:
+                    return "alias:" + (alias.MayAlias ? "may" : "no") + "(" +
+                        CreateTermKey(alias.Source) + "," +
+                        CreateTermKey(alias.Target) + ")";
+                case SymbolicBorrowAtom borrow:
+                    return "borrow:" + borrow.Kind + "(" +
+                        CreateTermKey(borrow.Owner) + "," +
+                        CreateTermKey(borrow.Borrow) + ")";
+                case SymbolicEscapeAtom escape:
+                    return "escape:" + escape.Kind + ":" + CreateTermKey(escape.Value);
+                case SymbolicReturnedOwnershipAtom returnedOwnership:
+                    return "returned-ownership:" + CreateTermKey(returnedOwnership.Value);
+                case SymbolicMutationAtom mutation:
+                    return "mutation:" + (mutation.CallerVisible ? "caller-visible" : "local") + ":" + CreateTermKey(mutation.Target);
+                case SymbolicDisposalAtom disposal:
+                    return "disposal:" + disposal.State + ":" + CreateTermKey(disposal.Resource);
+                case SymbolicResourceLifetimeAtom resourceLifetime:
+                    return "resource-lifetime:" + resourceLifetime.State + ":" + CreateTermKey(resourceLifetime.Resource);
+                case SymbolicTypeTestAtom typeTest:
+                    return "type-test:" + typeTest.TypeKey + ":" + CreateTermKey(typeTest.Value);
+                case SymbolicExceptionPreconditionAtom precondition:
+                    return "exception-precondition:" + precondition.Kind + ":" +
+                        (precondition.Subject != null ? CreateTermKey(precondition.Subject) : "none") + ":" +
+                        CreateConditionKey(precondition.Trigger);
+                default:
+                    return atom.ToString() ?? string.Empty;
+            }
         }
 
         private static (string AtomKey, bool Polarity) CreateRelationFactCoreKey(
