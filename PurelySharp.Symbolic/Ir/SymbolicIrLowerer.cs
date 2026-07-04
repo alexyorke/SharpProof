@@ -1028,6 +1028,14 @@ namespace PurelySharp.Symbolic.Ir
 
             if (expression is CastExpressionSyntax castExpression)
             {
+                if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
+                    TryLowerTerm(castExpression.Expression, context, out var referenceOperand) &&
+                    referenceOperand.Kind == SmtValueKind.Reference)
+                {
+                    term = referenceOperand;
+                    return true;
+                }
+
                 var sourceType = context.SemanticModel.GetTypeInfo(castExpression.Expression, context.CancellationToken).Type;
                 var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
                 if (sourceType?.TypeKind == TypeKind.Enum &&
