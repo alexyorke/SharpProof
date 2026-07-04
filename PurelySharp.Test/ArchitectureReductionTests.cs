@@ -1475,16 +1475,24 @@ namespace PurelySharp.Test
                 Is.True);
             var runtimeHazardFormulaFallbackLocations = root.GetProperty("runtimeHazardFormulaFallbackLocations")
                 .EnumerateArray()
-                .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
+                .Select(static location => new
+                {
+                    Path = location.GetProperty("path").GetString() ?? string.Empty,
+                    Text = location.GetProperty("text").GetString() ?? string.Empty,
+                })
                 .ToArray();
             var runtimeHazardFormulaFallbackCountsByPath = runtimeHazardFormulaFallbackLocations
-                .GroupBy(static path => path, StringComparer.Ordinal)
+                .GroupBy(static location => location.Path, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+            var runtimeHazardFormulaFallbackCountsByProvenance = runtimeHazardFormulaFallbackLocations
+                .Select(static location => ExtractRuntimeHazardFallbackProvenance(location.Text))
+                .GroupBy(static provenance => provenance, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
             Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(17));
             Assert.That(
-                runtimeHazardFormulaFallbackLocations.All(static path =>
-                    path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
+                runtimeHazardFormulaFallbackLocations.All(static location =>
+                    location.Path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
                 runtimeHazardFormulaFallbackCountsByPath,
@@ -1492,6 +1500,27 @@ namespace PurelySharp.Test
                 {
                     ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs"] = 9,
                     ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"] = 8,
+                }));
+            Assert.That(
+                runtimeHazardFormulaFallbackCountsByProvenance,
+                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
+                {
+                    ["ir.runtime-hazard.argument-null.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-conversion.overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.divide-by-zero.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.dynamic-null-binding.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.index.out-of-range.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.invalid-cast.formula-fallback"] = 2,
+                    ["ir.runtime-hazard.nullable-value.without-value.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.null-dereference.formula-fallback"] = 1,
+                    ["ir.runtime-hazard.unbox-null.formula-fallback"] = 1,
                 }));
         }
 
@@ -3424,6 +3453,20 @@ namespace PurelySharp.Test
             }
 
             return count;
+        }
+
+        private static string ExtractRuntimeHazardFallbackProvenance(string sourceLine)
+        {
+            const string Prefix = "ir.runtime-hazard.";
+            const string Suffix = ".formula-fallback";
+
+            var start = sourceLine.IndexOf(Prefix, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), $"Expected runtime-hazard fallback provenance in: {sourceLine}");
+
+            var end = sourceLine.IndexOf(Suffix, start, StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThanOrEqualTo(0), $"Expected runtime-hazard fallback suffix in: {sourceLine}");
+
+            return sourceLine.Substring(start, end + Suffix.Length - start);
         }
 
         private static string FindRepositoryRoot()
