@@ -96,6 +96,13 @@ namespace PurelySharp.Symbolic
                     "ir_state_contains_fact");
             }
 
+            if (StateContradictsFact(state, fact))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenFalse,
+                    "ir_state_contradicts_fact");
+            }
+
             return ClassifyWithIrCache(
                 "implication-fact:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(fact),
                 () =>
@@ -148,6 +155,13 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.ProvenTrue,
                     "ir_state_contains_condition");
+            }
+
+            if (StateContradictsCondition(state, condition))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenFalse,
+                    "ir_state_contradicts_condition");
             }
 
             return ClassifyWithIrCache(
@@ -226,6 +240,20 @@ namespace PurelySharp.Symbolic
                 return SymbolicIrProofResult.Syntactic(
                     syntacticStatus,
                     "ir_condition_syntactic_truth");
+            }
+
+            if (StateContainsCondition(state, condition))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_state_contains_condition");
+            }
+
+            if (StateContradictsCondition(state, condition))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenFalse,
+                    "ir_state_contradicts_condition");
             }
 
             var reachability = ClassifyReachability(state);
@@ -449,6 +477,11 @@ namespace PurelySharp.Symbolic
                     StringComparison.Ordinal));
         }
 
+        private static bool StateContradictsFact(SymbolicState state, SymbolicFact fact)
+        {
+            return StateContainsFact(state, fact.Negate());
+        }
+
         private static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
         {
             if (condition is SymbolicFactCondition factCondition &&
@@ -466,6 +499,11 @@ namespace PurelySharp.Symbolic
                     SymbolicState.CreateProofConditionKey(candidate),
                     conditionKey,
                     StringComparison.Ordinal));
+        }
+
+        private static bool StateContradictsCondition(SymbolicState state, SymbolicCondition condition)
+        {
+            return StateContainsCondition(state, new SymbolicNotCondition(condition));
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()
