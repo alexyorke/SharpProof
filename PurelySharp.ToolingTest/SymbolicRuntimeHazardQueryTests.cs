@@ -153,6 +153,9 @@ public class TestClass
             Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.divide-by-zero"));
             Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Has.Some.StartsWith("ir."));
             Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(hazard.Proof.Budget, Is.Not.Null);
+            Assert.That(hazard.Proof.Budget!.MaxPathConditions, Is.EqualTo(SmtAnalysisOptions.Default.MaxPathConditions));
             Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
             Assert.That(hazard.PathConditions, Does.Contain("divisor == 0"));
         }

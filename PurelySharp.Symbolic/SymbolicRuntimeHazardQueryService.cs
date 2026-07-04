@@ -409,7 +409,7 @@ namespace PurelySharp.Symbolic
                 category = ExceptionCategories.DefiniteThrowNull;
             }
 
-            var (status, reason) = ClassifyTrigger(
+            var (status, reason, proofInfo) = ClassifyTrigger(
                 analysis,
                 candidate.Site,
                 triggerCondition,
@@ -446,6 +446,7 @@ namespace PurelySharp.Symbolic
                             : new[] { SymbolicFactInfo.FromFact(triggerPrecondition) })),
                 analysis.Reachability,
                 analysis.ReachabilityReason,
+                proofInfo,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 
@@ -519,7 +520,7 @@ namespace PurelySharp.Symbolic
                 : null;
         }
 
-        private static (SymbolicRuntimeHazardStatus Status, string Reason) ClassifyTrigger(
+        private static (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo? Proof) ClassifyTrigger(
             SymbolicProgramPointAnalysis analysis,
             SyntaxNode sourceNode,
             SmtFormula triggerCondition,
@@ -528,27 +529,27 @@ namespace PurelySharp.Symbolic
         {
             if (analysis.Reachability == SymbolicReachability.Unreachable)
             {
-                return (SymbolicRuntimeHazardStatus.Unreachable, analysis.ReachabilityReason);
+                return (SymbolicRuntimeHazardStatus.Unreachable, analysis.ReachabilityReason, null);
             }
 
             if (analysis.Reachability == SymbolicReachability.Unknown)
             {
-                return (SymbolicRuntimeHazardStatus.Unknown, analysis.ReachabilityReason);
+                return (SymbolicRuntimeHazardStatus.Unknown, analysis.ReachabilityReason, null);
             }
 
             if (!smtAnalysis.Options.IsEnabled)
             {
-                return (SymbolicRuntimeHazardStatus.Unsupported, "smt_disabled");
+                return (SymbolicRuntimeHazardStatus.Unsupported, "smt_disabled", null);
             }
 
             if (triggerCondition is SmtBooleanConstant { Value: true })
             {
-                return (SymbolicRuntimeHazardStatus.Proven, "trigger_always_true");
+                return (SymbolicRuntimeHazardStatus.Proven, "trigger_always_true", null);
             }
 
             if (triggerCondition is SmtBooleanConstant { Value: false })
             {
-                return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false");
+                return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false", null);
             }
 
             if (triggerPrecondition != null &&
@@ -566,23 +567,23 @@ namespace PurelySharp.Symbolic
                 "runtime-hazard-trigger");
             if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
-                return (SymbolicRuntimeHazardStatus.Proven, formulaTruth.Info.Reason);
+                return (SymbolicRuntimeHazardStatus.Proven, formulaTruth.Info.Reason, formulaTruth.Info);
             }
 
             if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse ||
                 formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                return (SymbolicRuntimeHazardStatus.Unreachable, formulaTruth.Info.Reason);
+                return (SymbolicRuntimeHazardStatus.Unreachable, formulaTruth.Info.Reason, formulaTruth.Info);
             }
 
-            return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason);
+            return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason, formulaTruth.Info);
         }
 
         private static bool TryClassifyIrTrigger(
             SymbolicProgramPointAnalysis analysis,
             SymbolicFact triggerPrecondition,
             SmtAnalysisService smtAnalysis,
-            out (SymbolicRuntimeHazardStatus Status, string Reason) result)
+            out (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo Proof) result)
         {
             var proof = SymbolicReachabilityService.ClassifyStateHazardTrigger(
                 analysis.PathState,
@@ -590,13 +591,13 @@ namespace PurelySharp.Symbolic
                 smtAnalysis);
             if (proof.Info.Status == SymbolicProofStatus.ProvenTrue)
             {
-                result = (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason);
+                result = (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason, proof.Info);
                 return true;
             }
 
             if (proof.Info.Status == SymbolicProofStatus.Unreachable)
             {
-                result = (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason);
+                result = (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason, proof.Info);
                 return true;
             }
 
@@ -691,6 +692,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicFactInfo> symbolicFacts,
             SymbolicReachability reachability,
             string reachabilityReason,
+            SymbolicProofInfo? proofInfo,
             SymbolicSmtDiagnostics? smtDiagnostics = null)
         {
             FilePath = filePath;
@@ -718,16 +720,7 @@ namespace PurelySharp.Symbolic
             SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
-            Proof = new SymbolicProofInfo(
-                MapProofStatus(status),
-                ResolveProofBackend(status),
-                ResolveUnknownReason(status, statusReason),
-                statusReason,
-                cacheHit: false,
-                budget: null,
-                category,
-                triggerCondition,
-                kind.ToString());
+            Proof = CreateProofInfo(status, statusReason, category, triggerCondition, kind, proofInfo);
             InvariantInfo = new SymbolicInvariantInfo(
                 MergedInvariantText,
                 SymbolicFacts,
@@ -801,6 +794,42 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardStatus.Unreachable => SymbolicProofStatus.Unreachable,
                 _ => SymbolicProofStatus.Unknown,
             };
+        }
+
+        private static SymbolicProofInfo CreateProofInfo(
+            SymbolicRuntimeHazardStatus status,
+            string statusReason,
+            string category,
+            string triggerCondition,
+            SymbolicRuntimeHazardKind kind,
+            SymbolicProofInfo? proofInfo)
+        {
+            if (proofInfo == null)
+            {
+                return new SymbolicProofInfo(
+                    MapProofStatus(status),
+                    ResolveProofBackend(status),
+                    ResolveUnknownReason(status, statusReason),
+                    statusReason,
+                    cacheHit: false,
+                    budget: null,
+                    category,
+                    triggerCondition,
+                    kind.ToString());
+            }
+
+            return new SymbolicProofInfo(
+                MapProofStatus(status),
+                proofInfo.Backend,
+                status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable
+                    ? SymbolicUnknownReason.None
+                    : proofInfo.UnknownReason,
+                string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
+                proofInfo.CacheHit,
+                proofInfo.Budget,
+                category,
+                triggerCondition,
+                kind.ToString());
         }
 
         private static SymbolicProofBackend ResolveProofBackend(SymbolicRuntimeHazardStatus status)
