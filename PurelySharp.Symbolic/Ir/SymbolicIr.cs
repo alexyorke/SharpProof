@@ -886,6 +886,7 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
+                    operands = operands.Distinct(StringComparer.Ordinal).ToList();
                     if (operands.Count == 0)
                     {
                         return identityOperand;

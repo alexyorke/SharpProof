@@ -2041,6 +2041,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesDuplicateConditionOperands()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var direct = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                xPositive,
+            });
+            var duplicatedAnd = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, xPositive, xPositive),
+            });
+            var duplicatedOr = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, xPositive, xPositive),
+            });
+
+            Assert.That(direct.NormalizedProofKey, Is.EqualTo(duplicatedAnd.NormalizedProofKey));
+            Assert.That(direct.NormalizedProofKey, Is.EqualTo(duplicatedOr.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesNegatedFactConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
