@@ -134,6 +134,11 @@ path-fact, hazard, and ownership flows.
   `SymbolicProofService.CreateStateFromFormulaPath` and
   `TryCreateStateFromFormulaPath`, so reachability no longer owns its own
   lowered-path helper copies.
+  Prior-assignment state collection now also projects mutation-safe local
+  declarations and simple local or parameter assignments into
+  `SymbolicState` before the legacy formula shadow is merged, so exact
+  assigned-value and built-in-length facts for those shapes no longer depend
+  entirely on lowered SMT replay.
   `SymbolicProgramPointFacts` formula-path condition addition now also
   delegates through `SymbolicProofService.AddLoweredFormulaPathCondition`
   instead of lowering raw SMT conditions at that call site.
@@ -362,8 +367,12 @@ path-fact, hazard, and ownership flows.
   entries, catch entries, using entries, lock entries, and monotonic loop-body
   invariants are now visible through public invariant queries.
 - Prior assignment and normal-completion facts now have a compatibility shadow
-  in `SymbolicState` through `CollectPriorAssignmentState`; the remaining work
-  is to replace each lowered formula family with native IR construction.
+  in `SymbolicState` through `CollectPriorAssignmentState`. Mutation-safe local
+  declarations and simple local or parameter assignments now also emit native
+  IR equality, string-content, string-non-null, and built-in-length facts; the
+  remaining work is to replace the other lowered formula families, especially
+  coalesce, compound, tuple, completion, and self-referential assignment
+  shapes, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.

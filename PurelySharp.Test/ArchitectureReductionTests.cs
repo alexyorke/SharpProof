@@ -6701,6 +6701,70 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_BuildsNativePriorAssignmentStateBeforeFormulaShadow()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var methodIndex = source.IndexOf(
+                "internal static SymbolicState CollectPriorAssignmentState(",
+                StringComparison.Ordinal);
+            var nativeStateIndex = source.IndexOf(
+                "CollectPriorAssignmentStateNative(",
+                methodIndex,
+                StringComparison.Ordinal);
+            var formulaShadowIndex = source.IndexOf(
+                "AddFormulaPathConditions(",
+                nativeStateIndex,
+                StringComparison.Ordinal);
+
+            Assert.That(methodIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nativeStateIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(formulaShadowIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nativeStateIndex, Is.LessThan(formulaShadowIndex));
+            Assert.That(source, Does.Contain("private static void AddPriorStatementStateFacts("));
+            Assert.That(source, Does.Contain("private static void AddAssignedValueStateFacts("));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrPriorAssignmentState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int divisor = 5; return 10 / divisor; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicPriorAssignmentState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var condition = analysis.PathState.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.prior-statement.assigned-value",
+                    StringComparison.Ordinal));
+
+            Assert.That(condition, Is.Not.Null);
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!.Fact,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

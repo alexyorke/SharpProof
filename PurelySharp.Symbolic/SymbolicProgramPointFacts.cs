@@ -82,12 +82,68 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             bool includeCurrentStatementCompletionFacts = false)
         {
-            var state = new SymbolicState();
+            var state = CollectPriorAssignmentStateNative(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts);
             AddFormulaPathConditions(
                 ref state,
                 CollectPriorAssignmentFacts(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts),
                 site,
                 "ir.path.prior-statement");
+            return state.Normalize();
+        }
+
+        private static SymbolicState CollectPriorAssignmentStateNative(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts)
+        {
+            var state = new SymbolicState();
+            foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
+            {
+                if (IsLoopBodyBlock(containingBlock.Block))
+                {
+                    RemoveStateFactsInvalidatedByNestedMutations(
+                        ref state,
+                        containingBlock.Block,
+                        semanticModel,
+                        cancellationToken);
+                }
+
+                RemoveStateFactsInvalidatedByForLoopEntry(
+                    ref state,
+                    containingBlock.Block,
+                    semanticModel,
+                    cancellationToken);
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingBlock.ContainingStatement))
+                    {
+                        if (includeCurrentStatementCompletionFacts &&
+                            ReferenceEquals(site, statement) &&
+                            SupportsCurrentStatementCompletionFacts(statement))
+                        {
+                            AddPriorStatementStateFacts(
+                                ref state,
+                                statement,
+                                semanticModel,
+                                cancellationToken);
+                        }
+
+                        break;
+                    }
+
+                    AddPriorStatementStateFacts(
+                        ref state,
+                        statement,
+                        semanticModel,
+                        cancellationToken);
+                }
+            }
+
             return state;
         }
 
@@ -137,6 +193,24 @@ namespace PurelySharp.Symbolic
             foreach (var symbol in GetForLoopInitializerAssignedSymbols(forStatement, semanticModel, cancellationToken))
             {
                 RemoveFactsReferencingSymbol(facts, symbol);
+            }
+        }
+
+        private static void RemoveStateFactsInvalidatedByForLoopEntry(
+            ref SymbolicState state,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (block.Parent is not ForStatementSyntax forStatement ||
+                !ReferenceEquals(forStatement.Statement, block))
+            {
+                return;
+            }
+
+            foreach (var symbol in GetForLoopInitializerAssignedSymbols(forStatement, semanticModel, cancellationToken))
+            {
+                state = RemoveStateFactsReferencingSymbol(state, symbol);
             }
         }
 
@@ -1888,6 +1962,97 @@ namespace PurelySharp.Symbolic
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
 
+        private static SymbolicState RemoveStateFactsReferencingSymbol(SymbolicState state, ISymbol symbol)
+        {
+            var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+            var remainingFacts = state.Facts
+                .Where(fact => !ReferencesStateSymbol(fact, symbolName));
+            var remainingConditions = state.PathConditions
+                .Where(condition => !ReferencesStateSymbol(condition, symbolName));
+            return new SymbolicState(
+                remainingFacts,
+                remainingConditions,
+                state.SymbolVersions,
+                isContradictory: false).Normalize();
+        }
+
+        private static bool ReferencesStateSymbol(SymbolicFact fact, string symbolName)
+        {
+            return ReferencesStateSymbol(fact.Atom, symbolName);
+        }
+
+        private static bool ReferencesStateSymbol(SymbolicAtom atom, string symbolName)
+        {
+            return atom switch
+            {
+                SymbolicTruthAtom truth => ReferencesStateSymbol(truth.Condition, symbolName),
+                SymbolicRelationAtom relation => ReferencesStateSymbol(relation.Left, symbolName) ||
+                    ReferencesStateSymbol(relation.Right, symbolName),
+                SymbolicStringPredicateAtom predicate => ReferencesStateSymbol(predicate.Value, symbolName) ||
+                    ReferencesStateSymbol(predicate.Argument, symbolName),
+                SymbolicBoundsAtom bounds => ReferencesStateSymbol(bounds.Index, symbolName) ||
+                    ReferencesStateSymbol(bounds.Length, symbolName),
+                SymbolicFreshnessAtom freshness => ReferencesStateSymbol(freshness.Value, symbolName),
+                SymbolicOwnershipAtom ownership => ReferencesStateSymbol(ownership.Value, symbolName),
+                SymbolicAliasAtom alias => ReferencesStateSymbol(alias.Source, symbolName) ||
+                    ReferencesStateSymbol(alias.Target, symbolName),
+                SymbolicBorrowAtom borrow => ReferencesStateSymbol(borrow.Owner, symbolName) ||
+                    ReferencesStateSymbol(borrow.Borrow, symbolName),
+                SymbolicEscapeAtom escape => ReferencesStateSymbol(escape.Value, symbolName),
+                SymbolicReturnedOwnershipAtom returnedOwnership => ReferencesStateSymbol(returnedOwnership.Value, symbolName),
+                SymbolicMutationAtom mutation => ReferencesStateSymbol(mutation.Target, symbolName),
+                SymbolicDisposalAtom disposal => ReferencesStateSymbol(disposal.Resource, symbolName),
+                SymbolicResourceLifetimeAtom lifetime => ReferencesStateSymbol(lifetime.Resource, symbolName),
+                SymbolicTypeTestAtom typeTest => ReferencesStateSymbol(typeTest.Value, symbolName),
+                SymbolicExceptionPreconditionAtom exceptionPrecondition =>
+                    (exceptionPrecondition.Subject != null && ReferencesStateSymbol(exceptionPrecondition.Subject, symbolName)) ||
+                    ReferencesStateSymbol(exceptionPrecondition.Trigger, symbolName),
+                _ => false,
+            };
+        }
+
+        private static bool ReferencesStateSymbol(SymbolicCondition condition, string symbolName)
+        {
+            return condition switch
+            {
+                SymbolicConstantCondition => false,
+                SymbolicFactCondition factCondition => ReferencesStateSymbol(factCondition.Fact, symbolName),
+                SymbolicNotCondition notCondition => ReferencesStateSymbol(notCondition.Operand, symbolName),
+                SymbolicBinaryCondition binaryCondition => ReferencesStateSymbol(binaryCondition.Left, symbolName) ||
+                    ReferencesStateSymbol(binaryCondition.Right, symbolName),
+                _ => false,
+            };
+        }
+
+        private static bool ReferencesStateSymbol(SymbolicTerm term, string symbolName)
+        {
+            return term switch
+            {
+                SymbolicBooleanConstantTerm => false,
+                SymbolicIntegerConstantTerm => false,
+                SymbolicStringConstantTerm => false,
+                SymbolicNullTerm => false,
+                SymbolicVariableTerm variable => string.Equals(variable.Name, symbolName, StringComparison.Ordinal),
+                SymbolicMemberTerm member => ReferencesStateSymbol(member.Receiver, symbolName),
+                SymbolicElementTerm element => ReferencesStateSymbol(element.Receiver, symbolName) ||
+                    ReferencesStateSymbol(element.Index, symbolName),
+                SymbolicStringContentTerm stringContent => ReferencesStateSymbol(stringContent.Reference, symbolName),
+                SymbolicStringConcatTerm concat => ReferencesStateSymbol(concat.Left, symbolName) ||
+                    ReferencesStateSymbol(concat.Right, symbolName),
+                SymbolicNullableHasValueTerm nullableHasValue => string.Equals(nullableHasValue.NullableName, symbolName, StringComparison.Ordinal),
+                SymbolicNullableValueTerm nullableValue => string.Equals(nullableValue.NullableName, symbolName, StringComparison.Ordinal),
+                SymbolicLengthTerm length => ReferencesStateSymbol(length.Value, symbolName),
+                SymbolicArrayDimensionLengthTerm arrayLength => ReferencesStateSymbol(arrayLength.Value, symbolName),
+                SymbolicCountTerm count => ReferencesStateSymbol(count.Value, symbolName),
+                SymbolicBinaryTerm binary => ReferencesStateSymbol(binary.Left, symbolName) ||
+                    ReferencesStateSymbol(binary.Right, symbolName),
+                SymbolicConditionalTerm conditional => ReferencesStateSymbol(conditional.Condition, symbolName) ||
+                    ReferencesStateSymbol(conditional.WhenTrue, symbolName) ||
+                    ReferencesStateSymbol(conditional.WhenFalse, symbolName),
+                _ => false,
+            };
+        }
+
         private static void AddForeachBodyEntryStateFacts(
             ref SymbolicState state,
             ExpressionSyntax expressionSyntax,
@@ -3570,6 +3735,95 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddPriorStatementStateFacts(
+            ref SymbolicState state,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var declarator in localDeclaration.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null)
+                    {
+                        continue;
+                    }
+
+                    RemoveStateFactsInvalidatedByNestedMutations(
+                        ref state,
+                        declarator.Initializer.Value,
+                        semanticModel,
+                        cancellationToken);
+                    if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    {
+                        AddAssignedValueStateFacts(
+                            ref state,
+                            localSymbol.OriginalDefinition,
+                            declarator.Initializer.Value,
+                            semanticModel,
+                            cancellationToken);
+                    }
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax expressionStatement &&
+                expressionStatement.Expression is AssignmentExpressionSyntax assignment)
+            {
+                RemoveStateFactsInvalidatedByNestedMutations(
+                    ref state,
+                    assignment.Left,
+                    semanticModel,
+                    cancellationToken);
+                RemoveStateFactsInvalidatedByNestedMutations(
+                    ref state,
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken);
+
+                if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                    if (assignedSymbol != null)
+                    {
+                        assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
+                    }
+
+                    if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                    {
+                        AddAssignedValueStateFacts(
+                            ref state,
+                            assignedSymbol.OriginalDefinition,
+                            assignment.Right,
+                            semanticModel,
+                            cancellationToken);
+                    }
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax unaryExpressionStatement &&
+                TryGetIncrementedOrDecrementedSymbol(
+                    unaryExpressionStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var mutatedSymbol,
+                    out _))
+            {
+                state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol);
+                return;
+            }
+
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                statement,
+                semanticModel,
+                cancellationToken);
         }
 
         private static void AddCompletedScopedBlockFacts(
@@ -7051,6 +7305,49 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static void RemoveStateFactsInvalidatedByNestedMutations(
+            ref SymbolicState state,
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                var mutatedExpression = node switch
+                {
+                    AssignmentExpressionSyntax assignment => assignment.Left,
+                    PrefixUnaryExpressionSyntax prefixUnary
+                        when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                        prefixUnary.Operand,
+                    PostfixUnaryExpressionSyntax postfixUnary
+                        when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                        postfixUnary.Operand,
+                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                    _ => null
+                };
+
+                if (mutatedExpression != null)
+                {
+                    var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
+                    if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
+                    {
+                        state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol.OriginalDefinition);
+                    }
+
+                    foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
+                    {
+                        state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
+                    }
+                }
+
+                foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
+                {
+                    state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
+                }
+            }
+        }
+
         private static ISymbol? GetMutatedSymbol(
             ExpressionSyntax mutatedExpression,
             SemanticModel semanticModel,
@@ -7367,6 +7664,112 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddAssignedValueStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            state = RemoveStateFactsReferencingSymbol(state, assignedSymbol);
+
+            var hasThrowGuard = TryGetThrowGuardedValue(
+                valueExpression,
+                out var throwGuardedValue,
+                out _,
+                out _,
+                out _);
+            var effectiveValueExpression = hasThrowGuard
+                ? throwGuardedValue
+                : valueExpression;
+            if (ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (assignedType?.SpecialType == SpecialType.System_String)
+            {
+                AddAssignedStringStateFacts(
+                    ref state,
+                    assignedSymbol,
+                    effectiveValueExpression,
+                    context);
+            }
+            else if (TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
+                     SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var valueTerm) &&
+                     CanCompareIrTerms(targetTerm, valueTerm))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    valueTerm,
+                    effectiveValueExpression,
+                    "ir.path.prior-statement.assigned-value");
+            }
+
+            AddAssignedLengthStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                assignedType,
+                context);
+        }
+
+        private static void AddAssignedStringStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SymbolicLoweringContext context)
+        {
+            if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
+                !SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) ||
+                !SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
+            {
+                return;
+            }
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetString,
+                valueString,
+                valueExpression,
+                "ir.path.prior-statement.assigned-string");
+
+            if (SymbolicIrLowerer.TryLowerStringNonNullCondition(valueExpression, context, out var nonNullCondition))
+            {
+                state = state.AddPathCondition(nonNullCondition);
+            }
+        }
+
+        private static void AddAssignedLengthStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            ITypeSymbol? assignedType,
+            SymbolicLoweringContext context)
+        {
+            if (assignedType == null ||
+                !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
+                !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(assignedType, targetReference, out var targetLength) ||
+                !SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength) ||
+                !CanCompareIrTerms(targetLength, valueLength))
+            {
+                return;
+            }
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetLength,
+                valueLength,
+                valueExpression,
+                "ir.path.prior-statement.assigned-length");
         }
 
         private static void AddNotNullIfNotNullAssignedNullStateFacts(
