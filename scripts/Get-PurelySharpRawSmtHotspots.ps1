@@ -324,6 +324,39 @@ function Get-IrKnownApiLoweringLocations
     return @($locations)
 }
 
+function Get-RuntimeHazardFormulaFallbackLocations
+{
+    $files = Get-ChildItem -Path (Join-Path $repoRoot 'PurelySharp.Symbolic') -Recurse -Filter '*.cs' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/' -and
+                ($repoPath -match '^PurelySharp\.Symbolic/SymbolicRuntimeHazard' -or
+                    $repoPath -eq 'PurelySharp.Symbolic/SymbolicReachabilityService.cs')
+        } |
+        Sort-Object FullName
+
+    $locations = @()
+    foreach ($file in $files)
+    {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $file.FullName)
+        {
+            $lineNumber++
+            if ($line.IndexOf('ir.runtime-hazard.', [System.StringComparison]::Ordinal) -ge 0 -and
+                $line.IndexOf('formula-fallback', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $locations += [pscustomobject]@{
+                    path = Convert-ToRepoPath $file.FullName
+                    line = $lineNumber
+                    text = $line.Trim()
+                }
+            }
+        }
+    }
+
+    return @($locations)
+}
+
 Push-Location $repoRoot
 try
 {
@@ -334,6 +367,7 @@ try
     $symbolicDirectTranslatorUsages = @(Get-SymbolicDirectTranslatorUsage)
     $symbolicTranslatorShimUsages = @(Get-SymbolicTranslatorShimUsage)
     $irKnownApiLoweringLocations = @(Get-IrKnownApiLoweringLocations)
+    $runtimeHazardFormulaFallbackLocations = @(Get-RuntimeHazardFormulaFallbackLocations)
 
     $report = [ordered]@{
         schemaVersion = 1
@@ -353,6 +387,8 @@ try
         symbolicTranslatorShimUsages = @($symbolicTranslatorShimUsages)
         irKnownApiLoweringCount = $irKnownApiLoweringLocations.Count
         irKnownApiLoweringLocations = @($irKnownApiLoweringLocations)
+        runtimeHazardFormulaFallbackCount = $runtimeHazardFormulaFallbackLocations.Count
+        runtimeHazardFormulaFallbackLocations = @($runtimeHazardFormulaFallbackLocations)
     }
 
     if ($Json)
@@ -368,6 +404,7 @@ try
     "Symbolic direct CSharpConditionToFormula usages: $($report.symbolicDirectTranslatorUsageCount) lines"
     "Symbolic CSharpSmtFormulaTranslator shim usages: $($report.symbolicTranslatorShimUsageCount) lines"
     "IR known API lowering descriptors: $($report.irKnownApiLoweringCount) entries"
+    "Runtime-hazard formula fallback provenances: $($report.runtimeHazardFormulaFallbackCount) lines"
     ''
     $analyzer.hotspots | Format-Table -AutoSize | Out-String
     $analyzerTranslatorShimUsages | Format-Table -AutoSize | Out-String
@@ -376,6 +413,7 @@ try
     $symbolicDirectTranslatorUsages | Format-Table -AutoSize | Out-String
     $symbolicTranslatorShimUsages | Format-Table -AutoSize | Out-String
     $irKnownApiLoweringLocations | Format-Table -AutoSize | Out-String
+    $runtimeHazardFormulaFallbackLocations | Format-Table -AutoSize | Out-String
 }
 finally
 {

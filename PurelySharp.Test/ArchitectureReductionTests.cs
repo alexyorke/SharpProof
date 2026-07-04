@@ -1253,6 +1253,13 @@ namespace PurelySharp.Test
                     .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
                     .All(static path => path.StartsWith("PurelySharp.Symbolic/Ir/", StringComparison.Ordinal)),
                 Is.True);
+            Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(
+                root.GetProperty("runtimeHazardFormulaFallbackLocations")
+                    .EnumerateArray()
+                    .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
+                    .All(static path => path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
+                Is.True);
         }
 
         [Test]
