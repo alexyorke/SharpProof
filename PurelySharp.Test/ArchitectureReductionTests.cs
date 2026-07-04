@@ -1110,6 +1110,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsOperatorHelpersInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var operatorSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Operators.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryGetRelationOperator(binaryExpression.Kind()"));
+            Assert.That(coreSource, Does.Contain("TryGetBinaryTermOperator(binary.Kind()"));
+            Assert.That(coreSource, Does.Contain("CanCompareTerms(left, right, relationOperator)"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool CanCompareTerms"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsEqualityExpression"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetRelationOperator"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetBinaryTermOperator"));
+            Assert.That(operatorSource, Does.Contain("private static bool CanCompareTerms"));
+            Assert.That(operatorSource, Does.Contain("private static bool IsEqualityExpression"));
+            Assert.That(operatorSource, Does.Contain("private static bool TryGetRelationOperator"));
+            Assert.That(operatorSource, Does.Contain("private static bool TryGetBinaryTermOperator"));
+        }
+
+        [Test]
         public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
