@@ -507,6 +507,12 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool TryEvaluateFact(SymbolicFact fact, out bool value)
         {
+            if (fact.Confidence != SymbolicFactConfidence.Exact)
+            {
+                value = false;
+                return false;
+            }
+
             if (fact.Atom is SymbolicTruthAtom { Condition: var truthCondition } &&
                 TryEvaluateBooleanTerm(truthCondition, out var truthValue))
             {
