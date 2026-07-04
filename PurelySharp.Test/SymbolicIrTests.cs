@@ -317,6 +317,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_AndPatternComposesSharedRelations()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is > 0 and < 10");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
+            Assert.That(CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None, out var legacyFormula), Is.True);
+            Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        }
+
+        [Test]
+        public void LowerCondition_OrPatternComposesSharedRelations()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is < 0 or > 10");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var disjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Right).Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(

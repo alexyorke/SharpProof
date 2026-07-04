@@ -94,7 +94,8 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
-                (TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
+                (TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
@@ -120,14 +121,76 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
+        private static bool TryLowerBinaryPatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            return TryLowerBinaryPatternCondition(expression.Expression, expression.Pattern, context, out condition);
+        }
+
+        private static bool TryLowerPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            return TryLowerBinaryPatternCondition(expression, pattern, context, out condition) ||
+                TryLowerNullPatternCondition(expression, pattern, sourceNode, context, out condition) ||
+                TryLowerConstantPatternCondition(expression, pattern, sourceNode, context, out condition) ||
+                TryLowerRelationalPatternCondition(expression, pattern, sourceNode, context, out condition) ||
+                TryLowerEmptyRecursivePatternCondition(expression, pattern, sourceNode, context, out condition) ||
+                TryLowerTypePatternCondition(expression, pattern, sourceNode, context, out condition);
+        }
+
+        private static bool TryLowerBinaryPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (UnwrapPattern(pattern) is not BinaryPatternSyntax binaryPattern ||
+                !TryLowerPatternCondition(expression, binaryPattern.Left, binaryPattern.Left, context, out var left) ||
+                !TryLowerPatternCondition(expression, binaryPattern.Right, binaryPattern.Right, context, out var right))
+            {
+                return false;
+            }
+
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+            {
+                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
+                return true;
+            }
+
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
+            {
+                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right);
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool TryLowerNullPatternCondition(
             IsPatternExpressionSyntax expression,
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            return TryLowerNullPatternCondition(expression.Expression, expression.Pattern, expression, context, out condition);
+        }
+
+        private static bool TryLowerNullPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!TryLowerNullPattern(expression.Pattern, context, out var negate) ||
-                !TryLowerTerm(expression.Expression, context, out var value) ||
+            if (!TryLowerNullPattern(pattern, context, out var negate) ||
+                !TryLowerTerm(expression, context, out var value) ||
                 value.Kind != SmtValueKind.Reference)
             {
                 return false;
@@ -137,7 +200,7 @@ namespace PurelySharp.Symbolic.Ir
                 negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
                 value,
                 new SymbolicNullTerm(),
-                expression,
+                sourceNode,
                 "ir.pattern.null");
             return true;
         }
@@ -172,9 +235,19 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            return TryLowerConstantPatternCondition(expression.Expression, expression.Pattern, expression, context, out condition);
+        }
+
+        private static bool TryLowerConstantPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!TryLowerConstantPattern(expression.Pattern, out var constantExpression, out var negate) ||
-                !TryLowerTerm(expression.Expression, context, out var value) ||
+            if (!TryLowerConstantPattern(pattern, out var constantExpression, out var negate) ||
+                !TryLowerTerm(expression, context, out var value) ||
                 !TryLowerTerm(constantExpression, context, out var constant) ||
                 !CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
             {
@@ -185,7 +258,7 @@ namespace PurelySharp.Symbolic.Ir
                 negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
                 value,
                 constant,
-                expression,
+                sourceNode,
                 "ir.pattern.constant");
             return true;
         }
@@ -222,10 +295,20 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            return TryLowerRelationalPatternCondition(expression.Expression, expression.Pattern, expression, context, out condition);
+        }
+
+        private static bool TryLowerRelationalPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!TryLowerRelationalPattern(expression.Pattern, out var operatorKind, out var relationalExpression, out var negate) ||
+            if (!TryLowerRelationalPattern(pattern, out var operatorKind, out var relationalExpression, out var negate) ||
                 !TryGetRelationalPatternOperator(operatorKind, negate, out var relationOperator) ||
-                !TryLowerTerm(expression.Expression, context, out var value) ||
+                !TryLowerTerm(expression, context, out var value) ||
                 value.Kind != SmtValueKind.Int ||
                 !TryLowerTerm(relationalExpression, context, out var relationalValue) ||
                 relationalValue.Kind != SmtValueKind.Int)
@@ -237,7 +320,7 @@ namespace PurelySharp.Symbolic.Ir
                 relationOperator,
                 value,
                 relationalValue,
-                expression,
+                sourceNode,
                 "ir.pattern.relational");
             return true;
         }
@@ -296,9 +379,19 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            return TryLowerEmptyRecursivePatternCondition(expression.Expression, expression.Pattern, expression, context, out condition);
+        }
+
+        private static bool TryLowerEmptyRecursivePatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!TryLowerEmptyRecursivePattern(expression.Pattern, out var negate) ||
-                !TryLowerTerm(expression.Expression, context, out var value) ||
+            if (!TryLowerEmptyRecursivePattern(pattern, out var negate) ||
+                !TryLowerTerm(expression, context, out var value) ||
                 value.Kind != SmtValueKind.Reference)
             {
                 return false;
@@ -308,7 +401,7 @@ namespace PurelySharp.Symbolic.Ir
                 negate ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
                 value,
                 new SymbolicNullTerm(),
-                expression,
+                sourceNode,
                 "ir.pattern.recursive.empty");
             return true;
         }
@@ -341,13 +434,23 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            return TryLowerTypePatternCondition(expression.Expression, expression.Pattern, expression.Pattern, context, out condition);
+        }
+
+        private static bool TryLowerTypePatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!TryLowerTypePattern(expression.Pattern, out var typeSyntax, out var negate))
+            if (!TryLowerTypePattern(pattern, out var typeSyntax, out var negate))
             {
                 return false;
             }
 
-            return TryLowerTypeTestCondition(expression.Expression, typeSyntax, expression.Pattern, negate, context, out condition);
+            return TryLowerTypeTestCondition(expression, typeSyntax, sourceNode, negate, context, out condition);
         }
 
         private static bool TryLowerTypeTestCondition(
