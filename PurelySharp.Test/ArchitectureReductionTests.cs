@@ -2412,6 +2412,9 @@ namespace PurelySharp.Test
             Assert.That(valueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
             Assert.That(valueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(
+                valueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
+                Is.LessThan(valueHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal)));
+            Assert.That(
                 lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
                 Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
             Assert.That(

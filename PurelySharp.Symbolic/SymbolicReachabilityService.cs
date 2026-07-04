@@ -1685,14 +1685,14 @@ namespace PurelySharp.Symbolic
             SmtValueKind kind,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            SmtFormula? irFormula = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
             if (!ContainsDivisionOrModulo(expression) &&
                 SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
                 term.Kind == kind &&
                 SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
             {
-                irFormula = encodedFormula;
+                formula = encodedFormula;
+                return true;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateValue(
@@ -1708,8 +1708,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = irFormula!;
-            return formula != null;
+            formula = null!;
+            return false;
         }
 
         internal static bool TryTranslateValue(
