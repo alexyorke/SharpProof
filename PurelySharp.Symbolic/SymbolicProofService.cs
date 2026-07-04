@@ -227,6 +227,18 @@ namespace PurelySharp.Symbolic
                         "ir_branch_syntactic_false");
             }
 
+            if (StateContainsCondition(state, branchCondition))
+            {
+                return ClassifyReachability(state);
+            }
+
+            if (StateContradictsCondition(state, branchCondition))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Unreachable,
+                    "ir_state_contradicts_branch");
+            }
+
             return ClassifyReachability(state.AddPathCondition(branchCondition));
         }
 

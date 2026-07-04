@@ -2762,6 +2762,50 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_StateFactsClassifyCompositeBranchFeasibilityWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x");
+            var yPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y");
+            var branch = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                new SymbolicFactCondition(xPositive),
+                new SymbolicFactCondition(yPositive));
+            var reachableState = new SymbolicState(new[] { xPositive, yPositive });
+            var unreachableState = new SymbolicState(new[] { xPositive, yPositive });
+            using var reachableSmtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            using var unreachableSmtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var reachableBranch = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                reachableState,
+                branch,
+                reachableSmtAnalysis);
+            var unreachableBranch = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                unreachableState,
+                new SymbolicNotCondition(branch),
+                unreachableSmtAnalysis);
+
+            Assert.That(reachableBranch.Info.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
+            Assert.That(reachableBranch.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(unreachableBranch.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(unreachableBranch.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(unreachableSmtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_ClassifiesIrConditionTruthWithoutPublicFormulaInput()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
