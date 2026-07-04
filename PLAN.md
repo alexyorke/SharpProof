@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 9 symbolic-side
+  currently reports 0 analyzer-side and 8 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
   Comparable-value reachability now routes through the shared typed value
@@ -116,9 +116,10 @@ path-fact, hazard, and ownership flows.
 - Collection-expression lengths with exact spread sources now lower to IR
   additive terms, including array spreads and count-backed collection spreads
   such as `IReadOnlyCollection<T>`.
-- One-dimensional built-in element and range access guards now lower through
-  a shared IR helper that reuses the common `System.Index` and `System.Range`
-  shape resolution paths before the remaining translator fallback.
+- One-dimensional built-in element and range access guards now lower entirely
+  through a shared IR helper that reuses the common `System.Index` and
+  `System.Range` shape resolution paths; the direct reachability translator
+  fallback for that boundary is gone.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms before formula
   fallback. The remaining built-in-length shim is still carrying other
@@ -278,8 +279,9 @@ path-fact, hazard, and ownership flows.
   aliases such as `when (inRange)`, and project the alias initializer into
   branch facts so contradictory guarded index paths can be pruned.
 - Built-in element-access range checks now lower one-dimensional and
-  multidimensional array bounds through IR bounds facts before legacy formula
-  fallback; Index/Range shape compatibility still uses the fallback path.
+  multidimensional array bounds through IR bounds facts without the old
+  reachability translator fallback; `System.Index` and `System.Range` shape
+  compatibility now flows through shared IR shape resolution.
 - Subsequence range checks for `Substring`, `Slice`, `AsSpan`, and `AsMemory`
   now lower supported source/start/count bounds through IR conditions before
   formula fallback.

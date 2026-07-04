@@ -1495,16 +1495,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            if (TryCreateIrBuiltInElementAccessInRangeCondition(
-                    elementAccess,
-                    semanticModel,
-                    cancellationToken,
-                    out formula))
-            {
-                return true;
-            }
-
-            return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
+            return TryCreateIrBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 cancellationToken,

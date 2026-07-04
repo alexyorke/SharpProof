@@ -1362,7 +1362,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(reachabilitySource, Does.Contain("TryCreateIrBuiltInElementAccessInRangeCondition("));
             Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
-            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+            Assert.That(reachabilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
             Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
@@ -1400,7 +1400,7 @@ namespace PurelySharp.Test
             Assert.That(helperStart, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEnd, Is.GreaterThan(helperStart));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(fallbackIndex, Is.GreaterThan(irIndex));
+            Assert.That(fallbackIndex, Is.EqualTo(-1));
             Assert.That(reachabilitySource, Does.Not.Contain("TryCreateIrBuiltInElementAccessLengthTerm("));
             Assert.That(reachabilitySource, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessInRangeCondition("));
             Assert.That(lowererSource, Does.Contain("public static bool TryCreateBuiltInElementAccessInRangeCondition("));
@@ -2033,12 +2033,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(9));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(8));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 9,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 8,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2050,7 +2050,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                 }));
