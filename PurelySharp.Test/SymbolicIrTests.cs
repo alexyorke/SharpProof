@@ -933,6 +933,49 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_NullableBoolGetValueOrDefaultUsesConditionalDefaultTerm()
+        {
+            var context = CreateExpressionContext(
+                "bool? maybe",
+                "maybe.GetValueOrDefault() == false");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+            Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
+            Assert.That(conditional.WhenTrue.Kind, Is.EqualTo(SmtValueKind.Bool));
+            Assert.That(conditional.WhenFalse, Is.EqualTo(new SymbolicBooleanConstantTerm(false)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm()
+        {
+            var context = CreateExpressionContext(
+                "Status? maybe",
+                "maybe.GetValueOrDefault() == Status.None",
+                "public enum Status { None = 0, Active = 1 }");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+            Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
+            Assert.That(conditional.WhenTrue.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(conditional.WhenFalse, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
         public void Encoder_ExceptionPreconditionUsesTriggerFormulaWithoutSpecialAnalyzerRule()
         {
             var divisor = new SymbolicVariableTerm("d#1", SmtValueKind.Int);
