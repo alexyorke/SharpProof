@@ -848,8 +848,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
             Assert.That(source, Does.Contain("TryCreateNumericZeroCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.formula-fallback"));
-            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
@@ -870,9 +871,13 @@ namespace PurelySharp.Test
             }
 
             var fallbackIndex = source.IndexOf("TryTranslateZeroCondition(divisor", StringComparison.Ordinal);
+            var translatedIndex = source.IndexOf("ir.runtime-hazard.divide-by-zero.translated", StringComparison.Ordinal);
+            var formulaFallbackIndex = source.IndexOf("\"ir.runtime-hazard.divide-by-zero.formula-fallback\"", StringComparison.Ordinal);
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(fallbackIndex, Is.GreaterThan(helperIndex));
+            Assert.That(translatedIndex, Is.GreaterThan(fallbackIndex));
+            Assert.That(formulaFallbackIndex, Is.GreaterThan(translatedIndex));
             Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
             Assert.That(source, Does.Contain("new SymbolicConstantCondition(true)"));
             Assert.That(source, Does.Contain("new SymbolicConstantCondition(false)"));
@@ -892,8 +897,25 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.formula-fallback"));
+            Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula));"));
+        }
+
+        [Test]
+        public void RuntimeHazardIndexFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var translatedIndex = source.IndexOf("ir.runtime-hazard.index.out-of-range.translated", StringComparison.Ordinal);
+            var fallbackIndex = source.IndexOf("\"ir.runtime-hazard.index.out-of-range.formula-fallback\"", StringComparison.Ordinal);
+
+            Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex));
         }
 
         [Test]

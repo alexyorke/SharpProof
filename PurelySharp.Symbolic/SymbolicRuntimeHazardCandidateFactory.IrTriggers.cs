@@ -52,11 +52,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     divisor,
                     SymbolicExceptionPreconditionKind.DivideByZero,
                     subject: null,
                     formula,
+                    "ir.runtime-hazard.divide-by-zero.translated",
                     "ir.runtime-hazard.divide-by-zero.formula-fallback");
                 return true;
             }
@@ -173,11 +174,12 @@ namespace PurelySharp.Symbolic
             var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
                 ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
                 : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                 elementAccess,
                 preconditionKind,
                 subject: null,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                "ir.runtime-hazard.index.out-of-range.translated",
                 "ir.runtime-hazard.index.out-of-range.formula-fallback");
             return true;
         }
