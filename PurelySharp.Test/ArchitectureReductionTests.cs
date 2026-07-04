@@ -3638,6 +3638,35 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_DetectsContradictoryExactOwnershipStates()
+        {
+            var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+            var source = SyntaxFactory.ParseExpression("resource");
+            var owned = SymbolicFact.Exact(
+                new SymbolicOwnershipAtom(resource, Escaped: false),
+                source,
+                "test.owned");
+            var escaped = SymbolicFact.Exact(
+                new SymbolicOwnershipAtom(resource, Escaped: true),
+                source,
+                "test.escaped");
+            var approximateEscaped = escaped with { Confidence = SymbolicFactConfidence.Approximate };
+
+            var contradictoryFacts = new SymbolicState(new[] { owned, escaped });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(owned),
+                new SymbolicFactCondition(escaped),
+            });
+            var approximateState = new SymbolicState(new[] { owned, approximateEscaped });
+
+            Assert.That(contradictoryFacts.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFacts.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+            Assert.That(approximateState.IsContradictory, Is.False);
+        }
+
+        [Test]
         public void SymbolicState_DetectsContradictoryExactDisposalStates()
         {
             var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);

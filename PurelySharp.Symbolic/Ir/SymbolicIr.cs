@@ -409,6 +409,7 @@ namespace PurelySharp.Symbolic.Ir
             ImmutableArray<SymbolicCondition> conditions)
         {
             var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+            var ownershipStates = new Dictionary<string, SymbolicExclusiveOwnershipState>(StringComparer.Ordinal);
             var disposalStates = new Dictionary<string, SymbolicDisposalState>(StringComparer.Ordinal);
             var resourceLifetimeStates = new Dictionary<string, SymbolicResourceLifetimeState>(StringComparer.Ordinal);
             foreach (var fact in facts)
@@ -424,7 +425,7 @@ namespace PurelySharp.Symbolic.Ir
                     return true;
                 }
 
-                if (HasExclusiveResourceStateContradiction(disposalStates, resourceLifetimeStates, fact))
+                if (HasExclusiveResourceStateContradiction(ownershipStates, disposalStates, resourceLifetimeStates, fact))
                 {
                     return true;
                 }
@@ -449,7 +450,7 @@ namespace PurelySharp.Symbolic.Ir
                         return true;
                     }
 
-                    if (HasExclusiveResourceStateContradiction(disposalStates, resourceLifetimeStates, fact))
+                    if (HasExclusiveResourceStateContradiction(ownershipStates, disposalStates, resourceLifetimeStates, fact))
                     {
                         return true;
                     }
@@ -466,6 +467,7 @@ namespace PurelySharp.Symbolic.Ir
         }
 
         private static bool HasExclusiveResourceStateContradiction(
+            IDictionary<string, SymbolicExclusiveOwnershipState> ownershipStates,
             IDictionary<string, SymbolicDisposalState> disposalStates,
             IDictionary<string, SymbolicResourceLifetimeState> resourceLifetimeStates,
             SymbolicFact fact)
@@ -478,6 +480,11 @@ namespace PurelySharp.Symbolic.Ir
 
             switch (fact.Atom)
             {
+                case SymbolicOwnershipAtom ownership:
+                    return HasExclusiveStateContradiction(
+                        ownershipStates,
+                        CreateTermKey(ownership.Value),
+                        ownership.Escaped ? SymbolicExclusiveOwnershipState.Escaped : SymbolicExclusiveOwnershipState.Owned);
                 case SymbolicDisposalAtom { State: not SymbolicDisposalState.MaybeDisposed } disposal:
                     return HasExclusiveStateContradiction(
                         disposalStates,
@@ -491,6 +498,12 @@ namespace PurelySharp.Symbolic.Ir
                 default:
                     return false;
             }
+        }
+
+        private enum SymbolicExclusiveOwnershipState
+        {
+            Owned,
+            Escaped,
         }
 
         private static bool HasExclusiveStateContradiction<TState>(
