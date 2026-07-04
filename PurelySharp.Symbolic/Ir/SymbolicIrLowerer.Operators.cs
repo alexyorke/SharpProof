@@ -78,5 +78,30 @@ namespace PurelySharp.Symbolic.Ir
                     return false;
             }
         }
+
+        public static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
+        {
+            switch (smtOperator)
+            {
+                case SmtIntegerBinaryOperator.Add:
+                    op = SymbolicBinaryTermOperator.Add;
+                    return true;
+                case SmtIntegerBinaryOperator.Subtract:
+                    op = SymbolicBinaryTermOperator.Subtract;
+                    return true;
+                case SmtIntegerBinaryOperator.Multiply:
+                    op = SymbolicBinaryTermOperator.Multiply;
+                    return true;
+                case SmtIntegerBinaryOperator.Divide:
+                    op = SymbolicBinaryTermOperator.Divide;
+                    return true;
+                case SmtIntegerBinaryOperator.Remainder:
+                    op = SymbolicBinaryTermOperator.Remainder;
+                    return true;
+                default:
+                    op = default;
+                    return false;
+            }
+        }
     }
 }

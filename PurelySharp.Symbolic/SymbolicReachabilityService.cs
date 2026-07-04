@@ -1618,6 +1618,27 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!ContainsDivisionOrModulo(leftExpression) &&
+                !ContainsDivisionOrModulo(rightExpression) &&
+                smtOperator is not SmtIntegerBinaryOperator.Divide and not SmtIntegerBinaryOperator.Remainder &&
+                SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
+                SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) &&
+                SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) &&
+                left.Kind == SmtValueKind.Int &&
+                right.Kind == SmtValueKind.Int &&
+                SymbolicIrFormulaEncoder.TryEncode(
+                    SymbolicIrLowerer.CreateIntegerInRangeCondition(
+                        new SymbolicBinaryTerm(binaryOperator, left, right),
+                        minValue,
+                        maxValue,
+                        leftExpression,
+                        "ir.integer.binary.in-range"),
+                    out formula))
+            {
+                return true;
+            }
+
             if (!TryTranslateIntegerValue(
                     leftExpression,
                     semanticModel,
