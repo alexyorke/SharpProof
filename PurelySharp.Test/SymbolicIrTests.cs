@@ -103,6 +103,64 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_TypePatternUsesSharedTypeTestAtom()
+        {
+            var context = CreateExpressionContext(
+                "object value",
+                "value is string");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
+            var typeTest = AssertFactCondition<SymbolicTypeTestAtom>(conjunction.Right);
+            Assert.That(typeTest.TypeKey, Is.EqualTo("System.String"));
+            Assert.That(typeTest.Value, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_DeclarationPatternUsesSharedTypeTestAtom()
+        {
+            var context = CreateExpressionContext(
+                "object value",
+                "value is string text");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)condition;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
+            Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(conjunction.Right).TypeKey, Is.EqualTo("System.String"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_NegatedTypePatternNegatesSharedTypeTestFacts()
+        {
+            var context = CreateExpressionContext(
+                "object value",
+                "value is not string");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicNotCondition>());
+            var negated = (SymbolicNotCondition)condition;
+            Assert.That(negated.Operand, Is.TypeOf<SymbolicBinaryCondition>());
+            var conjunction = (SymbolicBinaryCondition)negated.Operand;
+
+            Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+            Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
+            Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(conjunction.Right).TypeKey, Is.EqualTo("System.String"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(

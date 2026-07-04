@@ -190,6 +190,18 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            if (targetType.SpecialType == SpecialType.System_Object)
+            {
+                typeKey = "System.Object";
+                return true;
+            }
+
+            if (targetType.SpecialType == SpecialType.System_String)
+            {
+                typeKey = "System.String";
+                return true;
+            }
+
             typeKey = targetType
                 .WithNullableAnnotation(NullableAnnotation.None)
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)

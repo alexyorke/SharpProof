@@ -45,6 +45,13 @@ namespace PurelySharp.Symbolic.Ir
 
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
+                if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
+                    binaryExpression.Right is TypeSyntax typeSyntax &&
+                    TryLowerTypeTestCondition(binaryExpression.Left, typeSyntax, binaryExpression, negate: false, context, out condition))
+                {
+                    return true;
+                }
+
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
                     TryLowerCondition(binaryExpression.Left, context, out var leftAnd) &&
                     TryLowerCondition(binaryExpression.Right, context, out var rightAnd))
@@ -86,6 +93,12 @@ namespace PurelySharp.Symbolic.Ir
                 }
             }
 
+            if (expression is IsPatternExpressionSyntax isPatternExpression &&
+                TryLowerTypePatternCondition(isPatternExpression, context, out condition))
+            {
+                return true;
+            }
+
             if (expression is InvocationExpressionSyntax invocation &&
                 TryLowerKnownApiInvocation(invocation, context, out condition))
             {
@@ -101,6 +114,94 @@ namespace PurelySharp.Symbolic.Ir
 
             condition = null!;
             return false;
+        }
+
+        private static bool TryLowerTypePatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerTypePattern(expression.Pattern, out var typeSyntax, out var negate))
+            {
+                return false;
+            }
+
+            return TryLowerTypeTestCondition(expression.Expression, typeSyntax, expression.Pattern, negate, context, out condition);
+        }
+
+        private static bool TryLowerTypeTestCondition(
+            ExpressionSyntax expression,
+            TypeSyntax typeSyntax,
+            SyntaxNode sourceNode,
+            bool negate,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            var type = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
+            if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(type, out var typeKey) ||
+                !TryLowerTerm(expression, context, out var value) ||
+                value.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            var nonNull = CreateRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                value,
+                new SymbolicNullTerm(),
+                expression,
+                "ir.pattern.type.non-null");
+            var typeTest = CreateFactCondition(
+                new SymbolicTypeTestAtom(value, typeKey),
+                sourceNode,
+                "ir.pattern.type.test");
+            var positive = new SymbolicBinaryCondition(SymbolicConditionOperator.And, nonNull, typeTest);
+            condition = negate ? new SymbolicNotCondition(positive) : positive;
+            return true;
+        }
+
+        private static bool TryLowerTypePattern(
+            PatternSyntax pattern,
+            out TypeSyntax type,
+            out bool negate)
+        {
+            pattern = UnwrapPattern(pattern);
+            negate = false;
+
+            if (pattern is TypePatternSyntax typePattern)
+            {
+                type = typePattern.Type;
+                return true;
+            }
+
+            if (pattern is DeclarationPatternSyntax declarationPattern)
+            {
+                type = declarationPattern.Type;
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryLowerTypePattern(unaryPattern.Pattern, out type, out var nestedNegate))
+            {
+                negate = !nestedNegate;
+                return true;
+            }
+
+            type = null!;
+            return false;
+        }
+
+        private static PatternSyntax UnwrapPattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern;
         }
 
         private static bool TryLowerStringEqualityCondition(
