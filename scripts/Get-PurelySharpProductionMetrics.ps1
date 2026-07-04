@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Reports PurelySharp production source size by module.
+Reports SharpProof production source size by module.
 
 .DESCRIPTION
 This is a read-only inventory aid for refactoring. It excludes tests, generated
