@@ -1587,31 +1587,12 @@ namespace PurelySharp.Symbolic.Smt
             out ExpressionSyntax dividendExpression,
             out ExpressionSyntax divisorExpression)
         {
-            dividendExpression = null!;
-            divisorExpression = null!;
-            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
-                invocationOperation.TargetMethod.Name != "Abs" ||
-                !invocationOperation.TargetMethod.IsStatic ||
-                invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
-                invocationOperation.TargetMethod.Parameters.Length != 1 ||
-                !IsIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var argumentExpression))
-            {
-                return false;
-            }
-
-            argumentExpression = UnwrapExpression(argumentExpression);
-            if (argumentExpression is not BinaryExpressionSyntax remainderExpression ||
-                !remainderExpression.IsKind(SyntaxKind.ModuloExpression) ||
-                !HasSupportedIntegralType(remainderExpression.Left, semanticModel, cancellationToken) ||
-                !HasSupportedIntegralType(remainderExpression.Right, semanticModel, cancellationToken))
-            {
-                return false;
-            }
-
-            dividendExpression = remainderExpression.Left;
-            divisorExpression = remainderExpression.Right;
-            return true;
+            return CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
+                invocationExpression,
+                semanticModel,
+                cancellationToken,
+                out dividendExpression,
+                out divisorExpression);
         }
 
         private static bool TryTranslateIntegralOperandWithSafeDivisors(

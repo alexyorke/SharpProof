@@ -7124,7 +7124,7 @@ namespace PurelySharp.Symbolic
             if (valueExpression is not InvocationExpressionSyntax invocationExpression ||
                 !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
                 targetFormula.Kind != SmtValueKind.Int ||
-                !CSharpSmtFormulaTranslator.TryGetMathAbsRemainderOperands(
+                !CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
                     invocationExpression,
                     semanticModel,
                     cancellationToken,

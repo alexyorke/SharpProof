@@ -293,21 +293,6 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
-        internal static bool TryGetMathAbsRemainderOperands(
-            InvocationExpressionSyntax invocationExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out ExpressionSyntax dividendExpression,
-            out ExpressionSyntax divisorExpression)
-        {
-            return CSharpConditionToFormula.TryGetMathAbsRemainderOperands(
-                invocationExpression,
-                semanticModel,
-                cancellationToken,
-                out dividendExpression,
-                out divisorExpression);
-        }
-
         internal static bool TryCreateRuntimeTypeTestFormula(
             SmtFormula value,
             ITypeSymbol targetType,
