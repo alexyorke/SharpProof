@@ -46,8 +46,8 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.Numerics.cs`, and string static-value lowering now lives
   in `SymbolicIrLowerer.Strings.cs`. Object API lowering now lives in
   `SymbolicIrLowerer.Objects.cs`, and pattern/type-test lowering now lives in
-  `SymbolicIrLowerer.Patterns.cs`; `SymbolicIrLowerer.cs` is about 1,118
-  lines.
+  `SymbolicIrLowerer.Patterns.cs`. String equality lowering now also lives in
+  the string partial; `SymbolicIrLowerer.cs` is about 995 lines.
 - `SymbolicProofService` exists, and the proof spine now normalizes many
   exact constant/string/bounds/conditional/type-test facts before SMT. It must
   keep growing into the only internal bridge from IR facts to solver formulas.
