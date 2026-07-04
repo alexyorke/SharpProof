@@ -180,23 +180,29 @@ namespace PurelySharp.Symbolic
                 () =>
                 {
                     var trueBranch = ClassifyBranchFeasibility(state, condition);
-                    if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable &&
-                        trueBranch.RawResult != null)
+                    if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable)
                     {
-                        return SymbolicIrProofResult.FromConditionTruth(
-                            trueBranch.RawResult,
-                            SymbolicProofStatus.ProvenFalse,
-                            CreateBudgetInfo());
+                        return trueBranch.RawResult != null
+                            ? SymbolicIrProofResult.FromConditionTruth(
+                                trueBranch.RawResult,
+                                SymbolicProofStatus.ProvenFalse,
+                                CreateBudgetInfo())
+                            : SymbolicIrProofResult.Syntactic(
+                                SymbolicProofStatus.ProvenFalse,
+                                trueBranch.Info.Reason);
                     }
 
                     var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
-                    if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable &&
-                        falseBranch.RawResult != null)
+                    if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable)
                     {
-                        return SymbolicIrProofResult.FromConditionTruth(
-                            falseBranch.RawResult,
-                            SymbolicProofStatus.ProvenTrue,
-                            CreateBudgetInfo());
+                        return falseBranch.RawResult != null
+                            ? SymbolicIrProofResult.FromConditionTruth(
+                                falseBranch.RawResult,
+                                SymbolicProofStatus.ProvenTrue,
+                                CreateBudgetInfo())
+                            : SymbolicIrProofResult.Syntactic(
+                                SymbolicProofStatus.ProvenTrue,
+                                falseBranch.Info.Reason);
                     }
 
                     return SymbolicIrProofResult.Unknown(falseBranch.Info.UnknownReason);

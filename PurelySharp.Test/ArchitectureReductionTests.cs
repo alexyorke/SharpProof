@@ -2252,6 +2252,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ClassifiesSyntacticConditionTruthWithoutSmt()
+        {
+            var state = new SymbolicState();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var trueResult = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicConstantCondition(true),
+                smtAnalysis);
+            var executedAfterTrue = smtAnalysis.ExecutedQueryCount;
+            var falseResult = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicConstantCondition(false),
+                smtAnalysis);
+
+            Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(executedAfterTrue));
+        }
+
+        [Test]
         public void SymbolicProofService_ConditionTruthRejectsNullStateBeforeProof()
         {
             Assert.Throws<ArgumentNullException>(() =>
