@@ -834,13 +834,29 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicBinaryTerm binary:
                     return CreateBinaryTermKey(binary);
                 case SymbolicConditionalTerm conditional:
-                    return "conditional(" +
-                        CreateConditionKey(conditional.Condition) + "," +
-                        CreateTermKey(conditional.WhenTrue) + "," +
-                        CreateTermKey(conditional.WhenFalse) + ")";
+                    return CreateConditionalTermKey(conditional);
                 default:
                     return term.ToString() ?? string.Empty;
             }
+        }
+
+        private static string CreateConditionalTermKey(SymbolicConditionalTerm conditional)
+        {
+            var conditionKey = CreateConditionKey(conditional.Condition);
+            if (string.Equals(conditionKey, "const:true", StringComparison.Ordinal))
+            {
+                return CreateTermKey(conditional.WhenTrue);
+            }
+
+            if (string.Equals(conditionKey, "const:false", StringComparison.Ordinal))
+            {
+                return CreateTermKey(conditional.WhenFalse);
+            }
+
+            return "conditional(" +
+                conditionKey + "," +
+                CreateTermKey(conditional.WhenTrue) + "," +
+                CreateTermKey(conditional.WhenFalse) + ")";
         }
 
         private static string CreateStringConcatTermKey(SymbolicStringConcatTerm concat)

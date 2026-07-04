@@ -2350,6 +2350,37 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConstantConditionalTerms()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var trueSelected = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(new SymbolicConstantCondition(true), x, y),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("true ? x : y"),
+                "test.conditional.true");
+            var falseSelected = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicConditionalTerm(new SymbolicConstantCondition(false), y, x),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("false ? y : x"),
+                "test.conditional.false");
+            var direct = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("x == 1"),
+                "test.direct");
+
+            Assert.That(new SymbolicState(new[] { trueSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { falseSelected }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { direct }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesCommutativeBinaryTerms()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
