@@ -13,6 +13,7 @@ namespace PurelySharp.Symbolic
 {
     internal sealed class SymbolicProofService
     {
+        private const string ContradictoryStateReason = "path_unsatisfiable";
         private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
         private static readonly ProofResultCache s_fallbackCache = new();
         private readonly SmtAnalysisService? smtAnalysis;
@@ -34,7 +35,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.Unreachable,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             if (state.Facts.Length == 0 && state.PathConditions.Length == 0)
@@ -86,7 +87,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.ProvenTrue,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             if (StateContainsFact(state, fact))
@@ -139,7 +140,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.ProvenTrue,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             if (TryClassifySyntacticConditionTruth(condition, out var syntacticStatus) &&
@@ -215,7 +216,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.Unreachable,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             if (TryClassifySyntacticConditionTruth(branchCondition, out var syntacticStatus))
@@ -259,7 +260,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.Unreachable,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             if (TryClassifySyntacticConditionTruth(condition, out var syntacticStatus))
@@ -340,7 +341,7 @@ namespace PurelySharp.Symbolic
             {
                 return SymbolicIrProofResult.Syntactic(
                     SymbolicProofStatus.Unreachable,
-                    "ir_state_contradictory");
+                    ContradictoryStateReason);
             }
 
             return ClassifyWithIrCache(
