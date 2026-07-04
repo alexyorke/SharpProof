@@ -3191,7 +3191,8 @@ namespace PurelySharp.Test
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
-            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -3223,6 +3224,39 @@ namespace PurelySharp.Test
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_ExceptionTriggerConditionProvesHazardWithoutSmt()
+        {
+            var divisor = new SymbolicVariableTerm("divisor", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var equalsZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    divisor,
+                    zero),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("divisor == 0"),
+                "test.zero");
+            var triggerCondition = new SymbolicFactCondition(equalsZero);
+            var triggerPrecondition = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    divisor,
+                    triggerCondition),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("10 / divisor"),
+                "test.trigger");
+            var state = new SymbolicState(new[] { equalsZero });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateHazardTrigger(
+                state,
+                triggerPrecondition,
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }

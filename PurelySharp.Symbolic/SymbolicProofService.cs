@@ -335,6 +335,19 @@ namespace PurelySharp.Symbolic
                 "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
                 () =>
                 {
+                    var triggerCondition = ClassifyExceptionTriggerCondition(state, triggerPrecondition);
+                    if (triggerCondition.Info.Status == SymbolicProofStatus.ProvenTrue)
+                    {
+                        return triggerCondition;
+                    }
+
+                    if (triggerCondition.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable)
+                    {
+                        return SymbolicIrProofResult.Syntactic(
+                            SymbolicProofStatus.Unreachable,
+                            triggerCondition.Info.Reason);
+                    }
+
                     var proven = ClassifyImplication(state, triggerPrecondition);
                     if (proven.Info.Status == SymbolicProofStatus.ProvenTrue)
                     {
@@ -348,6 +361,16 @@ namespace PurelySharp.Symbolic
                         ? triggerFeasibility
                         : proven;
                 });
+        }
+
+        private SymbolicIrProofResult ClassifyExceptionTriggerCondition(SymbolicState state, SymbolicFact triggerPrecondition)
+        {
+            if (triggerPrecondition is { Polarity: true, Atom: SymbolicExceptionPreconditionAtom precondition })
+            {
+                return ClassifyConditionTruth(state, precondition.Trigger);
+            }
+
+            return SymbolicIrProofResult.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
         }
 
         internal SymbolicIrProofResult ClassifyFormulaReachability(IEnumerable<SmtFormula> pathConditions)
