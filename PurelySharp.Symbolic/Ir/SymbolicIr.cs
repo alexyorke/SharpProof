@@ -528,6 +528,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (fact.Atom is SymbolicStringPredicateAtom stringPredicate &&
+                TryEvaluateConstantStringPredicate(stringPredicate, out value))
+            {
+                value = fact.Polarity ? value : !value;
+                return true;
+            }
+
             value = false;
             return false;
         }
@@ -602,6 +609,31 @@ namespace PurelySharp.Symbolic.Ir
             value = (!bounds.IncludeLowerBound || index.Value >= 0) &&
                 (!bounds.IncludeUpperBound || index.Value < length.Value);
             return true;
+        }
+
+        private static bool TryEvaluateConstantStringPredicate(
+            SymbolicStringPredicateAtom predicate,
+            out bool value)
+        {
+            if (predicate.Value is not SymbolicStringConstantTerm valueTerm ||
+                predicate.Argument is not SymbolicStringConstantTerm argumentTerm)
+            {
+                value = false;
+                return false;
+            }
+
+            value = predicate.Predicate switch
+            {
+                SymbolicStringPredicateKind.Contains => valueTerm.Value.Contains(argumentTerm.Value, StringComparison.Ordinal),
+                SymbolicStringPredicateKind.StartsWith => valueTerm.Value.StartsWith(argumentTerm.Value, StringComparison.Ordinal),
+                SymbolicStringPredicateKind.EndsWith => valueTerm.Value.EndsWith(argumentTerm.Value, StringComparison.Ordinal),
+                _ => false,
+            };
+
+            return predicate.Predicate is
+                SymbolicStringPredicateKind.Contains or
+                SymbolicStringPredicateKind.StartsWith or
+                SymbolicStringPredicateKind.EndsWith;
         }
 
         private static bool TryGetConstantEqualityKey(SymbolicTerm term, out string key)

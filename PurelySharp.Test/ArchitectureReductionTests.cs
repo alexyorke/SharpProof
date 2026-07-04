@@ -2530,6 +2530,56 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConstantStringPredicateFacts()
+        {
+            var haystack = new SymbolicStringConstantTerm("prefix-value");
+            var prefix = new SymbolicStringConstantTerm("prefix");
+            var suffix = new SymbolicStringConstantTerm("value");
+            var missing = new SymbolicStringConstantTerm("missing");
+            var containsPrefix = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.Contains,
+                    haystack,
+                    prefix),
+                SyntaxFactory.ParseExpression("\"prefix-value\".Contains(\"prefix\")"),
+                "test.contains");
+            var startsWithPrefix = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.StartsWith,
+                    haystack,
+                    prefix),
+                SyntaxFactory.ParseExpression("\"prefix-value\".StartsWith(\"prefix\")"),
+                "test.starts-with");
+            var endsWithSuffix = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.EndsWith,
+                    haystack,
+                    suffix),
+                SyntaxFactory.ParseExpression("\"prefix-value\".EndsWith(\"value\")"),
+                "test.ends-with");
+            var doesNotContain = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.Contains,
+                    haystack,
+                    missing),
+                SyntaxFactory.ParseExpression("\"prefix-value\".Contains(\"missing\")"),
+                "test.missing");
+            var empty = new SymbolicState();
+            var tautologicalPredicates = new SymbolicState(new[] { containsPrefix, startsWithPrefix, endsWithSuffix });
+            var contradictoryPredicate = new SymbolicState(new[] { doesNotContain });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(doesNotContain),
+            });
+
+            Assert.That(tautologicalPredicates.Facts, Is.Empty);
+            Assert.That(tautologicalPredicates.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryPredicate.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryPredicate.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
         {
             var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);
@@ -3588,6 +3638,20 @@ namespace PurelySharp.Test
                     IncludeUpperBound: true),
                 SyntaxFactory.ParseExpression("items[-1]"),
                 "test.false-bounds-target");
+            var trueStringTarget = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.StartsWith,
+                    new SymbolicStringConstantTerm("prefix-value"),
+                    new SymbolicStringConstantTerm("prefix")),
+                SyntaxFactory.ParseExpression("\"prefix-value\".StartsWith(\"prefix\")"),
+                "test.true-string-target");
+            var falseStringTarget = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.EndsWith,
+                    new SymbolicStringConstantTerm("prefix-value"),
+                    new SymbolicStringConstantTerm("missing")),
+                SyntaxFactory.ParseExpression("\"prefix-value\".EndsWith(\"missing\")"),
+                "test.false-string-target");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
@@ -3602,6 +3666,14 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseBoundsTarget,
                 smtAnalysis);
+            var trueStringResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueStringTarget,
+                smtAnalysis);
+            var falseStringResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseStringTarget,
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
@@ -3609,6 +3681,10 @@ namespace PurelySharp.Test
             Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseBoundsResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseBoundsResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
