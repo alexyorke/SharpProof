@@ -2129,6 +2129,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCollapsesEvaluatedFalseDisjunction()
+        {
+            var falseIntegerFact = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicIntegerConstantTerm(1),
+                    new SymbolicIntegerConstantTerm(2)),
+                SyntaxFactory.ParseExpression("1 > 2"),
+                "test.false-integer"));
+            var falseStringFact = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConstantTerm("left"),
+                    new SymbolicStringConstantTerm("right")),
+                SyntaxFactory.ParseExpression("\"left\" == \"right\""),
+                "test.false-string"));
+            var contradiction = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    falseIntegerFact,
+                    falseStringFact),
+            });
+            var directContradiction = new SymbolicState(pathConditions: new[] { new SymbolicConstantCondition(false) });
+
+            Assert.That(contradiction.IsContradictory, Is.True);
+            Assert.That(contradiction.NormalizedProofKey, Is.EqualTo(directContradiction.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeySimplifiesAbsorbedConditionOperands()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

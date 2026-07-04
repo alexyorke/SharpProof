@@ -811,6 +811,14 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool ContainsFalseConstant(SymbolicCondition condition)
         {
+            if (string.Equals(
+                    CreateConditionKey(condition),
+                    "const:false",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
             switch (condition)
             {
                 case SymbolicConstantCondition { Value: false }:
@@ -830,6 +838,14 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool ContainsTrueConstant(SymbolicCondition condition)
         {
+            if (string.Equals(
+                    CreateConditionKey(condition),
+                    "const:true",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
             switch (condition)
             {
                 case SymbolicConstantCondition { Value: true }:
