@@ -1320,7 +1320,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
-            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+            if (!TryTranslateBuiltInLengthValue(
                     receiverExpression,
                     semanticModel,
                     cancellationToken,
@@ -2214,7 +2214,7 @@ namespace PurelySharp.Symbolic
         {
             if (arrayType.Rank == 1 &&
                 dimension == 0 &&
-                CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+                TryTranslateBuiltInLengthValue(
                     receiverExpression,
                     semanticModel,
                     cancellationToken,
