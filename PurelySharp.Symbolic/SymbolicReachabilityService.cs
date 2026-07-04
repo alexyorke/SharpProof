@@ -2070,15 +2070,10 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion,
             out SymbolicTerm term)
         {
-            if (SymbolicFactFactory.GetTrackedSymbolType(symbol)?.SpecialType != SpecialType.System_String ||
-                !TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var reference))
-            {
-                term = null!;
-                return false;
-            }
-
-            term = new SymbolicStringContentTerm(reference);
-            return true;
+            term = null!;
+            return SymbolicFactFactory.GetTrackedSymbolType(symbol)?.SpecialType == SpecialType.System_String &&
+                TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var reference) &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out term);
         }
 
         private static bool TryCreateReferenceSymbolTerm(

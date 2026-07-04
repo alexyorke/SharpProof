@@ -198,15 +198,14 @@ namespace PurelySharp.Symbolic.Ir
 
             if (type.SpecialType == SpecialType.System_String)
             {
-                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
-                return true;
+                return TryCreateStringContentReferenceTerm(reference, out var stringContent) &&
+                    CreateLengthTerm(stringContent, out term);
             }
 
             if (type is IArrayTypeSymbol { Rank: 1 } ||
                 IsBuiltInSpanOrMemoryType(type))
             {
-                term = new SymbolicLengthTerm(reference);
-                return true;
+                return CreateLengthTerm(reference, out term);
             }
 
             return type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
@@ -235,6 +234,12 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = totalLength;
+            return true;
+        }
+
+        private static bool CreateLengthTerm(SymbolicTerm value, out SymbolicTerm term)
+        {
+            term = new SymbolicLengthTerm(value);
             return true;
         }
 

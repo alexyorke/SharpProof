@@ -874,12 +874,14 @@ namespace PurelySharp.Test
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringEqualityCondition"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateStringEqualityCondition"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringStaticValueMember"));
+            Assert.That(coreSource, Does.Not.Contain("internal static bool TryCreateStringContentReferenceTerm"));
             Assert.That(coreSource, Does.Not.Contain("private static bool IsSystemStringType"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerRegexIsMatchInvocation"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerStringPredicateInvocation"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerStringEqualityCondition"));
             Assert.That(stringSource, Does.Contain("private static bool TryCreateStringEqualityCondition"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerStringStaticValueMember"));
+            Assert.That(stringSource, Does.Contain("internal static bool TryCreateStringContentReferenceTerm"));
             Assert.That(stringSource, Does.Contain("private static bool IsSystemStringType"));
         }
 
@@ -1427,8 +1429,8 @@ namespace PurelySharp.Test
 
             Assert.That(lowererSource, Does.Contain("public static bool TryLowerBuiltInLengthTerm("));
             Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
-            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(new SymbolicStringContentTerm(reference))"));
-            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(reference)"));
+            Assert.That(lowererSource, Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
+            Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));
             Assert.That(reachabilitySource, Does.Contain("return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);"));
             Assert.That(irTriggerSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)"));
             Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
@@ -5534,7 +5536,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference)"));
             Assert.That(source, Does.Contain("new SymbolicNullableHasValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
-            Assert.That(source, Does.Contain("new SymbolicStringContentTerm("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateStringContentReferenceTerm("));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out term)"));
             Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringTerm)"));
@@ -5668,8 +5670,8 @@ namespace PurelySharp.Test
                 Is.LessThan(stringHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateStringValue(", StringComparison.Ordinal)));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateStringContentTerm("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out term)"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, reference, out term)"));
-            Assert.That(source, Does.Contain("new SymbolicStringContentTerm(reference)"));
         }
 
         [Test]

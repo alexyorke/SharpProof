@@ -20,12 +20,12 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 113,281 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,297 lines,
+- Production inventory currently reports 113,285 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 54,301 lines,
   `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
-  now at 8,882 lines. It routes legacy translation through
+  now at 8,864 lines. It routes legacy translation through
   `CSharpSmtFormulaTranslator` but still owns much of the formula-first
   path-fact pipeline.
 - Direct `CSharpConditionToFormula` usage outside approved shims is gone.
@@ -118,6 +118,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm`, and both
   `SymbolicReachabilityService` and `SymbolicProgramPointFacts` now delegate
   their local length-term helpers to that IR entrypoint.
+- Reference-backed string-content term construction is now shared through
+  `SymbolicIrLowerer.TryCreateStringContentReferenceTerm`, and both
+  `SymbolicReachabilityService` and `SymbolicProgramPointFacts` now delegate
+  their local string-content helpers to that IR entrypoint.
 - Simple integer range proofs now use
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable

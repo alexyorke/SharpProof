@@ -1605,22 +1605,16 @@ namespace PurelySharp.Symbolic
 
             if (type?.SpecialType == SpecialType.System_String)
             {
-                length = receiver.Kind == SmtValueKind.String
-                    ? new SymbolicLengthTerm(receiver)
-                    : receiver.Kind == SmtValueKind.Reference
-                        ? new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver))
-                        : null!;
-                return length != null;
+                if (receiver.Kind == SmtValueKind.String)
+                {
+                    length = new SymbolicLengthTerm(receiver);
+                    return true;
+                }
+
+                return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out length);
             }
 
-            if (type is IArrayTypeSymbol { Rank: 1 } &&
-                receiver.Kind == SmtValueKind.Reference)
-            {
-                length = new SymbolicLengthTerm(receiver);
-                return true;
-            }
-
-            return false;
+            return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out length);
         }
 
         private static void AddFormulaPathConditions(
@@ -7825,8 +7819,8 @@ namespace PurelySharp.Symbolic
 
             if (type?.SpecialType == SpecialType.System_String &&
                 TryCreateSymbolTerm(symbol, out var reference) &&
-                reference.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(reference), out formula))
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out var stringContent) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(stringContent, out formula))
             {
                 return true;
             }
@@ -7846,8 +7840,8 @@ namespace PurelySharp.Symbolic
             }
 
             if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(receiver), out formula))
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(receiver, out var stringContent) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(stringContent, out formula))
             {
                 return true;
             }
@@ -8229,8 +8223,8 @@ namespace PurelySharp.Symbolic
             }
 
             return TryCreateTupleElementTerm(tupleSymbol, elementName, out var element) &&
-                element.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(element), out formula);
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(element, out var stringContent) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(stringContent, out formula);
         }
 
         private static bool TryCreateTupleElementBuiltInLengthFormula(

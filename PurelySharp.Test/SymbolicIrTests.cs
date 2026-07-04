@@ -1595,6 +1595,15 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm()
+        {
+            var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
+
+            Assert.That(SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out var term), Is.True);
+            Assert.That(term, Is.EqualTo(new SymbolicStringContentTerm(reference)));
+        }
+
+        [Test]
         public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsMultidimensionalArrayTargets()
         {
             var context = CreateLocalDeclarationContext(
@@ -1615,6 +1624,29 @@ namespace PurelySharp.Test
             Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
             Assert.That(equality.Left, Is.TypeOf<SmtIntegerBinaryTerm>());
             Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
+        public void ReachabilityHelper_StringContentAssignedValueFactSupportsStringTargets()
+        {
+            var context = CreateLocalDeclarationContext(
+                "string input",
+                "string copy = input;");
+
+            Assert.That(
+                SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
+                    context.Symbol,
+                    context.ValueExpression,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    out var fact),
+                Is.True);
+
+            Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
+            var equality = (SmtBinaryFormula)fact;
+            Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
+            Assert.That(equality.Left.Kind, Is.EqualTo(SmtValueKind.String));
+            Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.String));
         }
 
         [Test]

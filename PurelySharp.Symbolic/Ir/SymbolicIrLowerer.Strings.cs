@@ -377,6 +377,20 @@ namespace PurelySharp.Symbolic.Ir
             return false;
         }
 
+        internal static bool TryCreateStringContentReferenceTerm(
+            SymbolicTerm reference,
+            out SymbolicTerm term)
+        {
+            if (reference.Kind != SmtValueKind.Reference)
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicStringContentTerm(reference);
+            return true;
+        }
+
         internal static bool TryLowerStringTerm(
             ExpressionSyntax expression,
             SymbolicLoweringContext context,
@@ -397,15 +411,13 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             if (!IsStringExpression(expression, context) ||
-                !TryLowerTerm(expression, context, out var reference) ||
-                reference.Kind != SmtValueKind.Reference)
+                !TryLowerTerm(expression, context, out var reference))
             {
                 term = null!;
                 return false;
             }
 
-            term = new SymbolicStringContentTerm(reference);
-            return true;
+            return TryCreateStringContentReferenceTerm(reference, out term);
         }
 
         private static bool TryLowerStringConcatOperand(
