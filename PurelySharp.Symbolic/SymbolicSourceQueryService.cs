@@ -1395,22 +1395,28 @@ namespace PurelySharp.Symbolic
             out SmtFormula? formula)
         {
             symbolicCondition = null;
+            SmtFormula? irFormula = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var loweredCondition))
             {
                 symbolicCondition = loweredCondition;
                 if (SymbolicIrFormulaEncoder.TryEncode(loweredCondition, out var encoded))
                 {
-                    formula = encoded;
-                    return true;
+                    irFormula = encoded;
                 }
             }
 
-            return SymbolicReachabilityService.TryTranslateConditionFormula(
+            if (SymbolicReachabilityService.TryTranslateConditionFormula(
                 condition,
                 semanticModel,
                 cancellationToken,
-                out formula);
+                out formula))
+            {
+                return true;
+            }
+
+            formula = irFormula;
+            return formula != null;
         }
 
         private static bool TryProveConditionWithIrState(

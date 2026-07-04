@@ -252,16 +252,6 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (TryTranslateUsingSymbolicIr(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion))
-            {
-                return true;
-            }
-
             if (expression is MemberAccessExpressionSyntax memberAccessExpression &&
                 TryTranslateRegexMatchSuccessProperty(
                     memberAccessExpression,
@@ -580,8 +570,26 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (!ContainsDivisionOrModulo(expression) &&
+                TryTranslateUsingSymbolicIr(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion))
+            {
+                return true;
+            }
+
             formula = null;
             return false;
+        }
+
+        private static bool ContainsDivisionOrModulo(ExpressionSyntax expression)
+        {
+            return expression.DescendantNodesAndSelf()
+                .OfType<BinaryExpressionSyntax>()
+                .Any(static binary => binary.IsKind(SyntaxKind.DivideExpression) || binary.IsKind(SyntaxKind.ModuloExpression));
         }
 
         private static bool TryTranslateUsingSymbolicIr(

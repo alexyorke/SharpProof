@@ -9371,21 +9371,28 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            SmtFormula? irFormula = null;
             var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerTerm(valueExpression, loweringContext, out var term) &&
                 term is SymbolicLengthTerm &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula))
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
             {
-                return true;
+                irFormula = encodedFormula;
             }
 
-            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                 valueExpression,
                 semanticModel,
                 cancellationToken,
                 out formula,
                 getSymbolVersion: null,
-                inlineDepth: 0);
+                inlineDepth: 0))
+            {
+                return true;
+            }
+
+            formula = irFormula!;
+            return formula != null;
         }
 
         private static bool TryCreateStringValueFormula(
@@ -9394,11 +9401,12 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            SmtFormula? irFormula = null;
             var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerStringTerm(valueExpression, loweringContext, out var stringTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out formula))
+                SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out var encodedFormula))
             {
-                return true;
+                irFormula = encodedFormula;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
@@ -9414,8 +9422,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = null!;
-            return false;
+            formula = irFormula!;
+            return formula != null;
         }
 
         private static bool TryCreateComparableValueFormula(
@@ -9469,11 +9477,12 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            SmtFormula? irFormula = null;
             var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerTerm(valueExpression, loweringContext, out var term) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula))
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
             {
-                return true;
+                irFormula = encodedFormula;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateValue(
@@ -9489,8 +9498,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = null!;
-            return false;
+            formula = irFormula!;
+            return formula != null;
         }
 
         private static bool TryCreateConditionFormula(
@@ -9499,11 +9508,12 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            SmtFormula? irFormula = null;
             var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (SymbolicIrLowerer.TryLowerCondition(condition, loweringContext, out var symbolicCondition) &&
-                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out formula))
+                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
             {
-                return true;
+                irFormula = encodedFormula;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslate(
@@ -9519,8 +9529,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = null!;
-            return false;
+            formula = irFormula!;
+            return formula != null;
         }
 
         private static bool TryCollectBranchAssumptionFacts(

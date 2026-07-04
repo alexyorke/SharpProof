@@ -392,6 +392,11 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> pathConditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
+            if (ContainsDivisionOrModulo(condition))
+            {
+                return false;
+            }
+
             if (!TryCreateIrBranchCondition(
                     condition,
                     branchWhenTrue,
@@ -406,6 +411,13 @@ namespace PurelySharp.Symbolic
 
             pathConditions.Add(formula);
             return true;
+        }
+
+        private static bool ContainsDivisionOrModulo(ExpressionSyntax expression)
+        {
+            return expression.DescendantNodesAndSelf()
+                .OfType<BinaryExpressionSyntax>()
+                .Any(static binary => binary.IsKind(SyntaxKind.DivideExpression) || binary.IsKind(SyntaxKind.ModuloExpression));
         }
 
         private static bool TryCreateIrBranchCondition(
@@ -711,19 +723,20 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula>? pathConditions = null)
         {
             var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
-            if (EvaluateConditionTruthWithIr(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    basePathConditions) is { } irTruth)
-            {
-                return irTruth;
-            }
-
             if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
+                if (!ContainsDivisionOrModulo(expression) &&
+                    EvaluateConditionTruthWithIr(
+                        expression,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis,
+                        basePathConditions) is { } irTruth)
+                {
+                    return irTruth;
+                }
+
                 if (IsBranchUnreachable(
                         basePathConditions,
                         expression,
@@ -1013,7 +1026,7 @@ namespace PurelySharp.Symbolic
             }
 
             var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
-            if (!CSharpSmtFormulaTranslator.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
+            if (!TryTranslateConditionFormula(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
                 return EvaluateKnownConditionTruth(
@@ -1094,14 +1107,6 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula? formula)
         {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
-                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
-            {
-                formula = encodedFormula;
-                return true;
-            }
-
             return CSharpSmtFormulaTranslator.TryTranslate(
                 condition,
                 semanticModel,
