@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,100 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,355 lines,
+- Production inventory currently reports 112,162 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,417 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -121,6 +121,9 @@ path-fact, hazard, and ownership flows.
   queries can expose loop initializer facts as symbolic facts.
 - `for` initial-entry reachability now tries the shared `SymbolicState` proof
   path before falling back to legacy formula path conditions.
+- Built-in element-access range checks now lower one-dimensional and
+  multidimensional array bounds through IR bounds facts before legacy formula
+  fallback; Index/Range shape compatibility still uses the fallback path.
 - Delete each old formula branch only after equivalence tests prove identical
   or more conservative behavior.
 
