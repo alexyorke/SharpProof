@@ -93,6 +93,8 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
             Assert.That(proofServiceSource, Does.Contain("private static SymbolicState NormalizeState(SymbolicState state)"));
             Assert.That(proofServiceSource, Does.Contain("state = NormalizeState(state);"));
+            Assert.That(proofServiceSource, Does.Contain("new Dictionary<string, bool>(StringComparer.Ordinal)"));
+            Assert.That(proofServiceSource, Does.Contain("IDictionary<string, bool> memo"));
         }
 
         [Test]
