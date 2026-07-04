@@ -1417,6 +1417,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardMultidimensionalElementAccess_UsesIrBoundsPreconditionBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var irTriggerSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+
+            Assert.That(source, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-bounds.in-range"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-out-of-range"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
+            Assert.That(source, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(irTriggerSource, Does.Contain("GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol { Rank: > 1 }"));
+            Assert.That(irTriggerSource, Does.Contain("return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger("));
+        }
+
+        [Test]
         public void RuntimeHazardNegativeLengths_UseIrExceptionPreconditionsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

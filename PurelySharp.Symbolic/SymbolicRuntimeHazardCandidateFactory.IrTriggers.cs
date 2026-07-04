@@ -192,6 +192,17 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardTrigger trigger)
         {
             trigger = default;
+            if (GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol { Rank: > 1 } arrayType)
+            {
+                return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
+                    elementAccess,
+                    kind,
+                    arrayType,
+                    semanticModel,
+                    cancellationToken,
+                    out trigger);
+            }
+
             if (elementAccess.ArgumentList.Arguments.Count != 1 ||
                 IsBuiltInRangeAccessArgument(
                     elementAccess.ArgumentList.Arguments[0].Expression,
@@ -235,6 +246,74 @@ namespace PurelySharp.Symbolic
                 outOfRangeCondition,
                 elementAccess,
                 "ir.runtime-hazard.index.out-of-range",
+                out trigger);
+        }
+
+        private static bool TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
+            ElementAccessExpressionSyntax elementAccess,
+            SymbolicRuntimeHazardKind kind,
+            IArrayTypeSymbol arrayType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardTrigger trigger)
+        {
+            trigger = default;
+            if (arrayType.Rank <= 1 ||
+                elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            SymbolicCondition? inRangeCondition = null;
+            SymbolicTerm? subject = null;
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!SymbolicIrLowerer.TryLowerTerm(
+                        elementAccess.ArgumentList.Arguments[dimension].Expression,
+                        context,
+                        out var index) ||
+                    index.Kind != SmtValueKind.Int ||
+                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
+                        elementAccess.Expression,
+                        dimension,
+                        context,
+                        out var length))
+                {
+                    return false;
+                }
+
+                subject ??= index;
+                var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(
+                        index,
+                        length,
+                        IncludeLowerBound: true,
+                        IncludeUpperBound: true),
+                    elementAccess,
+                    "ir.runtime-hazard.index.multidimensional-bounds.in-range"));
+                inRangeCondition = inRangeCondition == null
+                    ? dimensionInRange
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        inRangeCondition,
+                        dimensionInRange);
+            }
+
+            if (inRangeCondition == null)
+            {
+                return false;
+            }
+
+            var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+                ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+                : SymbolicExceptionPreconditionKind.IndexOutOfRange;
+            return TryEncodeIrExceptionPreconditionTrigger(
+                preconditionKind,
+                subject,
+                new SymbolicNotCondition(inRangeCondition),
+                elementAccess,
+                "ir.runtime-hazard.index.multidimensional-out-of-range",
                 out trigger);
         }
 
