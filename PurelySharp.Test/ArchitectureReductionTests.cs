@@ -3132,6 +3132,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ClassifiesFalseImplicationForEmptyStateWithoutSmt()
+        {
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                new SymbolicConstantCondition(false),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_ConditionTruthRejectsNullStateBeforeProof()
         {
             Assert.Throws<ArgumentNullException>(() =>

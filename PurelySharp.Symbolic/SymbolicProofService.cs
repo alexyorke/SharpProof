@@ -150,6 +150,21 @@ namespace PurelySharp.Symbolic
                     "ir_condition_syntactic_truth");
             }
 
+            if (syntacticStatus == SymbolicProofStatus.ProvenFalse)
+            {
+                var reachability = ClassifyReachability(state);
+                if (reachability.Info.Backend == SymbolicProofBackend.Syntactic)
+                {
+                    return reachability.Info.Status == SymbolicProofStatus.Unreachable
+                        ? SymbolicIrProofResult.Syntactic(
+                            SymbolicProofStatus.ProvenTrue,
+                            reachability.Info.Reason)
+                        : SymbolicIrProofResult.Syntactic(
+                            SymbolicProofStatus.ProvenFalse,
+                            "ir_condition_syntactic_false_reachable");
+                }
+            }
+
             if (StateContainsCondition(state, condition))
             {
                 return SymbolicIrProofResult.Syntactic(
