@@ -11,6 +11,7 @@ namespace PurelySharp.Symbolic.Ir
     {
         private static readonly ImmutableArray<KnownApiLoweringDescriptor> KnownApiLowerings =
             ImmutableArray.Create(
+                new KnownApiLoweringDescriptor("object", nameof(object.ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.Contains), TryLowerStringPredicateInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
@@ -599,6 +600,34 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             return false;
+        }
+
+        private static bool TryLowerObjectReferenceEqualsInvocation(
+            InvocationExpressionSyntax invocation,
+            IMethodSymbol method,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!method.IsStatic ||
+                invocation.ArgumentList.Arguments.Count != 2 ||
+                method.Parameters.Length != 2 ||
+                !TryLowerTerm(invocation.ArgumentList.Arguments[0].Expression, context, out var left) ||
+                !TryLowerTerm(invocation.ArgumentList.Arguments[1].Expression, context, out var right) ||
+                !CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||
+                left.Kind != SmtValueKind.Reference && right.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            condition = CreateFactCondition(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    left,
+                    right),
+                invocation,
+                "ir.known-api.object.reference-equals");
+            return true;
         }
 
         private static bool TryLowerKnownStaticValueMember(

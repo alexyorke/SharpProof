@@ -204,6 +204,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void KnownApiLowering_ObjectReferenceEqualsUsesReferenceEqualityAtom()
+        {
+            var context = CreateExpressionContext(
+                "object? left, object? right",
+                "object.ReferenceEquals(left, right)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(fact.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(fact.Left.Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(fact.Right.Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate()
         {
             var context = CreateExpressionContext(
