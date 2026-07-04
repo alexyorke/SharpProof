@@ -2005,11 +2005,10 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             fact = null!;
-            if (!TryCreateBuiltInLengthTerm(
-                    targetSymbol,
-                    getTargetSymbolVersion,
-                    out var targetLengthTerm) ||
-                !SymbolicIrFormulaEncoder.TryEncodeTerm(targetLengthTerm, out var targetLengthFormula) ||
+            if (!SymbolicFactFactory.TryCreateBuiltInLengthFormula(
+                    GetVersionedSmtVariableName(targetSymbol, getTargetSymbolVersion),
+                    SymbolicFactFactory.GetTrackedSymbolType(targetSymbol),
+                    out var targetLengthFormula) ||
                 !TryTranslateBuiltInLengthValue(
                     valueExpression,
                     semanticModel,
@@ -2052,17 +2051,6 @@ namespace PurelySharp.Symbolic
 
             fact = SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula);
             return true;
-        }
-
-        private static bool TryCreateBuiltInLengthTerm(
-            ISymbol symbol,
-            Func<ISymbol, int>? getSymbolVersion,
-            out SymbolicTerm term)
-        {
-            term = null!;
-            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-            return TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var reference) &&
-                SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, reference, out term);
         }
 
         private static bool TryCreateStringContentTerm(

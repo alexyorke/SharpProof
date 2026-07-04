@@ -5671,10 +5671,9 @@ namespace PurelySharp.Test
             Assert.That(
                 stringHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
                 Is.GreaterThanOrEqualTo(0));
-            Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
+            Assert.That(source, Does.Contain("SymbolicFactFactory.TryCreateBuiltInLengthFormula("));
             Assert.That(source, Does.Contain("TryCreateStringContentTerm("));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out term)"));
-            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, reference, out term)"));
         }
 
         [Test]

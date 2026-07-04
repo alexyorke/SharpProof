@@ -1974,6 +1974,33 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsAssignedRangeStringViews()
+        {
+            var context = CreateMethodLocalDeclarationContext(
+                "string text, Range range",
+                """
+                range = 1..^1;
+                ReadOnlySpan<char> view = text.AsSpan(range);
+                """,
+                "using System;");
+
+            Assert.That(
+                SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
+                    context.Symbol,
+                    context.ValueExpression,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    out var fact),
+                Is.True);
+
+            Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
+            var equality = (SmtBinaryFormula)fact;
+            Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
+            Assert.That(equality.Left.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
         public void ReachabilityHelper_StringContentAssignedValueFactSupportsStringTargets()
         {
             var context = CreateLocalDeclarationContext(
@@ -2231,6 +2258,36 @@ namespace PurelySharp.Test
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "SymbolicIrLocalDeclarationTest",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var declarator = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>()
+                .Single();
+
+            return new LocalDeclarationContext(
+                (ILocalSymbol)semanticModel.GetDeclaredSymbol(declarator)!,
+                declarator.Initializer!.Value,
+                semanticModel);
+        }
+
+        private static LocalDeclarationContext CreateMethodLocalDeclarationContext(string parameters, string statements, string declarations = "")
+        {
+            var source = $$"""
+                {{declarations}}
+                public sealed class C
+                {
+                    public void M({{parameters}})
+                    {
+                        {{statements}}
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrMethodLocalDeclarationTest",
                 new[] { syntaxTree },
                 AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

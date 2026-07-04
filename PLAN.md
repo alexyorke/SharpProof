@@ -114,6 +114,11 @@ path-fact, hazard, and ownership flows.
   and `System.Index` values can be recovered from direct expressions or simple
   local/parameter assignments. Count-backed collection length shapes and
   unknown range/index reassignments still remain on the compatibility path.
+- Assigned built-in-length facts now use the shared symbol-length formula path
+  for built-in span or memory locals, so assigned range-backed string views
+  such as `ReadOnlySpan<char> view = text.AsSpan(range)` can surface length
+  proofs through the public query path instead of relying on incidental
+  reference-only helpers.
 - Array-creation dimension lengths such as `new T[rows, columns].GetLength(1)`
   now lower the requested dimension directly to the corresponding size
   expression in `SymbolicIrLowerer.Indexing`, reducing reliance on

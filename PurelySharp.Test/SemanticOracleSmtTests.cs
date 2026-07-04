@@ -3198,6 +3198,38 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeAsSpanResultLength()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string text, Range range)
+    {
+        if (text != null && text.Length >= 2)
+        {
+            range = 1..^1;
+            ReadOnlySpan<char> view = text.AsSpan(range);
+            return view.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "AssignedRangeAsSpanResultLength.cs",
+                FindLine(source, "return view.Length;"),
+                20,
+                "view.Length == text.Length - 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull()
         {
             const string source = @"
