@@ -3118,6 +3118,52 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_StateFactsEvaluateCompositeConditionsWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x");
+            var yPositive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y");
+            var conjunction = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                new SymbolicFactCondition(xPositive),
+                new SymbolicFactCondition(yPositive));
+            var disjunction = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicFactCondition(xPositive),
+                new SymbolicFactCondition(yPositive));
+            var state = new SymbolicState(new[] { xPositive, yPositive });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var conjunctionProof = SymbolicReachabilityService.ClassifyStateImplication(state, conjunction, smtAnalysis);
+            var disjunctionTruth = SymbolicReachabilityService.ClassifyStateConditionTruth(state, disjunction, smtAnalysis);
+            var negatedConjunctionTruth = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicNotCondition(conjunction),
+                smtAnalysis);
+
+            Assert.That(conjunctionProof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(conjunctionProof.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(disjunctionTruth.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(disjunctionTruth.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(negatedConjunctionTruth.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(negatedConjunctionTruth.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_NegativeStateConditionProvesConditionFalseWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

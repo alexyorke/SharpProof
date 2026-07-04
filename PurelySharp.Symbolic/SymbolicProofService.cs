@@ -534,6 +534,11 @@ namespace PurelySharp.Symbolic
 
         private static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
         {
+            if (TryEvaluateConditionFromState(state, condition, out var value))
+            {
+                return value;
+            }
+
             if (condition is SymbolicFactCondition factCondition &&
                 StateContainsFact(state, factCondition.Fact))
             {
@@ -553,7 +558,84 @@ namespace PurelySharp.Symbolic
 
         private static bool StateContradictsCondition(SymbolicState state, SymbolicCondition condition)
         {
+            if (TryEvaluateConditionFromState(state, condition, out var value))
+            {
+                return !value;
+            }
+
             return StateContainsCondition(state, new SymbolicNotCondition(condition));
+        }
+
+        private static bool TryEvaluateConditionFromState(
+            SymbolicState state,
+            SymbolicCondition condition,
+            out bool value)
+        {
+            switch (condition)
+            {
+                case SymbolicConstantCondition constant:
+                    value = constant.Value;
+                    return true;
+                case SymbolicFactCondition factCondition:
+                    if (StateContainsFact(state, factCondition.Fact))
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (StateContradictsFact(state, factCondition.Fact))
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    break;
+                case SymbolicNotCondition notCondition:
+                    if (TryEvaluateConditionFromState(state, notCondition.Operand, out var operandValue))
+                    {
+                        value = !operandValue;
+                        return true;
+                    }
+
+                    break;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
+                    var leftAndKnown = TryEvaluateConditionFromState(state, andCondition.Left, out var leftAndValue);
+                    var rightAndKnown = TryEvaluateConditionFromState(state, andCondition.Right, out var rightAndValue);
+                    if ((leftAndKnown && !leftAndValue) ||
+                        (rightAndKnown && !rightAndValue))
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    if (leftAndKnown && rightAndKnown)
+                    {
+                        value = leftAndValue && rightAndValue;
+                        return true;
+                    }
+
+                    break;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition:
+                    var leftOrKnown = TryEvaluateConditionFromState(state, orCondition.Left, out var leftOrValue);
+                    var rightOrKnown = TryEvaluateConditionFromState(state, orCondition.Right, out var rightOrValue);
+                    if ((leftOrKnown && leftOrValue) ||
+                        (rightOrKnown && rightOrValue))
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftOrKnown && rightOrKnown)
+                    {
+                        value = leftOrValue || rightOrValue;
+                        return true;
+                    }
+
+                    break;
+            }
+
+            value = false;
+            return false;
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()
