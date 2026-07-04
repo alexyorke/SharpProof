@@ -115,6 +115,8 @@ namespace PurelySharp.Symbolic.Ir
 
     internal sealed record SymbolicNullableHasValueTerm(string NullableName) : SymbolicTerm(SmtValueKind.Bool);
 
+    internal sealed record SymbolicNullableValueTerm(string NullableName, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
+
     internal sealed record SymbolicLengthTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
 
     internal sealed record SymbolicCountTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
@@ -802,6 +804,8 @@ namespace PurelySharp.Symbolic.Ir
                     return CreateStringConcatTermKey(concat);
                 case SymbolicNullableHasValueTerm nullableHasValue:
                     return "nullable-has-value:" + nullableHasValue.NullableName;
+                case SymbolicNullableValueTerm nullableValue:
+                    return "nullable-value:" + nullableValue.NullableName + ":" + nullableValue.Kind;
                 case SymbolicLengthTerm length:
                     return "length:" + CreateTermKey(length.Value);
                 case SymbolicCountTerm count:

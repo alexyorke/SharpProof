@@ -710,6 +710,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_NullableValueUsesSharedNullableValueTerm()
+        {
+            var context = CreateExpressionContext(
+                "int? maybe, int expected",
+                "maybe.Value == expected");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(atom.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(atom.Left, Is.TypeOf<SymbolicNullableValueTerm>());
+            var nullableValue = (SymbolicNullableValueTerm)atom.Left;
+            Assert.That(nullableValue.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(nullableValue.NullableName, Does.StartWith("maybe#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+            Assert.That(formula, Is.TypeOf<SmtBinaryFormula>());
+            var binary = (SmtBinaryFormula)formula;
+            Assert.That(binary.Left, Is.TypeOf<SmtVariable>());
+            Assert.That(((SmtVariable)binary.Left).Name, Does.EndWith(".Value"));
+        }
+
+        [Test]
         public void Encoder_ExceptionPreconditionUsesTriggerFormulaWithoutSpecialAnalyzerRule()
         {
             var divisor = new SymbolicVariableTerm("d#1", SmtValueKind.Int);

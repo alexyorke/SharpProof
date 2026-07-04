@@ -864,6 +864,12 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (string.Equals(memberName, "Value", StringComparison.Ordinal) &&
+                TryLowerNullableValueTerm(memberAccess.Expression, context, out term))
+            {
+                return true;
+            }
+
             if (string.Equals(memberName, nameof(string.Length), StringComparison.Ordinal))
             {
                 if (receiverType?.SpecialType == SpecialType.System_String)
@@ -1005,6 +1011,26 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = new SymbolicNullableHasValueTerm(context.GetVariableName(symbol));
+            return true;
+        }
+
+        public static bool TryLowerNullableValueTerm(
+            ExpressionSyntax nullableExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            nullableExpression = UnwrapExpression(nullableExpression);
+            if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(
+                    context.SemanticModel.GetTypeInfo(nullableExpression, context.CancellationToken).Type,
+                    out var underlyingType) ||
+                !TryGetValueKind(underlyingType, out var valueKind) ||
+                !TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicNullableValueTerm(context.GetVariableName(symbol), valueKind);
             return true;
         }
 

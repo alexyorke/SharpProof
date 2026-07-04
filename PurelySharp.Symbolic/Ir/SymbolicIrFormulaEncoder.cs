@@ -140,6 +140,9 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicNullableHasValueTerm nullableHasValue:
                     formula = new SmtVariable(nullableHasValue.NullableName + ".HasValue", SmtValueKind.Bool);
                     return true;
+                case SymbolicNullableValueTerm nullableValue:
+                    formula = new SmtVariable(nullableValue.NullableName + ".Value", nullableValue.Kind);
+                    return true;
                 case SymbolicLengthTerm length:
                     if (TryEncodeTerm(length.Value, out var value))
                     {
