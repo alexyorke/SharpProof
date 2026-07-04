@@ -8812,8 +8812,9 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
-            return true;
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(
+                new SymbolicNullableHasValueTerm(SymbolicFactFactory.GetSmtVariableName(symbol)),
+                out formula);
         }
 
         private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
@@ -8825,8 +8826,9 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol) + ".Value", kind);
-            return true;
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(
+                new SymbolicNullableValueTerm(SymbolicFactFactory.GetSmtVariableName(symbol), kind),
+                out formula);
         }
 
         private static bool TryHandleTupleDeconstructionDeclaration(
