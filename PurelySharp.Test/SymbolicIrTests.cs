@@ -954,6 +954,47 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_NullableCoalesceUnderlyingFallbackUsesConditionalValueTerm()
+        {
+            var context = CreateExpressionContext(
+                "int? maybe, int fallback",
+                "(maybe ?? fallback) == fallback");
+            var coalesce = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(coalesce, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+            Assert.That(AssertFactCondition<SymbolicTruthAtom>(conditional.Condition).Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicNullableValueTerm>());
+            Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)conditional.WhenFalse).Name, Does.StartWith("fallback#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+        }
+
+        [Test]
+        public void LowerTerm_NullableConditionalAccessCoalesceUsesElementValueTerm()
+        {
+            var context = CreateExpressionContext(
+                "int[] values, int fallback",
+                "(values?[0] ?? fallback) == fallback");
+            var coalesce = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(coalesce, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+            var hasValue = AssertFactCondition<SymbolicTruthAtom>(conditional.Condition);
+            Assert.That(hasValue.Condition, Is.TypeOf<SymbolicConditionalTerm>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicElementTerm>());
+            Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)conditional.WhenFalse).Name, Does.StartWith("fallback#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+        }
+
+        [Test]
         public void LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm()
         {
             var context = CreateExpressionContext(

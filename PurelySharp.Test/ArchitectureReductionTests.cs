@@ -1992,12 +1992,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(21));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(20));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 21,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 20,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2010,7 +2010,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
                     ["if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||"] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 3,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
@@ -5651,7 +5650,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicReachabilityService_UsesIrNullableHasValueBeforeLegacyFallback()
+        public void SymbolicReachabilityService_UsesIrNullableHasValueWithoutLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -5668,9 +5667,8 @@ namespace PurelySharp.Test
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-            Assert.That(
-                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression", StringComparison.Ordinal),
-                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression"));
+            Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
         }
 

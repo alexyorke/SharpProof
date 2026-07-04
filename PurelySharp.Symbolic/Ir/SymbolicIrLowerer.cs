@@ -180,6 +180,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
+                nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeft) &&

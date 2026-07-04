@@ -1337,18 +1337,10 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            formula = null!;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out formula))
-            {
-                return true;
-            }
-
-            return CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out formula);
+            return SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out formula);
         }
 
         internal static bool TryCreateRuntimeTypeTestCondition(
@@ -2881,15 +2873,10 @@ namespace PurelySharp.Symbolic
         {
             expression = StripParentheses(expression);
             if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula))
+                SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
             {
-                SmtFormula? valueFormula = null;
-                if (SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
-                    SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var encodedValue))
-                {
-                    valueFormula = encodedValue;
-                }
-
                 parts = new NullableValueParts(hasValueFormula, valueFormula);
                 return true;
             }
