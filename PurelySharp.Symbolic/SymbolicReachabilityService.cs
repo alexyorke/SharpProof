@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -1950,7 +1951,7 @@ namespace PurelySharp.Symbolic
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula, getTargetSymbolVersion) ||
                 targetFormula is not { Kind: SmtValueKind.Reference } ||
-                !CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula(
+                !TryCreateNotNullIfNotNullResultNonNullFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1966,6 +1967,347 @@ namespace PurelySharp.Symbolic
                 SmtFormulaFactory.CreateReferenceNullComparison(targetFormula, isNull: false),
                 valueNonNullFormula);
             return true;
+        }
+
+        private static bool TryCreateNotNullIfNotNullResultNonNullFormula(
+            ExpressionSyntax resultExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0,
+            bool requireLocalOrParameterSource = false)
+        {
+            if (TryCreateIrNotNullIfNotNullResultNonNullFormula(
+                    resultExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    requireLocalOrParameterSource))
+            {
+                return true;
+            }
+
+            return CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula(
+                resultExpression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                requireLocalOrParameterSource);
+        }
+
+        private static bool TryCreateIrNotNullIfNotNullResultNonNullFormula(
+            ExpressionSyntax resultExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            bool requireLocalOrParameterSource)
+        {
+            formula = null!;
+            resultExpression = StripParentheses(resultExpression);
+            var resultTypeInfo = semanticModel.GetTypeInfo(resultExpression, cancellationToken);
+            var resultType = resultTypeInfo.ConvertedType ?? resultTypeInfo.Type;
+            if (resultType == null ||
+                !SymbolicTypeFacts.IsReferenceLikeType(resultType) ||
+                !TryCreateIrNotNullIfNotNullSourceFormula(
+                    resultExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceFormula,
+                    getSymbolVersion,
+                    requireLocalOrParameterSource))
+            {
+                return false;
+            }
+
+            var sourceNonNull = SmtFormulaFactory.CreateReferenceNullComparison(sourceFormula, isNull: false);
+            var fallbackNonNull = new SmtVariable(
+                CreateNotNullIfNotNullFallbackVariableName(resultExpression),
+                SmtValueKind.Bool);
+            formula = new SmtBinaryFormula(SmtBinaryOperator.Or, sourceNonNull, fallbackNonNull);
+            return true;
+        }
+
+        private static bool TryCreateIrNotNullIfNotNullSourceFormula(
+            ExpressionSyntax resultExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            bool requireLocalOrParameterSource)
+        {
+            formula = null!;
+            var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
+            if (operation is IInvocationOperation invocationOperation &&
+                TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod, out var methodParameterName) &&
+                TryGetInvocationSourceExpression(invocationOperation, methodParameterName, out var invocationSource) &&
+                TryCreateIrNotNullIfNotNullSourceReference(
+                    invocationSource,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    requireLocalOrParameterSource))
+            {
+                return true;
+            }
+
+            if (operation is IPropertyReferenceOperation propertyReferenceOperation &&
+                TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property, out var propertyParameterName) &&
+                TryGetPropertySourceExpression(propertyReferenceOperation, propertyParameterName, out var propertySource) &&
+                TryCreateIrNotNullIfNotNullSourceReference(
+                    propertySource,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    requireLocalOrParameterSource))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateIrNotNullIfNotNullSourceReference(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            bool requireLocalOrParameterSource)
+        {
+            formula = null!;
+            if (requireLocalOrParameterSource &&
+                !IsLocalOrParameterExpression(expression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var sourceTerm) ||
+                sourceTerm.Kind != SmtValueKind.Reference ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(sourceTerm, out formula))
+            {
+                formula = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryGetNotNullIfNotNullParameterName(IMethodSymbol methodSymbol, out string parameterName)
+        {
+            if (TryGetNotNullIfNotNullParameterName(methodSymbol.GetReturnTypeAttributes(), out parameterName))
+            {
+                return true;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(methodSymbol, methodSymbol.OriginalDefinition) &&
+                TryGetNotNullIfNotNullParameterName(methodSymbol.OriginalDefinition.GetReturnTypeAttributes(), out parameterName))
+            {
+                return true;
+            }
+
+            parameterName = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetNotNullIfNotNullParameterName(IPropertySymbol propertySymbol, out string parameterName)
+        {
+            if (TryGetNotNullIfNotNullParameterName(propertySymbol.GetAttributes(), out parameterName) ||
+                TryGetNotNullIfNotNullParameterName(propertySymbol.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName))
+            {
+                return true;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(propertySymbol, propertySymbol.OriginalDefinition) &&
+                (TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetAttributes(), out parameterName) ||
+                 TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName)))
+            {
+                return true;
+            }
+
+            parameterName = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetNotNullIfNotNullParameterName(
+            ImmutableArray<AttributeData> attributes,
+            out string parameterName)
+        {
+            foreach (var attribute in attributes)
+            {
+                if (!string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty),
+                        "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute",
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not string candidate ||
+                    string.IsNullOrEmpty(candidate))
+                {
+                    continue;
+                }
+
+                parameterName = candidate;
+                return true;
+            }
+
+            parameterName = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetInvocationSourceExpression(
+            IInvocationOperation invocationOperation,
+            string parameterName,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            for (var parameterIndex = 0; parameterIndex < invocationOperation.TargetMethod.Parameters.Length; parameterIndex++)
+            {
+                if (!string.Equals(
+                        invocationOperation.TargetMethod.Parameters[parameterIndex].Name,
+                        parameterName,
+                        StringComparison.Ordinal) ||
+                    !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out expression))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetPropertySourceExpression(
+            IPropertyReferenceOperation propertyReferenceOperation,
+            string parameterName,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            if (string.Equals(parameterName, "this", StringComparison.Ordinal) &&
+                propertyReferenceOperation.Instance?.Syntax is ExpressionSyntax receiverExpression)
+            {
+                expression = receiverExpression;
+                return true;
+            }
+
+            for (var parameterIndex = 0; parameterIndex < propertyReferenceOperation.Property.Parameters.Length; parameterIndex++)
+            {
+                if (!string.Equals(
+                        propertyReferenceOperation.Property.Parameters[parameterIndex].Name,
+                        parameterName,
+                        StringComparison.Ordinal) ||
+                    !TryGetPropertyArgumentExpression(propertyReferenceOperation, parameterIndex, out expression))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetInvocationArgumentExpression(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < invocationOperation.Arguments.Length &&
+                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                expression = fallbackExpression;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetPropertyArgumentExpression(
+            IPropertyReferenceOperation propertyReferenceOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= propertyReferenceOperation.Property.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = propertyReferenceOperation.Property.Parameters[parameterIndex];
+            foreach (var argument in propertyReferenceOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < propertyReferenceOperation.Arguments.Length &&
+                propertyReferenceOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                expression = fallbackExpression;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsLocalOrParameterExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = StripParentheses(expression);
+            return expression is IdentifierNameSyntax &&
+                semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is ILocalSymbol or IParameterSymbol;
+        }
+
+        private static string CreateNotNullIfNotNullFallbackVariableName(ExpressionSyntax expression)
+        {
+            return "$notNullIfNotNullResultNonNull#" +
+                RuntimeHelpers.GetHashCode(expression.SyntaxTree).ToString(CultureInfo.InvariantCulture) +
+                "#" +
+                expression.SpanStart.ToString(CultureInfo.InvariantCulture) +
+                "#" +
+                expression.Span.Length.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static ExpressionSyntax StripParentheses(ExpressionSyntax expression)
+        {
+            while (expression is ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            return expression;
         }
 
         internal static bool TryCreateAsExpressionAssignedValueFacts(
