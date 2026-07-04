@@ -93,7 +93,8 @@ path-fact, hazard, and ownership flows.
   overflow guard coverage beyond binary operations.
 - Signed division overflow checks now build IR equality conditions for
   left-min/right-minus-one before falling back to the legacy direct formula
-  path.
+  path. Runtime-hazard signed-division triggers now use the same shared IR
+  condition builder instead of owning a duplicate condition shape.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
