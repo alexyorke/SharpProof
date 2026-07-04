@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using SearchLib.Smt;
 
@@ -141,6 +142,7 @@ namespace PurelySharp.Symbolic.Ir
             const string stringSuffix = ".String";
             const string lengthSuffix = ".Length";
             const string countSuffix = ".Count";
+            const string getLengthMarker = ".GetLength(";
 
             if (variable.Kind == SmtValueKind.String &&
                 variable.Name.EndsWith(stringSuffix, StringComparison.Ordinal) &&
@@ -167,6 +169,28 @@ namespace PurelySharp.Symbolic.Ir
                 return new SymbolicCountTerm(new SymbolicVariableTerm(
                     variable.Name.Substring(0, variable.Name.Length - countSuffix.Length),
                     SmtValueKind.Reference));
+            }
+
+            if (variable.Kind == SmtValueKind.Int &&
+                variable.Name.EndsWith(")", StringComparison.Ordinal))
+            {
+                var markerIndex = variable.Name.LastIndexOf(getLengthMarker, StringComparison.Ordinal);
+                if (markerIndex > 0)
+                {
+                    var dimensionStart = markerIndex + getLengthMarker.Length;
+                    var dimensionText = variable.Name.Substring(dimensionStart, variable.Name.Length - dimensionStart - 1);
+                    if (int.TryParse(
+                            dimensionText,
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out var dimension) &&
+                        dimension >= 0)
+                    {
+                        return new SymbolicArrayDimensionLengthTerm(
+                            new SymbolicVariableTerm(variable.Name.Substring(0, markerIndex), SmtValueKind.Reference),
+                            dimension);
+                    }
+                }
             }
 
             return new SymbolicVariableTerm(variable.Name, variable.Kind);

@@ -1170,6 +1170,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtFormulaLowerer_ArrayDimensionLengthUsesSharedDimensionLengthAtom()
+        {
+            var sourceNode = SyntaxFactory.ParseExpression("matrix");
+            var smtFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int),
+                new SmtIntegerConstant(2));
+
+            Assert.That(SymbolicSmtFormulaLowerer.TryLowerCondition(
+                smtFormula,
+                sourceNode,
+                "test.smt-lowerer.dimension-length",
+                "test.smt-lowerer.dimension-length",
+                out var condition), Is.True);
+            var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(atom.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
+            Assert.That(atom.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            var dimensionLength = (SymbolicArrayDimensionLengthTerm)atom.Left;
+            Assert.That(dimensionLength.Dimension, Is.EqualTo(1));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded), Is.True);
+            Assert.That(encoded, Is.EqualTo(smtFormula));
+        }
+
+        [Test]
         public void SmtFormulaLowerer_AsExpressionImplicationUsesTypeTestAtom()
         {
             var sourceNode = SyntaxFactory.ParseExpression("value as string");
