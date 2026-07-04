@@ -1,11 +1,63 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Ir
 {
     internal static partial class SymbolicIrLowerer
     {
+        private static bool TryGetInstanceMemberSymbol(
+            SyntaxNode syntax,
+            SymbolicLoweringContext context,
+            out ISymbol memberSymbol)
+        {
+            var symbol = context.SemanticModel.GetSymbolInfo(syntax, context.CancellationToken).Symbol;
+            switch (symbol)
+            {
+                case IPropertySymbol { IsStatic: false } property:
+                    memberSymbol = property;
+                    return true;
+                case IFieldSymbol { IsStatic: false } field:
+                    memberSymbol = field;
+                    return true;
+            }
+
+            switch (context.SemanticModel.GetOperation(syntax, context.CancellationToken))
+            {
+                case IPropertyReferenceOperation { Property.IsStatic: false } propertyReference:
+                    memberSymbol = propertyReference.Property;
+                    return true;
+                case IFieldReferenceOperation { Field.IsStatic: false } fieldReference:
+                    memberSymbol = fieldReference.Field;
+                    return true;
+            }
+
+            memberSymbol = null!;
+            return false;
+        }
+
+        private static bool TryLowerImplicitThisMemberTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (expression is not IdentifierNameSyntax ||
+                !TryGetInstanceMemberSymbol(expression, context, out var memberSymbol) ||
+                !TryGetSymbolType(memberSymbol, out var memberType) ||
+                !TryGetValueKind(memberType, out var memberKind))
+            {
+                return false;
+            }
+
+            term = new SymbolicMemberTerm(
+                new SymbolicVariableTerm("this", SmtValueKind.Reference),
+                memberSymbol.Name,
+                memberKind);
+            return true;
+        }
+
         private static bool TryLowerMemberTerm(
             MemberAccessExpressionSyntax memberAccess,
             SymbolicLoweringContext context,

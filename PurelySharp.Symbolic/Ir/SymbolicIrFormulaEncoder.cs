@@ -131,6 +131,27 @@ namespace PurelySharp.Symbolic.Ir
 
                     break;
                 case SymbolicStringContentTerm stringContent:
+                    if (stringContent.Reference is SymbolicConditionalTerm conditionalReference &&
+                        conditionalReference.WhenTrue.Kind == SmtValueKind.Reference &&
+                        conditionalReference.WhenFalse.Kind == SmtValueKind.Reference &&
+                        TryEncode(conditionalReference.Condition, out var conditionalContentCondition) &&
+                        TryEncodeTerm(conditionalReference.WhenTrue, out var conditionalContentWhenTrue) &&
+                        TryEncodeTerm(conditionalReference.WhenFalse, out var conditionalContentWhenFalse) &&
+                        SymbolicFactFactory.TryCreateReferenceStringContentFormula(
+                            conditionalContentWhenTrue,
+                            out var conditionalContentWhenTrueString) &&
+                        SymbolicFactFactory.TryCreateReferenceStringContentFormula(
+                            conditionalContentWhenFalse,
+                            out var conditionalContentWhenFalseString))
+                    {
+                        formula = new SmtConditionalFormula(
+                            conditionalContentCondition,
+                            conditionalContentWhenTrueString,
+                            conditionalContentWhenFalseString,
+                            SmtValueKind.String);
+                        return true;
+                    }
+
                     if (TryEncodeTerm(stringContent.Reference, out var reference) &&
                         SymbolicFactFactory.TryCreateReferenceStringContentFormula(reference, out var stringFormula))
                     {

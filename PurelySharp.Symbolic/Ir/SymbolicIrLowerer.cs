@@ -180,6 +180,12 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
+                TryLowerReferenceConditionalAccessTerm(conditionalAccess, context, out term))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
                 nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
@@ -248,6 +254,11 @@ namespace PurelySharp.Symbolic.Ir
 
             if (expression is MemberAccessExpressionSyntax memberAccess &&
                 TryLowerMemberTerm(memberAccess, context, out term))
+            {
+                return true;
+            }
+
+            if (TryLowerImplicitThisMemberTerm(expression, context, out term))
             {
                 return true;
             }

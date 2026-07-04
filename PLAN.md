@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 14 symbolic-side
+  currently reports 0 analyzer-side and 13 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
@@ -132,6 +132,10 @@ path-fact, hazard, and ownership flows.
   longer falls back to the legacy translator for string non-null facts over
   literals, `string.Empty`, concat/interpolation, coalesce, conditional
   selection, or direct string references.
+- String value reachability is now IR-only at the `TryTranslateStringValue`
+  boundary. Shared IR now lowers implicit-`this` instance members and
+  reference-valued conditional access, and conditional-reference string
+  content encodes through the IR encoder without using the legacy translator.
 - `NotNullIfNotNull` result non-null reachability facts are now IR-only at the
   `TryCreateNotNullIfNotNullResultNonNullFormula` boundary; local/parameter
   assignment facts and semantic proof queries no longer retain a legacy

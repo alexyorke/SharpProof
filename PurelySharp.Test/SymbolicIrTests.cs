@@ -701,6 +701,87 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ImplicitThisStringPropertyUsesSharedMemberReference()
+        {
+            const string source = """
+                public sealed class C
+                {
+                    public string Text { get; set; }
+
+                    public string M()
+                    {
+                        return Text;
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrImplicitThisStringMember",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var expression = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Single(identifier => identifier.Identifier.ValueText == "Text");
+            var loweringContext = new SymbolicLoweringContext(semanticModel, CancellationToken.None);
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(expression, loweringContext, out var term), Is.True);
+            var member = (SymbolicMemberTerm)term;
+
+            Assert.That(member.Receiver, Is.EqualTo(new SymbolicVariableTerm("this", SmtValueKind.Reference)));
+            Assert.That(member.MemberName, Is.EqualTo("Text"));
+            Assert.That(member.Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(SymbolicIrLowerer.TryLowerStringTerm(expression, loweringContext, out var stringTerm), Is.True);
+            Assert.That(stringTerm, Is.TypeOf<SymbolicStringContentTerm>());
+        }
+
+        [Test]
+        public void LowerTerm_ConditionalAccessStringPropertyUsesConditionalReference()
+        {
+            const string source = """
+                public sealed class Holder
+                {
+                    public string Text { get; set; }
+                }
+
+                public sealed class C
+                {
+                    public string M(Holder holder)
+                    {
+                        return holder?.Text;
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrConditionalAccessStringMember",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var expression = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ConditionalAccessExpressionSyntax>()
+                .Single();
+            var loweringContext = new SymbolicLoweringContext(semanticModel, CancellationToken.None);
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(expression, loweringContext, out var term), Is.True);
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicMemberTerm>());
+            Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicNullTerm>());
+            Assert.That(SymbolicIrLowerer.TryLowerStringTerm(expression, loweringContext, out var stringTerm), Is.True);
+            Assert.That(stringTerm, Is.TypeOf<SymbolicStringContentTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+            Assert.That(((SmtConditionalFormula)formula).WhenTrue.Kind, Is.EqualTo(SmtValueKind.String));
+            Assert.That(((SmtConditionalFormula)formula).WhenFalse.Kind, Is.EqualTo(SmtValueKind.String));
+        }
+
+        [Test]
         public void LowerTerm_ArrayElementUsesSharedElementTerm()
         {
             var context = CreateExpressionContext(

@@ -2139,18 +2139,6 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion) &&
-                translatedFormula != null)
-            {
-                formula = translatedFormula;
-                return true;
-            }
-
             formula = null!;
             return false;
         }
