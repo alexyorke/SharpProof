@@ -925,6 +925,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsTupleLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var tupleSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Tuples.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerTupleEqualityCondition(binaryExpression"));
+            Assert.That(coreSource, Does.Contain("TryLowerTupleElementMemberTerm(memberAccess"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleEqualityCondition"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementMemberTerm"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementTerms"));
+            Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleEqualityCondition"));
+            Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleElementMemberTerm"));
+            Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleElementTerms"));
+            Assert.That(tupleSource, Does.Contain("ir.tuple.equality.element"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
