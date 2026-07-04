@@ -1503,6 +1503,12 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"source.query.condition\""));
             Assert.That(reachabilitySource, Does.Contain("TryTranslateConditionFormula("));
             Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
+            var helperIndex = reachabilitySource.IndexOf("internal static bool TryTranslateConditionFormula(", StringComparison.Ordinal);
+            var helperEndIndex = reachabilitySource.IndexOf("internal static bool TryCreateArrayLengthCountAliasFact(", StringComparison.Ordinal);
+            var helperSource = reachabilitySource.Substring(helperIndex, helperEndIndex - helperIndex);
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal)));
         }
 
         [Test]
