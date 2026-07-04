@@ -472,19 +472,22 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 "ir.runtime-hazard.throw-null.trigger",
-                out var nullCondition,
-                out var irNullTrigger);
+                out var nullCondition);
+            SmtFormula irNullTrigger = null!;
+            var hasIrNullTrigger = hasIrNullCondition &&
+                SymbolicIrFormulaEncoder.TryEncode(nullCondition, out irNullTrigger);
+            SmtFormula legacyNullTrigger = null!;
             var hasLegacyNullCondition = TryTranslateNullCondition(
                 thrownExpression,
                 semanticModel,
                 cancellationToken,
-                out var legacyNullTrigger);
-            if (!hasIrNullCondition && !hasLegacyNullCondition)
+                out legacyNullTrigger);
+            if (!hasIrNullTrigger && !hasLegacyNullCondition)
             {
                 return false;
             }
 
-            trigger = hasIrNullCondition ? irNullTrigger : legacyNullTrigger;
+            trigger = hasIrNullTrigger ? irNullTrigger : legacyNullTrigger;
             triggerPrecondition = hasIrNullCondition ? TryGetFactPrecondition(nullCondition) : null;
             if (trigger is SmtBooleanConstant { Value: true })
             {

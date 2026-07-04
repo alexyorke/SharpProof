@@ -2092,8 +2092,8 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     "ir.runtime-hazard.reference.non-null.guard",
-                    out _,
-                    out var irNullTrigger))
+                    out var condition) &&
+                SymbolicIrFormulaEncoder.TryEncode(condition, out var irNullTrigger))
             {
                 return new SmtUnaryFormula(SmtUnaryOperator.Not, irNullTrigger);
             }

@@ -1158,6 +1158,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardReferenceNullHelper_ReturnsIrConditionBeforeFormulaEncoding()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var helperIndex = source.IndexOf("private static bool TryCreateReferenceNullCondition", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("\r\n    }\r\n}", helperIndex, StringComparison.Ordinal);
+            if (helperEndIndex < 0)
+            {
+                helperEndIndex = source.IndexOf("\n    }\n}", helperIndex, StringComparison.Ordinal);
+            }
+
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+
+            Assert.That(helperSource, Does.Contain("out SymbolicCondition condition"));
+            Assert.That(helperSource, Does.Not.Contain("out SmtFormula trigger"));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode("));
+            Assert.That(helperSource, Does.Contain("new SymbolicConstantCondition(true)"));
+            Assert.That(helperSource, Does.Contain("new SymbolicRelationAtom("));
+        }
+
+        [Test]
         public void RuntimeHazardCandidates_DelegateLegacyFormulaFallbacksToReachability()
         {
             var repositoryRoot = FindRepositoryRoot();

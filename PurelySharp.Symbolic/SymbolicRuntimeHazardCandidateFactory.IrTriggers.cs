@@ -636,8 +636,7 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     "ir.runtime-hazard.dynamic-null-binding.trigger",
-                    out var condition,
-                    out _) &&
+                    out var condition) &&
                 TryCreateOptionalReferenceSubject(receiver, semanticModel, cancellationToken, out var subject) &&
                 TryEncodeIrExceptionPreconditionTrigger(
                     SymbolicExceptionPreconditionKind.DynamicNullBinding,
@@ -767,14 +766,12 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             string provenance,
-            out SymbolicCondition condition,
-            out SmtFormula trigger)
+            out SymbolicCondition condition)
         {
             expression = UnwrapExpression(expression);
             if (expression.IsKind(SyntaxKind.NullLiteralExpression))
             {
                 condition = new SymbolicConstantCondition(true);
-                trigger = new SmtBooleanConstant(true);
                 return true;
             }
 
@@ -782,7 +779,6 @@ namespace PurelySharp.Symbolic
                 IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
             {
                 condition = new SymbolicConstantCondition(true);
-                trigger = new SmtBooleanConstant(true);
                 return true;
             }
 
@@ -791,7 +787,6 @@ namespace PurelySharp.Symbolic
                 term.Kind != SmtValueKind.Reference)
             {
                 condition = null!;
-                trigger = null!;
                 return false;
             }
 
@@ -802,7 +797,7 @@ namespace PurelySharp.Symbolic
                     new SymbolicNullTerm()),
                 expression,
                 provenance));
-            return SymbolicIrFormulaEncoder.TryEncode(condition, out trigger);
+            return true;
         }
     }
 }
