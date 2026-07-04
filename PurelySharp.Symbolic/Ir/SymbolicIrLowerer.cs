@@ -677,6 +677,12 @@ namespace PurelySharp.Symbolic.Ir
                 case SyntaxKind.MultiplyExpression:
                     op = SymbolicBinaryTermOperator.Multiply;
                     return true;
+                case SyntaxKind.DivideExpression:
+                    op = SymbolicBinaryTermOperator.Divide;
+                    return true;
+                case SyntaxKind.ModuloExpression:
+                    op = SymbolicBinaryTermOperator.Remainder;
+                    return true;
                 default:
                     op = default;
                     return false;

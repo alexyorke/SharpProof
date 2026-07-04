@@ -279,13 +279,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void LowerCondition_UnguardedDivisionStaysOnLegacyConservativePath()
+        public void LowerCondition_DivisionAndRemainderUseSharedBinaryTerms()
         {
             var context = CreateExpressionContext(
                 "int value, int divisor",
-                "value / divisor == 2");
+                "value / divisor == value % divisor");
 
-            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(relation.Right, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(((SymbolicBinaryTerm)relation.Left).Operator, Is.EqualTo(SymbolicBinaryTermOperator.Divide));
+            Assert.That(((SymbolicBinaryTerm)relation.Right).Operator, Is.EqualTo(SymbolicBinaryTermOperator.Remainder));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
         }
 
         [Test]
