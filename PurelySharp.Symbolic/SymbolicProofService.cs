@@ -151,6 +151,18 @@ namespace PurelySharp.Symbolic
             return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
         }
 
+        internal static bool TryEncodeConditionWithPathState(
+            SymbolicCondition condition,
+            SymbolicState state,
+            out SmtFormula formula)
+        {
+            return TryEncodeConditionWithPathState(
+                condition,
+                state,
+                s_syntheticProofNode,
+                out formula);
+        }
+
         private static bool TryEncodeFactWithPathState(
             SymbolicFact fact,
             SymbolicState state,
@@ -206,6 +218,38 @@ namespace PurelySharp.Symbolic
             }
 
             return state;
+        }
+
+        internal static SymbolicState AddLoweredFormulaPathCondition(
+            SymbolicState state,
+            SmtFormula formula,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            if (sourceNode == null)
+            {
+                throw new ArgumentNullException(nameof(sourceNode));
+            }
+
+            return SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    formula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var condition)
+                ? state.AddPathCondition(condition)
+                : state;
         }
 
         internal static bool TryCreateStateFromFormulaPath(

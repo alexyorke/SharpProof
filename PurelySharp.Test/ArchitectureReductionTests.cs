@@ -106,6 +106,7 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeTermWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeConditionWithPathState("));
+            Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState AddLoweredFormulaPathCondition("));
             Assert.That(proofServiceSource, Does.Contain("private static bool TryEncodeFactWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);"));
             Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState CreateStateFromFormulaPath("));
@@ -122,6 +123,22 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("state = NormalizeState(state);"));
             Assert.That(proofServiceSource, Does.Contain("new Dictionary<string, bool>(StringComparer.Ordinal)"));
             Assert.That(proofServiceSource, Does.Contain("IDictionary<string, bool> memo"));
+        }
+
+        [Test]
+        public void PurityAnalysisEngine_UsesSharedProofBridgesForBranchPathConditions()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "Engine",
+                "PurityAnalysisEngine.cs"));
+
+            Assert.That(source, Does.Contain("return SymbolicProofService.TryEncodeConditionWithPathState("));
+            Assert.That(source, Does.Contain("return SymbolicProofService.AddLoweredFormulaPathCondition("));
+            Assert.That(source, Does.Not.Contain("return SymbolicIrFormulaEncoder.TryEncode(branchCondition, out formula);"));
+            Assert.That(source, Does.Not.Contain("return SymbolicSmtFormulaLowerer.TryLowerCondition("));
         }
 
         [Test]
@@ -6565,7 +6582,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryLowerAssignedLengthTerm"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerStringTerm"));
             Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerEqualityFact("));
-            Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
+            Assert.That(source, Does.Contain("SymbolicProofService.AddLoweredFormulaPathCondition("));
+            Assert.That(source, Does.Not.Contain("return SymbolicSmtFormulaLowerer.TryLowerCondition("));
             Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
             Assert.That(source, Does.Contain("\"analyzer.assignment.value\""));
             Assert.That(source, Does.Contain("\"analyzer.assignment.length\""));

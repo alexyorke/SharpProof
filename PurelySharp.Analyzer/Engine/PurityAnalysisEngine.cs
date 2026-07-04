@@ -3725,7 +3725,10 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var branchCondition = branchState.PathConditions[branchState.PathConditions.Length - 1];
-            return SymbolicIrFormulaEncoder.TryEncode(branchCondition, out formula);
+            return SymbolicProofService.TryEncodeConditionWithPathState(
+                branchCondition,
+                originalState,
+                out formula);
         }
 
         internal static bool TryCreateBranchAssumptionState(
@@ -7282,14 +7285,12 @@ namespace PurelySharp.Analyzer.Engine
             string provenance,
             string evidenceKey)
         {
-            return SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    formula,
-                    sourceNode,
-                    provenance,
-                    evidenceKey,
-                    out var condition)
-                ? state.AddPathCondition(condition)
-                : state;
+            return SymbolicProofService.AddLoweredFormulaPathCondition(
+                state,
+                formula,
+                sourceNode,
+                provenance,
+                evidenceKey);
         }
 
         private delegate bool LowerAssignedSymbolicTerm(
