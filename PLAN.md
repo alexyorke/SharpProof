@@ -139,6 +139,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicState` before the legacy formula shadow is merged, so exact
   assigned-value and built-in-length facts for those shapes no longer depend
   entirely on lowered SMT replay.
+  `for` initializer state collection now also projects declaration
+  initializers and simple local or parameter assignments into
+  `SymbolicState` before the legacy formula shadow is merged, so initial-entry
+  loop facts for those shapes no longer depend entirely on lowered SMT replay.
   `SymbolicProgramPointFacts` formula-path condition addition now also
   delegates through `SymbolicProofService.AddLoweredFormulaPathCondition`
   instead of lowering raw SMT conditions at that call site.
@@ -376,6 +380,11 @@ path-fact, hazard, and ownership flows.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.
+- `for` initializer compatibility shadow now also has native IR equality,
+  string-content, string-non-null, and built-in-length facts for declaration
+  initializers and simple local or parameter assignments. The remaining work
+  is the harder initializer families, plus deleting the formula shadow after
+  equivalence coverage is broad enough.
 - `for` initial-entry reachability now tries the shared `SymbolicState` proof
   path before falling back to legacy formula path conditions.
 - Catch-filter exception paths now preserve pre-`try` facts for simple boolean

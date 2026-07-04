@@ -6765,6 +6765,67 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_BuildsNativeForInitializerStateBeforeFormulaShadow()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var methodIndex = source.IndexOf(
+                "internal static SymbolicState CollectForInitializerState(",
+                StringComparison.Ordinal);
+            var nativeStateIndex = source.IndexOf(
+                "CollectForInitializerStateNative(",
+                methodIndex,
+                StringComparison.Ordinal);
+            var formulaShadowIndex = source.IndexOf(
+                "AddFormulaPathConditions(",
+                nativeStateIndex,
+                StringComparison.Ordinal);
+
+            Assert.That(methodIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nativeStateIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(formulaShadowIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nativeStateIndex, Is.LessThan(formulaShadowIndex));
+        }
+
+        [Test]
+        public void SymbolicProgramPointFacts_CarriesIrForInitializerState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { for (int divisor = 5; divisor == 5;) { return 10 / divisor; } return 0; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicForInitializerState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var forStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ForStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var state = SymbolicProgramPointFacts.CollectForInitializerState(
+                forStatement,
+                semanticModel,
+                CancellationToken.None);
+            var condition = state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.for-initializer.assigned-value",
+                    StringComparison.Ordinal));
+
+            Assert.That(condition, Is.Not.Null);
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                state,
+                condition!.Fact,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

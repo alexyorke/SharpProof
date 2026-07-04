@@ -2249,12 +2249,82 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var state = new SymbolicState();
+            var state = CollectForInitializerStateNative(
+                forStatement,
+                semanticModel,
+                cancellationToken);
             AddFormulaPathConditions(
                 ref state,
                 CollectForInitializerFacts(forStatement, semanticModel, cancellationToken),
                 forStatement,
                 "ir.path.for-initializer");
+            return state.Normalize();
+        }
+
+        private static SymbolicState CollectForInitializerStateNative(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var state = new SymbolicState();
+            if (forStatement.Declaration != null)
+            {
+                foreach (var declarator in forStatement.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null)
+                    {
+                        continue;
+                    }
+
+                    RemoveStateFactsInvalidatedByNestedMutations(
+                        ref state,
+                        declarator.Initializer.Value,
+                        semanticModel,
+                        cancellationToken);
+                    if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    {
+                        AddAssignedValueStateFacts(
+                            ref state,
+                            localSymbol.OriginalDefinition,
+                            declarator.Initializer.Value,
+                            semanticModel,
+                            cancellationToken,
+                            "ir.path.for-initializer");
+                    }
+                }
+            }
+
+            foreach (var initializer in forStatement.Initializers)
+            {
+                if (initializer is not AssignmentExpressionSyntax assignment ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    continue;
+                }
+
+                RemoveStateFactsInvalidatedByNestedMutations(
+                    ref state,
+                    assignment.Left,
+                    semanticModel,
+                    cancellationToken);
+                RemoveStateFactsInvalidatedByNestedMutations(
+                    ref state,
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken);
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    AddAssignedValueStateFacts(
+                        ref state,
+                        assignedSymbol.OriginalDefinition,
+                        assignment.Right,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.for-initializer");
+                }
+            }
+
             return state;
         }
 
@@ -3764,7 +3834,8 @@ namespace PurelySharp.Symbolic
                             localSymbol.OriginalDefinition,
                             declarator.Initializer.Value,
                             semanticModel,
-                            cancellationToken);
+                            cancellationToken,
+                            "ir.path.prior-statement");
                     }
                 }
 
@@ -3800,7 +3871,8 @@ namespace PurelySharp.Symbolic
                             assignedSymbol.OriginalDefinition,
                             assignment.Right,
                             semanticModel,
-                            cancellationToken);
+                            cancellationToken,
+                            "ir.path.prior-statement");
                     }
                 }
 
@@ -7671,7 +7743,8 @@ namespace PurelySharp.Symbolic
             ISymbol assignedSymbol,
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string provenanceRoot)
         {
             state = RemoveStateFactsReferencingSymbol(state, assignedSymbol);
 
@@ -7697,7 +7770,8 @@ namespace PurelySharp.Symbolic
                     ref state,
                     assignedSymbol,
                     effectiveValueExpression,
-                    context);
+                    context,
+                    provenanceRoot);
             }
             else if (TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
                      SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var valueTerm) &&
@@ -7709,7 +7783,7 @@ namespace PurelySharp.Symbolic
                     targetTerm,
                     valueTerm,
                     effectiveValueExpression,
-                    "ir.path.prior-statement.assigned-value");
+                    provenanceRoot + ".assigned-value");
             }
 
             AddAssignedLengthStateFacts(
@@ -7717,14 +7791,16 @@ namespace PurelySharp.Symbolic
                 assignedSymbol,
                 effectiveValueExpression,
                 assignedType,
-                context);
+                context,
+                provenanceRoot);
         }
 
         private static void AddAssignedStringStateFacts(
             ref SymbolicState state,
             ISymbol assignedSymbol,
             ExpressionSyntax valueExpression,
-            SymbolicLoweringContext context)
+            SymbolicLoweringContext context,
+            string provenanceRoot)
         {
             if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
                 !SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) ||
@@ -7739,7 +7815,7 @@ namespace PurelySharp.Symbolic
                 targetString,
                 valueString,
                 valueExpression,
-                "ir.path.prior-statement.assigned-string");
+                provenanceRoot + ".assigned-string");
 
             if (SymbolicIrLowerer.TryLowerStringNonNullCondition(valueExpression, context, out var nonNullCondition))
             {
@@ -7752,7 +7828,8 @@ namespace PurelySharp.Symbolic
             ISymbol assignedSymbol,
             ExpressionSyntax valueExpression,
             ITypeSymbol? assignedType,
-            SymbolicLoweringContext context)
+            SymbolicLoweringContext context,
+            string provenanceRoot)
         {
             if (assignedType == null ||
                 !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
@@ -7769,7 +7846,7 @@ namespace PurelySharp.Symbolic
                 targetLength,
                 valueLength,
                 valueExpression,
-                "ir.path.prior-statement.assigned-length");
+                provenanceRoot + ".assigned-length");
         }
 
         private static void AddNotNullIfNotNullAssignedNullStateFacts(
