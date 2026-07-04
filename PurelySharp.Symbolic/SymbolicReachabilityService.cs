@@ -2708,6 +2708,12 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
+            if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
+                TryTranslateIrNullableConditionalAccessValueParts(conditionalAccess, context, out parts))
+            {
+                return true;
+            }
+
             if (TryTranslateIrNullableWrappedValueParts(expression, context, out parts))
             {
                 return true;
@@ -2833,6 +2839,107 @@ namespace PurelySharp.Symbolic
 
             parts = new NullableValueParts(hasValueFormula, valueFormula);
             return true;
+        }
+
+        private static bool TryTranslateIrNullableConditionalAccessValueParts(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            parts = default;
+            var typeInfo = context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken);
+            var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
+                !SymbolicFactFactory.TryGetValueKind(
+                    underlyingType,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out var expectedKind) ||
+                !SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+                receiver.Kind != SmtValueKind.Reference ||
+                !TryCreateIrConditionalAccessWhenNotNullTerm(conditionalAccess, receiver, expectedKind, context, out var valueTerm) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
+            {
+                return false;
+            }
+
+            var hasValue = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    receiver,
+                    new SymbolicNullTerm()),
+                conditionalAccess.Expression,
+                "ir.nullable.conditional-access.receiver-not-null"));
+
+            if (!SymbolicIrFormulaEncoder.TryEncode(hasValue, out var hasValueFormula))
+            {
+                return false;
+            }
+
+            parts = new NullableValueParts(hasValueFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryCreateIrConditionalAccessWhenNotNullTerm(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SymbolicTerm receiver,
+            SmtValueKind expectedKind,
+            SymbolicLoweringContext context,
+            out SymbolicTerm valueTerm)
+        {
+            valueTerm = null!;
+            if (conditionalAccess.WhenNotNull is not MemberBindingExpressionSyntax memberBinding ||
+                context.SemanticModel.GetSymbolInfo(memberBinding.Name, context.CancellationToken).Symbol is not { } memberSymbol ||
+                !TryGetConditionalAccessMemberKind(memberSymbol, out var memberKind) ||
+                memberKind != expectedKind)
+            {
+                return false;
+            }
+
+            var receiverType = context.SemanticModel.GetTypeInfo(conditionalAccess.Expression, context.CancellationToken).Type;
+            if (string.Equals(memberSymbol.Name, nameof(string.Length), StringComparison.Ordinal))
+            {
+                if (receiverType?.SpecialType == SpecialType.System_String &&
+                    SymbolicIrLowerer.TryLowerStringTerm(conditionalAccess.Expression, context, out var stringValue))
+                {
+                    valueTerm = new SymbolicLengthTerm(stringValue);
+                    return true;
+                }
+
+                if (receiverType is IArrayTypeSymbol { Rank: 1 } ||
+                    SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
+                {
+                    valueTerm = new SymbolicLengthTerm(receiver);
+                    return true;
+                }
+            }
+
+            valueTerm = new SymbolicMemberTerm(receiver, memberSymbol.Name, memberKind);
+            return true;
+        }
+
+        private static bool TryGetConditionalAccessMemberKind(ISymbol memberSymbol, out SmtValueKind kind)
+        {
+            if (memberSymbol is IPropertySymbol { IsStatic: false } property)
+            {
+                return SymbolicFactFactory.TryGetValueKind(
+                    property.Type,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out kind);
+            }
+
+            if (memberSymbol is IFieldSymbol { IsStatic: false } field)
+            {
+                return SymbolicFactFactory.TryGetValueKind(
+                    field.Type,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out kind);
+            }
+
+            kind = default;
+            return false;
         }
 
         private static bool TryTranslateIrNullableWrappedValueParts(

@@ -977,8 +977,7 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             if (TryGetInstanceMemberValueKind(memberAccess, context, out var memberKind) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                memberKind == SmtValueKind.Reference)
+                receiver.Kind == SmtValueKind.Reference)
             {
                 term = new SymbolicMemberTerm(receiver, memberName, memberKind);
                 return true;
