@@ -528,8 +528,12 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicFactCondition factCondition:
                     yield return factCondition.Fact;
                     break;
-                case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
-                    yield return factCondition.Fact.Negate();
+                case SymbolicNotCondition { Operand: var operand }:
+                    foreach (var fact in EnumerateNegatedConditionFacts(operand))
+                    {
+                        yield return fact;
+                    }
+
                     break;
                 case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
                     foreach (var fact in EnumerateConditionFacts(binary.Left))
@@ -538,6 +542,35 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     foreach (var fact in EnumerateConditionFacts(binary.Right))
+                    {
+                        yield return fact;
+                    }
+
+                    break;
+            }
+        }
+
+        private static IEnumerable<SymbolicFact> EnumerateNegatedConditionFacts(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    yield return factCondition.Fact.Negate();
+                    break;
+                case SymbolicNotCondition { Operand: var operand }:
+                    foreach (var fact in EnumerateConditionFacts(operand))
+                    {
+                        yield return fact;
+                    }
+
+                    break;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
+                    foreach (var fact in EnumerateNegatedConditionFacts(binary.Left))
+                    {
+                        yield return fact;
+                    }
+
+                    foreach (var fact in EnumerateNegatedConditionFacts(binary.Right))
                     {
                         yield return fact;
                     }

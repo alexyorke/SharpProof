@@ -2098,6 +2098,45 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_DetectsContradictionFromNormalizedNegatedPathFacts()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x");
+            var yFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y");
+            var tripleNegation = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(xFact),
+                new SymbolicNotCondition(new SymbolicNotCondition(new SymbolicNotCondition(new SymbolicFactCondition(xFact)))),
+            });
+            var negatedOr = new SymbolicState(
+                new[] { xFact },
+                new SymbolicCondition[]
+                {
+                    new SymbolicNotCondition(new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        new SymbolicFactCondition(xFact),
+                        new SymbolicFactCondition(yFact))),
+                });
+
+            Assert.That(tripleNegation.IsContradictory, Is.True);
+            Assert.That(negatedOr.IsContradictory, Is.True);
+            Assert.That(tripleNegation.NormalizedProofKey, Is.EqualTo(negatedOr.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_DeduplicatesPathConditionsAlreadyStoredAsFacts()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
