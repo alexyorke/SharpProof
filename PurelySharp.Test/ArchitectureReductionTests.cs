@@ -3498,6 +3498,37 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ApproximateConfidenceFactsDoNotEvaluateSyntactically()
+        {
+            var syntax = SyntaxFactory.ParseExpression("1 > 2");
+            var approximateFalseFact = new SymbolicFact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicIntegerConstantTerm(1),
+                    new SymbolicIntegerConstantTerm(2)),
+                Polarity: true,
+                SymbolicFactConfidence.Approximate,
+                "test.approximate-confidence",
+                syntax.Span,
+                Symbol: null,
+                EvidenceKey: null);
+            var state = new SymbolicState(new[] { approximateFalseFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var reachability = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+            var implication = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                approximateFalseFact.Negate(),
+                smtAnalysis);
+
+            Assert.That(state.IsContradictory, Is.False);
+            Assert.That(reachability.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(reachability.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(implication.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(implication.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+        }
+
+        [Test]
         public void SymbolicProofService_StateFactImpliesItselfWithoutSmt()
         {
             var target = SymbolicFact.Exact(

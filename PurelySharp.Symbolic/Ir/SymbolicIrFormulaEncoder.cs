@@ -43,7 +43,7 @@ namespace PurelySharp.Symbolic.Ir
 
         internal static bool TryEncode(SymbolicFact fact, out SmtFormula formula)
         {
-            if (fact.Confidence == SymbolicFactConfidence.Unsupported ||
+            if (fact.Confidence != SymbolicFactConfidence.Exact ||
                 !TryEncode(fact.Atom, out formula))
             {
                 formula = null!;
