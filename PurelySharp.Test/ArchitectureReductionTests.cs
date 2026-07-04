@@ -3895,6 +3895,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrArrayLengthCountAliasTerms()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static bool TryCreateArrayLengthCountAliasFact(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal static bool TryCreateReferenceNullComparison(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(helperSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
+            Assert.That(helperSource, Does.Contain("new SymbolicCountTerm(receiver)"));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm("));
+            Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Length\""));
+            Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Count\""));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrStringNonNullBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

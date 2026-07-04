@@ -1222,12 +1222,15 @@ namespace PurelySharp.Symbolic
                     out var receiverFormula,
                     SmtValueKind.Reference,
                     getSymbolVersion) &&
-                receiverFormula is SmtVariable receiverVariable)
+                SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(receiver), out var lengthFormula) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicCountTerm(receiver), out var countFormula))
             {
                 aliasFact = new SmtBinaryFormula(
                     SmtBinaryOperator.Equal,
-                    new SmtVariable(receiverVariable.Name + ".Length", SmtValueKind.Int),
-                    new SmtVariable(receiverVariable.Name + ".Count", SmtValueKind.Int));
+                    lengthFormula,
+                    countFormula);
                 return true;
             }
 
