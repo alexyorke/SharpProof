@@ -995,6 +995,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_NullableConditionalAccessMultidimensionalArrayLengthUsesDimensionProduct()
+        {
+            var context = CreateExpressionContext(
+                "int[,] values, int fallback",
+                "(values?.Length ?? fallback) == fallback");
+            var coalesce = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(coalesce, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+            var conditional = (SymbolicConditionalTerm)term;
+            var hasValue = AssertFactCondition<SymbolicTruthAtom>(conditional.Condition);
+            Assert.That(hasValue.Condition, Is.TypeOf<SymbolicConditionalTerm>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicBinaryTerm>());
+            var multiply = (SymbolicBinaryTerm)conditional.WhenTrue;
+            Assert.That(multiply.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Multiply));
+            Assert.That(multiply.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(multiply.Right, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)conditional.WhenFalse).Name, Does.StartWith("fallback#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+        }
+
+        [Test]
         public void LowerTerm_NullableEnumGetValueOrDefaultUsesIntegralDefaultTerm()
         {
             var context = CreateExpressionContext(

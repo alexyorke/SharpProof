@@ -992,6 +992,7 @@ namespace PurelySharp.Test
             Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableHasValueTerm"));
             Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableValueTerm"));
             Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableGetValueOrDefaultInvocation"));
+            Assert.That(nullableSource, Does.Contain("TryLowerArrayTotalLengthTerm(conditionalAccess.Expression"));
         }
 
         [Test]
