@@ -2009,8 +2009,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService."));
             Assert.That(reachabilitySource, Does.Contain("SymbolicTranslatorCompatibility."));
             Assert.That(reachabilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
-            Assert.That(compatibilitySource, Does.Contain("CSharpSmtFormulaTranslator."));
-            Assert.That(compatibilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectDomainFacts("));
+            Assert.That(compatibilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(compatibilitySource, Does.Contain("LegacyFormulaCompatibility."));
         }
 
         [Test]
@@ -2099,33 +2099,17 @@ namespace PurelySharp.Test
                     static family => family.GetProperty("count").GetInt32(),
                     StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(5));
-            Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(4));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(0));
+            Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(0));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
-                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
-                {
-                    ["PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs"] = 5,
-                }));
+                Is.Empty);
             Assert.That(
                 symbolicTranslatorShimCountsByText,
-                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
-                {
-                    ["return CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
-                }));
+                Is.Empty);
             Assert.That(
                 symbolicTranslatorShimFamilyCounts,
-                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
-                {
-                    ["branch-facts"] = 1,
-                    ["condition"] = 1,
-                    ["pattern"] = 2,
-                    ["value"] = 1,
-                }));
+                Is.Empty);
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiTermLoweringCount").GetInt32(), Is.GreaterThan(0));
@@ -2505,7 +2489,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void LegacyTranslatorShimUsage_IsIsolatedToCompatibilityBoundary()
+        public void LegacyTranslatorShimUsage_IsAbsentFromSymbolicLayer()
         {
             var repositoryRoot = FindRepositoryRoot();
             var symbolicDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic");
@@ -2518,7 +2502,6 @@ namespace PurelySharp.Test
                 .Where(static file =>
                     !file.Path.StartsWith("PurelySharp.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
                     file.Path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs" &&
-                    file.Path != "PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs" &&
                     file.Source.Contains("CSharpSmtFormulaTranslator.", StringComparison.Ordinal))
                 .Select(static file => file.Path)
                 .Distinct(StringComparer.Ordinal)

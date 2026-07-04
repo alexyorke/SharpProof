@@ -64,7 +64,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
                 expression,
                 branchWhenTrue,
                 semanticModel,
@@ -82,7 +82,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+            return LegacyFormulaCompatibility.TryCollectPatternBindingFacts(
                 matchedValue,
                 matchedValueType,
                 pattern,
@@ -102,7 +102,7 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? valueType = null,
             int inlineDepth = 0)
         {
-            return CSharpSmtFormulaTranslator.TryTranslatePattern(
+            return LegacyFormulaCompatibility.TryTranslatePattern(
                 value,
                 pattern,
                 semanticModel,
@@ -121,7 +121,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            return CSharpSmtFormulaTranslator.TryTranslate(
+            return LegacyFormulaCompatibility.TryTranslateCondition(
                 condition,
                 semanticModel,
                 cancellationToken,
@@ -138,7 +138,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            return CSharpSmtFormulaTranslator.TryTranslateValue(
+            return LegacyFormulaCompatibility.TryTranslateValue(
                 expression,
                 semanticModel,
                 cancellationToken,

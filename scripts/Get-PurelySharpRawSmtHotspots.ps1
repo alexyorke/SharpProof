@@ -298,6 +298,7 @@ function Get-SymbolicTranslatorShimFamilies
 {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Usages
     )
 
