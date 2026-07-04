@@ -377,7 +377,8 @@ namespace PurelySharp.Symbolic.Ir
                 }
 
                 var key = CreateConditionKey(condition);
-                if (factConditionKeys.Contains(key))
+                if (string.Equals(key, "const:true", StringComparison.Ordinal) ||
+                    factConditionKeys.Contains(key))
                 {
                     continue;
                 }

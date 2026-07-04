@@ -2074,19 +2074,17 @@ namespace PurelySharp.Test
                     new SymbolicIntegerConstantTerm(0)),
                 SyntaxFactory.ParseExpression("x > 0"),
                 "test.fact");
-            var otherCondition = new SymbolicConstantCondition(true);
-
             var state = new SymbolicState(
                 new[] { fact },
                 new SymbolicCondition[]
                 {
                     new SymbolicFactCondition(fact),
-                    otherCondition,
+                    new SymbolicConstantCondition(true),
                 });
 
             Assert.That(state.Facts, Has.Length.EqualTo(1));
-            Assert.That(state.PathConditions, Has.Length.EqualTo(1));
-            Assert.That(state.PathConditions[0], Is.SameAs(otherCondition));
+            Assert.That(state.PathConditions, Is.Empty);
+            Assert.That(state.NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { fact }).NormalizedProofKey));
         }
 
         [Test]
