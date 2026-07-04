@@ -1438,12 +1438,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(20));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(21));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 20,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 21,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -1464,7 +1464,7 @@ namespace PurelySharp.Test
                     ["if (CSharpSmtFormulaTranslator.TryTranslateStringValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("] = 1,
-                    ["!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("] = 1,
+                    ["if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("] = 2,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("] = 1,
                 }));
@@ -3913,6 +3913,32 @@ namespace PurelySharp.Test
                 Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula(", StringComparison.Ordinal)));
             Assert.That(helperSource, Does.Contain("CreateNotNullIfNotNullFallbackVariableName(resultExpression)"));
             Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_UsesIrAsExpressionFactsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static bool TryCreateAsExpressionAssignedValueFacts(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "private static string GetVersionedSmtVariableName(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(
+                helperSource.IndexOf("TryCreateIrAsExpressionAssignmentFacts(", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("new SymbolicTypeTestAtom(source, typeKey)"));
+            Assert.That(helperSource, Does.Contain("CreateIrRelationCondition("));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));
         }
 
         [Test]

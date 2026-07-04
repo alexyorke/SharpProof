@@ -2431,8 +2431,24 @@ namespace PurelySharp.Symbolic
         {
             facts = ImmutableArray<SmtFormula>.Empty;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula, getTargetSymbolVersion) ||
-                targetFormula is not { Kind: SmtValueKind.Reference } ||
-                !CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
+                targetFormula is not { Kind: SmtValueKind.Reference })
+            {
+                facts = ImmutableArray<SmtFormula>.Empty;
+                return false;
+            }
+
+            if (TryCreateIrAsExpressionAssignmentFacts(
+                    valueExpression,
+                    targetFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out facts,
+                    getSymbolVersion))
+            {
+                return facts.Length > 0;
+            }
+
+            if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
                     valueExpression,
                     targetFormula,
                     semanticModel,
@@ -2445,6 +2461,130 @@ namespace PurelySharp.Symbolic
             }
 
             return facts.Length > 0;
+        }
+
+        private static bool TryCreateIrAsExpressionAssignmentFacts(
+            ExpressionSyntax valueExpression,
+            SmtFormula targetFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<SmtFormula> facts,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            facts = ImmutableArray<SmtFormula>.Empty;
+            valueExpression = StripParentheses(valueExpression);
+            if (valueExpression is not BinaryExpressionSyntax asExpression ||
+                !asExpression.IsKind(SyntaxKind.AsExpression) ||
+                asExpression.Right is not TypeSyntax typeSyntax ||
+                !SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula, out var target) ||
+                target.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            var targetType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
+            if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
+                !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var source) ||
+                source.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            var targetIsNull = CreateIrRelationCondition(
+                SymbolicRelationOperator.Equal,
+                target,
+                new SymbolicNullTerm(),
+                valueExpression,
+                "ir.as.target-null");
+            var targetNonNull = CreateIrRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm(),
+                valueExpression,
+                "ir.as.target-non-null");
+            var sourceNonNull = CreateIrRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                source,
+                new SymbolicNullTerm(),
+                valueExpression,
+                "ir.as.source-non-null");
+            var runtimeTypeTest = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTypeTestAtom(source, typeKey),
+                valueExpression,
+                "ir.as.runtime-type",
+                evidenceKey: "ir.as.runtime-type"));
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(4);
+            if (!TryAddEncodedCondition(
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),
+                    builder) ||
+                !TryAddEncodedCondition(
+                    new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, runtimeTypeTest),
+                    builder) ||
+                !TryAddEncodedCondition(
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        new SymbolicNotCondition(new SymbolicBinaryCondition(SymbolicConditionOperator.And, sourceNonNull, runtimeTypeTest)),
+                        targetNonNull),
+                    builder) ||
+                !TryAddEncodedCondition(
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        new SymbolicNotCondition(new SymbolicBinaryCondition(
+                            SymbolicConditionOperator.And,
+                            sourceNonNull,
+                            new SymbolicNotCondition(runtimeTypeTest))),
+                        targetIsNull),
+                    builder))
+            {
+                facts = ImmutableArray<SmtFormula>.Empty;
+                return false;
+            }
+
+            var irFacts = builder.MoveToImmutable();
+            if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
+                    valueExpression,
+                    targetFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var legacyFacts,
+                    getSymbolVersion) ||
+                !irFacts.SequenceEqual(legacyFacts))
+            {
+                facts = ImmutableArray<SmtFormula>.Empty;
+                return false;
+            }
+
+            facts = irFacts;
+            return true;
+        }
+
+        private static SymbolicCondition CreateIrRelationCondition(
+            SymbolicRelationOperator relationOperator,
+            SymbolicTerm left,
+            SymbolicTerm right,
+            SyntaxNode sourceNode,
+            string provenance)
+        {
+            return new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(relationOperator, left, right),
+                sourceNode,
+                provenance,
+                evidenceKey: provenance));
+        }
+
+        private static bool TryAddEncodedCondition(
+            SymbolicCondition condition,
+            ImmutableArray<SmtFormula>.Builder builder)
+        {
+            if (!SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
+            {
+                return false;
+            }
+
+            builder.Add(formula);
+            return true;
         }
 
         private static string GetVersionedSmtVariableName(
