@@ -8180,33 +8180,9 @@ namespace PurelySharp.Symbolic
             string elementName,
             out SmtFormula formula)
         {
-            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType))
-            {
-                formula = null!;
-                return false;
-            }
-
-            var variableName = SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName;
-            if (elementType.SpecialType == SpecialType.System_Boolean)
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Bool);
-                return true;
-            }
-
-            if (IsIntegralType(elementType))
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Int);
-                return true;
-            }
-
-            if (elementType.IsReferenceType)
-            {
-                formula = new SmtVariable(variableName, SmtValueKind.Reference);
-                return true;
-            }
-
             formula = null!;
-            return false;
+            return TryCreateTupleElementTerm(tupleSymbol, elementName, out var element) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(element, out formula);
         }
 
         private static bool TryGetTupleElementType(
@@ -8238,15 +8214,16 @@ namespace PurelySharp.Symbolic
             string elementName,
             out SmtFormula formula)
         {
+            formula = null!;
             if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
                 elementType.SpecialType != SpecialType.System_String)
             {
-                formula = null!;
                 return false;
             }
 
-            formula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName + ".String", SmtValueKind.String);
-            return true;
+            return TryCreateTupleElementTerm(tupleSymbol, elementName, out var element) &&
+                element.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(element), out formula);
         }
 
         private static bool TryCreateTupleElementBuiltInLengthFormula(
@@ -8260,11 +8237,16 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var elementFormula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
-            return SymbolicFactFactory.TryCreateBuiltInLengthFormula(
-                SymbolicFactFactory.GetReferenceFormulaName(elementFormula),
-                elementType,
-                out formula);
+            if (TryCreateTupleElementTerm(tupleSymbol, elementName, out var element) &&
+                element.Kind == SmtValueKind.Reference &&
+                TryCreateBuiltInLengthTerm(element, elementType, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            {
+                return true;
+            }
+
+            formula = null!;
+            return false;
         }
 
         private static bool TryCreateTupleElementArrayDimensionLengthFormula(
@@ -8273,21 +8255,36 @@ namespace PurelySharp.Symbolic
             int dimension,
             out SmtFormula formula)
         {
+            formula = null!;
             if (dimension < 0 ||
                 !TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
                 elementType is not IArrayTypeSymbol arrayType ||
                 dimension >= arrayType.Rank)
             {
-                formula = null!;
                 return false;
             }
 
-            var elementFormula = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
-            return SymbolicFactFactory.TryCreateArrayDimensionLengthFormulaForReference(
-                elementFormula,
-                arrayType,
-                dimension,
-                out formula);
+            return TryCreateTupleElementTerm(tupleSymbol, elementName, out var element) &&
+                element.Kind == SmtValueKind.Reference &&
+                TryCreateArrayDimensionLengthTerm(element, arrayType, dimension, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula);
+        }
+
+        private static bool TryCreateTupleElementTerm(
+            ISymbol tupleSymbol,
+            string elementName,
+            out SymbolicTerm term)
+        {
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                term = null!;
+                return false;
+            }
+
+            var tuple = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(tupleSymbol), SmtValueKind.Reference);
+            term = new SymbolicMemberTerm(tuple, elementName, elementKind);
+            return true;
         }
 
         private static void AddCoalesceAssignmentFacts(
