@@ -1253,13 +1253,26 @@ namespace PurelySharp.Test
                     .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
                     .All(static path => path.StartsWith("PurelySharp.Symbolic/Ir/", StringComparison.Ordinal)),
                 Is.True);
-            Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.GreaterThan(0));
+            var runtimeHazardFormulaFallbackLocations = root.GetProperty("runtimeHazardFormulaFallbackLocations")
+                .EnumerateArray()
+                .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
+            var runtimeHazardFormulaFallbackCountsByPath = runtimeHazardFormulaFallbackLocations
+                .GroupBy(static path => path, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+
+            Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(17));
             Assert.That(
-                root.GetProperty("runtimeHazardFormulaFallbackLocations")
-                    .EnumerateArray()
-                    .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
-                    .All(static path => path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
+                runtimeHazardFormulaFallbackLocations.All(static path =>
+                    path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
                 Is.True);
+            Assert.That(
+                runtimeHazardFormulaFallbackCountsByPath,
+                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
+                {
+                    ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs"] = 9,
+                    ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"] = 8,
+                }));
         }
 
         [Test]
