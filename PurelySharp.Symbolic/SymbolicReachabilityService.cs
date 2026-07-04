@@ -353,7 +353,7 @@ namespace PurelySharp.Symbolic
                 getSymbolVersion);
 
             var countBeforeBranchAssumptions = pathConditions.Count;
-            CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            TryCollectBranchAssumptions(
                 condition,
                 branchWhenTrue,
                 semanticModel,
@@ -389,6 +389,23 @@ namespace PurelySharp.Symbolic
         {
             return CSharpSmtFormulaTranslator.TryCollectDomainFacts(
                 expression,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        internal static bool TryCollectBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+                expression,
+                branchWhenTrue,
                 semanticModel,
                 cancellationToken,
                 formulas,

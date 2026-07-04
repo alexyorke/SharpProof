@@ -1241,7 +1241,7 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion);
 
                 var branchAssumptions = new List<SmtFormula>();
-                if (CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+                if (SymbolicReachabilityService.TryCollectBranchAssumptions(
                         whenClause.Condition,
                         branchWhenTrue: true,
                         semanticModel,

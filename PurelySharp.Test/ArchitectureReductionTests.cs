@@ -1517,9 +1517,9 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectDomainFacts("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslatePattern("));
             Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
         }
 
         [Test]
