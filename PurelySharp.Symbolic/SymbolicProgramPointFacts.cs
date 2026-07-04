@@ -8738,6 +8738,15 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(
+                    new SymbolicMemberTerm(receiver, memberSymbol.Name, kind),
+                    out formula))
+            {
+                return true;
+            }
+
             formula = new SmtVariable(receiverFormula + "." + memberSymbol.Name, kind);
             return true;
         }
