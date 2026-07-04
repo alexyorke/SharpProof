@@ -390,7 +390,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            return CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+            return SymbolicTranslatorCompatibility.TryCollectDomainFacts(
                 expression,
                 semanticModel,
                 cancellationToken,
@@ -406,7 +406,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            return SymbolicTranslatorCompatibility.TryCollectBranchAssumptions(
                 expression,
                 branchWhenTrue,
                 semanticModel,
@@ -424,7 +424,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
+            return SymbolicTranslatorCompatibility.TryCollectPatternBindingFacts(
                 matchedValue,
                 matchedValueType,
                 pattern,
@@ -461,7 +461,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            return CSharpSmtFormulaTranslator.TryTranslatePattern(
+            return SymbolicTranslatorCompatibility.TryTranslatePatternLegacy(
                 value,
                 pattern,
                 semanticModel,
@@ -1162,7 +1162,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslate(
+            if (SymbolicTranslatorCompatibility.TryTranslateConditionLegacy(
                     condition,
                     semanticModel,
                     cancellationToken,
@@ -1799,7 +1799,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (SymbolicTranslatorCompatibility.TryTranslateValueLegacy(
                     expression,
                     semanticModel,
                     cancellationToken,

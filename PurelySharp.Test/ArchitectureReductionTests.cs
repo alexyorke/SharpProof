@@ -67,6 +67,10 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var compatibilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicTranslatorCompatibility.cs"));
             var proofServiceSource = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Symbolic",
@@ -1653,6 +1657,10 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var compatibilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicTranslatorCompatibility.cs"));
             var lowererSource = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Symbolic",
@@ -1990,11 +1998,17 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var compatibilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicTranslatorCompatibility.cs"));
 
             Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(source, Does.Contain("SymbolicReachabilityService."));
-            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicTranslatorCompatibility."));
+            Assert.That(reachabilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(compatibilitySource, Does.Contain("CSharpSmtFormulaTranslator."));
         }
 
         [Test]
@@ -2089,14 +2103,14 @@ namespace PurelySharp.Test
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 6,
+                    ["PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs"] = 6,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslate("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
@@ -2417,7 +2431,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateConditionFormula("));
             Assert.That(source, Does.Contain("\"source.query.condition\""));
             Assert.That(reachabilitySource, Does.Contain("TryTranslateConditionFormula("));
-            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicTranslatorCompatibility.TryTranslateConditionLegacy("));
             Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFallback("));
         }
 
@@ -2455,7 +2469,7 @@ namespace PurelySharp.Test
             var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
             var irValueIndex = helperSource.IndexOf("SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue)", StringComparison.Ordinal);
             var irPatternIndex = helperSource.IndexOf("SymbolicIrLowerer.TryLowerPatternCondition(", StringComparison.Ordinal);
-            var legacyIndex = helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslatePattern(", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("SymbolicTranslatorCompatibility.TryTranslatePatternLegacy(", StringComparison.Ordinal);
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
@@ -2490,7 +2504,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void LegacyTranslatorShimUsage_IsIsolatedToReachabilityBoundary()
+        public void LegacyTranslatorShimUsage_IsIsolatedToCompatibilityBoundary()
         {
             var repositoryRoot = FindRepositoryRoot();
             var symbolicDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic");
@@ -2503,7 +2517,7 @@ namespace PurelySharp.Test
                 .Where(static file =>
                     !file.Path.StartsWith("PurelySharp.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
                     file.Path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs" &&
-                    file.Path != "PurelySharp.Symbolic/SymbolicReachabilityService.cs" &&
+                    file.Path != "PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs" &&
                     file.Source.Contains("CSharpSmtFormulaTranslator.", StringComparison.Ordinal))
                 .Select(static file => file.Path)
                 .Distinct(StringComparer.Ordinal)
@@ -5729,7 +5743,7 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
             var irIndex = source.IndexOf("TryAddIrBranchConditionFact(", StringComparison.Ordinal);
-            var legacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions", StringComparison.Ordinal);
+            var legacyIndex = source.IndexOf("SymbolicTranslatorCompatibility.TryCollectBranchAssumptions(", StringComparison.Ordinal);
             var helperStart = source.IndexOf("private static bool TryAddIrBranchConditionFact(", StringComparison.Ordinal);
             var helperEnd = source.IndexOf("private static bool ContainsDivisionOrModulo(", StringComparison.Ordinal);
             var helperSource = source.Substring(helperStart, helperEnd - helperStart);
@@ -5871,7 +5885,7 @@ namespace PurelySharp.Test
             var helperEndIndex = source.IndexOf("internal static bool TryCreateArrayLengthCountAliasFact(", StringComparison.Ordinal);
             var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
             var irIndex = helperSource.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal);
-            var legacyIndex = helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("SymbolicTranslatorCompatibility.TryTranslateConditionLegacy(", StringComparison.Ordinal);
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
@@ -5931,10 +5945,10 @@ namespace PurelySharp.Test
             Assert.That(untypedValueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
             Assert.That(untypedValueHelperSource, Does.Contain("SymbolicProofService.TryEncodeTermWithPathState("));
             Assert.That(untypedValueHelperSource, Does.Not.Contain("!ContainsDivisionOrModulo(expression)"));
-            Assert.That(untypedValueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
+            Assert.That(untypedValueHelperSource, Does.Contain("SymbolicTranslatorCompatibility.TryTranslateValueLegacy("));
             Assert.That(
                 untypedValueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
-                Is.LessThan(untypedValueHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal)));
+                Is.LessThan(untypedValueHelperSource.IndexOf("SymbolicTranslatorCompatibility.TryTranslateValueLegacy(", StringComparison.Ordinal)));
             Assert.That(valueWithPathFactsHelperSource, Does.Contain("TryTranslateValue("));
             Assert.That(valueWithPathFactsHelperSource, Does.Contain("pathFactArray.Length != 0"));
             Assert.That(valueWithPathFactsHelperSource, Does.Contain("SymbolicProofService.CreateStateFromFormulaPath(pathFactArray, expression)"));

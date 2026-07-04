@@ -29,16 +29,16 @@ path-fact, hazard, and ownership flows.
   `CSharpSmtFormulaTranslator` but still owns much of the formula-first
   path-fact pipeline.
 - Direct `CSharpConditionToFormula` usage outside approved shims is gone.
-  Translator-wrapper usage now exists only in symbolic reachability,
-  switch/path-fact compatibility, and path-fact compatibility paths. Public
-  source-query condition proof now delegates formula fallback through
-  reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 6 symbolic-side
-  `CSharpSmtFormulaTranslator` shim usages that should burn
-  down as IR lowerings replace formula-first compatibility.
-  The hotspot inventory now also groups those 6 reachability shims into 4
-  seam families: 2 branch-fact shims, 2 pattern shims, 1 condition shim,
-  and 1 value shim.
+  Remaining `CSharpSmtFormulaTranslator` calls are now isolated behind
+  `PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs` instead of being
+  mixed directly into `SymbolicReachabilityService`. Public source-query
+  condition proof still delegates formula fallback through reachability, but
+  the legacy bridge is now explicit and easier to delete incrementally. The
+  inventory currently reports 0 analyzer-side and 6 symbolic-side
+  `CSharpSmtFormulaTranslator` shim usages that should burn down as IR
+  lowerings replace formula-first compatibility. The hotspot inventory still
+  groups those 6 shims into 4 seam families: 2 branch-fact shims, 2 pattern
+  shims, 1 condition shim, and 1 value shim.
   Pattern translation now also tries lowering the incoming SMT value back to a
   `SymbolicTerm` and routes supported non-binding pattern conditions through
   `SymbolicIrLowerer.TryLowerPatternCondition` before the legacy translator
