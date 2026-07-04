@@ -2021,7 +2021,7 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     (expression, model, token) =>
-                        CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+                        TryTranslateBuiltInLengthValue(
                             expression,
                             model,
                             token,
@@ -2050,13 +2050,12 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     (expression, model, token) =>
-                        CSharpSmtFormulaTranslator.TryTranslateStringValue(
+                        TryTranslateStringValue(
                             expression,
                             model,
                             token,
                             out var valueString,
-                            getSymbolVersion) &&
-                        valueString != null
+                            getSymbolVersion)
                             ? valueString
                             : null,
                     out fact);
