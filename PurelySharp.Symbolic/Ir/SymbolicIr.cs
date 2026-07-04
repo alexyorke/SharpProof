@@ -398,12 +398,36 @@ namespace PurelySharp.Symbolic.Ir
                     return true;
                 }
 
+                if (ContainsConjunctionContradiction(condition))
+                {
+                    return true;
+                }
+
                 foreach (var fact in EnumerateConditionFacts(condition))
                 {
                     if (HasOppositePolarity(polarities, fact))
                     {
                         return true;
                     }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsConjunctionContradiction(SymbolicCondition condition)
+        {
+            if (condition is not SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And })
+            {
+                return false;
+            }
+
+            var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var fact in EnumerateConditionFacts(condition))
+            {
+                if (HasOppositePolarity(polarities, fact))
+                {
+                    return true;
                 }
             }
 
