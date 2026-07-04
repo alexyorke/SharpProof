@@ -1398,6 +1398,22 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!ContainsDivisionOrModulo(expression) &&
+                SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+                value.Kind == SmtValueKind.Int &&
+                SymbolicIrFormulaEncoder.TryEncode(
+                    SymbolicIrLowerer.CreateIntegerInRangeCondition(
+                        value,
+                        minValue,
+                        maxValue,
+                        expression,
+                        "ir.integer.in-range"),
+                    out formula))
+            {
+                return true;
+            }
+
             if (!TryTranslateIntegerValue(
                     expression,
                     semanticModel,

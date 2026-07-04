@@ -1550,6 +1550,15 @@ namespace PurelySharp.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Conditions.cs"));
 
             Assert.That(source, Does.Contain("TryCreateCheckedIntegralOutOfRangeTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
@@ -1578,6 +1587,11 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.translated"));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.CreateIntegerInRangeCondition("));
+            Assert.That(reachabilitySource, Does.Contain("\"ir.integer.in-range\""));
+            Assert.That(lowererSource, Does.Contain("public static SymbolicCondition CreateIntegerInRangeCondition("));
+            Assert.That(lowererSource, Does.Contain("provenance + \".lower-bound\""));
+            Assert.That(lowererSource, Does.Contain("provenance + \".upper-bound\""));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"));

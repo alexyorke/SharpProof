@@ -29,5 +29,28 @@ namespace PurelySharp.Symbolic.Ir
                 node,
                 "ir.string.concat.null-empty");
         }
+
+        public static SymbolicCondition CreateIntegerInRangeCondition(
+            SymbolicTerm value,
+            long minValue,
+            long maxValue,
+            SyntaxNode node,
+            string provenance)
+        {
+            return new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                CreateRelationCondition(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    value,
+                    new SymbolicIntegerConstantTerm(minValue),
+                    node,
+                    provenance + ".lower-bound"),
+                CreateRelationCondition(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    value,
+                    new SymbolicIntegerConstantTerm(maxValue),
+                    node,
+                    provenance + ".upper-bound"));
+        }
     }
 }
