@@ -1289,30 +1289,7 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
-            if (memberSymbol is IPropertySymbol property &&
-                IsBigIntegerType(property.Type))
-            {
-                if (string.Equals(property.Name, "Zero", StringComparison.Ordinal))
-                {
-                    term = new SymbolicIntegerConstantTerm(0);
-                    return true;
-                }
-
-                if (string.Equals(property.Name, "One", StringComparison.Ordinal))
-                {
-                    term = new SymbolicIntegerConstantTerm(1);
-                    return true;
-                }
-
-                if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal))
-                {
-                    term = new SymbolicIntegerConstantTerm(-1);
-                    return true;
-                }
-            }
-
-            term = null!;
-            return false;
+            return TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
         }
 
         private static bool IsSystemStringType(ITypeSymbol? type)
@@ -1520,12 +1497,6 @@ namespace PurelySharp.Symbolic.Ir
                 SpecialType.System_UInt64 ||
                 type.TypeKind == TypeKind.Enum ||
                 IsBigIntegerType(type);
-        }
-
-        private static bool IsBigIntegerType(ITypeSymbol type)
-        {
-            return string.Equals(type.ContainingNamespace?.ToDisplayString(), "System.Numerics", StringComparison.Ordinal) &&
-                string.Equals(type.Name, "BigInteger", StringComparison.Ordinal);
         }
 
         private static bool IsSupportedTupleCarrierType(ITypeSymbol type)

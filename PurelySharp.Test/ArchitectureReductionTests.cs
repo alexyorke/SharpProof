@@ -870,6 +870,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var numericSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Numerics.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerBigIntegerStaticValueMember(memberSymbol, out term)"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsBigIntegerType"));
+            Assert.That(numericSource, Does.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
+            Assert.That(numericSource, Does.Contain("private static bool IsBigIntegerType"));
+        }
+
+        [Test]
         public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
