@@ -768,6 +768,12 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is ElementAccessExpressionSyntax elementAccess &&
+                TryLowerElementAccessTerm(elementAccess, context, out term))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
@@ -904,6 +910,42 @@ namespace PurelySharp.Symbolic.Ir
                 }
             }
 
+            return false;
+        }
+
+        private static bool TryLowerElementAccessTerm(
+            ElementAccessExpressionSyntax elementAccess,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (elementAccess.ArgumentList.Arguments.Count != 1 ||
+                !TryGetElementAccessValueKind(elementAccess, context, out var elementKind) ||
+                !TryLowerTerm(elementAccess.Expression, context, out var receiver) ||
+                receiver.Kind != SmtValueKind.Reference ||
+                !TryLowerTerm(elementAccess.ArgumentList.Arguments[0].Expression, context, out var index) ||
+                index.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            term = new SymbolicElementTerm(receiver, index, elementKind);
+            return true;
+        }
+
+        private static bool TryGetElementAccessValueKind(
+            ElementAccessExpressionSyntax elementAccess,
+            SymbolicLoweringContext context,
+            out SmtValueKind kind)
+        {
+            var receiverType = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).Type;
+            if (receiverType is IArrayTypeSymbol { Rank: 1 } arrayType &&
+                TryGetValueKind(arrayType.ElementType, out kind))
+            {
+                return true;
+            }
+
+            kind = default;
             return false;
         }
 

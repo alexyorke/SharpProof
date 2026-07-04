@@ -3849,6 +3849,8 @@ namespace PurelySharp.Test
             Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm)"));
             Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm("));
             Assert.That(helperSource, Does.Contain("TryCreateIrConditionalAccessWhenNotNullTerm("));
+            Assert.That(helperSource, Does.Contain("ElementBindingExpressionSyntax"));
+            Assert.That(helperSource, Does.Contain("SymbolicElementTerm"));
             Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(true)"));
             Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(false)"));
         }

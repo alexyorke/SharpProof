@@ -638,6 +638,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayElementUsesSharedElementTerm()
+        {
+            var context = CreateExpressionContext(
+                "int[] values, int index",
+                "values[index]");
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
+            var element = (SymbolicElementTerm)term;
+
+            Assert.That(element.Receiver, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(element.Index, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(element.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(element, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+            Assert.That(
+                ((SmtVariable)formula).Name,
+                Does.StartWith(((SymbolicVariableTerm)element.Receiver).Name + "["));
+        }
+
+        [Test]
         public void KnownApiLowering_StringComparisonOverloadFallsBackToLegacyTranslator()
         {
             var context = CreateExpressionContext(

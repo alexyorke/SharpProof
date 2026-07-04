@@ -2888,6 +2888,17 @@ namespace PurelySharp.Symbolic
             out SymbolicTerm valueTerm)
         {
             valueTerm = null!;
+            if (conditionalAccess.WhenNotNull is ElementBindingExpressionSyntax elementBinding)
+            {
+                return TryCreateIrConditionalAccessElementBindingTerm(
+                    conditionalAccess,
+                    elementBinding,
+                    receiver,
+                    expectedKind,
+                    context,
+                    out valueTerm);
+            }
+
             if (conditionalAccess.WhenNotNull is not MemberBindingExpressionSyntax memberBinding ||
                 context.SemanticModel.GetSymbolInfo(memberBinding.Name, context.CancellationToken).Symbol is not { } memberSymbol ||
                 !TryGetConditionalAccessMemberKind(memberSymbol, out var memberKind) ||
@@ -2915,6 +2926,34 @@ namespace PurelySharp.Symbolic
             }
 
             valueTerm = new SymbolicMemberTerm(receiver, memberSymbol.Name, memberKind);
+            return true;
+        }
+
+        private static bool TryCreateIrConditionalAccessElementBindingTerm(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            ElementBindingExpressionSyntax elementBinding,
+            SymbolicTerm receiver,
+            SmtValueKind expectedKind,
+            SymbolicLoweringContext context,
+            out SymbolicTerm valueTerm)
+        {
+            valueTerm = null!;
+            var receiverType = context.SemanticModel.GetTypeInfo(conditionalAccess.Expression, context.CancellationToken).Type;
+            if (elementBinding.ArgumentList.Arguments.Count != 1 ||
+                receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !SymbolicFactFactory.TryGetValueKind(
+                    arrayType.ElementType,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out var elementKind) ||
+                elementKind != expectedKind ||
+                !SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) ||
+                index.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            valueTerm = new SymbolicElementTerm(receiver, index, elementKind);
             return true;
         }
 

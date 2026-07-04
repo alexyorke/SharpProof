@@ -117,6 +117,19 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     break;
+                case SymbolicElementTerm element:
+                    if (TryEncodeTerm(element.Receiver, out var elementReceiver) &&
+                        TryEncodeTerm(element.Index, out var elementIndex) &&
+                        elementReceiver.Kind == SmtValueKind.Reference &&
+                        elementIndex.Kind == SmtValueKind.Int)
+                    {
+                        formula = new SmtVariable(
+                            GetReferenceFormulaName(elementReceiver) + "[" + CreateElementAccessIndexText(elementIndex) + "]",
+                            element.Kind);
+                        return true;
+                    }
+
+                    break;
                 case SymbolicStringContentTerm stringContent:
                     if (TryEncodeTerm(stringContent.Reference, out var reference) &&
                         SymbolicFactFactory.TryCreateReferenceStringContentFormula(reference, out var stringFormula))
@@ -337,6 +350,13 @@ namespace PurelySharp.Symbolic.Ir
             return formula is SmtVariable variable
                 ? variable.Name
                 : formula.ToString() ?? string.Empty;
+        }
+
+        private static string CreateElementAccessIndexText(SmtFormula index)
+        {
+            return index is SmtIntegerConstant constant
+                ? constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : index.ToString() ?? string.Empty;
         }
     }
 }

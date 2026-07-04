@@ -109,6 +109,8 @@ namespace PurelySharp.Symbolic.Ir
 
     internal sealed record SymbolicMemberTerm(SymbolicTerm Receiver, string MemberName, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
 
+    internal sealed record SymbolicElementTerm(SymbolicTerm Receiver, SymbolicTerm Index, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
+
     internal sealed record SymbolicStringContentTerm(SymbolicTerm Reference) : SymbolicTerm(SmtValueKind.String);
 
     internal sealed record SymbolicStringConcatTerm(SymbolicTerm Left, SymbolicTerm Right) : SymbolicTerm(SmtValueKind.String);
@@ -800,6 +802,8 @@ namespace PurelySharp.Symbolic.Ir
                     return "var:" + variable.ValueKind + ":" + variable.Name;
                 case SymbolicMemberTerm member:
                     return "member:" + member.ValueKind + ":" + CreateTermKey(member.Receiver) + "." + member.MemberName;
+                case SymbolicElementTerm element:
+                    return "element:" + element.ValueKind + ":" + CreateTermKey(element.Receiver) + "[" + CreateTermKey(element.Index) + "]";
                 case SymbolicStringContentTerm content:
                     return "string-content:" + CreateTermKey(content.Reference);
                 case SymbolicStringConcatTerm concat:
