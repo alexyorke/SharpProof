@@ -13748,6 +13748,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_MultidimensionalArrayGetValueIndex_ReportsIndexOutOfRange()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[2, 3];
+        return (int)values.GetValue(1, 3)!;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_array_get_value_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_PartialConjunctiveGuardExcludesZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

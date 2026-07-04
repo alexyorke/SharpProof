@@ -1387,7 +1387,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void RuntimeHazardArrayGetValue1D_UsesIrBoundsPreconditionBeforeLegacyFallback()
+        public void RuntimeHazardArrayGetValue_UsesIrBoundsPreconditionBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -1406,8 +1406,11 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.bounds.in-range"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
             Assert.That(coreSource, Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
             Assert.That(coreSource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(reachabilitySource, Does.Contain("private static bool TryTranslateArrayGetValueDimensionLength("));

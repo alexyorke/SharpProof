@@ -377,43 +377,63 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardTrigger trigger)
         {
             trigger = default;
-            if (arrayType.Rank != 1 ||
-                invocationOperation.Arguments.Length != 1 ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var indexExpression))
-            {
-                return false;
-            }
-
-            var indexType = GetExpressionType(indexExpression, semanticModel, cancellationToken);
-            if (indexType?.SpecialType != SpecialType.System_Int32)
+            if (arrayType.Rank <= 0 ||
+                invocationOperation.Arguments.Length != arrayType.Rank)
             {
                 return false;
             }
 
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
-                index.Kind != SmtValueKind.Int ||
-                !SymbolicIrLowerer.TryLowerTerm(receiverExpression, context, out var receiver) ||
-                receiver.Kind != SmtValueKind.Reference)
+            SymbolicCondition? inRangeCondition = null;
+            SymbolicTerm? subject = null;
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
+                    GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Int32 ||
+                    !SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
+                    index.Kind != SmtValueKind.Int ||
+                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
+                        receiverExpression,
+                        dimension,
+                        context,
+                        out var length))
+                {
+                    return false;
+                }
+
+                subject ??= index;
+                var provenance = arrayType.Rank == 1
+                    ? "ir.runtime-hazard.array-get-value.bounds.in-range"
+                    : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range";
+                var dimensionInRange = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicBoundsAtom(
+                        index,
+                        length,
+                        IncludeLowerBound: true,
+                        IncludeUpperBound: true),
+                    invocation,
+                    provenance));
+                inRangeCondition = inRangeCondition == null
+                    ? dimensionInRange
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        inRangeCondition,
+                        dimensionInRange);
+            }
+
+            if (inRangeCondition == null)
             {
                 return false;
             }
 
-            var inRangeCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicBoundsAtom(
-                    index,
-                    new SymbolicLengthTerm(receiver),
-                    IncludeLowerBound: true,
-                    IncludeUpperBound: true),
-                invocation,
-                "ir.runtime-hazard.array-get-value.bounds.in-range"));
-
             return TryEncodeIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.IndexOutOfRange,
-                index,
+                subject,
                 new SymbolicNotCondition(inRangeCondition),
                 invocation,
-                "ir.runtime-hazard.array-get-value.index-out-of-range",
+                arrayType.Rank == 1
+                    ? "ir.runtime-hazard.array-get-value.index-out-of-range"
+                    : "ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range",
                 out trigger);
         }
 
