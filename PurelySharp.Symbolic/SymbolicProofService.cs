@@ -29,6 +29,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(state));
             }
 
+            state = NormalizeState(state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -57,6 +58,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(state));
             }
 
+            state = NormalizeState(state);
             return TryEncodeState(state, out pathConditions, out _);
         }
 
@@ -72,6 +74,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(fact));
             }
 
+            state = NormalizeState(state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -110,6 +113,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(condition));
             }
 
+            state = NormalizeState(state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -148,16 +152,23 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(branchCondition));
             }
 
+            state = NormalizeState(state);
             return ClassifyReachability(state.AddPathCondition(branchCondition));
         }
 
         public SymbolicIrProofResult ClassifyConditionTruth(SymbolicState state, SymbolicCondition condition)
         {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             if (condition == null)
             {
                 throw new ArgumentNullException(nameof(condition));
             }
 
+            state = NormalizeState(state);
             var reachability = ClassifyReachability(state);
             if (reachability.Info.Status == SymbolicProofStatus.Unreachable)
             {
@@ -204,6 +215,7 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(triggerPrecondition));
             }
 
+            state = NormalizeState(state);
             return ClassifyWithIrCache(
                 "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
                 () =>
@@ -333,6 +345,11 @@ namespace PurelySharp.Symbolic
             return smtAnalysis != null
                 ? s_serviceCaches.GetOrCreateValue(smtAnalysis)
                 : s_fallbackCache;
+        }
+
+        private static SymbolicState NormalizeState(SymbolicState state)
+        {
+            return state.Normalize();
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()

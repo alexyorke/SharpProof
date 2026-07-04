@@ -91,7 +91,8 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
             Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
             Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
-            Assert.That(proofServiceSource, Does.Not.Contain("state = state.Normalize();"));
+            Assert.That(proofServiceSource, Does.Contain("private static SymbolicState NormalizeState(SymbolicState state)"));
+            Assert.That(proofServiceSource, Does.Contain("state = NormalizeState(state);"));
         }
 
         [Test]
@@ -2053,6 +2054,16 @@ namespace PurelySharp.Test
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
+        public void SymbolicProofService_ConditionTruthRejectsNullStateBeforeProof()
+        {
+            Assert.Throws<ArgumentNullException>(() =>
+                SymbolicReachabilityService.ClassifyStateConditionTruth(
+                    null!,
+                    new SymbolicConstantCondition(true),
+                    smtAnalysis: null));
         }
 
         [Test]
