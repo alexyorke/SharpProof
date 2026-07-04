@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,535 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,790 lines,
+- Production inventory currently reports 112,534 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,789 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -95,6 +95,14 @@ path-fact, hazard, and ownership flows.
   left-min/right-minus-one before falling back to the legacy direct formula
   path. Runtime-hazard signed-division triggers now use the same shared IR
   condition builder instead of owning a duplicate condition shape.
+- Runtime-hazard divide-by-zero and reference-null IR helpers now use shared
+  `CreateIntegerZeroCondition` and `CreateReferenceNullCondition` factories
+  instead of owning duplicate zero/null relation atom construction. This does
+  not change the formula fallback inventory count.
+- Scalar reachability helper migration remains sensitive. Replacing
+  `TryCreateReferenceNullComparison`, numeric-zero, non-negative, or
+  negative-length helper outputs with IR-first formulas should wait for
+  dedicated equivalence locks around analyzer path-fact consumers.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
