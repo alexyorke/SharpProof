@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,243 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,498 lines,
+- Production inventory currently reports 112,416 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,671 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -73,6 +73,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.TryCreateArrayElementBoundsCondition`; reachability and
   runtime-hazard code consume that IR condition instead of owning duplicate
   per-dimension `SymbolicBoundsAtom` loops.
+- Subsequence/slicing bounds now have an IR condition builder in
+  `SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition`. Reachability and
+  runtime-hazard slicing checks try that IR path first, then keep the legacy
+  formula path for unsupported receiver/start/count shapes.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
@@ -133,6 +137,9 @@ path-fact, hazard, and ownership flows.
 - Built-in element-access range checks now lower one-dimensional and
   multidimensional array bounds through IR bounds facts before legacy formula
   fallback; Index/Range shape compatibility still uses the fallback path.
+- Subsequence range checks for `Substring`, `Slice`, `AsSpan`, and `AsMemory`
+  now lower supported source/start/count bounds through IR conditions before
+  formula fallback.
 - Delete each old formula branch only after equivalence tests prove identical
   or more conservative behavior.
 
