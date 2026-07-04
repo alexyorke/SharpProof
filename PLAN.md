@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 113,334 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,350 lines,
+- Production inventory currently reports 113,358 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 54,374 lines,
   `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 18 symbolic-side
+  currently reports 0 analyzer-side and 17 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
@@ -131,6 +131,11 @@ path-fact, hazard, and ownership flows.
   `TryCreateNotNullIfNotNullResultNonNullFormula` boundary; local/parameter
   assignment facts and semantic proof queries no longer retain a legacy
   translator fallback for that path.
+- Array-dimension length reachability facts are now IR-only at the
+  `TryTranslateArrayDimensionLengthValue` boundary. The indexing lowerer now
+  also handles casted array receivers and casted array-creation receivers, so
+  `GetLength`/`GetLongLength` dimension facts no longer retain a legacy
+  translator fallback in reachability or assigned-value mirroring.
 - Simple integer range proofs now use
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable

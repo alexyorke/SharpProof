@@ -3340,8 +3340,7 @@ namespace PurelySharp.Symbolic
                         model,
                         token,
                         out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
+                        getSymbolVersion: null)
                         ? valueDimensionLength
                         : null,
                 facts.Add);
@@ -3378,8 +3377,7 @@ namespace PurelySharp.Symbolic
                         model,
                         token,
                         out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
+                        getSymbolVersion: null)
                         ? valueDimensionLength
                         : null,
                 facts.Add);
@@ -3464,8 +3462,7 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula lengthFormula,
-            Func<ISymbol, int>? getSymbolVersion = null,
-            int inlineDepth = 0)
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(expression, cancellationToken).Type;
@@ -3488,14 +3485,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
-                expression,
-                dimension,
-                semanticModel,
-                cancellationToken,
-                out lengthFormula,
-                getSymbolVersion,
-                inlineDepth);
+            lengthFormula = null!;
+            return false;
         }
 
         internal static bool TryCreateCompoundAssignmentFact(

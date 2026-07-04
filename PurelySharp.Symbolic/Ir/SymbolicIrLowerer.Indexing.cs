@@ -151,6 +151,11 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (TryLowerReferenceCastArrayDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term))
+            {
+                return true;
+            }
+
             if (!TryLowerTerm(arrayExpression, context, out var arrayTerm) ||
                 arrayTerm.Kind != SmtValueKind.Reference)
             {
@@ -159,6 +164,40 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
+            return true;
+        }
+
+        private static bool TryLowerReferenceCastArrayDimensionLengthTerm(
+            ExpressionSyntax arrayExpression,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (arrayExpression is not CastExpressionSyntax castExpression)
+            {
+                return false;
+            }
+
+            var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
+            if (!SymbolEqualityComparer.Default.Equals(targetType, arrayType))
+            {
+                return false;
+            }
+
+            if (TryLowerArrayCreationDimensionLengthTerm(castExpression.Expression, arrayType, dimension, context, out term))
+            {
+                return true;
+            }
+
+            if (!TryLowerTerm(castExpression.Expression, context, out var operand) ||
+                operand.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            term = new SymbolicArrayDimensionLengthTerm(operand, dimension);
             return true;
         }
 

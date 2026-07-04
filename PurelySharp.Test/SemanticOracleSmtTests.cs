@@ -5622,6 +5622,29 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCastedMultidimensionalArrayGetLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return ((int[,])new int[2, 3]).GetLength(1);
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CastedMultidimensionalArrayGetLength.cs",
+                FindLine(source, "return ((int[,])new int[2, 3]).GetLength(1);"),
+                16,
+                "((int[,])new int[2, 3]).GetLength(1) == 3",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength()
         {
             const string source = @"

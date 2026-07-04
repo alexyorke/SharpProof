@@ -2016,12 +2016,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(18));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(17));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 18,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 17,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2041,7 +2041,6 @@ namespace PurelySharp.Test
                     ["if (CSharpSmtFormulaTranslator.TryTranslateStringValue("] = 1,
                     ["if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("] = 2,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("] = 1,
                 }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
@@ -5762,7 +5761,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicReachabilityService_UsesIrArrayDimensionLengthBeforeLegacyFallback()
+        public void SymbolicReachabilityService_UsesIrArrayDimensionLengthWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -5779,9 +5778,8 @@ namespace PurelySharp.Test
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-            Assert.That(
-                helperSource.IndexOf("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression", StringComparison.Ordinal),
-                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression, dimension, context, out var term)"));
+            Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(term"));
         }
 
