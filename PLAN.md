@@ -20,9 +20,9 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,534 C# production lines across
+- Production inventory currently reports 112,662 C# production lines across
   181 files. The largest modules are `PurelySharp.Symbolic` at 53,789 lines,
-  `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
+  `PurelySharp.Analyzer` at 37,178 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
   now at 8,882 lines. It routes legacy translation through
@@ -69,6 +69,10 @@ path-fact, hazard, and ownership flows.
   triggers before formula-backed compatibility. The fallback inventory count
   is unchanged because Index/Range and other unsupported element-access or
   invocation shapes still keep the legacy path alive.
+- Analyzer PS0010/PS0011 site reporting now also recognizes definite
+  `Array.GetValue` index hazards by reusing shared `Array.GetValue` in-range
+  formula construction plus analyzer path facts, preserving the
+  `definite_array_get_value_index_out_of_range` category/source.
 - Shared array element bounds construction now lives in
   `SymbolicIrLowerer.TryCreateArrayElementBoundsCondition`; reachability and
   runtime-hazard code consume that IR condition instead of owning duplicate
