@@ -951,6 +951,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsNullableLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var nullableSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Nullable.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerNullableHasValueTerm(memberAccess.Expression"));
+            Assert.That(coreSource, Does.Contain("TryLowerNullableValueTerm(memberAccess.Expression"));
+            Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableHasValueTerm"));
+            Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableValueTerm"));
+            Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableHasValueTerm"));
+            Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableValueTerm"));
+            Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableGetValueOrDefaultInvocation"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
