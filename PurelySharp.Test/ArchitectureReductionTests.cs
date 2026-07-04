@@ -875,6 +875,27 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsObjectLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var objectSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Objects.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerObjectReferenceEqualsInvocation"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerObjectReferenceEqualsInvocation"));
+            Assert.That(objectSource, Does.Contain("private static bool TryLowerObjectReferenceEqualsInvocation"));
+            Assert.That(objectSource, Does.Contain("ir.known-api.object.reference-equals"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
