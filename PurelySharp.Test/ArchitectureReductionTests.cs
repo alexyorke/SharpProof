@@ -2064,6 +2064,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCollapsesContradictoryStates()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("x == 1"),
+                "test.x");
+            var yFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("y > 10"),
+                "test.y");
+            var factContradiction = new SymbolicState(
+                new[] { xFact, xFact.Negate(), yFact },
+                symbolVersions: new[] { new KeyValuePair<string, int>("x", 1) });
+            var pathContradiction = new SymbolicState(
+                new[] { yFact },
+                new SymbolicCondition[] { new SymbolicConstantCondition(false) },
+                new[] { new KeyValuePair<string, int>("y", 2) });
+
+            Assert.That(factContradiction.IsContradictory, Is.True);
+            Assert.That(pathContradiction.IsContradictory, Is.True);
+            Assert.That(factContradiction.Facts, Has.Length.EqualTo(3));
+            Assert.That(pathContradiction.Facts, Has.Length.EqualTo(1));
+            Assert.That(factContradiction.NormalizedProofKey, Is.EqualTo(pathContradiction.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_DeduplicatesPathConditionsAlreadyStoredAsFacts()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

@@ -577,9 +577,14 @@ namespace PurelySharp.Symbolic.Ir
             ImmutableDictionary<string, int> symbolVersions,
             bool isContradictory)
         {
+            if (isContradictory)
+            {
+                return "contradictory:true";
+            }
+
             var parts = new List<string>
             {
-                isContradictory ? "contradictory:true" : "contradictory:false",
+                "contradictory:false",
             };
 
             parts.AddRange(symbolVersions
