@@ -228,7 +228,9 @@ namespace PurelySharp.Symbolic.Ir
             bool isContradictory = false)
         {
             var normalizedFacts = DeduplicateFacts(facts?.ToImmutableArray() ?? ImmutableArray<SymbolicFact>.Empty);
-            var normalizedConditions = DeduplicateConditions(pathConditions?.ToImmutableArray() ?? ImmutableArray<SymbolicCondition>.Empty);
+            var normalizedConditions = DeduplicateConditions(
+                pathConditions?.ToImmutableArray() ?? ImmutableArray<SymbolicCondition>.Empty,
+                normalizedFacts);
             SymbolVersions = symbolVersions?.ToImmutableDictionary(
                     static pair => pair.Key,
                     static pair => pair.Value,
@@ -288,7 +290,7 @@ namespace PurelySharp.Symbolic.Ir
         public SymbolicState Normalize()
         {
             var normalizedFacts = DeduplicateFacts(Facts);
-            var normalizedConditions = DeduplicateConditions(PathConditions);
+            var normalizedConditions = DeduplicateConditions(PathConditions, normalizedFacts);
             var contradictory = IsContradictory ||
                 ContainsContradiction(normalizedFacts, normalizedConditions);
 
@@ -353,13 +355,18 @@ namespace PurelySharp.Symbolic.Ir
             return left;
         }
 
-        private static ImmutableArray<SymbolicCondition> DeduplicateConditions(ImmutableArray<SymbolicCondition> conditions)
+        private static ImmutableArray<SymbolicCondition> DeduplicateConditions(
+            ImmutableArray<SymbolicCondition> conditions,
+            ImmutableArray<SymbolicFact> facts)
         {
             if (conditions.IsDefaultOrEmpty)
             {
                 return ImmutableArray<SymbolicCondition>.Empty;
             }
 
+            var factConditionKeys = new HashSet<string>(
+                facts.Select(static fact => "fact-condition:" + CreateFactKey(fact)),
+                StringComparer.Ordinal);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var builder = ImmutableArray.CreateBuilder<SymbolicCondition>(conditions.Length);
             foreach (var condition in conditions)
@@ -369,7 +376,13 @@ namespace PurelySharp.Symbolic.Ir
                     continue;
                 }
 
-                if (seen.Add(CreateConditionKey(condition)))
+                var key = CreateConditionKey(condition);
+                if (factConditionKeys.Contains(key))
+                {
+                    continue;
+                }
+
+                if (seen.Add(key))
                 {
                     builder.Add(condition);
                 }

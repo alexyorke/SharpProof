@@ -2064,6 +2064,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_DeduplicatesPathConditionsAlreadyStoredAsFacts()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.fact");
+            var otherCondition = new SymbolicConstantCondition(true);
+
+            var state = new SymbolicState(
+                new[] { fact },
+                new SymbolicCondition[]
+                {
+                    new SymbolicFactCondition(fact),
+                    otherCondition,
+                });
+
+            Assert.That(state.Facts, Has.Length.EqualTo(1));
+            Assert.That(state.PathConditions, Has.Length.EqualTo(1));
+            Assert.That(state.PathConditions[0], Is.SameAs(otherCondition));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesEquivalentRelationAtoms()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
