@@ -335,6 +335,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_ReferenceCoalesceUsesSharedConditionalTerm()
+        {
+            var context = CreateExpressionContext(
+                "object? left, object? right",
+                "(left ?? right) == null");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+            var conditional = (SymbolicConditionalTerm)relation.Left;
+
+            Assert.That(conditional.Condition, Is.TypeOf<SymbolicFactCondition>());
+            Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(conditional.WhenTrue.Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void LowerCondition_BigIntegerZeroOneUseIntegralAtoms()
         {
             var context = CreateExpressionContext(

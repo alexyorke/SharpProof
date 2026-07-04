@@ -292,6 +292,25 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
+                TryLowerTerm(coalesceExpression.Right, context, out var coalesceRight) &&
+                coalesceLeft.Kind == SmtValueKind.Reference &&
+                coalesceRight.Kind == SmtValueKind.Reference)
+            {
+                term = new SymbolicConditionalTerm(
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        coalesceLeft,
+                        new SymbolicNullTerm(),
+                        coalesceExpression.Left,
+                        "ir.coalesce.left-not-null"),
+                    coalesceLeft,
+                    coalesceRight);
+                return true;
+            }
+
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
                 TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
                 TryLowerTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
