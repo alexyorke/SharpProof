@@ -90,6 +90,13 @@ namespace PurelySharp.Symbolic
                     ContradictoryStateReason);
             }
 
+            if (SymbolicState.TryEvaluateProofFact(fact, out var factValue))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    factValue ? SymbolicProofStatus.ProvenTrue : SymbolicProofStatus.ProvenFalse,
+                    factValue ? "ir_target_fact_syntactic_true" : "ir_target_fact_syntactic_false");
+            }
+
             if (StateContainsFact(state, fact))
             {
                 return SymbolicIrProofResult.Syntactic(

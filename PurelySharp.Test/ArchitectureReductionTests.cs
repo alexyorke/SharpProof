@@ -3503,6 +3503,41 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ConstantTargetFactsClassifyWithoutSmt()
+        {
+            var trueTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicIntegerConstantTerm(1),
+                    new SymbolicIntegerConstantTerm(2)),
+                SyntaxFactory.ParseExpression("1 < 2"),
+                "test.true-target");
+            var falseTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    new SymbolicStringConstantTerm("same"),
+                    new SymbolicStringConstantTerm("same")),
+                SyntaxFactory.ParseExpression("\"same\" != \"same\""),
+                "test.false-target");
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueTarget,
+                smtAnalysis);
+            var falseResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseTarget,
+                smtAnalysis);
+
+            Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_ComplementaryRelationFactProvesFalseWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

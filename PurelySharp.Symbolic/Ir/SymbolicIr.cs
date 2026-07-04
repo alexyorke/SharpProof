@@ -760,6 +760,11 @@ namespace PurelySharp.Symbolic.Ir
             return EnumerateConditionFacts(condition).Select(CreateFactKey);
         }
 
+        internal static bool TryEvaluateProofFact(SymbolicFact fact, out bool value)
+        {
+            return TryEvaluateFact(fact, out value);
+        }
+
         private static string CreateFactKey(SymbolicFact fact)
         {
             var key = CreateFactCoreKey(fact);
