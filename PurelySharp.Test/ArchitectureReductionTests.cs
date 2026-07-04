@@ -2474,6 +2474,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TriesIrPatternBindingsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf("internal static bool TryCollectPatternBindingFacts(", StringComparison.Ordinal);
+            var outerMethodEndIndex = source.IndexOf("private static bool TryCollectIrPatternBindingFacts(", StringComparison.Ordinal);
+            var outerMethodSource = source.Substring(helperIndex, outerMethodEndIndex - helperIndex);
+            var nestedHelperEndIndex = source.IndexOf("internal static bool TryTranslatePattern(", StringComparison.Ordinal);
+            var nestedHelperSource = source.Substring(outerMethodEndIndex, nestedHelperEndIndex - outerMethodEndIndex);
+            var irIndex = outerMethodSource.IndexOf("TryCollectIrPatternBindingFacts(", StringComparison.Ordinal);
+            var legacyIndex = outerMethodSource.IndexOf("LegacyFormulaCompatibility.TryCollectPatternBindingFacts(", StringComparison.Ordinal);
+            var proofServiceIndex = nestedHelperSource.IndexOf("SymbolicProofService.TryEncodeDerivedFormulaFacts(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(outerMethodEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(nestedHelperEndIndex, Is.GreaterThan(outerMethodEndIndex));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThan(irIndex));
+            Assert.That(proofServiceIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nestedHelperSource, Does.Contain("TryAddIrDesignationBindingFacts("));
+        }
+
+        [Test]
         public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
         {
             var repositoryRoot = FindRepositoryRoot();

@@ -452,14 +452,195 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
+            if (TryCollectIrPatternBindingFacts(
+                    matchedValue,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion))
+            {
+                return true;
+            }
+
             return LegacyFormulaCompatibility.TryCollectPatternBindingFacts(
                 matchedValue,
                 matchedValueType,
                 pattern,
                 semanticModel,
                 cancellationToken,
-                formulas,
-                getSymbolVersion);
+            formulas,
+            getSymbolVersion);
+        }
+
+        private static bool TryCollectIrPatternBindingFacts(
+            SmtFormula matchedValue,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (!SymbolicProofService.TryEncodeDerivedFormulaFacts(
+                    matchedValue,
+                    (SymbolicTerm matchedTerm, ICollection<SymbolicFact> derivedFacts) =>
+                        TryCollectIrPatternBindingFacts(
+                            matchedTerm,
+                            pattern,
+                            semanticModel,
+                            cancellationToken,
+                            getSymbolVersion,
+                            derivedFacts),
+                    out var encodedFacts))
+            {
+                return false;
+            }
+
+            foreach (var encodedFact in encodedFacts)
+            {
+                formulas.Add(encodedFact);
+            }
+
+            return encodedFacts.Length != 0;
+        }
+
+        private static bool TryCollectIrPatternBindingFacts(
+            SymbolicTerm matchedTerm,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            ICollection<SymbolicFact> facts)
+        {
+            pattern = UnwrapPattern(pattern);
+
+            switch (pattern)
+            {
+                case ParenthesizedPatternSyntax parenthesizedPattern:
+                    return TryCollectIrPatternBindingFacts(
+                        matchedTerm,
+                        parenthesizedPattern.Pattern,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        facts);
+                case VarPatternSyntax varPattern:
+                    return TryAddIrDesignationBindingFacts(
+                        matchedTerm,
+                        varPattern.Designation,
+                        varPattern,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        addNonNullFact: false,
+                        facts);
+                case DeclarationPatternSyntax declarationPattern:
+                    return TryAddIrDesignationBindingFacts(
+                        matchedTerm,
+                        declarationPattern.Designation,
+                        declarationPattern,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        addNonNullFact: true,
+                        facts);
+                case RecursivePatternSyntax recursivePattern
+                    when recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                         recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 }:
+                    return TryAddIrDesignationBindingFacts(
+                        matchedTerm,
+                        recursivePattern.Designation,
+                        recursivePattern,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        addNonNullFact: true,
+                        facts);
+                case BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword):
+                    return TryCollectIrPatternBindingFacts(
+                            matchedTerm,
+                            binaryPattern.Left,
+                            semanticModel,
+                            cancellationToken,
+                            getSymbolVersion,
+                            facts) &&
+                        TryCollectIrPatternBindingFacts(
+                            matchedTerm,
+                            binaryPattern.Right,
+                            semanticModel,
+                            cancellationToken,
+                            getSymbolVersion,
+                            facts);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryAddIrDesignationBindingFacts(
+            SymbolicTerm matchedTerm,
+            VariableDesignationSyntax? designation,
+            SyntaxNode sourceNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            bool addNonNullFact,
+            ICollection<SymbolicFact> facts)
+        {
+            if (designation == null)
+            {
+                return false;
+            }
+
+            if (designation is DiscardDesignationSyntax)
+            {
+                return true;
+            }
+
+            if (designation is not SingleVariableDesignationSyntax singleVariableDesignation)
+            {
+                return false;
+            }
+
+            if (singleVariableDesignation.Identifier.ValueText == "_" ||
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol ||
+                !TryCreateVersionedSymbolTerm(localSymbol, getSymbolVersion, out var localTerm) ||
+                !CanCompareIrTerms(localTerm, matchedTerm))
+            {
+                return false;
+            }
+
+            facts.Add(SymbolicFact.Exact(
+                new SymbolicRelationAtom(SymbolicRelationOperator.Equal, localTerm, matchedTerm),
+                sourceNode,
+                "ir.pattern-binding.designation",
+                localSymbol,
+                "ir.pattern-binding.designation"));
+
+            if (addNonNullFact &&
+                localTerm.Kind == SmtValueKind.Reference)
+            {
+                facts.Add(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(SymbolicRelationOperator.NotEqual, localTerm, new SymbolicNullTerm()),
+                    sourceNode,
+                    "ir.pattern-binding.non-null",
+                    localSymbol,
+                    "ir.pattern-binding.non-null"));
+            }
+
+            if (SymbolicFactFactory.GetTrackedSymbolType(localSymbol)?.SpecialType == SpecialType.System_String &&
+                localTerm.Kind == SmtValueKind.Reference &&
+                TryCreateStringContentTerm(localSymbol, getSymbolVersion, out var localStringTerm) &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(matchedTerm, out var matchedStringTerm))
+            {
+                facts.Add(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, localStringTerm, matchedStringTerm),
+                    sourceNode,
+                    "ir.pattern-binding.string-content",
+                    localSymbol,
+                    "ir.pattern-binding.string-content"));
+            }
+
+            return true;
         }
 
         internal static bool TryTranslatePattern(
@@ -2339,13 +2520,17 @@ namespace PurelySharp.Symbolic
                 SymbolicIrLowerer.TryCreateStringContentReferenceTerm(reference, out term);
         }
 
-        private static bool TryCreateReferenceSymbolTerm(
+        private static bool TryCreateVersionedSymbolTerm(
             ISymbol symbol,
             Func<ISymbol, int>? getSymbolVersion,
             out SymbolicTerm term)
         {
             if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
-                !SymbolicTypeFacts.IsReferenceType(type))
+                !SymbolicFactFactory.TryGetValueKind(
+                    type,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out var kind))
             {
                 term = null!;
                 return false;
@@ -2353,8 +2538,29 @@ namespace PurelySharp.Symbolic
 
             term = new SymbolicVariableTerm(
                 GetVersionedSmtVariableName(symbol, getSymbolVersion),
-                SmtValueKind.Reference);
+                kind);
             return true;
+        }
+
+        private static bool TryCreateReferenceSymbolTerm(
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicTerm term)
+        {
+            if (!TryCreateVersionedSymbolTerm(symbol, getSymbolVersion, out term) ||
+                term.Kind != SmtValueKind.Reference)
+            {
+                term = null!;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right)
+        {
+            return left.Kind == right.Kind ||
+                left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference ||
+                right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference;
         }
 
         internal static bool TryTranslateBuiltInLengthValue(

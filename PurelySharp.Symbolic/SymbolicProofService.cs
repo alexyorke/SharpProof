@@ -18,6 +18,7 @@ namespace PurelySharp.Symbolic
     {
         internal delegate bool SymbolicTermTransformer(SymbolicTerm input, out SymbolicTerm output);
         internal delegate bool SymbolicConditionTransformer(SymbolicTerm input, out SymbolicCondition output);
+        internal delegate bool SymbolicFactTransformer(SymbolicTerm input, ICollection<SymbolicFact> output);
 
         private const string ContradictoryStateReason = "path_unsatisfiable";
         private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
@@ -214,6 +215,50 @@ namespace PurelySharp.Symbolic
             }
 
             return SymbolicIrFormulaEncoder.TryEncode(transformed, out encoded);
+        }
+
+        internal static bool TryEncodeDerivedFormulaFacts(
+            SmtFormula formula,
+            SymbolicFactTransformer transform,
+            out ImmutableArray<SmtFormula> encodedFacts)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            if (transform == null)
+            {
+                throw new ArgumentNullException(nameof(transform));
+            }
+
+            if (!SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term))
+            {
+                encodedFacts = ImmutableArray<SmtFormula>.Empty;
+                return false;
+            }
+
+            var facts = new List<SymbolicFact>();
+            if (!transform(term, facts) || facts.Count == 0)
+            {
+                encodedFacts = ImmutableArray<SmtFormula>.Empty;
+                return false;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(facts.Count);
+            foreach (var fact in facts)
+            {
+                if (!SymbolicIrFormulaEncoder.TryEncode(fact, out var encodedFact))
+                {
+                    encodedFacts = ImmutableArray<SmtFormula>.Empty;
+                    return false;
+                }
+
+                builder.Add(encodedFact);
+            }
+
+            encodedFacts = builder.MoveToImmutable();
+            return true;
         }
 
         private static bool TryEncodeFactWithPathState(

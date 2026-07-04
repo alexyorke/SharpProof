@@ -44,6 +44,12 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.TryLowerPatternCondition` before the legacy translator
   fallback. Declaration/binding-heavy pattern shapes still stay on the legacy
   path for now.
+  Simple single-variable pattern binding facts now also try an IR-first path
+  in reachability before the legacy binder. `var`, declaration, empty
+  recursive-designation, and `and`-combined versions of those shapes now emit
+  equality, string-content equality, and reference non-null facts through IR;
+  recursive property, positional, list, and nullable-specialized bindings
+  still fall back to the legacy binder.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped
