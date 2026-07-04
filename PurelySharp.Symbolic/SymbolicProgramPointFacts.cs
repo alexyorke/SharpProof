@@ -2053,6 +2053,105 @@ namespace PurelySharp.Symbolic
             };
         }
 
+        private static bool TryGetCurrentStateSymbolValueTerm(
+            SymbolicState state,
+            ISymbol symbol,
+            out SymbolicTerm valueTerm)
+        {
+            valueTerm = null!;
+            var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+            for (var index = state.PathConditions.Length - 1; index >= 0; index--)
+            {
+                if (TryGetStateEqualityValueTerm(state.PathConditions[index], symbolName, out valueTerm))
+                {
+                    return true;
+                }
+            }
+
+            for (var index = state.Facts.Length - 1; index >= 0; index--)
+            {
+                if (TryGetStateEqualityValueTerm(state.Facts[index], symbolName, out valueTerm))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetStateEqualityValueTerm(
+            SymbolicCondition condition,
+            string symbolName,
+            out SymbolicTerm valueTerm)
+        {
+            valueTerm = null!;
+            return condition is SymbolicFactCondition factCondition &&
+                TryGetStateEqualityValueTerm(factCondition.Fact, symbolName, out valueTerm);
+        }
+
+        private static bool TryGetStateEqualityValueTerm(
+            SymbolicFact fact,
+            string symbolName,
+            out SymbolicTerm valueTerm)
+        {
+            valueTerm = null!;
+            if (!fact.Polarity ||
+                fact.Atom is not SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: var left,
+                    Right: var right
+                })
+            {
+                return false;
+            }
+
+            if (left is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } leftVariable &&
+                string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
+                right.Kind == SmtValueKind.Int)
+            {
+                valueTerm = right;
+                return true;
+            }
+
+            if (right is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } rightVariable &&
+                string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
+                left.Kind == SmtValueKind.Int)
+            {
+                valueTerm = left;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateIncrementOrDecrementStateTerm(
+            SymbolicTerm previousValue,
+            int delta,
+            out SymbolicTerm updatedValue)
+        {
+            updatedValue = null!;
+            if (previousValue.Kind != SmtValueKind.Int ||
+                delta is not 1 and not -1)
+            {
+                return false;
+            }
+
+            if (previousValue is SymbolicIntegerConstantTerm integerConstant)
+            {
+                updatedValue = new SymbolicIntegerConstantTerm(integerConstant.Value + delta);
+                return true;
+            }
+
+            updatedValue = new SymbolicBinaryTerm(
+                delta > 0
+                    ? SymbolicBinaryTermOperator.Add
+                    : SymbolicBinaryTermOperator.Subtract,
+                previousValue,
+                new SymbolicIntegerConstantTerm(1));
+            return true;
+        }
+
         private static void AddForeachBodyEntryStateFacts(
             ref SymbolicState state,
             ExpressionSyntax expressionSyntax,
@@ -3761,7 +3860,7 @@ namespace PurelySharp.Symbolic
                 TryGetCurrentSymbolValue(facts, mutatedSymbol, out var previousMutatedValue))
             {
                 RemoveFactsReferencingSymbol(facts, mutatedSymbol);
-                if (TryCreateIncrementOrDecrementFact(mutatedSymbol, previousMutatedValue, delta, out var mutationFact))
+                if (SymbolicReachabilityService.TryCreateIncrementOrDecrementFact(mutatedSymbol, previousMutatedValue, delta, out var mutationFact))
                 {
                     facts.Add(mutationFact);
                 }
@@ -3885,8 +3984,27 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     out var mutatedSymbol,
-                    out _))
+                    out var delta))
             {
+                if (TryGetCurrentStateSymbolValueTerm(state, mutatedSymbol, out var previousValueTerm) &&
+                    TryCreateIncrementOrDecrementStateTerm(previousValueTerm, delta, out var updatedValueTerm) &&
+                    TryCreateSymbolTerm(mutatedSymbol, out var targetTerm) &&
+                    targetTerm.Kind == SmtValueKind.Int &&
+                    !ReferencesStateSymbol(updatedValueTerm, SymbolicFactFactory.GetSmtVariableName(mutatedSymbol)))
+                {
+                    state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol);
+                    AddRelationPathFact(
+                        ref state,
+                        SymbolicRelationOperator.Equal,
+                        targetTerm,
+                        updatedValueTerm,
+                        unaryExpressionStatement.Expression,
+                        delta >= 0
+                            ? "ir.path.prior-statement.increment"
+                            : "ir.path.prior-statement.decrement");
+                    return;
+                }
+
                 state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol);
                 return;
             }
@@ -9971,28 +10089,6 @@ namespace PurelySharp.Symbolic
 
             valueFormulas = builder.ToImmutable();
             return true;
-        }
-
-        private static bool TryCreateIncrementOrDecrementFact(
-            ISymbol targetSymbol,
-            SmtFormula previousValue,
-            int delta,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula))
-            {
-                return false;
-            }
-
-            return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
-                targetFormula,
-                previousValue,
-                SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                    previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                delta,
-                out fact);
         }
 
         private static bool TryGetCurrentSymbolValue(
