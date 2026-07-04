@@ -289,6 +289,21 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<InvocationExpressionSyntax> GetDefiniteArrayGetValueIndexOutOfRangeNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var invocation in GetRelevantDescendants<InvocationExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyOutOfRangeArrayGetValueCall(invocation, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return invocation;
+                }
+            }
+        }
+
         internal static IEnumerable<SyntaxNode> GetDefiniteArgumentOutOfRangeNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -1157,6 +1172,47 @@ namespace PurelySharp.Analyzer
             return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
         }
 
+        private static bool IsDefinitelyOutOfRangeArrayGetValueCall(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                !TryGetArrayGetValueRuntimeArrayType(
+                    receiverExpression,
+                    invocation,
+                    semanticModel,
+                    cancellationToken,
+                    out var arrayType) ||
+                invocationOperation.Arguments.Length != arrayType.Rank)
+            {
+                return false;
+            }
+
+            var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression))
+                {
+                    return false;
+                }
+
+                indexExpressions.Add(indexExpression);
+            }
+
+            return SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
+                    receiverExpression,
+                    arrayType,
+                    indexExpressions,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFormula) &&
+                IsDefinitelyFalseAtUse(invocation, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
         private static bool IsDefinitelyOutOfRangeBuiltInSliceCall(
             InvocationExpressionSyntax invocation,
             SemanticModel semanticModel,
@@ -1244,6 +1300,46 @@ namespace PurelySharp.Analyzer
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
         {
             return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
+        }
+
+        private static bool IsArrayGetValueInvocation(IMethodSymbol method)
+        {
+            return method.Name == "GetValue" &&
+                !method.IsStatic &&
+                method.ContainingType?.SpecialType == SpecialType.System_Array &&
+                method.ReturnType.SpecialType == SpecialType.System_Object &&
+                method.Parameters.Length > 0 &&
+                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+        }
+
+        private static bool TryGetArrayGetValueRuntimeArrayType(
+            ExpressionSyntax receiverExpression,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out IArrayTypeSymbol arrayType)
+        {
+            var receiverType = GetExpressionType(receiverExpression, semanticModel, cancellationToken);
+            if (receiverType is IArrayTypeSymbol staticArrayType)
+            {
+                arrayType = staticArrayType;
+                return true;
+            }
+
+            if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                    receiverExpression,
+                    useNode,
+                    semanticModel,
+                    cancellationToken,
+                    out var exactRuntimeType) &&
+                exactRuntimeType is IArrayTypeSymbol exactArrayType)
+            {
+                arrayType = exactArrayType;
+                return true;
+            }
+
+            arrayType = null!;
+            return false;
         }
 
         private static bool TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
@@ -1351,6 +1447,25 @@ namespace PurelySharp.Analyzer
             }
 
             return arguments.All(static argument => argument != null);
+        }
+
+        private static bool TryGetInvocationArgumentExpression(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.Parameter?.Ordinal == parameterIndex &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            expression = null!;
+            return false;
         }
 
         private static bool IsBuiltInRangeAccessArgument(

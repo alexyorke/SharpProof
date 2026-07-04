@@ -1453,6 +1453,14 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var exceptionSitesSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+            var exceptionQuerySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "ExceptionFlowQuery.cs"));
             var lowererSource = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Symbolic",
@@ -1473,6 +1481,12 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
             Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
+            Assert.That(exceptionSitesSource, Does.Contain("GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
+            Assert.That(exceptionSitesSource, Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
+            Assert.That(exceptionSitesSource, Does.Contain("TryGetArrayGetValueRuntimeArrayType("));
+            Assert.That(exceptionQuerySource, Does.Contain("ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
+            Assert.That(exceptionQuerySource, Does.Contain("ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange"));
+            Assert.That(exceptionQuerySource, Does.Contain("ExceptionSources.ArrayGetValue"));
         }
 
         [Test]

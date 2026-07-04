@@ -488,6 +488,34 @@ namespace PurelySharp.Analyzer
                         ExceptionSources.ArrayIndex));
             }
 
+            foreach (var arrayGetValueNode in ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(arrayGetValueNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(arrayGetValueNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.IndexOutOfRangeException);
+                if (IsCaughtWithinMethod(arrayGetValueNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    arrayGetValueNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        ExceptionTypes.IndexOutOfRangeException,
+                        ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
+                        ExceptionSources.ArrayGetValue));
+            }
+
             foreach (var argumentOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(argumentOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
