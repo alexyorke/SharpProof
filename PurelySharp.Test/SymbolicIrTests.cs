@@ -1843,8 +1843,9 @@ namespace PurelySharp.Test
         [Test]
         public void LowerBuiltInLengthTerm_StringAsSpanOneArgumentUsesSourceLengthDelta()
         {
-            var context = CreateExpressionContext(
+            var context = CreateMethodExpressionContext(
                 "string text, int start",
+                string.Empty,
                 "text.AsSpan(start).Length == text.Length - start");
             var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
@@ -1864,8 +1865,9 @@ namespace PurelySharp.Test
         [Test]
         public void LowerBuiltInLengthTerm_ReadOnlySpanSliceTwoArgumentUsesRequestedLength()
         {
-            var context = CreateExpressionContext(
+            var context = CreateMethodExpressionContext(
                 "ReadOnlySpan<int> values, int start, int length",
+                string.Empty,
                 "values.Slice(start, length).Length == length");
             var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
@@ -1993,6 +1995,72 @@ namespace PurelySharp.Test
             Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
             Assert.That(formula, Is.TypeOf<SmtVariable>());
             Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(formula.ToString(), Does.Contain(".Count"));
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_CountOnlyCollectionUsesCountTerm()
+        {
+            var context = CreateMethodExpressionContext(
+                "System.Collections.Generic.IReadOnlyCollection<int> values",
+                string.Empty,
+                "values.Count > 0");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(
+                    memberAccess.Expression,
+                    context.LoweringContext,
+                    out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicCountTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(formula.ToString(), Does.Contain(".Count"));
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_SpanParameterUsesReferenceBackedLengthTerm()
+        {
+            var context = CreateExpressionContext(
+                "System.Span<int> span",
+                "span.Length == 0");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(
+                    memberAccess.Expression,
+                    context.LoweringContext,
+                    out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicLengthTerm>());
+            var lengthTerm = (SymbolicLengthTerm)term;
+            Assert.That(lengthTerm.Value, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)lengthTerm.Value).Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_CollectionExpressionSpreadUsesSummedLengths()
+        {
+            var context = CreateMethodLocalDeclarationContext(
+                "System.Collections.Generic.IReadOnlyCollection<int> values",
+                "int[] copy = [0, .. values, 1];");
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(
+                    context.ValueExpression,
+                    new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None),
+                    out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
             Assert.That(formula.ToString(), Does.Contain(".Count"));
         }
 

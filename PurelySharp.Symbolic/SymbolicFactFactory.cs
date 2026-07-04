@@ -229,6 +229,14 @@ namespace PurelySharp.Symbolic
                 return TryCreateReferenceBuiltInLengthFormula(new SmtVariable(variableName, SmtValueKind.Reference), out formula);
             }
 
+            if (type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray)
+            {
+                return TryCreateReferenceArrayTotalLengthFormula(
+                    new SmtVariable(variableName, SmtValueKind.Reference),
+                    multiDimensionalArray,
+                    out formula);
+            }
+
             formula = null!;
             return false;
         }
@@ -255,6 +263,14 @@ namespace PurelySharp.Symbolic
                 IsBuiltInSpanOrMemoryType(type))
             {
                 return TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
+            }
+
+            if (type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray)
+            {
+                return TryCreateReferenceArrayTotalLengthFormula(
+                    receiverFormula,
+                    multiDimensionalArray,
+                    out formula);
             }
 
             formula = null!;
@@ -294,6 +310,37 @@ namespace PurelySharp.Symbolic
             }
 
             return TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, dimension, out formula);
+        }
+
+        private static bool TryCreateReferenceArrayTotalLengthFormula(
+            SmtFormula receiverFormula,
+            IArrayTypeSymbol arrayType,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (receiverFormula.Kind != SmtValueKind.Reference ||
+                arrayType.Rank <= 0 ||
+                !TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, 0, out var totalLength))
+            {
+                return false;
+            }
+
+            formula = totalLength;
+            for (var dimension = 1; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryCreateReferenceArrayDimensionLengthFormula(receiverFormula, dimension, out var dimensionLength))
+                {
+                    formula = null!;
+                    return false;
+                }
+
+                formula = new SmtIntegerBinaryTerm(
+                    SmtIntegerBinaryOperator.Multiply,
+                    formula,
+                    dimensionLength);
+            }
+
+            return true;
         }
 
         internal static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)

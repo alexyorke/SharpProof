@@ -292,7 +292,15 @@ namespace PurelySharp.Symbolic.Ir
                 return CreateLengthTerm(reference, out term);
             }
 
-            if (HasCountBackedIntIndexer(type))
+            if (type is not IArrayTypeSymbol &&
+                HasCountBackedIntIndexer(type))
+            {
+                term = new SymbolicCountTerm(reference);
+                return true;
+            }
+
+            if (type is not IArrayTypeSymbol &&
+                HasInstanceInt32Member(type, "Count"))
             {
                 term = new SymbolicCountTerm(reference);
                 return true;
@@ -699,6 +707,12 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             expression = UnwrapExpression(expression);
+            if (expression is CollectionExpressionSyntax collectionExpression &&
+                TryLowerCollectionExpressionLengthTerm(collectionExpression, context, out term))
+            {
+                return true;
+            }
+
             if (TryLowerDirectRangeAccessResultLengthTerm(expression, context, out term))
             {
                 return true;
@@ -739,6 +753,42 @@ namespace PurelySharp.Symbolic.Ir
 
             term = null!;
             return false;
+        }
+
+        private static bool TryLowerCollectionExpressionLengthTerm(
+            CollectionExpressionSyntax collectionExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = new SymbolicIntegerConstantTerm(0);
+            foreach (var element in collectionExpression.Elements)
+            {
+                SymbolicTerm elementLength;
+                switch (element)
+                {
+                    case ExpressionElementSyntax:
+                        elementLength = new SymbolicIntegerConstantTerm(1);
+                        break;
+                    case SpreadElementSyntax spreadElement:
+                        if (!TryLowerBuiltInLengthTerm(spreadElement.Expression, context, out elementLength) ||
+                            elementLength.Kind != SmtValueKind.Int)
+                        {
+                            term = null!;
+                            return false;
+                        }
+
+                        break;
+                    default:
+                        term = null!;
+                        return false;
+                }
+
+                term = term is SymbolicIntegerConstantTerm { Value: 0 }
+                    ? elementLength
+                    : new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, term, elementLength);
+            }
+
+            return true;
         }
 
         private static bool TryLowerBuiltInViewResultLengthTerm(

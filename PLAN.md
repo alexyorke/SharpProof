@@ -110,6 +110,12 @@ path-fact, hazard, and ownership flows.
   indexers such as `IReadOnlyList<T>` by emitting `SymbolicCountTerm`
   directly from the shared IR helper instead of relying on incidental
   translator-only count support.
+- Built-in span/memory locals and parameters now lower as reference-like IR
+  terms, so assigned span or memory length snapshots can flow through the
+  shared built-in-length helper instead of relying on the legacy translator.
+- Collection-expression lengths with exact spread sources now lower to IR
+  additive terms, including array spreads and count-backed collection spreads
+  such as `IReadOnlyCollection<T>`.
 - One-dimensional built-in element and range access guards now lower through
   a shared IR helper that reuses the common `System.Index` and `System.Range`
   shape resolution paths before the remaining translator fallback.

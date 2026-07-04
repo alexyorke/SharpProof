@@ -43,6 +43,7 @@ namespace PurelySharp.Symbolic.Ir
 
             if (type.TypeKind == TypeKind.Dynamic ||
                 type.IsReferenceType ||
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
                 IsSupportedTupleCarrierType(type))
             {
                 kind = SmtValueKind.Reference;
