@@ -861,9 +861,14 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Strings.cs"));
+            var knownApiSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.KnownApis.cs"));
 
             Assert.That(coreSource, Does.Contain("internal static partial class SymbolicIrLowerer"));
-            Assert.That(coreSource, Does.Contain("TryLowerStringStaticValueMember(memberSymbol, out term)"));
+            Assert.That(knownApiSource, Does.Contain("TryLowerStringStaticValueMember(memberSymbol, out term)"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerRegexIsMatchInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringPredicateInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringEqualityCondition"));
@@ -892,8 +897,13 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Objects.cs"));
+            var knownApiSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.KnownApis.cs"));
 
-            Assert.That(coreSource, Does.Contain("TryLowerObjectReferenceEqualsInvocation"));
+            Assert.That(knownApiSource, Does.Contain("TryLowerObjectReferenceEqualsInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerObjectReferenceEqualsInvocation"));
             Assert.That(objectSource, Does.Contain("private static bool TryLowerObjectReferenceEqualsInvocation"));
             Assert.That(objectSource, Does.Contain("ir.known-api.object.reference-equals"));
@@ -1074,8 +1084,13 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Numerics.cs"));
+            var knownApiSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.KnownApis.cs"));
 
-            Assert.That(coreSource, Does.Contain("TryLowerBigIntegerStaticValueMember(memberSymbol, out term)"));
+            Assert.That(knownApiSource, Does.Contain("TryLowerBigIntegerStaticValueMember(memberSymbol, out term)"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
             Assert.That(coreSource, Does.Not.Contain("private static bool IsBigIntegerType"));
             Assert.That(numericSource, Does.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
@@ -1135,6 +1150,40 @@ namespace PurelySharp.Test
             Assert.That(operatorSource, Does.Contain("private static bool IsEqualityExpression"));
             Assert.That(operatorSource, Does.Contain("private static bool TryGetRelationOperator"));
             Assert.That(operatorSource, Does.Contain("private static bool TryGetBinaryTermOperator"));
+        }
+
+        [Test]
+        public void SymbolicIrLowerer_KeepsKnownApiDispatchInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var knownApiSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.KnownApis.cs"));
+            var memberSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Members.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerKnownApiInvocation(invocation, context, out condition)"));
+            Assert.That(coreSource, Does.Contain("TryLowerKnownApiInvocationTerm(invocation, context, out term)"));
+            Assert.That(memberSource, Does.Contain("TryLowerKnownStaticValueMember(memberAccess, context, out term)"));
+            Assert.That(coreSource, Does.Not.Contain("KnownApiLowerings ="));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownApiInvocation("));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownApiInvocationTerm("));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownStaticValueMember("));
+            Assert.That(knownApiSource, Does.Contain("KnownApiLowerings ="));
+            Assert.That(knownApiSource, Does.Contain("KnownApiTermLowerings"));
+            Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocation("));
+            Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocationTerm("));
+            Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownStaticValueMember("));
         }
 
         [Test]
