@@ -119,6 +119,8 @@ namespace PurelySharp.Symbolic.Ir
 
     internal sealed record SymbolicLengthTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
 
+    internal sealed record SymbolicArrayDimensionLengthTerm(SymbolicTerm Value, int Dimension) : SymbolicTerm(SmtValueKind.Int);
+
     internal sealed record SymbolicCountTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
 
     internal sealed record SymbolicBinaryTerm(
@@ -808,6 +810,11 @@ namespace PurelySharp.Symbolic.Ir
                     return "nullable-value:" + nullableValue.NullableName + ":" + nullableValue.Kind;
                 case SymbolicLengthTerm length:
                     return "length:" + CreateTermKey(length.Value);
+                case SymbolicArrayDimensionLengthTerm dimensionLength:
+                    return "array-dimension-length:" +
+                        dimensionLength.Dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                        ":" +
+                        CreateTermKey(dimensionLength.Value);
                 case SymbolicCountTerm count:
                     return "count:" + CreateTermKey(count.Value);
                 case SymbolicBinaryTerm binary:

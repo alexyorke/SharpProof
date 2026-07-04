@@ -3843,6 +3843,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrArrayDimensionLengthBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static bool TryTranslateArrayDimensionLengthValue(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal static bool TryCreateCompoundAssignmentFact(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(term"));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrStringNonNullBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

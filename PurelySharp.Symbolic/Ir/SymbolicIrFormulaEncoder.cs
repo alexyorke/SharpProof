@@ -160,6 +160,18 @@ namespace PurelySharp.Symbolic.Ir
                     }
 
                     break;
+                case SymbolicArrayDimensionLengthTerm dimensionLength:
+                    if (TryEncodeTerm(dimensionLength.Value, out var arrayValue) &&
+                        SymbolicFactFactory.TryCreateReferenceArrayDimensionLengthFormula(
+                            arrayValue,
+                            dimensionLength.Dimension,
+                            out var dimensionLengthFormula))
+                    {
+                        formula = dimensionLengthFormula;
+                        return true;
+                    }
+
+                    break;
                 case SymbolicCountTerm count:
                     if (TryEncodeTerm(count.Value, out var countReference) &&
                         countReference.Kind == SmtValueKind.Reference)

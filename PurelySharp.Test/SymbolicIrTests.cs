@@ -1158,6 +1158,18 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void FormulaEncoder_ArrayDimensionLengthUsesReferenceDimensionLength()
+        {
+            var array = new SymbolicVariableTerm("matrix#1", SmtValueKind.Reference);
+            var dimensionLength = new SymbolicArrayDimensionLengthTerm(array, 1);
+
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(dimensionLength, out var encoded), Is.True);
+            Assert.That(
+                encoded,
+                Is.EqualTo(new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int)));
+        }
+
+        [Test]
         public void SmtFormulaLowerer_AsExpressionImplicationUsesTypeTestAtom()
         {
             var sourceNode = SyntaxFactory.ParseExpression("value as string");

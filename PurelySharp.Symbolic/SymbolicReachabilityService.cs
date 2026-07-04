@@ -2855,6 +2855,13 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression, dimension, context, out var term) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out lengthFormula))
+            {
+                return true;
+            }
+
             return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
                 expression,
                 dimension,

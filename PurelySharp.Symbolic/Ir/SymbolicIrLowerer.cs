@@ -1034,6 +1034,29 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        public static bool TryLowerArrayDimensionLengthTerm(
+            ExpressionSyntax arrayExpression,
+            int dimension,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            arrayExpression = UnwrapExpression(arrayExpression);
+            var type = context.SemanticModel.GetTypeInfo(arrayExpression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(arrayExpression, context.CancellationToken).Type;
+            if (type is not IArrayTypeSymbol arrayType ||
+                dimension < 0 ||
+                dimension >= arrayType.Rank ||
+                !TryLowerTerm(arrayExpression, context, out var arrayTerm) ||
+                arrayTerm.Kind != SmtValueKind.Reference)
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
+            return true;
+        }
+
         private static bool TryGetStableVariableSymbol(
             ExpressionSyntax expression,
             SymbolicLoweringContext context,
