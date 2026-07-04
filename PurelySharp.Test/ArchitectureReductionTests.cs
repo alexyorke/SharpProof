@@ -4900,6 +4900,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TranslatesConditionFormulaThroughIrBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf("internal static bool TryTranslateConditionFormula(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static bool TryCreateArrayLengthCountAliasFact(", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+            var irIndex = helperSource.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThan(irIndex));
+            Assert.That(helperSource, Does.Contain("formula = encodedFormula;"));
+            Assert.That(helperSource, Does.Contain("return true;"));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrAssignedValueHelpersBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();

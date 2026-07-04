@@ -1182,12 +1182,12 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            SmtFormula? irFormula = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
             if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
                 SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
             {
-                irFormula = encodedFormula;
+                formula = encodedFormula;
+                return true;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslate(
@@ -1203,8 +1203,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = irFormula;
-            return formula != null;
+            formula = null;
+            return false;
         }
 
         internal static bool TryCreateArrayLengthCountAliasFact(
