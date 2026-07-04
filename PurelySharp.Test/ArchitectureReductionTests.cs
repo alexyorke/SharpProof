@@ -3694,6 +3694,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference)"));
             Assert.That(source, Does.Contain("new SymbolicNullableHasValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
+            Assert.That(source, Does.Contain("new SymbolicStringContentTerm("));
+            Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));

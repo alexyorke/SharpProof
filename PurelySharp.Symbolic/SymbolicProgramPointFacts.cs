@@ -7816,6 +7816,14 @@ namespace PurelySharp.Symbolic
                 _ => null
             };
 
+            if (type?.SpecialType == SpecialType.System_String &&
+                TryCreateSymbolTerm(symbol, out var reference) &&
+                reference.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(reference), out formula))
+            {
+                return true;
+            }
+
             return SymbolicFactFactory.TryCreateStringContentFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
         }
 
@@ -7825,8 +7833,19 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             formula = null!;
-            return type?.SpecialType == SpecialType.System_String &&
-                SymbolicFactFactory.TryCreateReferenceStringContentFormula(receiverFormula, out formula);
+            if (type?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicStringContentTerm(receiver), out formula))
+            {
+                return true;
+            }
+
+            return SymbolicFactFactory.TryCreateReferenceStringContentFormula(receiverFormula, out formula);
         }
 
         private static void AddFiniteArrayElementAssignedValueFacts(
@@ -9355,6 +9374,14 @@ namespace PurelySharp.Symbolic
                 _ => null
             };
 
+            if (TryCreateSymbolTerm(symbol, out var reference) &&
+                reference.Kind == SmtValueKind.Reference &&
+                TryCreateBuiltInLengthTerm(reference, type, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            {
+                return true;
+            }
+
             return SymbolicFactFactory.TryCreateBuiltInLengthFormula(SymbolicFactFactory.GetSmtVariableName(symbol), type, out formula);
         }
 
@@ -9363,7 +9390,37 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? type,
             out SmtFormula formula)
         {
+            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                TryCreateBuiltInLengthTerm(receiver, type, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            {
+                return true;
+            }
+
             return SymbolicFactFactory.TryCreateBuiltInLengthFormulaForReference(receiverFormula, type, out formula);
+        }
+
+        private static bool TryCreateBuiltInLengthTerm(
+            SymbolicTerm receiver,
+            ITypeSymbol? type,
+            out SymbolicTerm term)
+        {
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
+            {
+                term = new SymbolicLengthTerm(receiver);
+                return true;
+            }
+
+            term = null!;
+            return false;
         }
 
         private static bool TryCreateArrayDimensionLengthFormulaForReference(
