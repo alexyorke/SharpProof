@@ -605,16 +605,16 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool TryEvaluateConstantBounds(SymbolicBoundsAtom bounds, out bool value)
         {
-            if (bounds.Index is not SymbolicIntegerConstantTerm index ||
-                bounds.Length is not SymbolicIntegerConstantTerm length ||
+            if (!TryEvaluateIntegerTerm(bounds.Index, out var index) ||
+                !TryEvaluateIntegerTerm(bounds.Length, out var length) ||
                 (!bounds.IncludeLowerBound && !bounds.IncludeUpperBound))
             {
                 value = false;
                 return false;
             }
 
-            value = (!bounds.IncludeLowerBound || index.Value >= 0) &&
-                (!bounds.IncludeUpperBound || index.Value < length.Value);
+            value = (!bounds.IncludeLowerBound || index >= 0) &&
+                (!bounds.IncludeUpperBound || index < length);
             return true;
         }
 

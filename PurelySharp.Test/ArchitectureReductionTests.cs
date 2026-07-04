@@ -2474,6 +2474,9 @@ namespace PurelySharp.Test
             var indexOne = new SymbolicIntegerConstantTerm(1);
             var indexNegative = new SymbolicIntegerConstantTerm(-1);
             var lengthThree = new SymbolicIntegerConstantTerm(3);
+            var literalLength = new SymbolicLengthTerm(new SymbolicStringConcatTerm(
+                new SymbolicStringConstantTerm("ab"),
+                new SymbolicStringConstantTerm("c")));
             var inRange = SymbolicFact.Exact(
                 new SymbolicBoundsAtom(
                     indexOne,
@@ -2514,19 +2517,38 @@ namespace PurelySharp.Test
                     IncludeUpperBound: true),
                 SyntaxFactory.ParseExpression("index < length"),
                 "test.upper-only");
+            var computedLengthInRange = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    indexOne,
+                    literalLength,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("\"abc\"[1]"),
+                "test.computed-length-in-range");
+            var computedLengthOutOfRange = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    literalLength,
+                    literalLength,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("\"abc\"[3]"),
+                "test.computed-length-out-of-range");
             var empty = new SymbolicState();
-            var tautologicalBounds = new SymbolicState(new[] { inRange, lowerOnly });
+            var tautologicalBounds = new SymbolicState(new[] { inRange, lowerOnly, computedLengthInRange });
             var negativeContradiction = new SymbolicState(new[] { negativeIndex });
             var upperContradiction = new SymbolicState(pathConditions: new SymbolicCondition[]
             {
                 new SymbolicFactCondition(upperOnly),
             });
+            var computedLengthContradiction = new SymbolicState(new[] { computedLengthOutOfRange });
 
             Assert.That(tautologicalBounds.Facts, Is.Empty);
             Assert.That(tautologicalBounds.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
             Assert.That(negativeContradiction.IsContradictory, Is.True);
             Assert.That(upperContradiction.IsContradictory, Is.True);
+            Assert.That(computedLengthContradiction.IsContradictory, Is.True);
             Assert.That(negativeContradiction.NormalizedProofKey, Is.EqualTo(upperContradiction.NormalizedProofKey));
+            Assert.That(computedLengthContradiction.NormalizedProofKey, Is.EqualTo(upperContradiction.NormalizedProofKey));
         }
 
         [Test]
@@ -3747,6 +3769,26 @@ namespace PurelySharp.Test
                     IncludeUpperBound: true),
                 SyntaxFactory.ParseExpression("items[-1]"),
                 "test.false-bounds-target");
+            var trueComputedBoundsTarget = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    new SymbolicIntegerConstantTerm(2),
+                    new SymbolicLengthTerm(new SymbolicStringConcatTerm(
+                        new SymbolicStringConstantTerm("ab"),
+                        new SymbolicStringConstantTerm("c"))),
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("\"abc\"[2]"),
+                "test.true-computed-bounds-target");
+            var falseComputedBoundsTarget = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    new SymbolicIntegerConstantTerm(3),
+                    new SymbolicLengthTerm(new SymbolicStringConcatTerm(
+                        new SymbolicStringConstantTerm("ab"),
+                        new SymbolicStringConstantTerm("c"))),
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("\"abc\"[3]"),
+                "test.false-computed-bounds-target");
             var trueStringTarget = SymbolicFact.Exact(
                 new SymbolicStringPredicateAtom(
                     SymbolicStringPredicateKind.StartsWith,
@@ -3793,6 +3835,14 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseBoundsTarget,
                 smtAnalysis);
+            var trueComputedBoundsResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueComputedBoundsTarget,
+                smtAnalysis);
+            var falseComputedBoundsResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseComputedBoundsTarget,
+                smtAnalysis);
             var trueStringResult = SymbolicReachabilityService.ClassifyStateImplication(
                 new SymbolicState(),
                 trueStringTarget,
@@ -3816,6 +3866,10 @@ namespace PurelySharp.Test
             Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseBoundsResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseBoundsResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueComputedBoundsResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueComputedBoundsResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseComputedBoundsResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseComputedBoundsResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(trueStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
