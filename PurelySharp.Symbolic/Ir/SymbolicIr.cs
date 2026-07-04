@@ -521,6 +521,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (fact.Atom is SymbolicBoundsAtom bounds &&
+                TryEvaluateConstantBounds(bounds, out value))
+            {
+                value = fact.Polarity ? value : !value;
+                return true;
+            }
+
             value = false;
             return false;
         }
@@ -580,6 +587,21 @@ namespace PurelySharp.Symbolic.Ir
 
             value = false;
             return false;
+        }
+
+        private static bool TryEvaluateConstantBounds(SymbolicBoundsAtom bounds, out bool value)
+        {
+            if (bounds.Index is not SymbolicIntegerConstantTerm index ||
+                bounds.Length is not SymbolicIntegerConstantTerm length ||
+                (!bounds.IncludeLowerBound && !bounds.IncludeUpperBound))
+            {
+                value = false;
+                return false;
+            }
+
+            value = (!bounds.IncludeLowerBound || index.Value >= 0) &&
+                (!bounds.IncludeUpperBound || index.Value < length.Value);
+            return true;
         }
 
         private static bool TryGetConstantEqualityKey(SymbolicTerm term, out string key)

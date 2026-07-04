@@ -2469,6 +2469,67 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConstantBoundsFacts()
+        {
+            var indexOne = new SymbolicIntegerConstantTerm(1);
+            var indexNegative = new SymbolicIntegerConstantTerm(-1);
+            var lengthThree = new SymbolicIntegerConstantTerm(3);
+            var inRange = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    indexOne,
+                    lengthThree,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("items[1]"),
+                "test.in-range");
+            var negativeIndex = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    indexNegative,
+                    lengthThree,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("items[-1]"),
+                "test.negative-index");
+            var upperOutOfRange = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    lengthThree,
+                    lengthThree,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("items[3]"),
+                "test.upper-out-of-range");
+            var lowerOnly = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    indexOne,
+                    lengthThree,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: false),
+                SyntaxFactory.ParseExpression("index >= 0"),
+                "test.lower-only");
+            var upperOnly = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    lengthThree,
+                    lengthThree,
+                    IncludeLowerBound: false,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("index < length"),
+                "test.upper-only");
+            var empty = new SymbolicState();
+            var tautologicalBounds = new SymbolicState(new[] { inRange, lowerOnly });
+            var negativeContradiction = new SymbolicState(new[] { negativeIndex });
+            var upperContradiction = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(upperOnly),
+            });
+
+            Assert.That(tautologicalBounds.Facts, Is.Empty);
+            Assert.That(tautologicalBounds.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(negativeContradiction.IsContradictory, Is.True);
+            Assert.That(upperContradiction.IsContradictory, Is.True);
+            Assert.That(negativeContradiction.NormalizedProofKey, Is.EqualTo(upperContradiction.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
         {
             var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);
@@ -3519,6 +3580,14 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("same")),
                 SyntaxFactory.ParseExpression("\"same\" != \"same\""),
                 "test.false-target");
+            var falseBoundsTarget = SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    new SymbolicIntegerConstantTerm(-1),
+                    new SymbolicIntegerConstantTerm(3),
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                SyntaxFactory.ParseExpression("items[-1]"),
+                "test.false-bounds-target");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
@@ -3529,11 +3598,17 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseTarget,
                 smtAnalysis);
+            var falseBoundsResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseBoundsTarget,
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseBoundsResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseBoundsResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
