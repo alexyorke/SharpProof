@@ -2038,23 +2038,17 @@ namespace PurelySharp.Test
             var valueLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal);
             var conditionIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerCondition(condition", StringComparison.Ordinal);
             var conditionLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(", StringComparison.Ordinal);
-            var lengthIrIndex = source.IndexOf("term is SymbolicLengthTerm", StringComparison.Ordinal);
-            var lengthLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal);
-            var stringIrIndex = source.IndexOf("SymbolicIrLowerer.TryLowerStringTerm(valueExpression", StringComparison.Ordinal);
-            var stringLegacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslateStringValue(", StringComparison.Ordinal);
 
             Assert.That(valueIrIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(valueLegacyIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(conditionIrIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(conditionLegacyIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(lengthIrIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(lengthLegacyIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(stringIrIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(stringLegacyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateBuiltInLengthValue("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateStringValue("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(valueIrIndex, Is.LessThan(valueLegacyIndex));
             Assert.That(conditionIrIndex, Is.LessThan(conditionLegacyIndex));
-            Assert.That(lengthIrIndex, Is.LessThan(lengthLegacyIndex));
-            Assert.That(stringIrIndex, Is.LessThan(stringLegacyIndex));
         }
 
         [Test]
@@ -2090,10 +2084,10 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
             var lengthHelperIndex = source.IndexOf(
-                "private static bool TryTranslateBuiltInLengthValue(",
+                "internal static bool TryTranslateBuiltInLengthValue(",
                 StringComparison.Ordinal);
             var stringHelperIndex = source.IndexOf(
-                "private static bool TryTranslateStringValue(",
+                "internal static bool TryTranslateStringValue(",
                 StringComparison.Ordinal);
             var valueHelperIndex = source.IndexOf(
                 "private static bool TryTranslateValue(",

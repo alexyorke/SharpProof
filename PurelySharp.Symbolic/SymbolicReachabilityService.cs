@@ -1756,7 +1756,7 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static bool TryTranslateBuiltInLengthValue(
+        internal static bool TryTranslateBuiltInLengthValue(
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -1786,7 +1786,7 @@ namespace PurelySharp.Symbolic
             return formula != null;
         }
 
-        private static bool TryTranslateStringValue(
+        internal static bool TryTranslateStringValue(
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -1933,13 +1933,12 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
+            if (TryTranslateNullableValueParts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
                     out var parts,
-                    getSymbolVersion: null,
-                    inlineDepth: 0))
+                    getSymbolVersion: null))
             {
                 facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetHasValue, parts.HasValue));
 
@@ -1961,6 +1960,43 @@ namespace PurelySharp.Symbolic
                 facts.Add(targetHasValue);
                 facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, wrappedValueFormula));
             }
+        }
+
+        internal static bool TryTranslateNullableValueParts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out NullableValueParts parts,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedParts,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                parts = new NullableValueParts(translatedParts.HasValue, translatedParts.Value);
+                return true;
+            }
+
+            parts = default;
+            return false;
+        }
+
+        internal readonly struct NullableValueParts
+        {
+            internal NullableValueParts(SmtFormula hasValue, SmtFormula? value)
+            {
+                HasValue = hasValue;
+                Value = value;
+            }
+
+            internal SmtFormula HasValue { get; }
+
+            internal SmtFormula? Value { get; }
         }
 
         private static bool TryTranslateNullableWrappedValueForUnderlyingType(
@@ -2243,7 +2279,7 @@ namespace PurelySharp.Symbolic
                 out lengthFormula);
         }
 
-        private static bool TryTranslateArrayDimensionLengthValue(
+        internal static bool TryTranslateArrayDimensionLengthValue(
             ExpressionSyntax expression,
             int dimension,
             SemanticModel semanticModel,

@@ -8098,14 +8098,13 @@ namespace PurelySharp.Symbolic
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
                 if (TryCreateTupleElementArrayDimensionLengthFormula(tupleSymbol, elementName, dimension, out var targetDimensionLength) &&
-                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
+                    SymbolicReachabilityService.TryTranslateArrayDimensionLengthValue(
                         valueExpression,
                         dimension,
                         semanticModel,
                         cancellationToken,
                         out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0))
+                        getSymbolVersion: null))
                 {
                     AddUniqueFact(
                         facts,
@@ -8356,13 +8355,12 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
+            if (SymbolicReachabilityService.TryTranslateNullableValueParts(
                     rightExpression,
                     semanticModel,
                     cancellationToken,
                     out var parts,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    getSymbolVersion: null) &&
                 parts.HasValue is SmtBooleanConstant { Value: true })
             {
                 facts.Add(targetHasValue);
@@ -9371,28 +9369,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            SmtFormula? irFormula = null;
-            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerTerm(valueExpression, loweringContext, out var term) &&
-                term is SymbolicLengthTerm &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
-            {
-                irFormula = encodedFormula;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+            return SymbolicReachabilityService.TryTranslateBuiltInLengthValue(
                 valueExpression,
                 semanticModel,
                 cancellationToken,
-                out formula,
-                getSymbolVersion: null,
-                inlineDepth: 0))
-            {
-                return true;
-            }
-
-            formula = irFormula!;
-            return formula != null;
+                out formula);
         }
 
         private static bool TryCreateStringValueFormula(
@@ -9401,29 +9382,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            SmtFormula? irFormula = null;
-            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerStringTerm(valueExpression, loweringContext, out var stringTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out var encodedFormula))
-            {
-                irFormula = encodedFormula;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                translatedFormula != null)
-            {
-                formula = translatedFormula;
-                return true;
-            }
-
-            formula = irFormula!;
-            return formula != null;
+            return SymbolicReachabilityService.TryTranslateStringValue(
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                out formula);
         }
 
         private static bool TryCreateComparableValueFormula(
