@@ -1341,6 +1341,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ElementAccessRangeHelper_UsesIrMultidimensionalBoundsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperStart = reachabilitySource.IndexOf(
+                "internal static bool TryCreateBuiltInElementAccessInRangeCondition(",
+                StringComparison.Ordinal);
+            var helperEnd = reachabilitySource.IndexOf(
+                "private static bool TryCreateIrBuiltInElementAccessInRangeCondition(",
+                StringComparison.Ordinal);
+            var helperSource = reachabilitySource.Substring(helperStart, helperEnd - helperStart);
+            var irIndex = helperSource.IndexOf(
+                "TryCreateIrBuiltInElementAccessInRangeCondition(",
+                StringComparison.Ordinal);
+            var fallbackIndex = helperSource.IndexOf(
+                "CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(",
+                StringComparison.Ordinal);
+
+            Assert.That(helperStart, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEnd, Is.GreaterThan(helperStart));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(fallbackIndex, Is.GreaterThan(irIndex));
+            Assert.That(reachabilitySource, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessInRangeCondition("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm("));
+            Assert.That(reachabilitySource, Does.Contain("ir.element-access.multidimensional-bounds.in-range"));
+            Assert.That(reachabilitySource, Does.Contain("new SymbolicBoundsAtom("));
+        }
+
+        [Test]
         public void RuntimeHazardSlicing_PreservesIrExceptionPreconditionWhenFormulaLowers()
         {
             var repositoryRoot = FindRepositoryRoot();

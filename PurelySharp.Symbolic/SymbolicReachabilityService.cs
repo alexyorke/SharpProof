@@ -1488,6 +1488,18 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             formula = null!;
+            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (receiverType is IArrayTypeSymbol { Rank: > 1 } multidimensionalArrayType)
+            {
+                return TryCreateIrMultidimensionalArrayElementAccessInRangeCondition(
+                    elementAccess,
+                    multidimensionalArrayType,
+                    semanticModel,
+                    cancellationToken,
+                    out formula);
+            }
+
             if (elementAccess.ArgumentList.Arguments.Count != 1)
             {
                 return false;
@@ -1557,6 +1569,62 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool TryCreateIrMultidimensionalArrayElementAccessInRangeCondition(
+            ElementAccessExpressionSyntax elementAccess,
+            IArrayTypeSymbol arrayType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (arrayType.Rank <= 1 ||
+                elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            SmtFormula? combined = null;
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!SymbolicIrLowerer.TryLowerTerm(
+                        elementAccess.ArgumentList.Arguments[dimension].Expression,
+                        context,
+                        out var index) ||
+                    index.Kind != SmtValueKind.Int ||
+                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(
+                        elementAccess.Expression,
+                        dimension,
+                        context,
+                        out var length) ||
+                    !SymbolicIrFormulaEncoder.TryEncode(
+                        SymbolicFact.Exact(
+                            new SymbolicBoundsAtom(
+                                index,
+                                length,
+                                IncludeLowerBound: true,
+                                IncludeUpperBound: true),
+                            elementAccess,
+                            "ir.element-access.multidimensional-bounds.in-range"),
+                        out var dimensionInRange))
+                {
+                    return false;
+                }
+
+                combined = combined == null
+                    ? dimensionInRange
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, combined, dimensionInRange);
+            }
+
+            if (combined == null)
+            {
+                return false;
+            }
+
+            formula = combined;
+            return true;
         }
 
         internal static bool TryCreateIntegerBinaryInRangeCondition(
