@@ -173,19 +173,55 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            var legacyConditions = CollectAncestorReachabilityConditionsLegacy(
+                syntaxNode,
+                semanticModel,
+                cancellationToken);
             var state = CollectAncestorReachabilityState(
                 syntaxNode,
                 semanticModel,
                 cancellationToken);
-            if (SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions))
+            if (!SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions))
             {
-                return pathConditions;
+                return legacyConditions;
             }
 
-            return CollectAncestorReachabilityConditionsLegacy(
-                syntaxNode,
-                semanticModel,
-                cancellationToken);
+            return MergeUniqueFormulas(pathConditions, legacyConditions);
+        }
+
+        private static ImmutableArray<SmtFormula> MergeUniqueFormulas(
+            ImmutableArray<SmtFormula> preferred,
+            ImmutableArray<SmtFormula> compatibility)
+        {
+            if (preferred.Length == 0)
+            {
+                return compatibility;
+            }
+
+            if (compatibility.Length == 0)
+            {
+                return preferred;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(preferred.Length + compatibility.Length);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var formula in preferred)
+            {
+                if (seen.Add(GetFormulaKey(formula)))
+                {
+                    builder.Add(formula);
+                }
+            }
+
+            foreach (var formula in compatibility)
+            {
+                if (seen.Add(GetFormulaKey(formula)))
+                {
+                    builder.Add(formula);
+                }
+            }
+
+            return builder.ToImmutable();
         }
 
         private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditionsLegacy(
@@ -766,6 +802,12 @@ namespace PurelySharp.Symbolic
                             out var sectionCondition))
                     {
                         AddFormulaPathCondition(ref state, sectionCondition, matchingSection, "ir.path.switch-section");
+                        AddSwitchStatementSectionStateFacts(
+                            ref state,
+                            switchStatementSyntax.Expression,
+                            matchingSection,
+                            semanticModel,
+                            cancellationToken);
                     }
                 }
                 else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)
@@ -787,15 +829,16 @@ namespace PurelySharp.Symbolic
                             out var armCondition))
                     {
                         AddFormulaPathCondition(ref state, armCondition, matchingArm, "ir.path.switch-expression-arm");
-                        AddSwitchExpressionPatternBindingStateFacts(
+                        AddSwitchBranchPatternBindingStateFacts(
                             ref state,
                             switchExpressionSyntax.GoverningExpression,
+                            matchingArm.Pattern,
                             matchingArm,
                             semanticModel,
                             cancellationToken);
-                        AddSwitchExpressionGuardStateFacts(
+                        AddSwitchBranchGuardStateFacts(
                             ref state,
-                            matchingArm,
+                            matchingArm.WhenClause?.Condition,
                             semanticModel,
                             cancellationToken);
                     }
@@ -849,17 +892,99 @@ namespace PurelySharp.Symbolic
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
 
-        private static void AddSwitchExpressionPatternBindingStateFacts(
+        private static void AddSwitchStatementSectionStateFacts(
             ref SymbolicState state,
             ExpressionSyntax governingExpression,
-            SwitchExpressionArmSyntax arm,
+            SwitchSectionSyntax section,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (section.Labels.Count != 1)
+            {
+                return;
+            }
+
+            AddSwitchStatementSectionConditionStateFacts(
+                ref state,
+                governingExpression,
+                section.Labels[0],
+                semanticModel,
+                cancellationToken);
+
+            if (section.Labels[0] is not CasePatternSwitchLabelSyntax patternLabel)
+            {
+                return;
+            }
+
+            AddSwitchBranchPatternBindingStateFacts(
+                ref state,
+                governingExpression,
+                patternLabel.Pattern,
+                patternLabel,
+                semanticModel,
+                cancellationToken);
+            AddSwitchBranchGuardStateFacts(
+                ref state,
+                patternLabel.WhenClause?.Condition,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static void AddSwitchStatementSectionConditionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax governingExpression,
+            SwitchLabelSyntax label,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm))
+            {
+                return;
+            }
+
+            switch (label)
+            {
+                case CaseSwitchLabelSyntax caseLabel:
+                    if (!SymbolicIrLowerer.TryLowerTerm(caseLabel.Value, context, out var labelTerm) ||
+                        !CanCompareIrTerms(governingTerm, labelTerm))
+                    {
+                        return;
+                    }
+
+                    AddRelationPathFact(
+                        ref state,
+                        SymbolicRelationOperator.Equal,
+                        governingTerm,
+                        labelTerm,
+                        caseLabel,
+                        "ir.path.switch-section.constant");
+                    return;
+
+                case CasePatternSwitchLabelSyntax patternLabel
+                    when SymbolicIrLowerer.TryLowerPatternCondition(
+                        governingTerm,
+                        patternLabel.Pattern,
+                        patternLabel.Pattern,
+                        context,
+                        out var patternCondition):
+                    state = state.AddPathCondition(patternCondition);
+                    return;
+            }
+        }
+
+        private static void AddSwitchBranchPatternBindingStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax governingExpression,
+            PatternSyntax pattern,
+            SyntaxNode sourceNode,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
             if (TryAddIrSwitchExpressionPatternBindingStateFacts(
                     ref state,
                     governingExpression,
-                    arm.Pattern,
+                    pattern,
                     semanticModel,
                     cancellationToken))
             {
@@ -881,7 +1006,7 @@ namespace PurelySharp.Symbolic
             if (!SymbolicReachabilityService.TryCollectPatternBindingFacts(
                     matchedValue,
                     matchedType,
-                    arm.Pattern,
+                    pattern,
                     semanticModel,
                     cancellationToken,
                     bindingFacts))
@@ -889,7 +1014,7 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            AddFormulaPathConditions(ref state, bindingFacts, arm, "ir.path.switch-expression-pattern-binding");
+            AddFormulaPathConditions(ref state, bindingFacts, sourceNode, "ir.path.switch-pattern-binding");
         }
 
         private static bool TryAddIrSwitchExpressionPatternBindingStateFacts(
@@ -1074,13 +1199,13 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static void AddSwitchExpressionGuardStateFacts(
+        private static void AddSwitchBranchGuardStateFacts(
             ref SymbolicState state,
-            SwitchExpressionArmSyntax arm,
+            ExpressionSyntax? guardCondition,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            if (arm.WhenClause?.Condition is not { } guardCondition)
+            if (guardCondition == null)
             {
                 return;
             }

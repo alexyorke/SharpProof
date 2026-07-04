@@ -70,6 +70,13 @@ path-fact, hazard, and ownership flows.
   Switch-expression state collection now also projects simple one-dimensional
   array list-pattern bindings and `when` guard facts into `SymbolicState`
   before falling back to formula compatibility.
+  Switch-statement section state collection now mirrors the same bounded
+  state shadow for single pattern-label sections, including `when` guard
+  facts plus simple one-dimensional array list-pattern bindings.
+  Single-label switch-statement sections now also project lowerable constant
+  and pattern label predicates into `SymbolicState`, so exact-value and
+  relational source-predicate proofs no longer depend entirely on the legacy
+  section-condition formula path.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped
@@ -168,9 +175,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicSmtFormulaLowerer.TryLowerCondition` for mirrored path conditions.
   Formula-facing ancestor reachability collection in
   `SymbolicProgramPointFacts` now projects `CollectAncestorReachabilityState`
-  back through `SymbolicProofService.TryEncodeStatePathConditions` before
-  falling back to the legacy formula-only traversal, so another path-condition
-  entrypoint now prefers the IR-native state pipeline.
+  back through `SymbolicProofService.TryEncodeStatePathConditions` and then
+  merges any remaining legacy-only ancestor formulas as a compatibility
+  shadow, so another path-condition entrypoint now prefers the IR-native
+  state pipeline without dropping unsupported switch/pattern shapes.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

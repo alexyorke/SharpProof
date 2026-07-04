@@ -1000,6 +1000,41 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_SwitchStatementListPatternNotNullWhenGuardSubstitutesBinding()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string?[] values)
+    {
+        switch (values)
+        {
+            case [var first] when Guard.IsPresent(first):
+                return values[0].Length;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return values[0].Length;");
+            var proof = ProveAtMarker(source, marker, "values[0] != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_NotNullWhenFalseNegatedBranchProvesArgumentNonNull()
         {
             const string source = @"

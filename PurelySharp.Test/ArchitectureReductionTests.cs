@@ -6171,7 +6171,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateBeforeLegacyFormulaFallback()
+        public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateBeforeLegacyFormulaCompatibilityMerge()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -6194,7 +6194,33 @@ namespace PurelySharp.Test
             Assert.That(encodeIndex, Is.GreaterThan(stateIndex));
             Assert.That(helperSource, Does.Contain("CollectAncestorReachabilityState("));
             Assert.That(helperSource, Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)"));
-            Assert.That(helperSource, Does.Contain("return CollectAncestorReachabilityConditionsLegacy("));
+            Assert.That(helperSource, Does.Contain("var legacyConditions = CollectAncestorReachabilityConditionsLegacy("));
+            Assert.That(helperSource, Does.Contain("return legacyConditions;"));
+            Assert.That(helperSource, Does.Contain("return MergeUniqueFormulas(pathConditions, legacyConditions);"));
+        }
+
+        [Test]
+        public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var stateHelperIndex = source.IndexOf("public static SymbolicState CollectAncestorReachabilityState(", StringComparison.Ordinal);
+            var switchStatementIndex = source.IndexOf("else if (ancestor is SwitchStatementSyntax switchStatementSyntax)", stateHelperIndex, StringComparison.Ordinal);
+            var switchExpressionIndex = source.IndexOf("else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)", switchStatementIndex, StringComparison.Ordinal);
+            var switchStatementSource = source.Substring(switchStatementIndex, switchExpressionIndex - switchStatementIndex);
+
+            Assert.That(stateHelperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(switchStatementIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(switchExpressionIndex, Is.GreaterThan(switchStatementIndex));
+            Assert.That(switchStatementSource, Does.Contain("AddFormulaPathCondition(ref state, sectionCondition, matchingSection, \"ir.path.switch-section\")"));
+            Assert.That(switchStatementSource, Does.Contain("AddSwitchStatementSectionStateFacts("));
+            Assert.That(source, Does.Contain("private static void AddSwitchStatementSectionStateFacts("));
+            Assert.That(source, Does.Contain("private static void AddSwitchStatementSectionConditionStateFacts("));
+            Assert.That(source, Does.Contain("AddSwitchBranchPatternBindingStateFacts("));
+            Assert.That(source, Does.Contain("AddSwitchBranchGuardStateFacts("));
         }
 
         [Test]
