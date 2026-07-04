@@ -249,6 +249,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm()
+        {
+            var context = CreateExpressionContext(
+                "Holder holder",
+                "holder.Value",
+                "public sealed class Holder { public string? Value { get; set; } }");
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(context.Expression, context.LoweringContext, out var term), Is.True);
+            var member = (SymbolicMemberTerm)term;
+
+            Assert.That(member.Receiver, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(member.MemberName, Is.EqualTo("Value"));
+            Assert.That(member.Kind, Is.EqualTo(SmtValueKind.Reference));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(member, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtVariable(((SymbolicVariableTerm)member.Receiver).Name + ".Value", SmtValueKind.Reference)));
+        }
+
+        [Test]
         public void KnownApiLowering_StringComparisonOverloadFallsBackToLegacyTranslator()
         {
             var context = CreateExpressionContext(

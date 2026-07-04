@@ -90,6 +90,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_ZeroTimeout_ReturnsConservativeTimeoutWithoutSolver()
+        {
+            var value = new SmtVariable("timeout_value_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var containsNeedle = new SmtStringContainsFormula(value, new SmtStringConstant("needle"));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(500),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32));
+
+            var result = service.Classify(CreateQuery(Array.Empty<SmtFormula>(), containsNeedle));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo("smt_timeout"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache()
         {
             var x = new SmtVariable("normalized_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);

@@ -241,7 +241,9 @@ namespace PurelySharp.Symbolic
 
         private static string FormatFactText(SymbolicFact fact)
         {
-            var text = fact.Atom.ToString() ?? string.Empty;
+            var text = SymbolicIrFormulaEncoder.TryEncode(fact, out var formula)
+                ? SymbolicFormulaDisplay.Format(formula)
+                : fact.Atom.ToString() ?? string.Empty;
             return fact.Polarity ? text : "!(" + text + ")";
         }
     }

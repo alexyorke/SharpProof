@@ -100,6 +100,11 @@ namespace PurelySharp.Symbolic.Smt
                 return syntacticResult;
             }
 
+            if (Options.QueryTimeout <= TimeSpan.Zero)
+            {
+                return Unknown("smt_timeout");
+            }
+
             if (pathConditions.Length > Options.MaxPathConditions)
             {
                 return Unknown("smt_path_condition_budget_exceeded");

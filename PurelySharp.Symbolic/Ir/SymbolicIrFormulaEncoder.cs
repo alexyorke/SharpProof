@@ -106,6 +106,17 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicVariableTerm variable:
                     formula = new SmtVariable(variable.Name, variable.Kind);
                     return true;
+                case SymbolicMemberTerm member:
+                    if (TryEncodeTerm(member.Receiver, out var receiver) &&
+                        receiver.Kind == SmtValueKind.Reference)
+                    {
+                        formula = new SmtVariable(
+                            GetReferenceFormulaName(receiver) + "." + member.MemberName,
+                            member.Kind);
+                        return true;
+                    }
+
+                    break;
                 case SymbolicStringContentTerm stringContent:
                     if (TryEncodeTerm(stringContent.Reference, out var reference) &&
                         SymbolicFactFactory.TryCreateReferenceStringContentFormula(reference, out var stringFormula))

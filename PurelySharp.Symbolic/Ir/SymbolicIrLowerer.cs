@@ -385,6 +385,36 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (TryGetInstanceMemberValueKind(memberAccess, context, out var memberKind) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                memberKind == SmtValueKind.Reference)
+            {
+                term = new SymbolicMemberTerm(receiver, memberName, memberKind);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetInstanceMemberValueKind(
+            MemberAccessExpressionSyntax memberAccess,
+            SymbolicLoweringContext context,
+            out SmtValueKind kind)
+        {
+            var symbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol;
+            if (symbol is IPropertySymbol { IsStatic: false } property &&
+                TryGetValueKind(property.Type, out kind))
+            {
+                return true;
+            }
+
+            if (symbol is IFieldSymbol { IsStatic: false } field &&
+                TryGetValueKind(field.Type, out kind))
+            {
+                return true;
+            }
+
+            kind = default;
             return false;
         }
 

@@ -101,6 +101,468 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 1:
+                return value;
+            default:
+                return 0;
+        }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "SwitchStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "SwitchStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(returnPoint.SymbolicFacts.Select(static fact => fact.Kind), Does.Contain("SymbolicRelationAtom"));
+            Assert.That(returnPoint.Facts, Does.Contain("value == 1"));
+            Assert.That(returnPoint.MergedInvariantText, Does.Contain("value == 1"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        foreach (var value in values)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "ForeachStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "ForeachStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.foreach-entry.not-null"));
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.foreach-entry.length-positive"));
+            Assert.That(returnPoint.Facts, Does.Contain("values != null"));
+            Assert.That(returnPoint.MergedInvariantText, Does.Contain("values.Length > 0"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        return 10 / divisor;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "PriorAssignmentStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "PriorAssignmentStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return 10 / divisor;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.prior-statement"));
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Text),
+                Does.Contain("divisor == 5"));
+            Assert.That(returnPoint.Facts, Does.Contain("divisor == 5"));
+        }
+
+        [Test]
+        public void SymbolicQueryService_ForInitialEntryFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        for (var index = 0; index < 10; index++)
+        {
+            return index;
+        }
+
+        return -1;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "ForInitialEntryStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "ForInitialEntryStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var forStatement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ForStatementSyntax>()
+                .Single();
+
+            var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromNode(forStatement, semanticModel),
+                SymbolicQueryTarget.Node()));
+
+            var programPoint = result.ProgramPoints.Single();
+            Assert.That(programPoint.NodeKind, Is.EqualTo("ForStatement"));
+            Assert.That(
+                programPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.for-initializer"));
+            Assert.That(
+                programPoint.SymbolicFacts.Select(static fact => fact.Text),
+                Does.Contain("index == 0"));
+            Assert.That(programPoint.Facts, Does.Contain("index == 0"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException ex) when (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CatchStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "CatchStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.catch-entry.exception-not-null"));
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Has.Some.StartsWith("ir.relation"));
+            Assert.That(returnPoint.Facts, Does.Contain("ex != null"));
+            Assert.That(returnPoint.MergedInvariantText, Does.Contain("value > 0"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_LockEntryFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        lock (gate)
+        {
+            return gate.GetHashCode();
+        }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LockStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "LockStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return gate.GetHashCode();"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.lock-entry.not-null"));
+            Assert.That(returnPoint.Facts, Does.Contain("gate != null"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_UsingExpressionFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (value ?? throw new InvalidOperationException())
+        {
+            return 1;
+        }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "UsingExpressionStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "UsingExpressionStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return 1;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
+            Assert.That(returnPoint.Facts, Does.Contain("value != null"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value ?? throw new InvalidOperationException())
+        {
+            return resource.GetHashCode();
+        }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "UsingDeclarationStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "UsingDeclarationStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return resource.GetHashCode();"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.using-entry.declaration-alias"));
+            Assert.That(returnPoint.Facts, Does.Contain("value != null"));
+            Assert.That(returnPoint.Facts, Does.Contain("resource == value"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        for (var index = 0; index < values.Length; index++)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "ForLoopStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "ForLoopStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return values[index];"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.for-loop-invariant.lower-bound"));
+            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+            Assert.That(returnPoint.MergedInvariantText, Does.Contain("index >= 0"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var index = 0;
+        while (index < values.Length)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "WhileLoopStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "WhileLoopStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return values[index];"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.while-loop-invariant.lower-bound"));
+            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_DoLoopInvariantFactsFlowThroughSymbolicState()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var index = 0;
+        do
+        {
+            return index;
+        } while (index < 10);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "DoLoopStateFacts.cs");
+            var compilation = CSharpCompilation.Create(
+                "DoLoopStateFacts",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return index;"),
+                smtAnalysis: smtAnalysis);
+
+            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+            Assert.That(
+                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+                Does.Contain("ir.path.do-loop-invariant.lower-bound"));
+            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+        }
+
+        [Test]
         public void SymbolicQueryService_QueryRuntimeHazards_UsesRequestApi()
         {
             const string source = @"
@@ -219,11 +681,11 @@ public class TestClass
                 Is.EqualTo(result.ProgramPoints.Sum(point => point.ConditionProofs.Count)));
             Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
             Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
-            Assert.That(returnPoint.PathConditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
-            Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.PathConditions.Count));
+            Assert.That(returnPoint.Invariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
+            Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.Invariant.Conditions.Count));
             Assert.That(returnPoint.SymbolicFacts, Is.Not.Empty);
             Assert.That(returnPoint.SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
-            Assert.That(returnPoint.SymbolicFacts.Single().Text, Does.Contain("GreaterThan"));
+            Assert.That(returnPoint.SymbolicFacts.Single().Text, Is.EqualTo("value > 0"));
             Assert.That(returnPoint.SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
             Assert.That(returnPoint.InvariantInfo.MergedText, Is.EqualTo(returnPoint.MergedInvariantText));
             Assert.That(returnPoint.InvariantInfo.Facts, Is.EquivalentTo(returnPoint.SymbolicFacts));
@@ -236,9 +698,9 @@ public class TestClass
             Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
             Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
             Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-            Assert.That(returnPoint.PathConditions.All(condition => condition.IsSolverBacked), Is.True);
-            Assert.That(returnPoint.PathConditions.Single().Target, Is.EqualTo("value"));
-            Assert.That(returnPoint.PathConditions.All(condition => !string.IsNullOrWhiteSpace(condition.DisplayKind)), Is.True);
+            Assert.That(returnPoint.Invariant.Conditions.All(condition => condition.IsSolverBacked), Is.True);
+            Assert.That(returnPoint.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
+            Assert.That(returnPoint.Invariant.Conditions.All(condition => !string.IsNullOrWhiteSpace(condition.DisplayKind)), Is.True);
         }
 
         [Test]
@@ -542,9 +1004,8 @@ public class TestClass
             Assert.That(result.Column, Is.EqualTo(FindColumn(source, "return value;")));
             Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
             Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.PathConditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
+            Assert.That(result.Facts, Does.Contain("value > 0"));
+            Assert.That(result.Invariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
             Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
             Assert.That(result.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
             Assert.That(result.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
@@ -580,11 +1041,11 @@ public class TestClass
                 smtAnalysis: smtAnalysis);
 
             Assert.That(result.ProgramPoints.Count(point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
-            var conditionTexts = result.ProgramPoints.SelectMany(point => point.PathConditions).Select(condition => condition.Text);
+            var conditionTexts = result.ProgramPoints.SelectMany(point => point.Invariant.Conditions).Select(condition => condition.Text);
             Assert.That(conditionTexts, Does.Contain("value > 0"));
             Assert.That(conditionTexts, Does.Contain("!(value > 0)"));
-            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("GreaterThan"));
-            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value"));
+            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
+            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("!(value > 0)"));
             Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
             Assert.That(result.MergedPathFacts.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
             Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
@@ -798,7 +1259,7 @@ public class TestClass
 
             var guardedReturn = result.ProgramPoints
                 .Where(static point => point.NodeKind == "ReturnStatement")
-                .Single(point => point.PathConditions.Any(static condition => condition.Text == "copy > 0"));
+                .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
             Assert.That(guardedReturn.InvariantQuery.MustFacts, Does.Contain("copy > 0"));
             Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
@@ -849,7 +1310,7 @@ public class TestClass
             Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
             var guardedReturn = result.ProgramPoints
                 .Where(static point => point.NodeKind == "ReturnStatement")
-                .Single(point => point.PathConditions.Any(static condition => condition.Text == "copy > 0"));
+                .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
             Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
@@ -1126,8 +1587,8 @@ public class TestClass
 
             Assert.That(points, Is.Not.Empty);
             Assert.That(points.All(static point => point.MethodName == "First"), Is.True);
-            Assert.That(points.All(static point => point.PathConditions.Any(condition => condition.Target == "value")), Is.True);
-            Assert.That(points.All(static point => point.PathConditions.Any(condition => condition.Text == "value > 0")), Is.True);
+            Assert.That(points.All(static point => point.Invariant.Conditions.Any(condition => condition.Target == "value")), Is.True);
+            Assert.That(points.All(static point => point.Invariant.Conditions.Any(condition => condition.Text == "value > 0")), Is.True);
             Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
             Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
 
@@ -1398,7 +1859,7 @@ public class TestClass
             Assert.That(compact.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
             Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
             Assert.That(compact.ObservedInvariant.RawFacts, Is.EqualTo(result.Facts.Take(1)));
-            Assert.That(compact.ObservedInvariant.Text, Does.Contain("GreaterThan"));
+            Assert.That(compact.ObservedInvariant.Text, Does.Contain("value > 0"));
             Assert.That(compact.ConservativeInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
             Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
             Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));

@@ -1002,6 +1002,57 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_CoalesceRightInvocationAfterNullExit_IsStaticallyUnreachable()
+        {
+            Assert.That(
+                IsExpressionUnreachable(
+                    @"
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
+        return value ?? Impure();
+    }
+
+    private static string Impure() => string.Empty;
+}",
+                    "Impure()"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ConditionalAccessInvocationAfterNonNullExit_IsStaticallyUnreachable()
+        {
+            Assert.That(
+                IsExpressionUnreachable(
+                    @"
+public class TestClass
+{
+    public string TestMethod(Worker worker)
+    {
+        if (worker != null)
+        {
+            return string.Empty;
+        }
+
+        return worker?.Impure() ?? string.Empty;
+    }
+}
+
+public sealed class Worker
+{
+    public string Impure() => string.Empty;
+}",
+                    ".Impure()"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_PriorLocalAssignment_PrunesUnreachableIfBranch()
         {
             Assert.That(
@@ -2190,8 +2241,8 @@ public class TestClass
             Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
             Assert.That(result.Facts, Is.Not.Empty);
             Assert.That(result.MergedInvariantText, Does.Contain("&&"));
-            Assert.That(result.Facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("<", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains(">=", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -2226,8 +2277,8 @@ public class TestClass
 
             Assert.That(analysis.PathConditions, Is.Not.Empty);
             Assert.That(analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
-            Assert.That(analysis.MergedInvariantText, Does.Contain("GreaterThan"));
-            Assert.That(analysis.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(analysis.MergedInvariantText, Does.Contain("value > 0"));
+            Assert.That(analysis.Facts, Does.Contain("value > 0"));
             Assert.That(analysis.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
         }
 
@@ -2261,7 +2312,7 @@ public class TestClass
             Assert.That(result.Analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
             Assert.That(result.SymbolicFacts, Is.Not.Empty);
             Assert.That(result.MergedInvariantText, Is.EqualTo(result.Analysis.MergedInvariantText));
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("value > 0", StringComparison.Ordinal)), Is.True);
             Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
         }
 
@@ -4628,9 +4679,7 @@ public class TestClass
 
             Assert.That(result.NodeKind, Is.EqualTo("IdentifierName"));
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("first", StringComparison.Ordinal) &&
-                                                 fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("first == null"));
         }
 
         [Test]
@@ -4661,12 +4710,8 @@ public class TestClass
 
             Assert.That(result.NodeKind, Is.EqualTo("IfStatement"));
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("safe", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("NotEqual", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal) &&
-                                                 fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("safe == value"));
+            Assert.That(result.Facts, Does.Contain("value != null"));
             Assert.That(result.Facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal) &&
                                                  fact.Contains("safe", StringComparison.Ordinal) &&
                                                  fact.Contains("value", StringComparison.Ordinal)), Is.True);
@@ -4893,12 +4938,8 @@ public class TestClass
 
             Assert.That(result.NodeKind, Is.EqualTo("IfStatement"));
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("safe", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("NotEqual", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal) &&
-                                                 fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("safe == value"));
+            Assert.That(result.Facts, Does.Contain("value != null"));
         }
 
         [Test]
@@ -4925,12 +4966,8 @@ public class TestClass
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
-                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("value > 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("divisor == value"));
         }
 
         [Test]
@@ -4957,12 +4994,8 @@ public class TestClass
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("Length", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("length", StringComparison.Ordinal) &&
-                                                 fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("text.Length > 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("length == text.Length"));
         }
 
         [Test]
@@ -4991,12 +5024,8 @@ public class TestClass
                 impliedConditions: new[] { "divisor != 0" });
 
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("[0]", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
-                                                 fact.Contains("[0]", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("values[0] > 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("divisor == values[0]"));
             Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
@@ -5026,12 +5055,8 @@ public class TestClass
                 impliedConditions: new[] { "divisor != 0" });
 
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("[^1]", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
-                                                 fact.Contains("[^1]", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("values[^1] > 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("divisor == values[^1]"));
             Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
@@ -5062,12 +5087,8 @@ public class TestClass
                 impliedConditions: new[] { "divisor != 0" });
 
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
-                                                 fact.Contains("[0]", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
-                                                 fact.Contains("[0]", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("values[0] > 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("divisor == values[0]"));
             Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
@@ -5098,9 +5119,7 @@ public class TestClass
                 smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
                 impliedConditions: new[] { "divisor != 0" });
 
-            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                                 fact.Contains("[0]", StringComparison.Ordinal) &&
-                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts, Does.Contain("values[0] == 0"));
             Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
         }
 
@@ -14618,6 +14637,28 @@ public class TestClass
                 .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
             return (bool)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
+        }
+
+        private static bool IsExpressionUnreachable(string source, string expressionText)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ExpressionReachabilityHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var expression = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ExpressionSyntax>()
+                .Where(node => string.Equals(node.ToString(), expressionText, StringComparison.Ordinal))
+                .OrderBy(static node => node.Span.Length)
+                .First();
+            var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
+                .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
+                .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+            return (bool)method.Invoke(null, new object?[] { expression, semanticModel, CancellationToken.None })!;
         }
 
         private static string[] CollectProgramPointFacts(string source, string statementPrefix)

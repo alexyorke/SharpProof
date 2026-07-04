@@ -72,18 +72,50 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic",
                 "SymbolicProofService.cs"));
 
-            Assert.That(reachabilitySource, Does.Contain("ClassifyWithFormulaFallback("));
+            Assert.That(reachabilitySource, Does.Not.Contain("ClassifyWithFormulaFallback("));
+            Assert.That(reachabilitySource, Does.Not.Contain("new SmtAnalysisService("));
+            Assert.That(reachabilitySource, Does.Not.Contain("new PurityProofQuery("));
             Assert.That(reachabilitySource, Does.Contain("ClassifyFormulaReachability(pathConditions, smtAnalysis).Info.Status"));
             Assert.That(reachabilitySource, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, factFormula, smtAnalysis).Info.Status"));
             Assert.That(reachabilitySource, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, formula, smtAnalysis).Info.Status"));
-            Assert.That(reachabilitySource, Does.Not.Contain("new SymbolicProofService(smtAnalysis).ClassifyFormula"));
+            Assert.That(reachabilitySource, Does.Contain("new SymbolicProofService(smtAnalysis).ClassifyFormula"));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeReachable("));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeUnreachable("));
-            Assert.That(proofServiceSource, Does.Not.Contain("internal SymbolicIrProofResult ClassifyFormula"));
-            Assert.That(proofServiceSource, Does.Not.Contain("internal PurityProofResult ClassifyFormula"));
+            Assert.That(proofServiceSource, Does.Contain("internal SymbolicIrProofResult ClassifyFormulaReachability"));
+            Assert.That(proofServiceSource, Does.Contain("internal SymbolicIrProofResult ClassifyFormulaConditionTruth"));
+            Assert.That(proofServiceSource, Does.Contain("internal PurityProofResult ClassifyFormulaImplication"));
+            Assert.That(proofServiceSource, Does.Contain("internal PurityProofResult ClassifyFormulaBranchReachability"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyReachability(SymbolicState state)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
+        }
+
+        [Test]
+        public void ProductionSmtAnalysisServiceConstruction_IsLimitedToOwnedBoundaries()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var allowed = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "PurelySharp.Analyzer/Engine/CompilationPurityService.cs",
+                "PurelySharp.Symbolic/SymbolicProofService.cs",
+                "Tools/PurelySharp.SymbolicCli/Program.cs",
+            };
+            var offenders = Directory.GetFiles(repositoryRoot, "*.cs", SearchOption.AllDirectories)
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}PurelySharp.Test{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}PurelySharp.ToolingTest{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(file => file.Source.Contains("new SmtAnalysisService(", StringComparison.Ordinal) &&
+                    !allowed.Contains(file.Path))
+                .Select(file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
         }
 
         [Test]
@@ -710,6 +742,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ForInitialEntryReachability_UsesSymbolicStateBeforeFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var methodStart = source.IndexOf("internal static bool IsForInitialEntryConditionAlwaysFalse", StringComparison.Ordinal);
+            var methodEnd = source.IndexOf("internal static IEnumerable<SmtFormula> CollectForInitializerFacts", StringComparison.Ordinal);
+            var methodSource = source.Substring(methodStart, methodEnd - methodStart);
+            var stateIndex = methodSource.IndexOf("SymbolicProgramPointFacts.CollectForInitialEntryState", StringComparison.Ordinal);
+            var proofIndex = methodSource.IndexOf("ClassifyStateConditionTruth(initialEntryState", StringComparison.Ordinal);
+            var formulaIndex = methodSource.IndexOf("var pathConditions = CollectPathConditionsAt", StringComparison.Ordinal);
+
+            Assert.That(stateIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(proofIndex, Is.GreaterThan(stateIndex));
+            Assert.That(formulaIndex, Is.GreaterThan(proofIndex));
+        }
+
+        [Test]
         public void SymbolicPublicSurface_HidesImplementationTranslators()
         {
             Assert.That(typeof(CSharpConditionToFormula).IsPublic, Is.False);
@@ -791,7 +843,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
             Assert.That(source, Does.Contain("TryTranslateZeroCondition(divisor"));
-            Assert.That(source, Does.Contain("new RuntimeHazardTrigger(formula)"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.formula-fallback"));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+            Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
         }
@@ -806,7 +861,33 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.formula-fallback"));
+            Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula));"));
+        }
+
+        [Test]
+        public void AnalyzerExceptionSites_UseSharedIrFirstElementAccessRangeHelper()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Analyzer",
+                "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+            Assert.That(reachabilitySource, Does.Contain("TryCreateIrBuiltInElementAccessInRangeCondition("));
+            Assert.That(reachabilitySource, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
+            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
         }
 
         [Test]
@@ -816,7 +897,8 @@ namespace PurelySharp.Test
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
 
             Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.argument-out-of-range"));
@@ -835,12 +917,18 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
 
             Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.bounds.in-range"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
             Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
-            Assert.That(source, Does.Contain("TryTranslateArrayGetValueDimensionLength"));
+            Assert.That(coreSource, Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
+            Assert.That(coreSource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(reachabilitySource, Does.Contain("private static bool TryTranslateArrayGetValueDimensionLength("));
             Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
             Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
@@ -861,7 +949,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.array.negative-length.aggregate"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.stackalloc.negative-length.aggregate"));
             Assert.That(source, Does.Contain("TryTranslateNegativeCondition(lengthExpression"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateNegativeLengthTrigger("));
+            Assert.That(source, Does.Contain("provenance + \".formula-fallback\""));
             Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
+            Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
         }
 
         [Test]
@@ -882,7 +973,23 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.increment-overflow"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.decrement-overflow"));
             Assert.That(source, Does.Contain("IsSignedDivisionOverflowOperator"));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerInRangeCondition("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.formula-fallback"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
         }
 
         [Test]
@@ -893,8 +1000,10 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("TryCreateNullDereferenceTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullDereference"));
-            Assert.That(source, Does.Contain("IsStableIrReferenceSubject"));
+            Assert.That(source, Does.Not.Contain("IsStableIrReferenceSubject"));
+            Assert.That(source, Does.Contain("TryCreateIrRelationalExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("TryTranslateNullCondition(receiver"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateReferenceNullComparison("));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.null-dereference.formula-fallback\""));
             Assert.That(source, Does.Contain("!TryCreateNullDereferenceTrigger(receiver"));
         }
@@ -922,6 +1031,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateArgumentNullTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentNull"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.argument-null"));
+            Assert.That(source, Does.Not.Contain("IsStableIrReferenceSubject"));
             Assert.That(source, Does.Contain("TryTranslateNullCondition(expression"));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.argument-null.formula-fallback\""));
             Assert.That(source, Does.Contain("!TryCreateArgumentNullTrigger(expression"));
@@ -936,7 +1046,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("TryCreateNullableValueWithoutValueTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullableValueWithoutValue"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateNullableHasValueCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.nullable-value.without-value.formula-fallback"));
+            Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("!TryCreateNullableValueWithoutValueTrigger("));
         }
 
@@ -959,7 +1072,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.invalid-cast.non-null"));
             Assert.That(source, Does.Contain("new SymbolicTypeTestAtom"));
             Assert.That(source, Does.Contain("SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey"));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateRuntimeTypeTestCondition("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula("));
             Assert.That(source, Does.Contain("TryCreateReferenceNullCondition("));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.reference.non-null.guard\""));
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
@@ -1007,6 +1121,20 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardDynamicNullBinding_UsesIrExceptionPreconditionBeforeFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+
+            Assert.That(source, Does.Contain("TryCreateDynamicNullBindingTrigger"));
+            Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DynamicNullBinding"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.dynamic-null-binding"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.dynamic-null-binding.formula-fallback"));
+            Assert.That(source, Does.Contain("TryCreateOptionalReferenceSubject"));
+            Assert.That(source, Does.Not.Contain("!TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger)"));
+        }
+
+        [Test]
         public void RuntimeHazardIrTriggerBridge_LivesInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -1026,13 +1154,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void RuntimeHazardCandidates_UseTranslatorShimForLegacyFallbacks()
+        public void RuntimeHazardCandidates_DelegateLegacyFormulaFallbacksToReachability()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
 
             Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService."));
+            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator."));
         }
 
         [Test]
@@ -1084,15 +1218,30 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("module").GetString(), Is.EqualTo("Analyzer"));
             Assert.That(root.GetProperty("hotspotCount").GetInt32(), Is.EqualTo(0));
             Assert.That(hotspotPaths, Is.EquivalentTo(ApprovedAnalyzerRawSmtHotspots));
+            Assert.That(root.GetProperty("analyzerTranslatorShimUsageCount").GetInt32(), Is.EqualTo(0));
+            Assert.That(
+                root.GetProperty("analyzerTranslatorShimUsages")
+                    .EnumerateArray()
+                    .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
+                    .Distinct(StringComparer.Ordinal),
+                Is.Empty);
             Assert.That(root.GetProperty("symbolicPublicFormulaSurfaceCount").GetInt32(), Is.EqualTo(0));
             Assert.That(root.GetProperty("symbolicCompatibilitySurfaceCount").GetInt32(), Is.EqualTo(0));
-            Assert.That(root.GetProperty("symbolicDirectTranslatorUsageCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("symbolicDirectTranslatorUsageCount").GetInt32(), Is.EqualTo(0));
             Assert.That(
                 root.GetProperty("symbolicDirectTranslatorUsages")
                     .EnumerateArray()
                     .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
                     .Distinct(StringComparer.Ordinal),
-                Is.EquivalentTo(new[] { "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs" }));
+                Is.Empty);
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(
+                root.GetProperty("symbolicTranslatorShimUsages")
+                    .EnumerateArray()
+                    .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
+                    .All(static path => path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal) &&
+                        path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs"),
+                Is.True);
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(
                 root.GetProperty("irKnownApiLoweringLocations")
@@ -1306,10 +1455,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("private static SymbolicSourceQueryResult CreateSourceQueryResult("));
             Assert.That(source.Split("new SymbolicSourceQueryResult(", StringSplitOptions.None).Length - 1, Is.EqualTo(1));
             Assert.That(source, Does.Contain("var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);"));
-            Assert.That(source, Does.Contain("SymbolicInvariantResult.FromFacts("));
+            Assert.That(source, Does.Contain("SymbolicInvariantResult.FromFormulas("));
             Assert.That(combinedSource.Split("new SymbolicSourceQueryResult(", StringSplitOptions.None).Length - 1, Is.EqualTo(2));
             Assert.That(combinedSource, Does.Not.Contain("FromPathConditions("));
-            Assert.That(combinedSource, Does.Not.Contain("SymbolicInvariantCondition.FromFormula("));
             Assert.That(combinedSource, Does.Not.Contain("SymbolicInvariantResult.FromPathConditions(\r\n                query.Analysis.PathConditions"));
             Assert.That(combinedSource, Does.Not.Contain("SymbolicInvariantResult.FromPathConditions(\n                query.Analysis.PathConditions"));
             Assert.That(combinedSource, Does.Not.Contain("SymbolicInvariantResult.FromPathConditions(\r\n                analysis.PathConditions"));
@@ -1319,15 +1467,20 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicSourceQueryService_UsesTranslatorShimForSpeculativeConditionProofs()
+        public void SymbolicSourceQueryService_DelegatesSpeculativeConditionFormulaFallbacks()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicSourceQueryService.cs"));
+            var reachabilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
 
             Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
             Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
             Assert.That(source, Does.Not.Contain("new SymbolicNotCondition(symbolicCondition)"));
@@ -1335,8 +1488,10 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ClassifyStateFeasibilityWithFormulaFallback("));
             Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.ClassifyFormulaReachability("));
             Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.ClassifyFormulaConditionTruth("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryTranslateConditionFormula("));
             Assert.That(source, Does.Contain("\"source.query.condition\""));
-            Assert.That(source, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
+            Assert.That(reachabilitySource, Does.Contain("TryTranslateConditionFormula("));
+            Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
         }
 
         [Test]
@@ -1356,14 +1511,10 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void LegacyTranslatorReferencesOutsideShim_AreIsolatedToProgramPointFacts()
+        public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
         {
             var repositoryRoot = FindRepositoryRoot();
             var symbolicDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic");
-            var allowedFiles = new HashSet<string>(StringComparer.Ordinal)
-            {
-                "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
-            };
             var offenders = Directory.GetFiles(symbolicDirectory, "*.cs", SearchOption.AllDirectories)
                 .Select(path => new
                 {
@@ -1376,15 +1527,9 @@ namespace PurelySharp.Test
                     file.Source.Contains("CSharpConditionToFormula.", StringComparison.Ordinal))
                 .Select(static file => file.Path)
                 .Distinct(StringComparer.Ordinal)
-                .Except(allowedFiles, StringComparer.Ordinal)
                 .ToArray();
-            var programPointSource = File.ReadAllText(Path.Combine(
-                repositoryRoot,
-                "PurelySharp.Symbolic",
-                "SymbolicProgramPointFacts.cs"));
 
             Assert.That(offenders, Is.Empty);
-            Assert.That(programPointSource, Does.Contain("CSharpConditionToFormula."));
         }
 
         [Test]
@@ -1476,7 +1621,91 @@ namespace PurelySharp.Test
             Assert.That(info.Provenance, Is.EqualTo("test.fact"));
             Assert.That(info.Confidence, Is.EqualTo(SymbolicFactConfidence.Exact.ToString()));
             Assert.That(info.EvidenceKey, Is.EqualTo("evidence.symbolic.fact"));
-            Assert.That(info.Text, Does.Contain(nameof(SymbolicRelationOperator.Equal)));
+            Assert.That(info.Text, Is.EqualTo("x == 1"));
+        }
+
+        [Test]
+        public void SymbolicState_NormalizeDeduplicatesFactsAndCreatesStableProofKey()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var first = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("x == 1"),
+                "test.first");
+            var duplicateWithDifferentProvenance = first with { Provenance = "test.second" };
+            var y = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicVariableTerm("y", SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y");
+
+            var left = new SymbolicState(new[] { first, duplicateWithDifferentProvenance, y }).Normalize();
+            var right = new SymbolicState(new[] { y, first }).Normalize();
+
+            Assert.That(left.Facts, Has.Length.EqualTo(2));
+            Assert.That(left.NormalizedProofKey, Is.EqualTo(right.NormalizedProofKey));
+        }
+
+        [Test]
+        public void SymbolicState_NormalizedProofKeyIncludesSymbolVersions()
+        {
+            var baseline = new SymbolicState().WithSymbolVersion("x", 0);
+            var advanced = new SymbolicState().WithSymbolVersion("x", 1);
+
+            Assert.That(baseline.SymbolVersions["x"], Is.EqualTo(0));
+            Assert.That(advanced.SymbolVersions["x"], Is.EqualTo(1));
+            Assert.That(baseline.NormalizedProofKey, Is.Not.EqualTo(advanced.NormalizedProofKey));
+        }
+
+        [Test]
+        public void SymbolicProofService_ContradictoryStateShortCircuitsWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("x == 1"),
+                "test.fact");
+            var state = new SymbolicState(new[] { fact, fact.Negate() });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_UnsupportedTargetFactStaysConservative()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var supportedStateFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.state");
+            var unsupportedTarget = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("resource", SmtValueKind.Reference)),
+                SyntaxFactory.ParseExpression("resource"),
+                "test.target");
+            var state = new SymbolicState(new[] { supportedStateFact });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, unsupportedTarget, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.None));
         }
 
         [Test]
@@ -1492,7 +1721,7 @@ namespace PurelySharp.Test
             var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
-            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
         }
 
         [Test]
@@ -1642,6 +1871,112 @@ namespace PurelySharp.Test
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        }
+
+        [Test]
+        public void SymbolicProofService_ReusesNormalizedStateCacheForEquivalentBranchProofs()
+        {
+            var x = new SymbolicVariableTerm("proof_cache_x", SmtValueKind.Int);
+            var positive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("proof_cache_x > 0"),
+                "test.positive");
+            var upperBound = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(100)),
+                SyntaxFactory.ParseExpression("proof_cache_x < 100"),
+                "test.upper");
+            var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("proof_cache_x <= 0"),
+                "test.branch"));
+            var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(750),
+                TimeSpan.FromMilliseconds(5000),
+                maxPathConditions: 192,
+                maxExpressionNodes: 2048);
+            using var smtAnalysis = new SmtAnalysisService(options);
+
+            var first = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                new SymbolicState(new[] { positive, upperBound }),
+                impossibleBranch,
+                smtAnalysis);
+            var executedAfterFirst = smtAnalysis.ExecutedQueryCount;
+            var second = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                new SymbolicState(new[] { upperBound, positive, positive }),
+                impossibleBranch,
+                smtAnalysis);
+
+            Assert.That(first.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(first.Info.CacheHit, Is.False);
+            Assert.That(second.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(second.Info.CacheHit, Is.True);
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(executedAfterFirst));
+        }
+
+        [Test]
+        public void SymbolicProofService_CachesUnsupportedIrConservatively()
+        {
+            var unsupportedFact = SymbolicFact.Exact(
+                new SymbolicFreshnessAtom(new SymbolicVariableTerm("proof_cache_resource", SmtValueKind.Reference)),
+                SyntaxFactory.ParseExpression("proof_cache_resource"),
+                "test.unsupported");
+            using var smtAnalysis = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(750),
+                TimeSpan.FromMilliseconds(5000),
+                maxPathConditions: 192,
+                maxExpressionNodes: 2048));
+            var state = new SymbolicState(new[] { unsupportedFact });
+
+            var first = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+            var second = SymbolicReachabilityService.ClassifyStateFeasibility(state.Normalize(), smtAnalysis);
+
+            Assert.That(first.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(first.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(first.Info.CacheHit, Is.False);
+            Assert.That(second.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(second.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(second.Info.CacheHit, Is.True);
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_TimeoutReasonMapsToPublicUnknownReason()
+        {
+            var value = new SymbolicVariableTerm("proof_timeout_value", SmtValueKind.String);
+            var containsNeedle = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.Contains,
+                    value,
+                    new SymbolicStringConstantTerm("needle")),
+                SyntaxFactory.ParseExpression("proof_timeout_value.Contains(\"needle\")"),
+                "test.timeout");
+            using var smtAnalysis = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(5000),
+                maxPathConditions: 192,
+                maxExpressionNodes: 2048));
+
+            var result = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                new SymbolicState(),
+                new SymbolicFactCondition(containsNeedle),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
+            Assert.That(result.Info.Reason, Is.EqualTo("smt_timeout"));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -1836,6 +2171,9 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("WithPathConditionsAndState("));
             Assert.That(source, Does.Contain("TryCreateReferenceNullPathState("));
             Assert.That(source, Does.Contain("\"analyzer.branch.edge\""));
+            Assert.That(source, Does.Contain("addTranslatedFormulaFallback: true"));
+            Assert.That(source, Does.Contain("TryEncodeSymbolicBranchFormula("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslate(expressionSyntax"));
             Assert.That(branchStateIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyBranchIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(branchStateIndex, Is.LessThan(legacyBranchIndex));
@@ -1878,6 +2216,10 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var symbolicProgramPointFactsSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
 
             Assert.That(pathFactsSource, Does.Contain("SymbolicPathConditionsAreSatisfiable("));
             Assert.That(pathFactsSource, Does.Contain("SymbolicReachabilityService.TryGetCurrentSymbolValue("));
@@ -1962,6 +2304,7 @@ namespace PurelySharp.Test
             Assert.That(initialAssignedValueFactSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("));
             Assert.That(initialAssignedValueFactSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(initialAssignedValueFactSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
+            Assert.That(initialAssignedValueFactSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("));
             Assert.That(initialAssignedValueFactSource, Does.Not.Contain("SmtFormulaFactory.CreateEquality("));
             Assert.That(initialAssignedValueFactSource, Does.Not.Contain("SmtFormulaFactory.CreateReferenceNullComparison("));
             Assert.That(pathFactsSource, Does.Not.Contain("private static void AddNullableAssignedValueFacts("));
@@ -1981,6 +2324,8 @@ namespace PurelySharp.Test
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryCreateCompoundAssignmentFact("));
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryCreateIncrementOrDecrementFact("));
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryGetCurrentSymbolValue("));
+            Assert.That(symbolicProgramPointFactsSource, Does.Contain("SymbolicReachabilityService.TryCreateNotNullIfNotNullAssignedValueFact("));
+            Assert.That(symbolicProgramPointFactsSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("));
             var addCompletedIfFactsIndex = pathFactsSource.IndexOf("private static void AddCompletedIfStatementFacts(", StringComparison.Ordinal);
             Assert.That(addSymbolNonNullFactIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(addCompletedIfFactsIndex, Is.GreaterThan(addSymbolNonNullFactIndex));
@@ -2090,11 +2435,19 @@ namespace PurelySharp.Test
                 "PurelySharp.Analyzer",
                 "Engine",
                 "PurityAnalysisEngine.cs"));
-            var rawFactIndex = source.IndexOf("CreateAssignedValueFact(targetFormula, valueFormula)", StringComparison.Ordinal);
+            var rawFactIndex = source.IndexOf("SymbolicReachabilityService.TryCreateAssignedValueFact(", StringComparison.Ordinal);
             var symbolicFactIndex = source.IndexOf("AddAssignedSymbolicEqualityFact(", StringComparison.Ordinal);
 
             Assert.That(rawFactIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(symbolicFactIndex, Is.GreaterThan(rawFactIndex));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateStringContentAssignedValueFact("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact("));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
+            Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerTerm("));
             Assert.That(source, Does.Contain("TryLowerAssignedLengthTerm"));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerStringTerm"));

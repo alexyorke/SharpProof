@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -53,6 +56,7 @@ namespace PurelySharp.Symbolic.Ir
         InvalidCast,
         UnboxNull,
         NullableValueWithoutValue,
+        DynamicNullBinding,
         SwitchExpressionNoMatch,
         DirectThrow,
     }
@@ -102,6 +106,8 @@ namespace PurelySharp.Symbolic.Ir
     internal sealed record SymbolicNullTerm() : SymbolicTerm(SmtValueKind.Reference);
 
     internal sealed record SymbolicVariableTerm(string Name, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
+
+    internal sealed record SymbolicMemberTerm(SymbolicTerm Receiver, string MemberName, SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
 
     internal sealed record SymbolicStringContentTerm(SymbolicTerm Reference) : SymbolicTerm(SmtValueKind.String);
 
@@ -217,24 +223,327 @@ namespace PurelySharp.Symbolic.Ir
     {
         public SymbolicState(
             IEnumerable<SymbolicFact>? facts = null,
-            IEnumerable<SymbolicCondition>? pathConditions = null)
+            IEnumerable<SymbolicCondition>? pathConditions = null,
+            IEnumerable<KeyValuePair<string, int>>? symbolVersions = null,
+            bool isContradictory = false)
         {
             Facts = facts?.ToImmutableArray() ?? ImmutableArray<SymbolicFact>.Empty;
             PathConditions = pathConditions?.ToImmutableArray() ?? ImmutableArray<SymbolicCondition>.Empty;
+            SymbolVersions = symbolVersions?.ToImmutableDictionary(
+                    static pair => pair.Key,
+                    static pair => pair.Value,
+                    StringComparer.Ordinal) ??
+                ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+            IsContradictory = isContradictory;
+            NormalizedProofKey = CreateProofKey(Facts, PathConditions, SymbolVersions, IsContradictory);
         }
 
         public ImmutableArray<SymbolicFact> Facts { get; }
 
         public ImmutableArray<SymbolicCondition> PathConditions { get; }
 
+        public ImmutableDictionary<string, int> SymbolVersions { get; }
+
+        public bool IsContradictory { get; }
+
+        public string NormalizedProofKey { get; }
+
         public SymbolicState AddFact(SymbolicFact fact)
         {
-            return new SymbolicState(Facts.Add(fact), PathConditions);
+            if (fact == null)
+            {
+                throw new ArgumentNullException(nameof(fact));
+            }
+
+            return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory).Normalize();
         }
 
         public SymbolicState AddPathCondition(SymbolicCondition condition)
         {
-            return new SymbolicState(Facts, PathConditions.Add(condition));
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition));
+            }
+
+            return new SymbolicState(Facts, PathConditions.Add(condition), SymbolVersions, IsContradictory).Normalize();
+        }
+
+        public SymbolicState WithSymbolVersion(string symbolKey, int version)
+        {
+            if (string.IsNullOrWhiteSpace(symbolKey))
+            {
+                throw new ArgumentException("Symbol key is required.", nameof(symbolKey));
+            }
+
+            return new SymbolicState(
+                Facts,
+                PathConditions,
+                SymbolVersions.SetItem(symbolKey, version),
+                IsContradictory).Normalize();
+        }
+
+        public SymbolicState Normalize()
+        {
+            var normalizedFacts = DeduplicateFacts(Facts);
+            var normalizedConditions = DeduplicateConditions(PathConditions);
+            var contradictory = IsContradictory ||
+                ContainsContradiction(normalizedFacts, normalizedConditions);
+
+            if (normalizedFacts.SequenceEqual(Facts) &&
+                normalizedConditions.SequenceEqual(PathConditions) &&
+                contradictory == IsContradictory)
+            {
+                return this;
+            }
+
+            return new SymbolicState(
+                normalizedFacts,
+                normalizedConditions,
+                SymbolVersions,
+                contradictory);
+        }
+
+        private static ImmutableArray<SymbolicFact> DeduplicateFacts(ImmutableArray<SymbolicFact> facts)
+        {
+            if (facts.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SymbolicFact>.Empty;
+            }
+
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+            var builder = ImmutableArray.CreateBuilder<SymbolicFact>(facts.Length);
+            foreach (var fact in facts)
+            {
+                if (fact == null)
+                {
+                    continue;
+                }
+
+                var key = CreateFactKey(fact);
+                if (seen.TryGetValue(key, out var existingIndex))
+                {
+                    builder[existingIndex] = SelectCanonicalFact(builder[existingIndex], fact);
+                }
+                else
+                {
+                    seen.Add(key, builder.Count);
+                    builder.Add(fact);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static SymbolicFact SelectCanonicalFact(SymbolicFact left, SymbolicFact right)
+        {
+            if (right.Provenance.Length < left.Provenance.Length)
+            {
+                return right;
+            }
+
+            if (right.Provenance.Length == left.Provenance.Length &&
+                string.CompareOrdinal(right.Provenance, left.Provenance) < 0)
+            {
+                return right;
+            }
+
+            return left;
+        }
+
+        private static ImmutableArray<SymbolicCondition> DeduplicateConditions(ImmutableArray<SymbolicCondition> conditions)
+        {
+            if (conditions.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SymbolicCondition>.Empty;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var builder = ImmutableArray.CreateBuilder<SymbolicCondition>(conditions.Length);
+            foreach (var condition in conditions)
+            {
+                if (condition == null)
+                {
+                    continue;
+                }
+
+                if (seen.Add(CreateConditionKey(condition)))
+                {
+                    builder.Add(condition);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static bool ContainsContradiction(
+            ImmutableArray<SymbolicFact> facts,
+            ImmutableArray<SymbolicCondition> conditions)
+        {
+            var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var fact in facts)
+            {
+                if (HasOppositePolarity(polarities, fact))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var condition in conditions)
+            {
+                if (ContainsFalseConstant(condition))
+                {
+                    return true;
+                }
+
+                foreach (var fact in EnumerateConditionFacts(condition))
+                {
+                    if (HasOppositePolarity(polarities, fact))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasOppositePolarity(
+            IDictionary<string, bool> polarities,
+            SymbolicFact fact)
+        {
+            var key = CreateFactAtomKey(fact);
+            if (polarities.TryGetValue(key, out var existingPolarity))
+            {
+                return existingPolarity != fact.Polarity;
+            }
+
+            polarities.Add(key, fact.Polarity);
+            return false;
+        }
+
+        private static bool ContainsFalseConstant(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicConstantCondition { Value: false }:
+                    return true;
+                case SymbolicNotCondition { Operand: SymbolicConstantCondition { Value: true } }:
+                    return true;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
+                    return ContainsFalseConstant(binary.Left) || ContainsFalseConstant(binary.Right);
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
+                    return ContainsFalseConstant(binary.Left) && ContainsFalseConstant(binary.Right);
+                case SymbolicNotCondition { Operand: var operand }:
+                    return ContainsTrueConstant(operand);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ContainsTrueConstant(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicConstantCondition { Value: true }:
+                    return true;
+                case SymbolicNotCondition { Operand: SymbolicConstantCondition { Value: false } }:
+                    return true;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
+                    return ContainsTrueConstant(binary.Left) && ContainsTrueConstant(binary.Right);
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } binary:
+                    return ContainsTrueConstant(binary.Left) || ContainsTrueConstant(binary.Right);
+                case SymbolicNotCondition { Operand: var operand }:
+                    return ContainsFalseConstant(operand);
+                default:
+                    return false;
+            }
+        }
+
+        private static IEnumerable<SymbolicFact> EnumerateConditionFacts(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    yield return factCondition.Fact;
+                    break;
+                case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
+                    yield return factCondition.Fact.Negate();
+                    break;
+                case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } binary:
+                    foreach (var fact in EnumerateConditionFacts(binary.Left))
+                    {
+                        yield return fact;
+                    }
+
+                    foreach (var fact in EnumerateConditionFacts(binary.Right))
+                    {
+                        yield return fact;
+                    }
+
+                    break;
+            }
+        }
+
+        private static string CreateProofKey(
+            ImmutableArray<SymbolicFact> facts,
+            ImmutableArray<SymbolicCondition> conditions,
+            ImmutableDictionary<string, int> symbolVersions,
+            bool isContradictory)
+        {
+            var parts = new List<string>
+            {
+                isContradictory ? "contradictory:true" : "contradictory:false",
+            };
+
+            parts.AddRange(symbolVersions
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair => "version:" + pair.Key + "=" + pair.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            parts.AddRange(facts.Select(static fact => "fact:" + CreateFactKey(fact)).OrderBy(static key => key, StringComparer.Ordinal));
+            parts.AddRange(conditions.Select(static condition => "condition:" + CreateConditionKey(condition)).OrderBy(static key => key, StringComparer.Ordinal));
+            return string.Join("\n", parts);
+        }
+
+        internal static string CreateProofFactKey(SymbolicFact fact)
+        {
+            return CreateFactKey(fact);
+        }
+
+        internal static string CreateProofConditionKey(SymbolicCondition condition)
+        {
+            return CreateConditionKey(condition);
+        }
+
+        private static string CreateFactKey(SymbolicFact fact)
+        {
+            return string.Join(
+                "|",
+                CreateFactAtomKey(fact),
+                fact.Polarity ? "true" : "false",
+                fact.Confidence.ToString());
+        }
+
+        private static string CreateFactAtomKey(SymbolicFact fact)
+        {
+            return fact.Atom.ToString() ?? string.Empty;
+        }
+
+        private static string CreateConditionKey(SymbolicCondition condition)
+        {
+            switch (condition)
+            {
+                case SymbolicConstantCondition constant:
+                    return "const:" + (constant.Value ? "true" : "false");
+                case SymbolicFactCondition factCondition:
+                    return "fact-condition:" + CreateFactKey(factCondition.Fact);
+                case SymbolicNotCondition notCondition:
+                    return "not(" + CreateConditionKey(notCondition.Operand) + ")";
+                case SymbolicBinaryCondition binaryCondition:
+                    return "binary:" + binaryCondition.Operator + "(" +
+                        CreateConditionKey(binaryCondition.Left) + "," +
+                        CreateConditionKey(binaryCondition.Right) + ")";
+                default:
+                    return condition.ToString() ?? string.Empty;
+            }
         }
     }
 }

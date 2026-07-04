@@ -76,6 +76,46 @@ namespace PurelySharp.Symbolic
             return facts;
         }
 
+        internal static SymbolicState CollectPriorAssignmentState(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            var state = new SymbolicState();
+            AddFormulaPathConditions(
+                ref state,
+                CollectPriorAssignmentFacts(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts),
+                site,
+                "ir.path.prior-statement");
+            return state;
+        }
+
+        internal static SymbolicState CollectForInitialEntryState(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var state = CollectAncestorReachabilityState(forStatement, semanticModel, cancellationToken);
+            state = MergeStates(
+                state,
+                CollectPriorAssignmentState(forStatement, semanticModel, cancellationToken));
+            state = MergeStates(
+                state,
+                CollectForInitializerState(forStatement, semanticModel, cancellationToken));
+            return state;
+        }
+
+        internal static SymbolicState MergeStates(SymbolicState left, SymbolicState right)
+        {
+            var symbolVersions = left.SymbolVersions.SetItems(right.SymbolVersions);
+            return new SymbolicState(
+                left.Facts.Concat(right.Facts),
+                left.PathConditions.Concat(right.PathConditions),
+                symbolVersions,
+                left.IsContradictory || right.IsContradictory).Normalize();
+        }
+
         private static bool SupportsCurrentStatementCompletionFacts(StatementSyntax statement)
         {
             return statement is LocalDeclarationStatementSyntax or
@@ -503,7 +543,71 @@ namespace PurelySharp.Symbolic
                              semanticModel,
                              cancellationToken))
                 {
-                    AddReferenceNullCondition(ref state, lockStatementSyntax.Expression, isNull: false, semanticModel, cancellationToken);
+                    AddReferenceNullCondition(
+                        ref state,
+                        lockStatementSyntax.Expression,
+                        isNull: false,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.lock-entry.not-null");
+                }
+                else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
+                         catchClauseSyntax.Block.Span.Contains(syntaxNode.Span))
+                {
+                    var facts = ImmutableArray.CreateBuilder<SmtFormula>();
+                    AddCatchBodyEntryStateFacts(
+                        ref state,
+                        catchClauseSyntax,
+                        syntaxNode.SpanStart,
+                        semanticModel,
+                        cancellationToken);
+                    AddCatchBodyEntryFacts(
+                        facts,
+                        catchClauseSyntax,
+                        syntaxNode.SpanStart,
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(ref state, facts, catchClauseSyntax, "ir.path.catch-entry");
+                }
+                else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
+                         usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    var facts = ImmutableArray.CreateBuilder<SmtFormula>();
+                    if (usingStatementSyntax.Declaration != null)
+                    {
+                        AddUsingStatementDeclarationStateFacts(
+                            ref state,
+                            usingStatementSyntax,
+                            semanticModel,
+                            cancellationToken);
+                        AddUsingStatementDeclarationFacts(
+                            facts,
+                            usingStatementSyntax,
+                            semanticModel,
+                            cancellationToken);
+                    }
+                    else if (usingStatementSyntax.Expression != null &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 usingStatementSyntax.Expression,
+                                 usingStatementSyntax.Statement,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
+                    {
+                        AddUsingStatementExpressionStateFacts(
+                            ref state,
+                            usingStatementSyntax.Expression,
+                            usingStatementSyntax.Statement,
+                            semanticModel,
+                            cancellationToken);
+                        AddUsingStatementExpressionFacts(
+                            facts,
+                            usingStatementSyntax.Expression,
+                            semanticModel,
+                            cancellationToken);
+                    }
+
+                    AddFormulaPathConditions(ref state, facts, usingStatementSyntax, "ir.path.using-entry");
                 }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -515,18 +619,155 @@ namespace PurelySharp.Symbolic
                              cancellationToken))
                 {
                     AddReachabilityCondition(ref state, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    AddPreLoopBodyInvariantStateFacts(
+                        ref state,
+                        whileStatementSyntax,
+                        whileStatementSyntax.Statement,
+                        "ir.path.while-loop-invariant",
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(
+                        ref state,
+                        CollectLoopBodyInvariantFacts(whileStatementSyntax, semanticModel, cancellationToken),
+                        whileStatementSyntax,
+                        "ir.path.while-loop-invariant");
+                }
+                else if (ancestor is DoStatementSyntax doStatementSyntax &&
+                         doStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    AddPreLoopBodyInvariantStateFacts(
+                        ref state,
+                        doStatementSyntax,
+                        doStatementSyntax.Statement,
+                        "ir.path.do-loop-invariant",
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(
+                        ref state,
+                        CollectLoopBodyInvariantFacts(doStatementSyntax, semanticModel, cancellationToken),
+                        doStatementSyntax,
+                        "ir.path.do-loop-invariant");
                 }
                 else if (ancestor is ForStatementSyntax forStatementSyntax &&
-                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                         forStatementSyntax.Condition != null &&
+                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    if (forStatementSyntax.Condition != null &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            forStatementSyntax.Condition,
+                            forStatementSyntax.Statement,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        AddReachabilityCondition(ref state, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+
+                    AddForLoopBodyInvariantStateFacts(
+                        ref state,
+                        forStatementSyntax,
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(
+                        ref state,
+                        CollectLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken),
+                        forStatementSyntax,
+                        "ir.path.for-loop-invariant");
+                }
+                else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
+                         forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
                          !AnyReferencedSymbolAssignedBeforeUse(
-                             forStatementSyntax.Condition,
-                             forStatementSyntax.Statement,
+                             forEachStatementSyntax.Expression,
+                             forEachStatementSyntax.Statement,
                              syntaxNode.SpanStart,
                              semanticModel,
                              cancellationToken))
                 {
-                    AddReachabilityCondition(ref state, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    var facts = ImmutableArray.CreateBuilder<SmtFormula>();
+                    AddForeachBodyEntryStateFacts(
+                        ref state,
+                        forEachStatementSyntax.Expression,
+                        forEachStatementSyntax,
+                        forEachStatementSyntax.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    AddForeachBodyEntryFacts(
+                        facts,
+                        forEachStatementSyntax.Expression,
+                        semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken) as ILocalSymbol,
+                        forEachStatementSyntax,
+                        forEachStatementSyntax.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(ref state, facts, forEachStatementSyntax, "ir.path.foreach-entry");
+                }
+                else if (ancestor is ForEachVariableStatementSyntax forEachVariableStatementSyntax &&
+                         forEachVariableStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             forEachVariableStatementSyntax.Expression,
+                             forEachVariableStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    var facts = ImmutableArray.CreateBuilder<SmtFormula>();
+                    AddForeachBodyEntryStateFacts(
+                        ref state,
+                        forEachVariableStatementSyntax.Expression,
+                        forEachVariableStatementSyntax,
+                        forEachVariableStatementSyntax.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    AddForeachBodyEntryFacts(
+                        facts,
+                        forEachVariableStatementSyntax.Expression,
+                        iterationSymbol: null,
+                        forEachVariableStatementSyntax,
+                        forEachVariableStatementSyntax.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    AddFormulaPathConditions(ref state, facts, forEachVariableStatementSyntax, "ir.path.foreach-entry");
+                }
+                else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
+                {
+                    var matchingSection = switchStatementSyntax.Sections
+                        .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
+                    if (matchingSection != null &&
+                        !AnySwitchStatementConditionSymbolAssignedBeforeUse(
+                            switchStatementSyntax,
+                            matchingSection,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken) &&
+                        SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                            switchStatementSyntax.Expression,
+                            matchingSection,
+                            semanticModel,
+                            cancellationToken,
+                            out var sectionCondition))
+                    {
+                        AddFormulaPathCondition(ref state, sectionCondition, matchingSection, "ir.path.switch-section");
+                    }
+                }
+                else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)
+                {
+                    var matchingArm = switchExpressionSyntax.Arms
+                        .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
+                    if (matchingArm != null &&
+                        !AnySwitchExpressionConditionSymbolAssignedBeforeUse(
+                            switchExpressionSyntax,
+                            matchingArm,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken) &&
+                        SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                            switchExpressionSyntax.GoverningExpression,
+                            matchingArm,
+                            semanticModel,
+                            cancellationToken,
+                            out var armCondition))
+                    {
+                        AddFormulaPathCondition(ref state, armCondition, matchingArm, "ir.path.switch-expression-arm");
+                    }
                 }
             }
 
@@ -557,7 +798,8 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax expression,
             bool isNull,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? provenance = null)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
             if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var subject) ||
@@ -572,8 +814,842 @@ namespace PurelySharp.Symbolic
                     subject,
                     new SymbolicNullTerm()),
                 expression,
-                isNull ? "ir.path.reference-null" : "ir.path.reference-not-null");
+                provenance ?? (isNull ? "ir.path.reference-null" : "ir.path.reference-not-null"));
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static void AddSymbolReferenceNullCondition(
+            ref SymbolicState state,
+            ISymbol symbol,
+            SyntaxNode source,
+            bool isNull,
+            string provenance)
+        {
+            if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
+                !TryGetValueKind(type, out var kind) ||
+                kind != SmtValueKind.Reference)
+            {
+                return;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                    new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Reference),
+                    new SymbolicNullTerm()),
+                source,
+                provenance);
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static void AddCatchBodyEntryStateFacts(
+            ref SymbolicState state,
+            CatchClauseSyntax catchClause,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (catchClause.Declaration != null &&
+                semanticModel.GetDeclaredSymbol(catchClause.Declaration, cancellationToken) is ILocalSymbol localSymbol &&
+                !IsSymbolAssignedBetween(
+                    catchClause.Block,
+                    catchClause.Block.SpanStart - 1,
+                    useSpanStart,
+                    localSymbol.OriginalDefinition,
+                    semanticModel,
+                    cancellationToken))
+            {
+                AddSymbolReferenceNullCondition(
+                    ref state,
+                    localSymbol.OriginalDefinition,
+                    catchClause.Declaration,
+                    isNull: false,
+                    "ir.path.catch-entry.exception-not-null");
+            }
+
+            if (catchClause.Filter?.FilterExpression is { } filterExpression &&
+                !AnyReferencedSymbolAssignedBeforeUse(
+                    filterExpression,
+                    catchClause.Block,
+                    useSpanStart,
+                    semanticModel,
+                    cancellationToken))
+            {
+                AddReachabilityCondition(ref state, filterExpression, mustBeTrue: true, semanticModel, cancellationToken);
+            }
+        }
+
+        private static void AddUsingStatementExpressionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddThrowGuardedExpressionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken,
+                "ir.path.using-entry.throw-guarded-not-null");
+        }
+
+        private static void AddUsingStatementDeclarationStateFacts(
+            ref SymbolicState state,
+            UsingStatementSyntax usingStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (usingStatement.Declaration == null)
+            {
+                return;
+            }
+
+            foreach (var declarator in usingStatement.Declaration.Variables)
+            {
+                if (declarator.Initializer == null ||
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol)
+                {
+                    continue;
+                }
+
+                AddUsingDeclarationInitializerStateFacts(
+                    ref state,
+                    localSymbol,
+                    declarator.Initializer.Value,
+                    usingStatement.Statement,
+                    semanticModel,
+                    cancellationToken);
+            }
+        }
+
+        private static void AddUsingDeclarationInitializerStateFacts(
+            ref SymbolicState state,
+            ILocalSymbol localSymbol,
+            ExpressionSyntax initializer,
+            StatementSyntax usingBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var effectiveInitializer = initializer;
+            if (TryGetThrowGuardedValue(
+                    initializer,
+                    out var guardedValue,
+                    out _,
+                    out _,
+                    out _))
+            {
+                effectiveInitializer = guardedValue;
+                AddThrowGuardedExpressionStateFacts(
+                    ref state,
+                    initializer,
+                    usingBody,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.using-entry.throw-guarded-not-null");
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!TryCreateLocalSymbolTerm(localSymbol, out var target) ||
+                !SymbolicIrLowerer.TryLowerTerm(effectiveInitializer, context, out var value) ||
+                !CanCompareIrTerms(target, value))
+            {
+                return;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    target,
+                    value),
+                initializer,
+                "ir.path.using-entry.declaration-alias");
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static bool TryCreateLocalSymbolTerm(
+            ILocalSymbol localSymbol,
+            out SymbolicTerm term)
+        {
+            if (!TryGetValueKind(localSymbol.Type, out var kind))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(localSymbol), kind);
+            return true;
+        }
+
+        private static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right)
+        {
+            return left.Kind == right.Kind ||
+                left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference ||
+                right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference;
+        }
+
+        private static void AddForLoopBodyInvariantStateFacts(
+            ref SymbolicState state,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddForLoopMonotonicLowerBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+            AddForLoopMonotonicUpperBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+        }
+
+        private static void AddPreLoopBodyInvariantStateFacts(
+            ref SymbolicState state,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            string provenancePrefix,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddPreLoopMonotonicLowerBoundStateFacts(
+                ref state,
+                loopStatement,
+                loopBody,
+                provenancePrefix,
+                semanticModel,
+                cancellationToken);
+            AddPreLoopMonotonicUpperBoundStateFacts(
+                ref state,
+                loopStatement,
+                loopBody,
+                provenancePrefix,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static void AddPreLoopMonotonicLowerBoundStateFacts(
+            ref SymbolicState state,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            string provenancePrefix,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerBoundTerms(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveLowerBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    symbolTerm,
+                    initializer.Bound,
+                    loopStatement,
+                    provenancePrefix + ".lower-bound");
+            }
+        }
+
+        private static void AddPreLoopMonotonicUpperBoundStateFacts(
+            ref SymbolicState state,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            string provenancePrefix,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddPreLoopMonotonicInitialUpperBoundStateFacts(
+                ref state,
+                loopStatement,
+                loopBody,
+                provenancePrefix,
+                semanticModel,
+                cancellationToken);
+
+            foreach (var initializer in EnumeratePreLoopStrictUpperBoundInitializerTerms(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.UpperBound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.LessThan,
+                    symbolTerm,
+                    initializer.UpperBound,
+                    loopStatement,
+                    provenancePrefix + ".strict-upper-bound");
+            }
+        }
+
+        private static void AddPreLoopMonotonicInitialUpperBoundStateFacts(
+            ref SymbolicState state,
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            string provenancePrefix,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerBoundTerms(loopStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                        LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
+                    !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    symbolTerm,
+                    initializer.Bound,
+                    loopStatement,
+                    provenancePrefix + ".initial-upper-bound");
+            }
+        }
+
+        private static void AddForLoopMonotonicLowerBoundStateFacts(
+            ref SymbolicState state,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumerateForLoopInitializerBoundTerms(forStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
+                    !ForLoopIncrementorsPreserveLowerBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    symbolTerm,
+                    initializer.Bound,
+                    forStatement,
+                    "ir.path.for-loop-invariant.lower-bound");
+            }
+        }
+
+        private static void AddForLoopMonotonicUpperBoundStateFacts(
+            ref SymbolicState state,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddForLoopMonotonicInitialUpperBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+
+            foreach (var initializer in EnumerateForLoopStrictUpperBoundInitializerTerms(forStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.UpperBound.Kind != SmtValueKind.Int ||
+                    StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
+                    !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.LessThan,
+                    symbolTerm,
+                    initializer.UpperBound,
+                    forStatement,
+                    "ir.path.for-loop-invariant.strict-upper-bound");
+            }
+        }
+
+        private static void AddForLoopMonotonicInitialUpperBoundStateFacts(
+            ref SymbolicState state,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumerateForLoopInitializerBoundTerms(forStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
+                    symbolTerm.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
+                    !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    symbolTerm,
+                    initializer.Bound,
+                    forStatement,
+                    "ir.path.for-loop-invariant.initial-upper-bound");
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)> EnumerateForLoopInitializerBoundTerms(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (forStatement.Declaration != null)
+            {
+                foreach (var declarator in forStatement.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
+                        !TryLowerInitializerBoundTerm(
+                            declarator.Initializer.Value,
+                            localSymbol.OriginalDefinition,
+                            semanticModel,
+                            cancellationToken,
+                            out var lowerBound,
+                            out var boundSymbols))
+                    {
+                        continue;
+                    }
+
+                    yield return (localSymbol.OriginalDefinition, lowerBound, boundSymbols);
+                }
+            }
+
+            foreach (var expression in forStatement.Initializers)
+            {
+                if (expression is not AssignmentExpressionSyntax assignment ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
+                    symbol is not ILocalSymbol and not IParameterSymbol ||
+                    !TryLowerInitializerBoundTerm(
+                        assignment.Right,
+                        symbol.OriginalDefinition,
+                        semanticModel,
+                        cancellationToken,
+                        out var lowerBound,
+                        out var boundSymbols))
+                {
+                    continue;
+                }
+
+                yield return (symbol.OriginalDefinition, lowerBound, boundSymbols);
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SymbolicTerm UpperBound, IReadOnlyList<ISymbol> BoundSymbols)> EnumerateForLoopStrictUpperBoundInitializerTerms(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (forStatement.Declaration != null)
+            {
+                foreach (var declarator in forStatement.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
+                        !TryGetStrictUpperBoundInitializerTerm(
+                            declarator.Initializer.Value,
+                            localSymbol.OriginalDefinition,
+                            semanticModel,
+                            cancellationToken,
+                            out var upperBound,
+                            out var boundSymbols))
+                    {
+                        continue;
+                    }
+
+                    yield return (localSymbol.OriginalDefinition, upperBound, boundSymbols);
+                }
+            }
+
+            foreach (var expression in forStatement.Initializers)
+            {
+                if (expression is not AssignmentExpressionSyntax assignment ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
+                    symbol is not ILocalSymbol and not IParameterSymbol ||
+                    !TryGetStrictUpperBoundInitializerTerm(
+                        assignment.Right,
+                        symbol.OriginalDefinition,
+                        semanticModel,
+                        cancellationToken,
+                        out var upperBound,
+                        out var boundSymbols))
+                {
+                    continue;
+                }
+
+                yield return (symbol.OriginalDefinition, upperBound, boundSymbols);
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)> EnumeratePreLoopInitializerBoundTerms(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel, cancellationToken))
+            {
+                if (TryLowerInitializerBoundTerm(
+                        initializer.Value,
+                        initializer.Symbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var bound,
+                        out var boundSymbols) &&
+                    !AnyPriorStatementsInvalidateInitializer(
+                        initializer,
+                        loopStatement,
+                        boundSymbols,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    yield return (initializer.Symbol, bound, boundSymbols);
+                }
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SymbolicTerm UpperBound, IReadOnlyList<ISymbol> BoundSymbols)> EnumeratePreLoopStrictUpperBoundInitializerTerms(
+            StatementSyntax loopStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumeratePreLoopInitializerExpressions(loopStatement, semanticModel, cancellationToken))
+            {
+                if (TryGetStrictUpperBoundInitializerTerm(
+                        initializer.Value,
+                        initializer.Symbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var upperBound,
+                        out var boundSymbols) &&
+                    !AnyPriorStatementsInvalidateInitializer(
+                        initializer,
+                        loopStatement,
+                        boundSymbols,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    yield return (initializer.Symbol, upperBound, boundSymbols);
+                }
+            }
+        }
+
+        private static bool TryGetStrictUpperBoundInitializerTerm(
+            ExpressionSyntax expression,
+            ISymbol initializedSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm upperBound,
+            out IReadOnlyList<ISymbol> upperBoundSymbols)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is not BinaryExpressionSyntax binaryExpression)
+            {
+                upperBound = null!;
+                upperBoundSymbols = Array.Empty<ISymbol>();
+                return false;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
+                TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var subtractedValue) &&
+                subtractedValue > 0 &&
+                TryLowerInitializerBoundTerm(
+                    binaryExpression.Left,
+                    initializedSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out upperBound,
+                    out upperBoundSymbols))
+            {
+                return true;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.AddExpression))
+            {
+                if (TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
+                    rightValue < 0 &&
+                    TryLowerInitializerBoundTerm(
+                        binaryExpression.Left,
+                        initializedSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out upperBound,
+                        out upperBoundSymbols))
+                {
+                    return true;
+                }
+
+                if (TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
+                    leftValue < 0 &&
+                    TryLowerInitializerBoundTerm(
+                        binaryExpression.Right,
+                        initializedSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out upperBound,
+                        out upperBoundSymbols))
+                {
+                    return true;
+                }
+            }
+
+            upperBound = null!;
+            upperBoundSymbols = Array.Empty<ISymbol>();
+            return false;
+        }
+
+        private static bool TryLowerInitializerBoundTerm(
+            ExpressionSyntax expression,
+            ISymbol initializedSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm bound,
+            out IReadOnlyList<ISymbol> boundSymbols)
+        {
+            var referencedSymbols = GetReferencedLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
+            if (referencedSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, initializedSymbol)) ||
+                !SymbolicIrLowerer.TryLowerTerm(
+                    expression,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var candidate) ||
+                candidate.Kind != SmtValueKind.Int)
+            {
+                bound = null!;
+                boundSymbols = Array.Empty<ISymbol>();
+                return false;
+            }
+
+            bound = candidate;
+            boundSymbols = referencedSymbols;
+            return true;
+        }
+
+        private static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term)
+        {
+            if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
+                !TryGetValueKind(type, out var kind))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), kind);
+            return true;
+        }
+
+        private static void AddRelationPathFact(
+            ref SymbolicState state,
+            SymbolicRelationOperator op,
+            SymbolicTerm left,
+            SymbolicTerm right,
+            SyntaxNode source,
+            string provenance)
+        {
+            if (!CanCompareIrTerms(left, right))
+            {
+                return;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(op, left, right),
+                source,
+                provenance);
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static void AddForeachBodyEntryStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachStatement,
+            StatementSyntax foreachBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddThrowGuardedExpressionStateFacts(
+                ref state,
+                expressionSyntax,
+                foreachBody,
+                semanticModel,
+                cancellationToken);
+            AddReferenceNullCondition(
+                ref state,
+                expressionSyntax,
+                isNull: false,
+                semanticModel,
+                cancellationToken,
+                "ir.path.foreach-entry.not-null");
+            AddForeachLengthPositiveStateFact(
+                ref state,
+                expressionSyntax,
+                foreachStatement,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static void AddThrowGuardedExpressionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax guardedStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string nonNullProvenance = "ir.path.foreach-entry.throw-guarded-not-null")
+        {
+            if (!TryGetThrowGuardedValue(
+                    expression,
+                    out var effectiveValueExpression,
+                    out var guardExpression,
+                    out var guardBranchWhenTrue,
+                    out var requiresNonNullValue))
+            {
+                return;
+            }
+
+            if (guardExpression != null)
+            {
+                if (!AnyConditionSymbolInvalidatedInStatement(guardExpression, guardedStatement, semanticModel, cancellationToken))
+                {
+                    AddReachabilityCondition(ref state, guardExpression, guardBranchWhenTrue, semanticModel, cancellationToken);
+                }
+            }
+            else if (requiresNonNullValue &&
+                     !AnyConditionSymbolInvalidatedInStatement(effectiveValueExpression, guardedStatement, semanticModel, cancellationToken))
+            {
+                AddReferenceNullCondition(
+                    ref state,
+                    effectiveValueExpression,
+                    isNull: false,
+                    semanticModel,
+                    cancellationToken,
+                    nonNullProvenance);
+            }
+        }
+
+        private static void AddForeachLengthPositiveStateFact(
+            ref SymbolicState state,
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (AnyConditionSymbolInvalidatedInStatement(expressionSyntax, foreachStatement, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expressionSyntax, cancellationToken);
+            if (!TryCreateForeachLengthTerm(expressionSyntax, typeInfo.Type, semanticModel, cancellationToken, out var length) &&
+                !TryCreateForeachLengthTerm(expressionSyntax, typeInfo.ConvertedType, semanticModel, cancellationToken, out length))
+            {
+                return;
+            }
+
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    length,
+                    new SymbolicIntegerConstantTerm(0)),
+                expressionSyntax,
+                "ir.path.foreach-entry.length-positive");
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static bool TryCreateForeachLengthTerm(
+            ExpressionSyntax expressionSyntax,
+            ITypeSymbol? type,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm length)
+        {
+            length = null!;
+            if (!IsSupportedForeachLengthReceiver(type))
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(expressionSyntax, context, out var receiver))
+            {
+                return false;
+            }
+
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                length = receiver.Kind == SmtValueKind.String
+                    ? new SymbolicLengthTerm(receiver)
+                    : receiver.Kind == SmtValueKind.Reference
+                        ? new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver))
+                        : null!;
+                return length != null;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } &&
+                receiver.Kind == SmtValueKind.Reference)
+            {
+                length = new SymbolicLengthTerm(receiver);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void AddFormulaPathConditions(
+            ref SymbolicState state,
+            IEnumerable<SmtFormula> formulas,
+            SyntaxNode source,
+            string provenance)
+        {
+            foreach (var formula in formulas)
+            {
+                AddFormulaPathCondition(ref state, formula, source, provenance);
+            }
+        }
+
+        private static void AddFormulaPathCondition(
+            ref SymbolicState state,
+            SmtFormula formula,
+            SyntaxNode source,
+            string provenance)
+        {
+            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    formula,
+                    source,
+                    provenance,
+                    evidenceKey: provenance,
+                    out var condition))
+            {
+                state = state.AddPathCondition(condition);
+            }
         }
 
         internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
@@ -610,6 +1686,20 @@ namespace PurelySharp.Symbolic
             }
 
             return facts;
+        }
+
+        internal static SymbolicState CollectForInitializerState(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var state = new SymbolicState();
+            AddFormulaPathConditions(
+                ref state,
+                CollectForInitializerFacts(forStatement, semanticModel, cancellationToken),
+                forStatement,
+                "ir.path.for-initializer");
+            return state;
         }
 
         internal static ImmutableArray<SmtFormula> CollectForLoopBodyInvariantFacts(
@@ -1161,14 +2251,11 @@ namespace PurelySharp.Symbolic
         {
             var referencedSymbols = GetReferencedLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
             if (referencedSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, initializedSymbol)) ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !TryCreateIntegerValueFormula(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var candidate,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                candidate is not { Kind: SmtValueKind.Int })
+                    out var candidate))
             {
                 upperBound = null!;
                 upperBoundSymbols = Array.Empty<ISymbol>();
@@ -2014,12 +3101,13 @@ namespace PurelySharp.Symbolic
                         }
                     }
                     else if (previousAssignedValue != null &&
-                             TryCreateCompoundAssignmentFact(
+                             SymbolicReachabilityService.TryCreateCompoundAssignmentFact(
                                  originalAssignedSymbol,
                                  previousAssignedValue,
                                  assignment,
                                  semanticModel,
                                  cancellationToken,
+                                 ExpressionReferencesSymbol(assignment.Right, originalAssignedSymbol, semanticModel, cancellationToken),
                                  out var compoundAssignmentFact))
                     {
                         facts.Add(compoundAssignmentFact);
@@ -2723,13 +3811,11 @@ namespace PurelySharp.Symbolic
             foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
-                    !CSharpConditionToFormula.TryTranslateValue(
+                    !TryCreateIntegerValueFormula(
                         sizeExpression,
                         semanticModel,
                         cancellationToken,
-                        out var sizeFormula,
-                        getSymbolVersion: null) ||
-                    sizeFormula is not { Kind: SmtValueKind.Int })
+                        out var sizeFormula))
                 {
                     continue;
                 }
@@ -2771,7 +3857,7 @@ namespace PurelySharp.Symbolic
 
             if (expression is ElementAccessExpressionSyntax elementAccess &&
                 !AnyConditionSymbolInvalidatedInStatement(elementAccess, statement, semanticModel, cancellationToken) &&
-                CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -2800,20 +3886,14 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (SymbolicReachabilityService.TryCreateReferenceNullComparison(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var expressionFormula,
-                    getSymbolVersion: null) &&
-                expressionFormula is { Kind: SmtValueKind.Reference })
+                    equalToNull: false,
+                    out var notNullFact))
             {
-                AddUniqueFact(
-                    facts,
-                    new SmtBinaryFormula(
-                        SmtBinaryOperator.NotEqual,
-                        expressionFormula,
-                        new SmtNullConstant()));
+                AddUniqueFact(facts, notNullFact);
                 return true;
             }
 
@@ -3233,7 +4313,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             var formulas = new List<SmtFormula>();
-            if (!CSharpConditionToFormula.TryCollectBranchAssumptions(
+            if (!CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
                     condition,
                     branchWhenTrue,
                     semanticModel,
@@ -4710,7 +5790,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            CSharpConditionToFormula.TryCollectBranchAssumptions(
+            CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,
@@ -4731,7 +5811,7 @@ namespace PurelySharp.Symbolic
                     branchWhenTrue,
                     out var isPatternExpression,
                     out var matchedPattern) ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     isPatternExpression.Expression,
                     semanticModel,
                     cancellationToken,
@@ -4745,7 +5825,7 @@ namespace PurelySharp.Symbolic
 
             var matchedType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
-            CSharpConditionToFormula.TryCollectPatternBindingFacts(
+            CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts(
                 matchedValue,
                 matchedType,
                 matchedPattern,
@@ -4971,12 +6051,11 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+            if (!TryCreateBuiltInLengthValueFormula(
                     expressionSyntax,
                     semanticModel,
                     cancellationToken,
-                    out var lengthFormula,
-                    getSymbolVersion: null) ||
+                    out var lengthFormula) ||
                 lengthFormula is not { Kind: SmtValueKind.Int })
             {
                 return;
@@ -5476,21 +6555,17 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
                     expressionSyntax,
                     semanticModel,
                     cancellationToken,
-                    out var formula,
-                    getSymbolVersion: null) ||
-                formula is not { Kind: SmtValueKind.Reference })
+                    isNull,
+                    out var formula))
             {
                 return;
             }
 
-            facts.Add(new SmtBinaryFormula(
-                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
-                formula,
-                new SmtNullConstant()));
+            facts.Add(formula);
         }
 
         private static bool StatementDefinitelyExits(
@@ -5802,29 +6877,20 @@ namespace PurelySharp.Symbolic
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateStringContentAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var stringContentFact))
+                SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var stringContentFact))
             {
                 facts.Add(stringContentFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateSymbolSmtValue(assignedSymbol, out var targetReferenceFormula) &&
-                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol)?.SpecialType == SpecialType.System_String &&
-                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
+                    assignedSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueNonNullFormula) &&
-                valueNonNullFormula != null)
+                    out var stringNonNullFact))
             {
-                facts.Add(new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    new SmtBinaryFormula(
-                        SmtBinaryOperator.NotEqual,
-                        targetReferenceFormula,
-                        new SmtNullConstant()),
-                    valueNonNullFormula));
+                facts.Add(stringNonNullFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
@@ -5833,31 +6899,31 @@ namespace PurelySharp.Symbolic
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateBuiltInLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
+                SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
             {
                 facts.Add(lengthFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateReferenceBackedLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceLengthFact))
+                SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceLengthFact))
             {
                 AddUniqueFact(facts, referenceLengthFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateCollectionExpressionLengthLowerBoundFact(assignedSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
+                SymbolicReachabilityService.TryCreateCollectionExpressionLengthLowerBoundFact(assignedSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
             {
                 AddUniqueFact(facts, lowerBoundLengthFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
-                AddArrayDimensionLengthAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                SymbolicReachabilityService.AddArrayDimensionLengthAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
-                AddReferenceBackedArrayDimensionLengthFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                SymbolicReachabilityService.AddReferenceBackedArrayDimensionLengthFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
@@ -5877,7 +6943,7 @@ namespace PurelySharp.Symbolic
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateReferenceBackedStringContentFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceStringFact))
+                SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceStringFact))
             {
                 AddUniqueFact(facts, referenceStringFact);
             }
@@ -5885,7 +6951,7 @@ namespace PurelySharp.Symbolic
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddStructuralReferenceNullStateAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
-                AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                SymbolicReachabilityService.AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddAsExpressionAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddConditionalAccessAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
@@ -5918,24 +6984,17 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            if (!TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
-                targetFormula is not { Kind: SmtValueKind.Reference } ||
-                !CSharpConditionToFormula.TryCreateNotNullIfNotNullResultNonNullFormula(
+            if (!SymbolicReachabilityService.TryCreateNotNullIfNotNullAssignedValueFact(
+                    assignedSymbol,
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueNonNullFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0,
-                    requireLocalOrParameterSource: true))
+                    out var fact))
             {
                 return;
             }
 
-            facts.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                CreateReferenceNonNullFormula(targetFormula),
-                valueNonNullFormula));
+            facts.Add(fact);
         }
 
         private static void AddSwitchExpressionAssignedValueFacts(
@@ -6068,20 +7127,17 @@ namespace PurelySharp.Symbolic
             if (valueExpression is not InvocationExpressionSyntax invocationExpression ||
                 !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
                 targetFormula.Kind != SmtValueKind.Int ||
-                !CSharpConditionToFormula.TryGetMathAbsRemainderOperands(
+                !CSharpSmtFormulaTranslator.TryGetMathAbsRemainderOperands(
                     invocationExpression,
                     semanticModel,
                     cancellationToken,
                     out _,
                     out var divisorExpression) ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !TryCreateIntegerValueFormula(
                     divisorExpression,
                     semanticModel,
                     cancellationToken,
-                    out var divisorFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                divisorFormula is not { Kind: SmtValueKind.Int } ||
+                    out var divisorFormula) ||
                 (!FactsProvePositiveInteger(divisorFormula, facts) &&
                     !IsBuiltInNonNegativeLengthValue(divisorExpression, divisorFormula, semanticModel, cancellationToken)))
             {
@@ -6111,25 +7167,21 @@ namespace PurelySharp.Symbolic
             expression = UnwrapExpression(expression);
             if (expression is MemberAccessExpressionSyntax memberAccess &&
                 string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) &&
-                CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                TryCreateBuiltInLengthValueFormula(
                     memberAccess.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var receiverLengthFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    out var receiverLengthFormula) &&
                 Equals(receiverLengthFormula, expectedFormula))
             {
                 return true;
             }
 
-            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+            return TryCreateBuiltInLengthValueFormula(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var lengthFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    out var lengthFormula) &&
                 Equals(lengthFormula, expectedFormula);
         }
 
@@ -6188,89 +7240,6 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
-        private static bool TryCreateReferenceBackedLengthFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapExpression(valueExpression),
-                    semanticModel,
-                    cancellationToken,
-                    (expression, model, token) =>
-                        TryCreateBuiltInLengthValueFormula(expression, model, token, out var formula)
-                            ? formula
-                            : null,
-                    out fact);
-        }
-
-        private static void AddReferenceBackedArrayDimensionLengthFacts(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetReference))
-            {
-                return;
-            }
-
-            SymbolicFactFactory.AddReferenceBackedArrayDimensionLengthFacts(
-                targetReference,
-                valueExpression,
-                UnwrapExpression(valueExpression),
-                semanticModel,
-                cancellationToken,
-                (expression, dimension, model, token) =>
-                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
-                        expression,
-                        dimension,
-                        model,
-                        token,
-                        out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
-                        ? valueDimensionLength
-                        : null,
-                fact => AddUniqueFact(facts, fact));
-        }
-
-        private static bool TryCreateReferenceBackedStringContentFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapExpression(valueExpression),
-                    semanticModel,
-                    cancellationToken,
-                    (expression, model, token) =>
-                        CSharpConditionToFormula.TryTranslateStringValue(
-                            expression,
-                            model,
-                            token,
-                            out var valueString,
-                            getSymbolVersion: null,
-                            inlineDepth: 0) &&
-                        valueString != null
-                            ? valueString
-                            : null,
-                    out fact);
-        }
-
         private static void AddArrayDimensionLengthSourceSymbolSnapshotFacts(
             ISymbol assignedSymbol,
             ISymbol sourceSymbol,
@@ -6292,40 +7261,6 @@ namespace PurelySharp.Symbolic
                     AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
                 }
             }
-        }
-
-        private static void AddArrayDimensionLengthAssignedValueFacts(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol) is not IArrayTypeSymbol targetArrayType)
-            {
-                return;
-            }
-
-            SymbolicFactFactory.AddArrayDimensionLengthAssignedValueFacts(
-                targetArrayType,
-                dimension => TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength)
-                    ? targetDimensionLength
-                    : null,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                (expression, dimension, model, token) =>
-                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
-                        expression,
-                        dimension,
-                        model,
-                        token,
-                        out var valueDimensionLength,
-                        getSymbolVersion: null,
-                        inlineDepth: 0)
-                        ? valueDimensionLength
-                        : null,
-                fact => AddUniqueFact(facts, fact));
         }
 
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
@@ -6691,14 +7626,11 @@ namespace PurelySharp.Symbolic
                     out formula);
             }
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!TryCreateReferenceValueFormula(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var valueFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                valueFormula is not { Kind: SmtValueKind.Reference })
+                    out var valueFormula))
             {
                 return false;
             }
@@ -6715,7 +7647,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             formula = null!;
-            if (!CSharpConditionToFormula.TryTranslate(
+            if (!CSharpSmtFormulaTranslator.TryTranslate(
                     conditionalExpression.Condition,
                     semanticModel,
                     cancellationToken,
@@ -6780,14 +7712,11 @@ namespace PurelySharp.Symbolic
         {
             formula = null!;
             if (depth >= MaxStructuralNullStateDepth ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !TryCreateReferenceValueFormula(
                     conditionalAccess.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var receiverFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                receiverFormula is not { Kind: SmtValueKind.Reference } ||
+                    out var receiverFormula) ||
                 !TryCreateConditionalAccessWhenNotNullValueFormula(
                     conditionalAccess,
                     receiverFormula,
@@ -6836,7 +7765,7 @@ namespace PurelySharp.Symbolic
             }
 
             if (valueExpression is ConditionalExpressionSyntax conditionalExpression &&
-                CSharpConditionToFormula.TryTranslate(
+                CSharpSmtFormulaTranslator.TryTranslate(
                     conditionalExpression.Condition,
                     semanticModel,
                     cancellationToken,
@@ -6866,7 +7795,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+            if (CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -6881,31 +7810,6 @@ namespace PurelySharp.Symbolic
 
             formula = null;
             return false;
-        }
-
-        private static bool TryCreateStringContentAssignedValueFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateStringContentFormula(targetSymbol, out var targetFormula) ||
-                !CSharpConditionToFormula.TryTranslateStringValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var valueFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                valueFormula == null)
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
-            return true;
         }
 
         private static bool TryCreateStringContentFormula(ISymbol symbol, out SmtFormula formula)
@@ -7006,7 +7910,7 @@ namespace PurelySharp.Symbolic
 
             var receiverSymbols = GetReferencedLocalAndParameterSymbols(elementAccess.Expression, semanticModel, cancellationToken);
             if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken) ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -7163,7 +8067,7 @@ namespace PurelySharp.Symbolic
                     facts);
 
                 if (!TryCreateTupleElementSmtValue(assignedSymbol, elementNames[index], out var targetFormula) ||
-                    !CSharpConditionToFormula.TryTranslateValue(
+                    !CSharpSmtFormulaTranslator.TryTranslateValue(
                         argumentExpression,
                         semanticModel,
                         cancellationToken,
@@ -7189,14 +8093,11 @@ namespace PurelySharp.Symbolic
             List<SmtFormula> facts)
         {
             if (TryCreateTupleElementStringContentFormula(tupleSymbol, elementName, out var targetString) &&
-                CSharpConditionToFormula.TryTranslateStringValue(
+                TryCreateStringValueFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var valueString,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                valueString != null)
+                    out var valueString))
             {
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString));
             }
@@ -7218,7 +8119,7 @@ namespace PurelySharp.Symbolic
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
                 if (TryCreateTupleElementArrayDimensionLengthFormula(tupleSymbol, elementName, dimension, out var targetDimensionLength) &&
-                    CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
                         valueExpression,
                         dimension,
                         semanticModel,
@@ -7419,14 +8320,11 @@ namespace PurelySharp.Symbolic
 
             AddCoalesceAssignmentRightNullImplication(targetFormula, rightExpression, semanticModel, cancellationToken, facts);
 
-            if (!CSharpConditionToFormula.TryTranslateValue(
+            if (!TryCreateReferenceValueFormula(
                     rightExpression,
                     semanticModel,
                     cancellationToken,
-                    out var rightFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                rightFormula is not { Kind: SmtValueKind.Reference })
+                    out var rightFormula))
             {
                 return;
             }
@@ -7479,7 +8377,7 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
+            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
                     rightExpression,
                     semanticModel,
                     cancellationToken,
@@ -7634,22 +8532,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            if (!CSharpConditionToFormula.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var formula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                formula is not { Kind: SmtValueKind.Reference })
-            {
-                return;
-            }
-
-            facts.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.NotEqual,
-                formula,
-                new SmtNullConstant()));
+            AddReferenceNullCondition(facts, expression, isNull: false, semanticModel, cancellationToken);
         }
 
         private static bool TryCreateAssignedValueFact(
@@ -7760,7 +8643,7 @@ namespace PurelySharp.Symbolic
         {
             valueExpression = UnwrapExpression(valueExpression);
             if (valueExpression is not ConditionalAccessExpressionSyntax conditionalAccess ||
-                !CSharpConditionToFormula.TryTranslateValue(
+                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     conditionalAccess.Expression,
                     semanticModel,
                     cancellationToken,
@@ -7838,12 +8721,11 @@ namespace PurelySharp.Symbolic
             {
                 if (memberSymbol.Name == "Length" &&
                     IsStringExpression(conditionalAccess.Expression, semanticModel, cancellationToken) &&
-                    CSharpConditionToFormula.TryTranslateStringValue(
+                    TryCreateStringValueFormula(
                         conditionalAccess.Expression,
                         semanticModel,
                         cancellationToken,
-                        out var stringFormula) &&
-                    stringFormula != null)
+                        out var stringFormula))
                 {
                     formula = new SmtStringLengthTerm(stringFormula);
                     return true;
@@ -7892,72 +8774,19 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            valueExpression = UnwrapExpression(valueExpression);
-            if (valueExpression is not BinaryExpressionSyntax asExpression ||
-                !asExpression.IsKind(SyntaxKind.AsExpression) ||
-                !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
-                targetFormula is not { Kind: SmtValueKind.Reference })
-            {
-                return;
-            }
-
-            if (CSharpConditionToFormula.TryCreateAsExpressionAssignmentFacts(
-                    asExpression,
-                    targetFormula,
+            if (!SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts(
+                    assignedSymbol,
+                    valueExpression,
                     semanticModel,
                     cancellationToken,
                     out var asFacts))
             {
-                foreach (var fact in asFacts)
-                {
-                    AddUniqueFact(facts, fact);
-                }
-            }
-        }
-
-        private static void AddNullableAssignedValueFacts(
-            ISymbol assignedSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            List<SmtFormula> facts)
-        {
-            if (!TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) ||
-                !TryCreateNullableValueFormula(assignedSymbol, out var targetValue))
-            {
                 return;
             }
 
-            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var parts,
-                    getSymbolVersion: null,
-                    inlineDepth: 0))
+            foreach (var fact in asFacts)
             {
-                facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetHasValue, parts.HasValue));
-
-                if (parts.Value != null &&
-                    SymbolicFactFactory.CanCompareSmtValues(targetValue, parts.Value))
-                {
-                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, parts.Value));
-                }
-            }
-            else if (TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol), out var underlyingType) &&
-                     TryTranslateNullableWrappedValueForUnderlyingType(
-                         valueExpression,
-                         underlyingType,
-                         semanticModel,
-                         cancellationToken,
-                         out var wrappedValueFormula))
-            {
-                facts.Add(targetHasValue);
-
-                if (SymbolicFactFactory.CanCompareSmtValues(targetValue, wrappedValueFormula))
-                {
-                    facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetValue, wrappedValueFormula));
-                }
+                AddUniqueFact(facts, fact);
             }
         }
 
@@ -7977,7 +8806,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -8253,39 +9082,6 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static bool TryCreateCompoundAssignmentFact(
-            ISymbol targetSymbol,
-            SmtFormula previousValue,
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                !CSharpConditionToFormula.TryTranslateValue(
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken,
-                    out var rightValue,
-                    getSymbolVersion: null,
-                    inlineDepth: 0))
-            {
-                return false;
-            }
-
-            return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
-                targetFormula,
-                previousValue,
-                SmtFormulaReferenceScanner.ContainsVariablePrefix(
-                    previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken),
-                assignment.Kind(),
-                rightValue,
-                out fact);
-        }
-
         private static bool TryCreateIncrementOrDecrementFact(
             ISymbol targetSymbol,
             SmtFormula previousValue,
@@ -8544,37 +9340,6 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
-        private static bool TryCreateBuiltInLengthFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            if (!TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) ||
-                !TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
-            {
-                return false;
-            }
-
-            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula);
-            return true;
-        }
-
-        private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
-            ISymbol targetSymbol,
-            ExpressionSyntax valueExpression,
-            out SmtFormula fact)
-        {
-            fact = null!;
-            return TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
-                SymbolicFactFactory.TryCreateCollectionExpressionLengthLowerBoundFact(
-                    targetLengthFormula,
-                    UnwrapExpression(valueExpression),
-                    out fact);
-        }
-
         private static bool TryCreateArrayDimensionLengthFormula(
             ISymbol symbol,
             int dimension,
@@ -8633,13 +9398,82 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
                 valueExpression,
                 semanticModel,
                 cancellationToken,
                 out formula,
                 getSymbolVersion: null,
                 inlineDepth: 0);
+        }
+
+        private static bool TryCreateStringValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedFormula != null)
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateIntegerValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedFormula is { Kind: SmtValueKind.Int })
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateReferenceValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedFormula is { Kind: SmtValueKind.Reference })
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
         }
 
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)

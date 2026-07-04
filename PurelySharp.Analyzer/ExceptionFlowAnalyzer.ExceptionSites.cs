@@ -559,19 +559,21 @@ namespace PurelySharp.Analyzer
                     out var smtOperator,
                     out var minValue,
                     out var maxValue) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
-                operandFormula is not { Kind: SmtValueKind.Int })
+                !SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
+                    operand,
+                    smtOperator,
+                    semanticModel,
+                    cancellationToken,
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = SmtFormulaFactory.CreateIntegerBinaryTerm(
-                smtOperator,
-                operandFormula,
-                SmtFormulaFactory.CreateIntegerOne());
             return IsDefinitelyFalseAtUse(
                 updateExpression,
-                SmtFormulaFactory.CreateIntegerInRange(resultFormula, minValue, maxValue),
+                inRangeFormula,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -924,7 +926,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
+            if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1116,7 +1118,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
+            if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1143,7 +1145,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
+            if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -1257,31 +1259,19 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     out var receiverExpression,
                     out var startExpression,
-                    out var lengthExpression) ||
-                !CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
-                    receiverExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var receiverLengthFormula) ||
-                receiverLengthFormula is not { Kind: SmtValueKind.Int } ||
-                !TryTranslateIntExpression(startExpression, semanticModel, cancellationToken, out var startFormula))
+                    out var lengthExpression))
             {
                 return false;
             }
 
-            SmtFormula? sliceLengthFormula = null;
-            if (lengthExpression != null &&
-                !TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out sliceLengthFormula))
-            {
-                return false;
-            }
-
-            inRangeFormula = CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula(
-                receiverLengthFormula,
-                startFormula,
-                sliceLengthFormula,
+            return SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
+                receiverExpression,
+                startExpression,
+                lengthExpression,
+                semanticModel,
+                cancellationToken,
+                out inRangeFormula,
                 oneArgumentUpperBoundIsInclusive: true);
-            return true;
         }
 
         private static bool TryGetBuiltInSliceCallParts(
@@ -1361,28 +1351,6 @@ namespace PurelySharp.Analyzer
             }
 
             return arguments.All(static argument => argument != null);
-        }
-
-        private static bool TryTranslateIntExpression(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null) &&
-                translatedFormula is { Kind: SmtValueKind.Int })
-            {
-                formula = translatedFormula;
-                return true;
-            }
-
-            formula = null!;
-            return false;
         }
 
         private static bool IsBuiltInRangeAccessArgument(

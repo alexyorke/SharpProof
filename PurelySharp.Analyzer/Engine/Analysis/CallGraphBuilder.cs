@@ -26,6 +26,14 @@ namespace PurelySharp.Analyzer.Engine.Analysis
 					var delegateTargetsBySymbol = new Dictionary<ISymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
 					foreach (var inv in body.Descendants().OfType<IInvocationOperation>())
 					{
+						if (inv.Syntax != null &&
+							ExecutionVisibility.IsInStaticallyUnreachableBranch(
+								inv.Syntax,
+								model))
+						{
+							continue;
+						}
+
 						if (inv.TargetMethod != null)
 						{
 							var target = inv.TargetMethod.OriginalDefinition;
@@ -523,4 +531,3 @@ namespace PurelySharp.Analyzer.Engine.Analysis
 		}
 	}
 }
-

@@ -437,8 +437,8 @@ namespace PurelySharp.Symbolic
                 options.SmtAnalysis,
                 cancellationToken);
             var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(analysis.PathConditions);
-            var invariant = SymbolicInvariantResult.FromFacts(
-                analysis.Facts,
+            var invariant = SymbolicInvariantResult.FromFormulas(
+                analysis.PathConditions,
                 mergedInvariantText,
                 SymbolicInvariantMergeKind.Conjunction);
             return new SymbolicSourceQueryResult(

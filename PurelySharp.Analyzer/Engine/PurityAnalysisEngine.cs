@@ -25,15 +25,10 @@ namespace PurelySharp.Analyzer.Engine
         private readonly CompilationPurityService? _purityService;
         private readonly SmtAnalysisService _smtAnalysis;
 
-        public PurityAnalysisEngine()
+        public PurityAnalysisEngine(CompilationPurityService purityService)
         {
-            _smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        }
-
-        public PurityAnalysisEngine(CompilationPurityService? purityService)
-        {
-            _purityService = purityService;
-            _smtAnalysis = purityService?.SmtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
+            _purityService = purityService ?? throw new ArgumentNullException(nameof(purityService));
+            _smtAnalysis = purityService.SmtAnalysis;
         }
 
         internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis)
@@ -1164,11 +1159,10 @@ namespace PurelySharp.Analyzer.Engine
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             HashSet<IMethodSymbol> visited,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
-            SmtAnalysisService? smtAnalysis = null)
+            SmtAnalysisService smtAnalysis)
         {
 
-            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
-            var activeSmtAnalysis = smtAnalysis ?? fallbackSmtAnalysis!;
+            var activeSmtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
             var indent = new string(' ', visited.Count * 2);
             LogDebug($"{indent}>> Enter DeterminePurity: {methodSymbol.ToDisplayString()}");
 
@@ -1536,6 +1530,11 @@ namespace PurelySharp.Analyzer.Engine
                                 var returnPurity = CheckSingleOperation(returnOp, postCfgContext, returnState);
                                 if (!returnPurity.IsPure)
                                 {
+                                    if (IsImpurityProvenUnreachable(returnPurity, semanticModel, activeSmtAnalysis))
+                                    {
+                                        continue;
+                                    }
+
                                     LogDebug($"{indent}    Post-CFG: Return value IMPURE: {returnOp.ReturnedValue.Syntax}");
                                     result = returnPurity;
                                     goto PostCfgChecksDone;
@@ -1651,11 +1650,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Known Impure Invocations...");
                         foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IInvocationOperation>())
                         {
-                            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                                    invocationOp.Syntax,
-                                    semanticModel,
-                                    CancellationToken.None,
-                                    activeSmtAnalysis))
+                            if (ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis))
                             {
                                 continue;
                             }
@@ -1848,12 +1843,90 @@ namespace PurelySharp.Analyzer.Engine
             SemanticModel semanticModel,
             SmtAnalysisService smtAnalysis)
         {
-            return operation.Syntax != null &&
-                ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                    operation.Syntax,
-                    semanticModel,
-                    CancellationToken.None,
-                    smtAnalysis);
+            if (operation.Syntax == null)
+            {
+                return false;
+            }
+
+            foreach (var syntax in GetOperationVisibilitySyntaxCandidates(operation.Syntax))
+            {
+                if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                        syntax,
+                        semanticModel,
+                        CancellationToken.None,
+                        smtAnalysis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsImpurityProvenUnreachable(
+            PurityAnalysisResult result,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (result.IsPure ||
+                result.ImpureSyntaxNode == null)
+            {
+                return false;
+            }
+
+            foreach (var syntax in GetOperationVisibilitySyntaxCandidates(result.ImpureSyntaxNode))
+            {
+                if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                        syntax,
+                        semanticModel,
+                        CancellationToken.None,
+                        smtAnalysis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax)
+        {
+            yield return syntax;
+
+            foreach (var ancestor in syntax.Ancestors())
+            {
+                if (ancestor is ConditionalAccessExpressionSyntax conditionalAccess &&
+                    conditionalAccess.WhenNotNull.Span.Contains(syntax.SpanStart))
+                {
+                    yield return conditionalAccess.WhenNotNull;
+                    continue;
+                }
+
+                if (ancestor is BinaryExpressionSyntax binaryExpression &&
+                    binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                    binaryExpression.Right.Span.Contains(syntax.SpanStart))
+                {
+                    yield return binaryExpression.Right;
+                    continue;
+                }
+
+                if (IsNestedCallableBoundary(ancestor))
+                {
+                    yield break;
+                }
+            }
+        }
+
+        private static bool IsNestedCallableBoundary(SyntaxNode syntax)
+        {
+            return syntax is MethodDeclarationSyntax or
+                ConstructorDeclarationSyntax or
+                OperatorDeclarationSyntax or
+                AccessorDeclarationSyntax or
+                LocalFunctionStatementSyntax or
+                ParenthesizedLambdaExpressionSyntax or
+                SimpleLambdaExpressionSyntax or
+                AnonymousMethodExpressionSyntax;
         }
 
         private static PurityAnalysisState AddCompletedStraightLineUsingDisposeFacts(
@@ -3025,6 +3098,11 @@ namespace PurelySharp.Analyzer.Engine
                     currentStateInBlock = currentStateInBlock.WithFlowCaptureResult(flowCap.Id, valResult);
                     if (!valResult.IsPure)
                     {
+                        if (IsImpurityProvenUnreachable(valResult, semanticModel, smtAnalysis))
+                        {
+                            continue;
+                        }
+
                         LogDebug($"ApplyTransferFunction IMPURE FlowCapture value in Block #{block.Ordinal}");
                         currentStateInBlock = currentStateInBlock.WithImpurity(valResult, flowCap.Syntax);
                         break;
@@ -3038,6 +3116,11 @@ namespace PurelySharp.Analyzer.Engine
 
                 if (!opResult.IsPure)
                 {
+                    if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis))
+                    {
+                        continue;
+                    }
+
                     LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Op: {op.Kind} ({op.Syntax})");
 
                     if (IsRecursivePlaceholderImpurity(opResult))
@@ -3084,8 +3167,11 @@ namespace PurelySharp.Analyzer.Engine
                 var branchValueResult = CheckSingleOperation(block.BranchValue, ruleContext, currentStateInBlock);
                 if (!branchValueResult.IsPure)
                 {
-                    LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Branch Value: {block.BranchValue.Kind} ({block.BranchValue.Syntax})");
-                    currentStateInBlock = currentStateInBlock.WithImpurity(branchValueResult, block.BranchValue.Syntax);
+                    if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis))
+                    {
+                        LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Branch Value: {block.BranchValue.Kind} ({block.BranchValue.Syntax})");
+                        currentStateInBlock = currentStateInBlock.WithImpurity(branchValueResult, block.BranchValue.Syntax);
+                    }
                 }
                 else
                 {
@@ -3561,7 +3647,8 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 CancellationToken.None,
                 nextPathConditionsBuilder,
-                currentState.GetSmtSymbolVersion);
+                currentState.GetSmtSymbolVersion,
+                addTranslatedFormulaFallback: true);
 
             SmtFormula branchFormula;
             if (TryTranslateBranchValueToFormula(branchValue, currentState, out var operationFormula) &&
@@ -3569,10 +3656,14 @@ namespace PurelySharp.Analyzer.Engine
             {
                 branchFormula = operationFormula;
             }
-            else if (CSharpSmtFormulaTranslator.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula, currentState.GetSmtSymbolVersion) &&
-                     syntaxFormula != null)
+            else if (TryEncodeSymbolicBranchFormula(
+                         currentState.PathState,
+                         symbolicBranchState,
+                         addedSymbolicBranchAssumption,
+                         out var symbolicBranchFormula) &&
+                     symbolicBranchFormula != null)
             {
-                branchFormula = syntaxFormula;
+                branchFormula = symbolicBranchFormula;
             }
             else
             {
@@ -3618,6 +3709,23 @@ namespace PurelySharp.Analyzer.Engine
 
             successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
             return true;
+        }
+
+        private static bool TryEncodeSymbolicBranchFormula(
+            SymbolicState originalState,
+            SymbolicState branchState,
+            bool hasBranchAssumption,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (!hasBranchAssumption ||
+                branchState.PathConditions.Length <= originalState.PathConditions.Length)
+            {
+                return false;
+            }
+
+            var branchCondition = branchState.PathConditions[branchState.PathConditions.Length - 1];
+            return SymbolicIrFormulaEncoder.TryEncode(branchCondition, out formula);
         }
 
         internal static bool TryCreateBranchAssumptionState(
@@ -3973,9 +4081,7 @@ namespace PurelySharp.Analyzer.Engine
                 return PurityAnalysisResult.Pure;
             }
 
-            var canUseSyntaxOnlyReachability = currentState.SmtSymbolVersions.Count == 0;
-            if (canUseSyntaxOnlyReachability &&
-                ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                     operation.Syntax,
                     context.SemanticModel,
                     CancellationToken.None,
@@ -6101,7 +6207,7 @@ namespace PurelySharp.Analyzer.Engine
                 useOperation,
                 syntaxNode: useOperation.Syntax,
                 symbol: usedMemberSymbol,
-                catalogSource: "symbolic_resource_lifetime.using");
+                catalogSource: "symbolic_resource_lifetime");
             return true;
         }
 
@@ -6823,17 +6929,16 @@ namespace PurelySharp.Analyzer.Engine
                 targetSymbol,
                 valueOperation,
                 valueState);
-            if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) &&
-                CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (SymbolicReachabilityService.TryCreateAssignedValueFact(
+                    targetSymbol,
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
-                    out var valueFormula,
-                    valueState.GetSmtSymbolVersion) &&
-                valueFormula != null &&
-                SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
+                    out var assignedFact,
+                    valueState.GetSmtSymbolVersion,
+                    currentState.GetSmtSymbolVersion) &&
+                TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula))
             {
-                var assignedFact = SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
                 nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
@@ -6846,16 +6951,17 @@ namespace PurelySharp.Analyzer.Engine
                     "analyzer.assignment.value");
             }
 
-            if (TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
-                TryCreateBuiltInLengthValueFormula(
+            if (SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
+                    targetSymbol,
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
+                    out var lengthAssignedFact,
                     valueState.GetSmtSymbolVersion,
-                    out var valueLengthFormula))
+                    currentState.GetSmtSymbolVersion) &&
+                TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula))
             {
-                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
-                    SmtFormulaFactory.CreateEquality(targetLengthFormula, valueLengthFormula)));
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(lengthAssignedFact));
                 nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
                     targetLengthFormula,
@@ -6899,17 +7005,17 @@ namespace PurelySharp.Analyzer.Engine
                     "analyzer.assignment.collection_length");
             }
 
-            if (TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula) &&
-                CSharpSmtFormulaTranslator.TryTranslateStringValue(
+            if (SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
+                    targetSymbol,
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
-                    out var valueStringFormula,
-                    valueState.GetSmtSymbolVersion) &&
-                valueStringFormula != null)
+                    out var stringAssignedFact,
+                    valueState.GetSmtSymbolVersion,
+                    currentState.GetSmtSymbolVersion) &&
+                TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula))
             {
-                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
-                    SmtFormulaFactory.CreateEquality(targetStringFormula, valueStringFormula)));
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringAssignedFact));
                 nextState = AddAssignedSymbolicEqualityFact(
                     nextState,
                     targetStringFormula,
@@ -6921,14 +7027,14 @@ namespace PurelySharp.Analyzer.Engine
                     "analyzer.assignment.string");
             }
 
-            if (targetFormula is { Kind: SmtValueKind.Reference } &&
-                CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts(
+            if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts(
+                    targetSymbol,
                     valueExpression,
-                    targetFormula,
                     semanticModel,
                     CancellationToken.None,
                     out var asExpressionFacts,
-                    valueState.GetSmtSymbolVersion))
+                    valueState.GetSmtSymbolVersion,
+                    currentState.GetSmtSymbolVersion))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.AddRange(asExpressionFacts));
                 nextState = AddSymbolicConditionsFromFormulas(
@@ -6956,21 +7062,20 @@ namespace PurelySharp.Analyzer.Engine
                     "analyzer.assignment.reference_string");
             }
 
-            if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
-                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
-                SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
-                CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
+            if (SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
+                    targetSymbol,
                     valueExpression,
                     semanticModel,
                     CancellationToken.None,
-                    out var valueNonNullFormula,
-                    valueState.GetSmtSymbolVersion) &&
-                valueNonNullFormula != null)
+                    out var stringNonNullFact,
+                    valueState.GetSmtSymbolVersion,
+                    currentState.GetSmtSymbolVersion) &&
+                TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
+                targetReferenceFormula is { Kind: SmtValueKind.Reference })
             {
                 var targetNonNullFormula = SmtFormulaFactory.CreateReferenceNullComparison(
                     targetReferenceFormula,
                     isNull: false);
-                var stringNonNullFact = SmtFormulaFactory.CreateEquality(targetNonNullFormula, valueNonNullFormula);
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringNonNullFact));
                 nextState = AddSymbolicConditionFromFormula(
                     nextState,
@@ -7226,24 +7331,14 @@ namespace PurelySharp.Analyzer.Engine
             SemanticModel semanticModel,
             out SmtFormula fact)
         {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapSmtFactExpression(valueExpression),
-                    semanticModel,
-                    CancellationToken.None,
-                    (expression, model, token) =>
-                        TryCreateBuiltInLengthValueFormula(
-                            expression,
-                            model,
-                            token,
-                            valueState.GetSmtSymbolVersion,
-                            out var formula)
-                                ? formula
-                                : null,
-                    out fact);
+            return SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
+                targetSymbol,
+                valueExpression,
+                semanticModel,
+                CancellationToken.None,
+                out fact,
+                valueState.GetSmtSymbolVersion,
+                currentState.GetSmtSymbolVersion);
         }
 
         private static bool TryCreateReferenceBackedStringContentFact(
@@ -7254,25 +7349,14 @@ namespace PurelySharp.Analyzer.Engine
             SemanticModel semanticModel,
             out SmtFormula fact)
         {
-            fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) &&
-                SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
-                    targetReference,
-                    valueExpression,
-                    UnwrapSmtFactExpression(valueExpression),
-                    semanticModel,
-                    CancellationToken.None,
-                    (expression, model, token) =>
-                        CSharpSmtFormulaTranslator.TryTranslateStringValue(
-                            expression,
-                            model,
-                            token,
-                            out var valueString,
-                            valueState.GetSmtSymbolVersion) &&
-                        valueString != null
-                            ? valueString
-                            : null,
-                    out fact);
+            return SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
+                targetSymbol,
+                valueExpression,
+                semanticModel,
+                CancellationToken.None,
+                out fact,
+                valueState.GetSmtSymbolVersion,
+                currentState.GetSmtSymbolVersion);
         }
 
         private static bool TryCreateSymbolSmtValue(
@@ -7317,22 +7401,6 @@ namespace PurelySharp.Analyzer.Engine
                 GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
                 type,
                 out formula);
-        }
-
-        private static bool TryCreateBuiltInLengthValueFormula(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            Func<ISymbol, int> getSymbolVersion,
-            out SmtFormula formula)
-        {
-            return CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out formula,
-                getSymbolVersion,
-                inlineDepth: 0);
         }
 
         private static bool TryCreateCollectionExpressionLengthLowerBoundFact(

@@ -45,6 +45,13 @@ namespace PurelySharp.Symbolic
                 site,
                 semanticModel,
                 cancellationToken);
+            pathState = SymbolicProgramPointFacts.MergeStates(
+                pathState,
+                SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                    site,
+                    semanticModel,
+                    cancellationToken,
+                    includeCurrentStatementCompletionFacts));
             return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis, site);
         }
 
@@ -58,8 +65,12 @@ namespace PurelySharp.Symbolic
                 forStatement,
                 semanticModel,
                 cancellationToken);
+            var pathState = SymbolicProgramPointFacts.CollectForInitialEntryState(
+                forStatement,
+                semanticModel,
+                cancellationToken);
 
-            return CreateAnalysis(forStatement.SpanStart, formulas, new SymbolicState(), smtAnalysis, forStatement);
+            return CreateAnalysis(forStatement.SpanStart, formulas, pathState, smtAnalysis, forStatement);
         }
 
         public SymbolicInvariantImplicationResult ProveImplicationAt(
@@ -470,8 +481,8 @@ namespace PurelySharp.Symbolic
             PathConditions = pathConditions;
             PathState = pathState ?? new SymbolicState();
             SourceNode = sourceNode ?? throw new ArgumentNullException(nameof(sourceNode));
-            Facts = pathConditions.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
-            MergedInvariantText = SymbolicInvariantService.FormatMergedInvariant(pathConditions);
+            Facts = pathConditions.Select(SymbolicFormulaDisplay.Format).ToArray();
+            MergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;

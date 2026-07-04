@@ -699,7 +699,7 @@ namespace PurelySharp.Symbolic
                 out var mismatchFormula)
                 ? mismatchFormula
                 : CreateUnknownTrigger(assignment, "array_type_mismatch");
-            var inRangeTrigger = CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(
+            var inRangeTrigger = SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 cancellationToken,
@@ -1038,7 +1038,7 @@ namespace PurelySharp.Symbolic
         {
             candidate = default;
             if (!IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-                !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
+                !TryCreateDynamicNullBindingTrigger(receiver, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
             }
@@ -1126,43 +1126,18 @@ namespace PurelySharp.Symbolic
                     out var countExpression,
                     out var oneArgumentUpperBoundIsInclusive,
                     out var category) ||
-                !CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
+                !SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
                     sourceExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var sourceLength) ||
-                sourceLength is not { Kind: SmtValueKind.Int } ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     startExpression,
+                    countExpression,
                     semanticModel,
                     cancellationToken,
-                    out var start,
-                    getSymbolVersion: null) ||
-                start is not { Kind: SmtValueKind.Int })
+                    out var inRange,
+                    oneArgumentUpperBoundIsInclusive))
             {
                 return false;
             }
 
-            SmtFormula? count = null;
-            if (countExpression != null)
-            {
-                if (!CSharpSmtFormulaTranslator.TryTranslateValue(
-                        countExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out count,
-                        getSymbolVersion: null) ||
-                    count is not { Kind: SmtValueKind.Int })
-                {
-                    return false;
-                }
-            }
-
-            var inRange = CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula(
-                sourceLength,
-                start,
-                count,
-                oneArgumentUpperBoundIsInclusive);
             var trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRange);
             candidate = new RuntimeHazardCandidate(
                 invocation,
@@ -1212,42 +1187,24 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            SmtFormula? inRange = null;
+            var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
-                    !CSharpSmtFormulaTranslator.TryTranslateValue(
-                        indexExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out var indexFormula,
-                        getSymbolVersion: null) ||
-                    indexFormula is not { Kind: SmtValueKind.Int } ||
-                    !TryTranslateArrayGetValueDimensionLength(
-                        receiverExpression,
-                        arrayType,
-                        dimension,
-                        semanticModel,
-                        cancellationToken,
-                        out var lengthFormula) ||
-                    lengthFormula is not { Kind: SmtValueKind.Int })
+                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression))
                 {
                     return false;
                 }
 
-                var lowerBound = new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
-                    indexFormula,
-                    new SmtIntegerConstant(0));
-                var upperBound = new SmtBinaryFormula(
-                    SmtBinaryOperator.LessThan,
-                    indexFormula,
-                    lengthFormula);
-                var dimensionInRange = Conjoin(lowerBound, upperBound);
-                inRange = inRange == null ? dimensionInRange : Conjoin(inRange, dimensionInRange);
+                indexExpressions.Add(indexExpression);
             }
 
-            if (inRange == null)
+            if (!SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
+                    receiverExpression,
+                    arrayType,
+                    indexExpressions,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRange))
             {
                 return false;
             }
@@ -1264,33 +1221,6 @@ namespace PurelySharp.Symbolic
                 ExceptionTypes.IndexOutOfRangeException,
                 ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
             return true;
-        }
-
-        private static bool TryTranslateArrayGetValueDimensionLength(
-            ExpressionSyntax receiverExpression,
-            IArrayTypeSymbol arrayType,
-            int dimension,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula lengthFormula)
-        {
-            if (arrayType.Rank == 1 &&
-                dimension == 0 &&
-                CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
-                    receiverExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out lengthFormula))
-            {
-                return true;
-            }
-
-            return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
-                receiverExpression,
-                dimension,
-                semanticModel,
-                cancellationToken,
-                out lengthFormula);
         }
 
         private static bool TryCreateNegativeArrayLengthCandidate(
@@ -1570,31 +1500,47 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (IsSignedDivisionOverflowOperator(smtOperator))
+            {
+                if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
+                        binaryExpression.Left,
+                        binaryExpression.Right,
+                        semanticModel,
+                        cancellationToken,
+                        minValue,
+                        out var signedDivisionOverflow))
+                {
+                    return false;
+                }
+
+                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                    binaryExpression,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
+                    signedDivisionOverflow,
+                    "ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback");
+                return true;
+            }
+
+            if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
                     binaryExpression.Left,
-                    semanticModel,
-                    cancellationToken,
-                    out var leftFormula,
-                    getSymbolVersion: null) ||
-                leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     binaryExpression.Right,
+                    smtOperator,
                     semanticModel,
                     cancellationToken,
-                    out var rightFormula,
-                    getSymbolVersion: null) ||
-                rightFormula is not { Kind: SmtValueKind.Int })
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            var triggerFormula = IsSignedDivisionOverflowOperator(smtOperator)
-                ? Conjoin(
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
-                : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
-            trigger = new RuntimeHazardTrigger(triggerFormula);
+            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                binaryExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject: null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
             return true;
         }
 
@@ -1624,19 +1570,24 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
                     unaryExpression.Operand,
+                    SmtIntegerUnaryOperator.Negate,
                     semanticModel,
                     cancellationToken,
-                    out var operandFormula,
-                    getSymbolVersion: null) ||
-                operandFormula is not { Kind: SmtValueKind.Int })
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
-            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue));
+            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                unaryExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject: null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
             return true;
         }
 
@@ -1666,19 +1617,26 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
                     operand,
+                    smtOperator,
                     semanticModel,
                     cancellationToken,
-                    out var operandFormula,
-                    getSymbolVersion: null) ||
-                operandFormula is not { Kind: SmtValueKind.Int })
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
-            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue));
+            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                site,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject: null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                smtOperator == SmtIntegerBinaryOperator.Add
+                    ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
+                    : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
             return true;
         }
 
@@ -1706,31 +1664,47 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (IsSignedDivisionOverflowOperator(smtOperator))
+            {
+                if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
+                        assignment.Left,
+                        assignment.Right,
+                        semanticModel,
+                        cancellationToken,
+                        minValue,
+                        out var signedDivisionOverflow))
+                {
+                    return false;
+                }
+
+                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                    assignment,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    subject: null,
+                    signedDivisionOverflow,
+                    "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback");
+                return true;
+            }
+
+            if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
                     assignment.Left,
-                    semanticModel,
-                    cancellationToken,
-                    out var leftFormula,
-                    getSymbolVersion: null) ||
-                leftFormula is not { Kind: SmtValueKind.Int } ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
                     assignment.Right,
+                    smtOperator,
                     semanticModel,
                     cancellationToken,
-                    out var rightFormula,
-                    getSymbolVersion: null) ||
-                rightFormula is not { Kind: SmtValueKind.Int })
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
-            var triggerFormula = IsSignedDivisionOverflowOperator(smtOperator)
-                ? Conjoin(
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, leftFormula, new SmtIntegerConstant(minValue)),
-                    new SmtBinaryFormula(SmtBinaryOperator.Equal, rightFormula, new SmtIntegerConstant(-1)))
-                : CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
-            trigger = new RuntimeHazardTrigger(triggerFormula);
+            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                assignment,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject: null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
             return true;
         }
 
@@ -1756,18 +1730,23 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
                     castExpression.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var operandFormula,
-                    getSymbolVersion: null) ||
-                operandFormula is not { Kind: SmtValueKind.Int })
+                    minValue,
+                    maxValue,
+                    out var inRangeFormula))
             {
                 return false;
             }
 
-            trigger = new RuntimeHazardTrigger(CreateIntegralOutOfRangeFormula(operandFormula, minValue, maxValue));
+            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                castExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject: null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
             return true;
         }
 
@@ -2001,19 +1980,6 @@ namespace PurelySharp.Symbolic
             return SymbolicTypeFacts.TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
         }
 
-        private static SmtFormula CreateIntegralOutOfRangeFormula(SmtFormula resultFormula, long minValue, long maxValue)
-        {
-            var lowerOverflow = new SmtBinaryFormula(
-                SmtBinaryOperator.LessThan,
-                resultFormula,
-                new SmtIntegerConstant(minValue));
-            var upperOverflow = new SmtBinaryFormula(
-                SmtBinaryOperator.GreaterThan,
-                resultFormula,
-                new SmtIntegerConstant(maxValue));
-            return new SmtBinaryFormula(SmtBinaryOperator.Or, lowerOverflow, upperOverflow);
-        }
-
         private static bool TryGetArrayElementStoreType(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
@@ -2166,22 +2132,21 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (!SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison(
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out var value,
-                    getSymbolVersion: null) ||
-                value is not { Kind: SmtValueKind.Int })
+                    out trigger))
             {
+                SmtFormula value;
                 if (!TryTranslateDecimalZeroComparableValue(expression, semanticModel, cancellationToken, out value))
                 {
                     trigger = null!;
                     return false;
                 }
-            }
 
-            trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
+                trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
+            }
             return true;
         }
 
@@ -2210,20 +2175,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula trigger)
         {
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var value,
-                    getSymbolVersion: null) ||
-                value is not { Kind: SmtValueKind.Int })
-            {
-                trigger = null!;
-                return false;
-            }
-
-            trigger = new SmtBinaryFormula(SmtBinaryOperator.LessThan, value, new SmtIntegerConstant(0));
-            return true;
+            return SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out trigger);
         }
 
         private static bool TryTranslateNullCondition(
@@ -2246,20 +2202,12 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var value,
-                    getSymbolVersion: null) ||
-                value is not { Kind: SmtValueKind.Reference })
-            {
-                trigger = null!;
-                return false;
-            }
-
-            trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
-            return true;
+            return SymbolicReachabilityService.TryCreateReferenceNullComparison(
+                expression,
+                semanticModel,
+                cancellationToken,
+                equalToNull: true,
+                out trigger);
         }
 
         private static bool IsBuiltInSequenceElementAccess(

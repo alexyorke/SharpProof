@@ -154,8 +154,7 @@ public class TestClass
             Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Has.Some.StartsWith("ir."));
             Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(hazard.InvariantInfo.Facts, Is.EquivalentTo(hazard.SymbolicFacts));
-            Assert.That(hazard.PathConditions.Any(condition => condition.Contains("divisor", StringComparison.Ordinal) &&
-                                                               condition.Contains("Value = 0", StringComparison.Ordinal)), Is.True);
+            Assert.That(hazard.PathConditions, Does.Contain("divisor == 0"));
         }
 
         [Test]
@@ -340,6 +339,44 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_MemberReceiverNullDereferenceUsesIrPrecondition()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string? Value { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Holder holder)
+    {
+        if (holder.Value is null)
+        {
+            return holder.Value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return holder.Value.Length;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.null-dereference"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.null-dereference"));
         }
 
         [Test]
@@ -905,6 +942,10 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.dynamic-null-binding"));
         }
 
         [Test]
@@ -931,6 +972,9 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.dynamic-null-binding"));
         }
 
         [Test]
@@ -1171,6 +1215,9 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
         }
 
         [Test]
@@ -1225,6 +1272,10 @@ public class TestClass
             Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.nullable-value.without-value"));
+            Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance), Does.Contain("ir.runtime-hazard.nullable-value.without-value"));
         }
 
         [Test]

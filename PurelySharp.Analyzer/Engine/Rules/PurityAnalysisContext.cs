@@ -46,7 +46,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityRules = purityRules;
             CancellationToken = cancellationToken;
             PurityService = purityService;
-            SmtAnalysis = smtAnalysis ?? purityService?.SmtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
+            SmtAnalysis = smtAnalysis ?? purityService?.SmtAnalysis ??
+                throw new ArgumentNullException(nameof(smtAnalysis), "Purity analysis requires a compilation-scoped SMT service.");
         }
     }
 }

@@ -1406,7 +1406,7 @@ namespace PurelySharp.Symbolic
                 }
             }
 
-            return CSharpSmtFormulaTranslator.TryTranslate(
+            return SymbolicReachabilityService.TryTranslateConditionFormula(
                 condition,
                 semanticModel,
                 cancellationToken,
@@ -1654,8 +1654,8 @@ namespace PurelySharp.Symbolic
                 query.Node.Span,
                 cancellationToken);
             var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);
-            var invariant = SymbolicInvariantResult.FromFacts(
-                query.Analysis.Facts,
+            var invariant = SymbolicInvariantResult.FromFormulas(
+                query.Analysis.PathConditions,
                 mergedInvariantText,
                 SymbolicInvariantMergeKind.Conjunction);
             return new SymbolicSourceQueryResult(
@@ -7139,22 +7139,36 @@ namespace PurelySharp.Symbolic
                 return name ?? string.Empty;
             }
 
+            const string recordPrefix = "SmtVariable {";
+            if (name.StartsWith(recordPrefix, StringComparison.Ordinal))
+            {
+                var nameMarker = "Name = ";
+                var nameIndex = name.IndexOf(nameMarker, StringComparison.Ordinal);
+                var closeIndex = name.IndexOf(" }", StringComparison.Ordinal);
+                if (nameIndex >= 0 && closeIndex > nameIndex)
+                {
+                    var innerNameStart = nameIndex + nameMarker.Length;
+                    var innerName = name.Substring(innerNameStart, closeIndex - innerNameStart).Trim();
+                    var suffix = closeIndex + 2 < name.Length
+                        ? name.Substring(closeIndex + 2)
+                        : string.Empty;
+                    return FormatVariableName(innerName) + suffix;
+                }
+            }
+
+            name = name.Replace(".String", string.Empty);
             var hashIndex = name.LastIndexOf('#');
             if (hashIndex > 0 && hashIndex + 1 < name.Length)
             {
-                var allDigits = true;
-                for (var index = hashIndex + 1; index < name.Length; index++)
+                var index = hashIndex + 1;
+                while (index < name.Length && char.IsDigit(name[index]))
                 {
-                    if (!char.IsDigit(name[index]))
-                    {
-                        allDigits = false;
-                        break;
-                    }
+                    index++;
                 }
 
-                if (allDigits)
+                if (index > hashIndex + 1)
                 {
-                    return name.Substring(0, hashIndex);
+                    return name.Substring(0, hashIndex) + name.Substring(index);
                 }
             }
 
@@ -7455,6 +7469,24 @@ namespace PurelySharp.Symbolic
                 mergeKind);
         }
 
+        internal static SymbolicInvariantResult FromFormulas(
+            IReadOnlyList<SmtFormula> formulas,
+            string? mergedInvariantText = null,
+            SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.Conjunction)
+        {
+            if (formulas == null)
+            {
+                throw new ArgumentNullException(nameof(formulas));
+            }
+
+            return new SymbolicInvariantResult(
+                formulas
+                    .Select(static (formula, index) => SymbolicInvariantCondition.FromFormula(index, formula))
+                    .ToArray(),
+                mergedInvariantText ?? SymbolicFormulaDisplay.FormatMergedInvariant(formulas),
+                mergeKind);
+        }
+
         public static SymbolicInvariantResult FromMergedPathFacts(SymbolicMergedPathFacts facts)
         {
             if (facts == null)
@@ -7524,13 +7556,31 @@ namespace PurelySharp.Symbolic
 
         public static SymbolicInvariantCondition FromText(int index, string text)
         {
+            var normalizedText = text ?? string.Empty;
             return new SymbolicInvariantCondition(
                 index,
-                text ?? string.Empty,
+                normalizedText,
                 "Text",
                 "Unknown",
                 isSolverBacked: false,
-                text ?? string.Empty,
+                ExtractTextFactTarget(normalizedText),
+                isConservativeUnknown: false);
+        }
+
+        internal static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            return new SymbolicInvariantCondition(
+                index,
+                SymbolicFormulaDisplay.Format(formula),
+                GetFormulaKind(formula),
+                formula.Kind.ToString(),
+                isSolverBacked: true,
+                SymbolicFormulaDisplay.GetMergeTarget(formula),
                 isConservativeUnknown: false);
         }
 
@@ -7559,6 +7609,57 @@ namespace PurelySharp.Symbolic
             }
 
             return text ?? string.Empty;
+        }
+
+        private static string GetFormulaKind(SmtFormula formula)
+        {
+            var typeName = formula.GetType().Name;
+            return typeName.EndsWith("Formula", StringComparison.Ordinal)
+                ? typeName.Substring(0, typeName.Length - "Formula".Length)
+                : typeName;
+        }
+
+        private static string ExtractTextFactTarget(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            var value = text.Trim();
+            while (value.StartsWith("!", StringComparison.Ordinal) ||
+                (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)))
+            {
+                value = value.StartsWith("!", StringComparison.Ordinal)
+                    ? value.Substring(1).TrimStart()
+                    : value.Substring(1, value.Length - 2).Trim();
+            }
+
+            for (var index = 0; index < value.Length; index++)
+            {
+                if (!SyntaxFacts.IsIdentifierStartCharacter(value[index]) && value[index] != '@')
+                {
+                    continue;
+                }
+
+                var start = index;
+                index++;
+                while (index < value.Length && SyntaxFacts.IsIdentifierPartCharacter(value[index]))
+                {
+                    index++;
+                }
+
+                var target = value.Substring(start, index - start);
+                if (index + ".Length".Length <= value.Length &&
+                    string.Equals(value.Substring(index, ".Length".Length), ".Length", StringComparison.Ordinal))
+                {
+                    target += ".Length";
+                }
+
+                return target;
+            }
+
+            return value;
         }
     }
 

@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -10,6 +13,8 @@ namespace PurelySharp.Symbolic
 {
     internal sealed class SymbolicProofService
     {
+        private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
+        private static readonly ProofResultCache s_fallbackCache = new();
         private readonly SmtAnalysisService? smtAnalysis;
 
         public SymbolicProofService(SmtAnalysisService? smtAnalysis)
@@ -19,42 +24,119 @@ namespace PurelySharp.Symbolic
 
         public SymbolicIrProofResult ClassifyReachability(SymbolicState state)
         {
-            if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
+            if (state == null)
             {
-                return SymbolicIrProofResult.Unknown(unknownReason);
+                throw new ArgumentNullException(nameof(state));
             }
 
-            var result = ClassifyFormulaPathFeasibility(pathConditions);
-            return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
+            state = state.Normalize();
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Unreachable,
+                    "ir_state_contradictory");
+            }
+
+            return ClassifyWithIrCache(
+                "reachability:" + state.NormalizedProofKey,
+                () =>
+                {
+                    if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
+                    {
+                        return SymbolicIrProofResult.Unknown(unknownReason);
+                    }
+
+                    var result = ClassifyFormulaPathFeasibility(pathConditions);
+                    return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
+                });
         }
 
         internal bool TryEncode(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
         {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             return TryEncodeState(state, out pathConditions, out _);
         }
 
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)
         {
-            if (!TryEncodeState(state, out var pathConditions, out var unknownReason) ||
-                !SymbolicIrFormulaEncoder.TryEncode(fact, out var factFormula))
+            if (state == null)
             {
-                return SymbolicIrProofResult.Unknown(unknownReason);
+                throw new ArgumentNullException(nameof(state));
             }
 
-            var result = ClassifyFormulaImplication(pathConditions, factFormula);
-            return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
+            if (fact == null)
+            {
+                throw new ArgumentNullException(nameof(fact));
+            }
+
+            state = state.Normalize();
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_state_contradictory");
+            }
+
+            return ClassifyWithIrCache(
+                "implication-fact:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(fact),
+                () =>
+                {
+                    if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
+                    {
+                        return SymbolicIrProofResult.Unknown(unknownReason);
+                    }
+
+                    if (!SymbolicIrFormulaEncoder.TryEncode(fact, out var factFormula))
+                    {
+                        return SymbolicIrProofResult.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
+                    }
+
+                    var result = ClassifyFormulaImplication(pathConditions, factFormula);
+                    return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
+                });
         }
 
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)
         {
-            if (!TryEncodeState(state, out var pathConditions, out var unknownReason) ||
-                !SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
+            if (state == null)
             {
-                return SymbolicIrProofResult.Unknown(unknownReason);
+                throw new ArgumentNullException(nameof(state));
             }
 
-            var result = ClassifyFormulaImplication(pathConditions, formula);
-            return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition));
+            }
+
+            state = state.Normalize();
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_state_contradictory");
+            }
+
+            return ClassifyWithIrCache(
+                "implication-condition:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofConditionKey(condition),
+                () =>
+                {
+                    if (!TryEncodeState(state, out var pathConditions, out var unknownReason))
+                    {
+                        return SymbolicIrProofResult.Unknown(unknownReason);
+                    }
+
+                    if (!SymbolicIrFormulaEncoder.TryEncode(condition, out var formula))
+                    {
+                        return SymbolicIrProofResult.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
+                    }
+
+                    var result = ClassifyFormulaImplication(pathConditions, formula);
+                    return SymbolicIrProofResult.FromImplication(result, CreateBudgetInfo());
+                });
         }
 
         public SymbolicIrProofResult ClassifyBranchFeasibility(SymbolicState state, SymbolicCondition branchCondition)
@@ -80,27 +162,33 @@ namespace PurelySharp.Symbolic
                 return reachability;
             }
 
-            var trueBranch = ClassifyBranchFeasibility(state, condition);
-            if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable &&
-                trueBranch.RawResult != null)
-            {
-                return SymbolicIrProofResult.FromConditionTruth(
-                    trueBranch.RawResult,
-                    SymbolicProofStatus.ProvenFalse,
-                    CreateBudgetInfo());
-            }
+            state = state.Normalize();
+            return ClassifyWithIrCache(
+                "condition-truth:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofConditionKey(condition),
+                () =>
+                {
+                    var trueBranch = ClassifyBranchFeasibility(state, condition);
+                    if (trueBranch.Info.Status == SymbolicProofStatus.Unreachable &&
+                        trueBranch.RawResult != null)
+                    {
+                        return SymbolicIrProofResult.FromConditionTruth(
+                            trueBranch.RawResult,
+                            SymbolicProofStatus.ProvenFalse,
+                            CreateBudgetInfo());
+                    }
 
-            var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
-            if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable &&
-                falseBranch.RawResult != null)
-            {
-                return SymbolicIrProofResult.FromConditionTruth(
-                    falseBranch.RawResult,
-                    SymbolicProofStatus.ProvenTrue,
-                    CreateBudgetInfo());
-            }
+                    var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
+                    if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable &&
+                        falseBranch.RawResult != null)
+                    {
+                        return SymbolicIrProofResult.FromConditionTruth(
+                            falseBranch.RawResult,
+                            SymbolicProofStatus.ProvenTrue,
+                            CreateBudgetInfo());
+                    }
 
-            return SymbolicIrProofResult.Unknown(falseBranch.Info.UnknownReason);
+                    return SymbolicIrProofResult.Unknown(falseBranch.Info.UnknownReason);
+                });
         }
 
         public SymbolicIrProofResult ClassifyHazardTrigger(SymbolicState state, SymbolicFact triggerPrecondition)
@@ -110,26 +198,74 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(triggerPrecondition));
             }
 
-            var proven = ClassifyImplication(state, triggerPrecondition);
-            if (proven.Info.Status == SymbolicProofStatus.ProvenTrue)
+            state = state.Normalize();
+            return ClassifyWithIrCache(
+                "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
+                () =>
+                {
+                    var proven = ClassifyImplication(state, triggerPrecondition);
+                    if (proven.Info.Status == SymbolicProofStatus.ProvenTrue)
+                    {
+                        return proven;
+                    }
+
+                    var triggerFeasibility = ClassifyBranchFeasibility(
+                        state,
+                        new SymbolicFactCondition(triggerPrecondition));
+                    return triggerFeasibility.Info.Status == SymbolicProofStatus.Unreachable
+                        ? triggerFeasibility
+                        : proven;
+                });
+        }
+
+        internal SymbolicIrProofResult ClassifyFormulaReachability(IEnumerable<SmtFormula> pathConditions)
+        {
+            var result = ClassifyFormulaPathFeasibility(pathConditions);
+            return SymbolicIrProofResult.FromReachability(result, CreateBudgetInfo());
+        }
+
+        internal SymbolicIrProofResult ClassifyFormulaConditionTruth(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula)
+        {
+            if (conditionFormula == null)
             {
-                return proven;
+                throw new ArgumentNullException(nameof(conditionFormula));
             }
 
-            var triggerFeasibility = ClassifyBranchFeasibility(
-                state,
-                new SymbolicFactCondition(triggerPrecondition));
-            return triggerFeasibility.Info.Status == SymbolicProofStatus.Unreachable
-                ? triggerFeasibility
-                : proven;
+            var trueProof = ClassifyFormulaImplication(pathConditions, conditionFormula);
+            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                var status = string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
+                    ? SymbolicProofStatus.Unreachable
+                    : SymbolicProofStatus.ProvenTrue;
+                return SymbolicIrProofResult.FromConditionTruth(
+                    trueProof,
+                    status,
+                    CreateBudgetInfo());
+            }
+
+            var falseProof = ClassifyFormulaImplication(
+                pathConditions,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
+            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                var status = string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
+                    ? SymbolicProofStatus.Unreachable
+                    : SymbolicProofStatus.ProvenFalse;
+                return SymbolicIrProofResult.FromConditionTruth(
+                    falseProof,
+                    status,
+                    CreateBudgetInfo());
+            }
+
+            return SymbolicIrProofResult.FromConditionTruth(
+                trueProof,
+                SymbolicProofStatus.Unknown,
+                CreateBudgetInfo());
         }
 
-        private PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
-        {
-            return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
-        }
-
-        private PurityProofResult ClassifyFormulaImplication(
+        internal PurityProofResult ClassifyFormulaImplication(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula)
         {
@@ -141,6 +277,26 @@ namespace PurelySharp.Symbolic
             return ClassifyWithFallback(service => service.ClassifyImplication(pathConditions, factFormula));
         }
 
+        internal PurityProofResult ClassifyFormulaBranchReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula branchCondition)
+        {
+            if (branchCondition == null)
+            {
+                throw new ArgumentNullException(nameof(branchCondition));
+            }
+
+            return ClassifyWithFallback(
+                service => service.Classify(new PurityProofQuery(
+                    pathConditions.ToArray(),
+                    new PurityHazard(PurityHazardKind.BranchReachability, branchCondition))));
+        }
+
+        private PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
+        {
+            return ClassifyWithFallback(service => service.ClassifyPathFeasibility(pathConditions));
+        }
+
         private PurityProofResult ClassifyWithFallback(Func<SmtAnalysisService, PurityProofResult> classify)
         {
             if (smtAnalysis != null)
@@ -150,6 +306,28 @@ namespace PurelySharp.Symbolic
 
             using var fallback = new SmtAnalysisService(SmtAnalysisOptions.Default);
             return classify(fallback);
+        }
+
+        private SymbolicIrProofResult ClassifyWithIrCache(
+            string key,
+            Func<SymbolicIrProofResult> classify)
+        {
+            var cache = GetProofResultCache();
+            if (cache.Results.TryGetValue(key, out var cached))
+            {
+                return cached.WithCacheHit(CreateBudgetInfo());
+            }
+
+            var result = classify();
+            cache.Results.TryAdd(key, result);
+            return result;
+        }
+
+        private ProofResultCache GetProofResultCache()
+        {
+            return smtAnalysis != null
+                ? s_serviceCaches.GetOrCreateValue(smtAnalysis)
+                : s_fallbackCache;
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()
@@ -174,6 +352,7 @@ namespace PurelySharp.Symbolic
             out ImmutableArray<SmtFormula> pathConditions,
             out SymbolicUnknownReason unknownReason)
         {
+            state = state.Normalize();
             var builder = ImmutableArray.CreateBuilder<SmtFormula>(
                 state.Facts.Length + state.PathConditions.Length);
             var skippedUnsupported = false;
@@ -211,6 +390,11 @@ namespace PurelySharp.Symbolic
             unknownReason = SymbolicUnknownReason.None;
             return true;
         }
+
+        private sealed class ProofResultCache
+        {
+            internal ConcurrentDictionary<string, SymbolicIrProofResult> Results { get; } = new(StringComparer.Ordinal);
+        }
     }
 
     internal sealed class SymbolicIrProofResult
@@ -236,6 +420,37 @@ namespace PurelySharp.Symbolic
                     reason.ToString(),
                     cacheHit: false,
                     budget: null));
+        }
+
+        public static SymbolicIrProofResult Syntactic(
+            SymbolicProofStatus status,
+            string reason)
+        {
+            return new SymbolicIrProofResult(
+                rawResult: null,
+                new SymbolicProofInfo(
+                    status,
+                    SymbolicProofBackend.Syntactic,
+                    SymbolicUnknownReason.None,
+                    reason,
+                    cacheHit: false,
+                    budget: null));
+        }
+
+        internal SymbolicIrProofResult WithCacheHit(SymbolicBudgetInfo? budget)
+        {
+            return new SymbolicIrProofResult(
+                RawResult,
+                new SymbolicProofInfo(
+                    Info.Status,
+                    Info.Backend,
+                    Info.UnknownReason,
+                    Info.Reason,
+                    cacheHit: true,
+                    budget ?? Info.Budget,
+                    Info.Target,
+                    Info.ConditionText,
+                    Info.DisplayKind));
         }
 
         public static SymbolicIrProofResult FromReachability(
@@ -304,6 +519,7 @@ namespace PurelySharp.Symbolic
             {
                 "smt_disabled" => SymbolicUnknownReason.SmtDisabled,
                 "smt_unavailable" => SymbolicUnknownReason.SmtUnavailable,
+                "smt_timeout" => SymbolicUnknownReason.Timeout,
                 "smt_method_budget_exceeded" => SymbolicUnknownReason.MethodBudgetExceeded,
                 "smt_path_condition_budget_exceeded" => SymbolicUnknownReason.PathConditionBudgetExceeded,
                 "smt_expression_budget_exceeded" => SymbolicUnknownReason.ExpressionBudgetExceeded,

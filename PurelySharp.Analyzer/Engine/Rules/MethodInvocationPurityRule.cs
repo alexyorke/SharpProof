@@ -24,8 +24,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            var visibilitySyntax = GetVisibilitySyntax(invocationOperation);
             if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                    invocationOperation.Syntax,
+                    visibilitySyntax,
                     context.SemanticModel,
                     System.Threading.CancellationToken.None,
                     context.SmtAnalysis))
@@ -767,6 +768,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return calleePurity.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : calleePurity.WithCallee(originalDefinitionSymbol, invocationOperation.Syntax);
+        }
+
+        private static SyntaxNode GetVisibilitySyntax(IInvocationOperation invocationOperation)
+        {
+            return invocationOperation.Syntax is ConditionalAccessExpressionSyntax conditionalAccess
+                ? conditionalAccess.WhenNotNull
+                : invocationOperation.Syntax;
         }
 
         private static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(
