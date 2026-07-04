@@ -690,9 +690,7 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicOwnershipAtom ownership:
                     return "ownership:" + (ownership.Escaped ? "escaped" : "owned") + ":" + CreateTermKey(ownership.Value);
                 case SymbolicAliasAtom alias:
-                    return "alias:" + (alias.MayAlias ? "may" : "no") + "(" +
-                        CreateTermKey(alias.Source) + "," +
-                        CreateTermKey(alias.Target) + ")";
+                    return CreateAliasAtomKey(alias);
                 case SymbolicBorrowAtom borrow:
                     return "borrow:" + borrow.Kind + "(" +
                         CreateTermKey(borrow.Owner) + "," +
@@ -716,6 +714,18 @@ namespace PurelySharp.Symbolic.Ir
                 default:
                     return atom.ToString() ?? string.Empty;
             }
+        }
+
+        private static string CreateAliasAtomKey(SymbolicAliasAtom alias)
+        {
+            var source = CreateTermKey(alias.Source);
+            var target = CreateTermKey(alias.Target);
+            if (string.CompareOrdinal(source, target) > 0)
+            {
+                (source, target) = (target, source);
+            }
+
+            return "alias:" + (alias.MayAlias ? "may" : "no") + "(" + source + "," + target + ")";
         }
 
         private static (string AtomKey, bool Polarity) CreateRelationFactCoreKey(

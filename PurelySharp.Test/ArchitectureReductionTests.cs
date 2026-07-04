@@ -2495,6 +2495,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesAliasAtoms()
+        {
+            var owner = new SymbolicVariableTerm("owner", SmtValueKind.Reference);
+            var alias = new SymbolicVariableTerm("alias", SmtValueKind.Reference);
+            var sourceFirst = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                alias,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("alias"),
+                "test.source-first");
+            var targetFirst = SymbolicOwnershipFactFactory.CreateAlias(
+                alias,
+                owner,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.target-first");
+
+            var merged = new SymbolicState(new[] { sourceFirst, targetFirst });
+            var baseline = new SymbolicState(new[] { sourceFirst });
+
+            Assert.That(merged.Facts, Has.Length.EqualTo(1));
+            Assert.That(merged.NormalizedProofKey, Is.EqualTo(baseline.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
