@@ -2129,6 +2129,54 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesAbsorbedConditionOperands()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var yPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y"));
+            var direct = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                xPositive,
+            });
+            var orAbsorption = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    xPositive,
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        xPositive,
+                        yPositive)),
+            });
+            var andAbsorption = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    xPositive,
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        xPositive,
+                        yPositive)),
+            });
+
+            Assert.That(direct.NormalizedProofKey, Is.EqualTo(orAbsorption.NormalizedProofKey));
+            Assert.That(direct.NormalizedProofKey, Is.EqualTo(andAbsorption.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesNegatedFactConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);

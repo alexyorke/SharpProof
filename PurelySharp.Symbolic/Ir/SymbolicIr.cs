@@ -954,8 +954,11 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicNotCondition notCondition:
                     return "not(" + CreateConditionKey(notCondition.Operand) + ")";
                 case SymbolicBinaryCondition binaryCondition:
-                    var operands = new List<string>();
-                    CollectBinaryConditionOperandKeys(binaryCondition, binaryCondition.Operator, operands);
+                    var operandConditions = new List<SymbolicCondition>();
+                    CollectBinaryConditionOperands(binaryCondition, binaryCondition.Operator, operandConditions);
+                    var operands = operandConditions
+                        .Select(CreateConditionKey)
+                        .ToList();
                     var identityOperand = binaryCondition.Operator == SymbolicConditionOperator.And
                         ? "const:true"
                         : "const:false";
@@ -974,6 +977,7 @@ namespace PurelySharp.Symbolic.Ir
 
                     operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
                     operands = operands.Distinct(StringComparer.Ordinal).ToList();
+                    operands = RemoveAbsorbedConditionOperands(binaryCondition.Operator, operandConditions, operands);
                     if (operands.Count == 0)
                     {
                         return identityOperand;
@@ -989,22 +993,6 @@ namespace PurelySharp.Symbolic.Ir
                 default:
                     return condition.ToString() ?? string.Empty;
             }
-        }
-
-        private static void CollectBinaryConditionOperandKeys(
-            SymbolicCondition condition,
-            SymbolicConditionOperator binaryOperator,
-            ICollection<string> operands)
-        {
-            if (condition is SymbolicBinaryCondition nested &&
-                nested.Operator == binaryOperator)
-            {
-                CollectBinaryConditionOperandKeys(nested.Left, binaryOperator, operands);
-                CollectBinaryConditionOperandKeys(nested.Right, binaryOperator, operands);
-                return;
-            }
-
-            operands.Add(CreateConditionKey(condition));
         }
 
         private static bool ContainsComplementaryConditionOperands(SymbolicBinaryCondition condition)
@@ -1042,6 +1030,44 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             operands.Add(condition);
+        }
+
+        private static List<string> RemoveAbsorbedConditionOperands(
+            SymbolicConditionOperator conditionOperator,
+            IReadOnlyCollection<SymbolicCondition> operandConditions,
+            List<string> operandKeys)
+        {
+            if (operandKeys.Count < 2)
+            {
+                return operandKeys;
+            }
+
+            var keySet = new HashSet<string>(operandKeys, StringComparer.Ordinal);
+            var absorbedKeys = new HashSet<string>(StringComparer.Ordinal);
+            var oppositeOperator = NegateConditionOperator(conditionOperator);
+            foreach (var operandCondition in operandConditions)
+            {
+                if (operandCondition is not SymbolicBinaryCondition nested ||
+                    nested.Operator != oppositeOperator)
+                {
+                    continue;
+                }
+
+                var nestedOperands = new List<SymbolicCondition>();
+                CollectBinaryConditionOperands(nested, oppositeOperator, nestedOperands);
+                if (nestedOperands
+                    .Select(CreateConditionKey)
+                    .Any(keySet.Contains))
+                {
+                    absorbedKeys.Add(CreateConditionKey(operandCondition));
+                }
+            }
+
+            return absorbedKeys.Count == 0
+                ? operandKeys
+                : operandKeys
+                    .Where(key => !absorbedKeys.Contains(key))
+                    .ToList();
         }
 
         private static SymbolicConditionOperator NegateConditionOperator(SymbolicConditionOperator conditionOperator)
