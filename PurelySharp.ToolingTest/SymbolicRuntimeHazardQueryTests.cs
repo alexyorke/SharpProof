@@ -2599,6 +2599,11 @@ public class TestClass
             Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
             Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
             Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+            Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.checked-integral.binary-overflow"));
+            Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(hazard.Proof.Budget, Is.Not.Null);
         }
 
         [Test]
