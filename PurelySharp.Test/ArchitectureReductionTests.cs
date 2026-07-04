@@ -2967,6 +2967,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ReversedAliasFactImpliesWithoutSmt()
+        {
+            var owner = new SymbolicVariableTerm("owner", SmtValueKind.Reference);
+            var alias = new SymbolicVariableTerm("alias", SmtValueKind.Reference);
+            var stored = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                alias,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("alias"),
+                "test.alias.stored");
+            var queried = SymbolicOwnershipFactFactory.CreateAlias(
+                alias,
+                owner,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.alias.queried");
+            var state = new SymbolicState(new[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(
+                state,
+                queried,
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicProofService_NegativeStateFactImpliesNegatedConditionWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
