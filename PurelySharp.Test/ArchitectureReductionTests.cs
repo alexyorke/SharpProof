@@ -2468,17 +2468,17 @@ namespace PurelySharp.Test
             var helperIndex = source.IndexOf("internal static bool TryTranslatePattern(", StringComparison.Ordinal);
             var helperEndIndex = source.IndexOf("internal static void AddUnsatisfiablePathCondition(", StringComparison.Ordinal);
             var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
-            var irValueIndex = helperSource.IndexOf("SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue)", StringComparison.Ordinal);
+            var proofServiceIndex = helperSource.IndexOf("SymbolicProofService.TryEncodeDerivedFormulaCondition(", StringComparison.Ordinal);
             var irPatternIndex = helperSource.IndexOf("SymbolicIrLowerer.TryLowerPatternCondition(", StringComparison.Ordinal);
             var legacyIndex = helperSource.IndexOf("SymbolicTranslatorCompatibility.TryTranslatePatternLegacy(", StringComparison.Ordinal);
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
-            Assert.That(irValueIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(irPatternIndex, Is.GreaterThan(irValueIndex));
+            Assert.That(proofServiceIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(irPatternIndex, Is.GreaterThan(proofServiceIndex));
             Assert.That(legacyIndex, Is.GreaterThan(irPatternIndex));
             Assert.That(helperSource, Does.Contain("CanUseIrPatternTranslation(pattern)"));
-            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula)"));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue)"));
             Assert.That(helperSource, Does.Contain("formula = encodedFormula;"));
         }
 

@@ -447,14 +447,16 @@ namespace PurelySharp.Symbolic
             if (CanUseIrPatternTranslation(pattern))
             {
                 var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-                if (SymbolicSmtFormulaLowerer.TryLowerTerm(value, out var symbolicValue) &&
-                    SymbolicIrLowerer.TryLowerPatternCondition(
-                        symbolicValue,
-                        pattern,
-                        pattern,
-                        context,
-                        out var symbolicCondition) &&
-                    SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
+                if (SymbolicProofService.TryEncodeDerivedFormulaCondition(
+                    value,
+                    (SymbolicTerm symbolicValue, out SymbolicCondition symbolicCondition) =>
+                        SymbolicIrLowerer.TryLowerPatternCondition(
+                            symbolicValue,
+                            pattern,
+                            pattern,
+                            context,
+                            out symbolicCondition),
+                    out var encodedFormula))
                 {
                     formula = encodedFormula;
                     return true;
