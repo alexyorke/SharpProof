@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,410 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,665 lines,
+- Production inventory currently reports 112,454 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,709 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -85,6 +85,9 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable
   integral terms.
+- Binary add/subtract/multiply range proofs now build IR `SymbolicBinaryTerm`
+  conditions before formula fallback, so checked arithmetic overflow guards
+  have an IR path for lowerable non-division operands.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
