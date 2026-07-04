@@ -33,13 +33,16 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 11 symbolic-side
+  currently reports 0 analyzer-side and 10 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped
   value helper instead of keeping a second direct translator path.
+  Condition-truth reachability now also reuses the shared
+  `TryTranslateConditionFormula` helper instead of issuing its own direct
+  translator call.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
   value-term lowering. Term lowerings are intentionally tracked separately
   because value-returning APIs such as `Nullable<T>.GetValueOrDefault` should

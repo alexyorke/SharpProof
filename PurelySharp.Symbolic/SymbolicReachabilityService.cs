@@ -807,7 +807,11 @@ namespace PurelySharp.Symbolic
                 return irTruth;
             }
 
-            if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
+            if (!TryTranslateConditionFormula(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula) ||
                 formula == null)
             {
                 if (IsBranchUnreachable(

@@ -2024,12 +2024,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(11));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(10));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 11,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 10,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2040,7 +2040,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
-                    ["if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||"] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
@@ -5560,17 +5559,20 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var methodIndex = source.IndexOf("internal static bool? EvaluateConditionTruth(", StringComparison.Ordinal);
             var irIndex = source.IndexOf("EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
-            var legacyIndex = source.IndexOf("CSharpSmtFormulaTranslator.TryTranslate(expression", StringComparison.Ordinal);
             var helperIndex = source.IndexOf("private static bool? EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
             var helperEndIndex = source.IndexOf("private static SymbolicState CreateStateFromFormulaPath", StringComparison.Ordinal);
+            var methodSource = source.Substring(methodIndex, helperIndex - methodIndex);
             var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
 
+            Assert.That(methodIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
-            Assert.That(irIndex, Is.LessThan(legacyIndex));
+            Assert.That(methodSource, Does.Contain("EvaluateConditionTruthWithIr("));
+            Assert.That(methodSource, Does.Contain("TryTranslateConditionFormula("));
+            Assert.That(methodSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslate(expression"));
             Assert.That(helperSource, Does.Contain("ClassifyStateConditionTruth(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateBranchFeasibility(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateImplication(state, condition"));
