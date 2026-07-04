@@ -7449,9 +7449,10 @@ namespace PurelySharp.Symbolic
                 case SmtStringLengthTerm stringLength:
                     if (TrySubstituteFormula(stringLength.Value, sourceFormula, targetFormula, out var stringLengthValue))
                     {
-                        if (SymbolicSmtFormulaLowerer.TryLowerTerm(stringLengthValue, out var stringLengthTerm) &&
-                            stringLengthTerm.Kind == SmtValueKind.String &&
-                            SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(stringLengthTerm), out substituted))
+                        if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                                stringLengthValue,
+                                TryCreateStringLengthDerivedTerm,
+                                out substituted))
                         {
                             return true;
                         }
@@ -7856,9 +7857,10 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(receiver, out var stringContent) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(stringContent, out formula))
+            if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    TryCreateStringContentDerivedTerm,
+                    out formula))
             {
                 return true;
             }
@@ -8740,9 +8742,10 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var stringFormula))
                 {
-                    if (SymbolicSmtFormulaLowerer.TryLowerTerm(stringFormula, out var stringTerm) &&
-                        stringTerm.Kind == SmtValueKind.String &&
-                        SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(stringTerm), out formula))
+                    if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                            stringFormula,
+                            TryCreateStringLengthDerivedTerm,
+                            out formula))
                     {
                         return true;
                     }
@@ -8783,10 +8786,10 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(
-                    new SymbolicMemberTerm(receiver, memberSymbol.Name, kind),
+            if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    (SymbolicTerm receiver, out SymbolicTerm term) =>
+                        TryCreateMemberDerivedTerm(receiver, memberSymbol, kind, out term),
                     out formula))
             {
                 return true;
@@ -9420,10 +9423,11 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? type,
             out SmtFormula formula)
         {
-            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                TryCreateBuiltInLengthTerm(receiver, type, out var lengthTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    (SymbolicTerm receiver, out SymbolicTerm term) =>
+                        TryCreateBuiltInLengthDerivedTerm(receiver, type, out term),
+                    out formula))
             {
                 return true;
             }
@@ -9445,10 +9449,11 @@ namespace PurelySharp.Symbolic
             int dimension,
             out SmtFormula formula)
         {
-            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                TryCreateArrayDimensionLengthTerm(receiver, arrayType, dimension, out var lengthTerm) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    (SymbolicTerm receiver, out SymbolicTerm term) =>
+                        TryCreateArrayDimensionLengthDerivedTerm(receiver, arrayType, dimension, out term),
+                    out formula))
             {
                 return true;
             }
@@ -9475,6 +9480,62 @@ namespace PurelySharp.Symbolic
 
             term = new SymbolicArrayDimensionLengthTerm(receiver, dimension);
             return true;
+        }
+
+        private static bool TryCreateStringLengthDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
+        {
+            output = null!;
+            if (input.Kind != SmtValueKind.String)
+            {
+                return false;
+            }
+
+            output = new SymbolicLengthTerm(input);
+            return true;
+        }
+
+        private static bool TryCreateStringContentDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
+        {
+            output = null!;
+            return input.Kind == SmtValueKind.Reference &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(input, out output);
+        }
+
+        private static bool TryCreateMemberDerivedTerm(
+            SymbolicTerm receiver,
+            ISymbol memberSymbol,
+            SmtValueKind kind,
+            out SymbolicTerm output)
+        {
+            output = null!;
+            if (receiver.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            output = new SymbolicMemberTerm(receiver, memberSymbol.Name, kind);
+            return true;
+        }
+
+        private static bool TryCreateBuiltInLengthDerivedTerm(
+            SymbolicTerm receiver,
+            ITypeSymbol? type,
+            out SymbolicTerm output)
+        {
+            output = null!;
+            return receiver.Kind == SmtValueKind.Reference &&
+                TryCreateBuiltInLengthTerm(receiver, type, out output);
+        }
+
+        private static bool TryCreateArrayDimensionLengthDerivedTerm(
+            SymbolicTerm receiver,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            out SymbolicTerm output)
+        {
+            output = null!;
+            return receiver.Kind == SmtValueKind.Reference &&
+                TryCreateArrayDimensionLengthTerm(receiver, arrayType, dimension, out output);
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(

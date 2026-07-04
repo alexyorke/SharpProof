@@ -108,6 +108,7 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeDerivedFormulaTerm("));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeTermWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeConditionWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState AddLoweredFormulaPathCondition("));
@@ -5817,15 +5818,14 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicElementTerm("));
             Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(element"));
             Assert.That(source, Does.Contain("new SymbolicMemberTerm("));
-            Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula"));
+            Assert.That(source, Does.Contain("SymbolicProofService.TryEncodeDerivedFormulaTerm("));
             Assert.That(source, Does.Contain("new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference)"));
             Assert.That(source, Does.Contain("new SymbolicNullableHasValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateStringContentReferenceTerm("));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out term)"));
-            Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringTerm)"));
-            Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringLengthTerm)"));
+            Assert.That(source, Does.Contain("new SymbolicLengthTerm(input)"));
             Assert.That(source, Does.Contain("new SymbolicArrayDimensionLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateArrayDimensionLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateTupleElementTerm("));
@@ -5833,6 +5833,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));
+            Assert.That(source, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm("));
         }
 
         [Test]

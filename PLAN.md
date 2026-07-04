@@ -104,6 +104,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicProgramPointFacts` formula-path condition addition now also
   delegates through `SymbolicProofService.AddLoweredFormulaPathCondition`
   instead of lowering raw SMT conditions at that call site.
+  `SymbolicProgramPointFacts` SMT-term re-encoding for string content, string
+  length, member access, built-in length, and array-dimension length now also
+  delegates through `SymbolicProofService.TryEncodeDerivedFormulaTerm`
+  instead of lowering SMT terms directly at those call sites.
   IR-first formula proof orchestration now also lives behind
   `SymbolicProofService` helpers for condition truth, formula-path
   feasibility, and branch-condition truth, with reachability remaining only as

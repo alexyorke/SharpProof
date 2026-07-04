@@ -16,6 +16,8 @@ namespace PurelySharp.Symbolic
 {
     internal sealed class SymbolicProofService
     {
+        internal delegate bool SymbolicTermTransformer(SymbolicTerm input, out SymbolicTerm output);
+
         private const string ContradictoryStateReason = "path_unsatisfiable";
         private static readonly ConditionalWeakTable<SmtAnalysisService, ProofResultCache> s_serviceCaches = new();
         private static readonly ProofResultCache s_fallbackCache = new();
@@ -161,6 +163,31 @@ namespace PurelySharp.Symbolic
                 state,
                 s_syntheticProofNode,
                 out formula);
+        }
+
+        internal static bool TryEncodeDerivedFormulaTerm(
+            SmtFormula formula,
+            SymbolicTermTransformer transform,
+            out SmtFormula encoded)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            if (transform == null)
+            {
+                throw new ArgumentNullException(nameof(transform));
+            }
+
+            if (!SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term) ||
+                !transform(term, out var transformed))
+            {
+                encoded = null!;
+                return false;
+            }
+
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(transformed, out encoded);
         }
 
         private static bool TryEncodeFactWithPathState(
