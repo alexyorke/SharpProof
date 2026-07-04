@@ -2096,7 +2096,7 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 (expression, dimension, model, token) =>
-                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
+                    TryTranslateArrayDimensionLengthValue(
                         expression,
                         dimension,
                         model,
@@ -2134,7 +2134,7 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 (expression, dimension, model, token) =>
-                    CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
+                    TryTranslateArrayDimensionLengthValue(
                         expression,
                         dimension,
                         model,
@@ -2212,23 +2212,45 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula lengthFormula)
         {
-            if (arrayType.Rank == 1 &&
-                dimension == 0 &&
-                TryTranslateBuiltInLengthValue(
-                    receiverExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out lengthFormula))
-            {
-                return true;
-            }
-
-            return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
+            return TryTranslateArrayDimensionLengthValue(
                 receiverExpression,
                 dimension,
                 semanticModel,
                 cancellationToken,
                 out lengthFormula);
+        }
+
+        private static bool TryTranslateArrayDimensionLengthValue(
+            ExpressionSyntax expression,
+            int dimension,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            var type = semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+            if (dimension == 0 &&
+                type is IArrayTypeSymbol { Rank: 1 } &&
+                TryTranslateBuiltInLengthValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion))
+            {
+                return true;
+            }
+
+            return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue(
+                expression,
+                dimension,
+                semanticModel,
+                cancellationToken,
+                out lengthFormula,
+                getSymbolVersion,
+                inlineDepth);
         }
 
         internal static bool TryCreateCompoundAssignmentFact(
