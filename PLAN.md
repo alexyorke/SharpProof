@@ -99,17 +99,21 @@ path-fact, hazard, and ownership flows.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms before formula
   fallback. The remaining built-in-length shim is still carrying other
-  domains such as range/slice and count-backed collection lengths.
+  domains such as count-backed collection lengths and unsupported
+  `System.Range`/`System.Index` symbol flows.
 - Direct range-result lengths such as `values[1..^1].Length` and
   `text[1..^1].Length` now also lower through the IR indexing partial before
-  formula fallback. Assigned `System.Range`, `Slice(...)`, and count-backed
-  collection length shapes still remain on the compatibility path.
+  formula fallback. Resolvable assigned `System.Range` locals and parameters
+  now use the same IR path for range-result lengths. Count-backed collection
+  length shapes and unknown range/index reassignments still remain on the
+  compatibility path.
 - Built-in view-result lengths such as `text.AsSpan(start).Length` and
   `values.Slice(start, length).Length` now lower through the same IR indexing
-  partial before formula fallback. Assigned `System.Range` views, direct
-  `AsSpan(...Range...)`/`AsMemory(...Range...)` coverage beyond simple direct
-  syntax, and count-backed collection length shapes still remain on the
-  compatibility path.
+  partial before formula fallback. Resolvable `AsSpan(range)` and
+  `AsMemory(range)` lengths now also lower through IR when the `System.Range`
+  and `System.Index` values can be recovered from direct expressions or simple
+  local/parameter assignments. Count-backed collection length shapes and
+  unknown range/index reassignments still remain on the compatibility path.
 - Array-creation dimension lengths such as `new T[rows, columns].GetLength(1)`
   now lower the requested dimension directly to the corresponding size
   expression in `SymbolicIrLowerer.Indexing`, reducing reliance on

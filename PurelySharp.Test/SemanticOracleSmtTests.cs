@@ -3166,6 +3166,38 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAssignedRangeElementAccessResultLength()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values != null && values.Length >= 2)
+        {
+            Range range = 1..^1;
+            int[] slice = values[range];
+            return slice.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "AssignedRangeElementAccessResultLength.cs",
+                FindLine(source, "return slice.Length;"),
+                20,
+                "slice.Length == values.Length - 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull()
         {
             const string source = @"

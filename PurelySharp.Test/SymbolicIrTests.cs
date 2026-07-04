@@ -1880,6 +1880,46 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerBuiltInLengthTerm_AssignedRangeElementAccessUsesResolvedEndpoints()
+        {
+            var context = CreateMethodExpressionContext(
+                "int[] values",
+                """
+                Range range = 1..^1;
+                """,
+                "values[range].Length == values.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_AssignedRangeStringViewUsesResolvedEndpoints()
+        {
+            var context = CreateMethodExpressionContext(
+                "string text, Range range",
+                """
+                range = 1..^1;
+                """,
+                "text.AsSpan(range).Length == text.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
         public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm()
         {
             var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
@@ -1909,6 +1949,28 @@ namespace PurelySharp.Test
             Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
             Assert.That(equality.Left, Is.TypeOf<SmtIntegerBinaryTerm>());
             Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
+        public void ReachabilityHelper_BuiltInLengthValueSupportsAssignedRangeStringViews()
+        {
+            var context = CreateMethodExpressionContext(
+                "string text, Range range",
+                """
+                range = 1..^1;
+                """,
+                "text.AsSpan(range).Length == text.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateBuiltInLengthValue(
+                    memberAccess.Expression,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    out var formula),
+                Is.True);
+
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
         }
 
         [Test]
@@ -2108,6 +2170,37 @@ namespace PurelySharp.Test
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "SymbolicIrTest",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var returnStatement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+
+            return new ExpressionContext(
+                returnStatement.Expression!,
+                semanticModel,
+                new SymbolicLoweringContext(semanticModel, CancellationToken.None));
+        }
+
+        private static ExpressionContext CreateMethodExpressionContext(string parameters, string statements, string expression)
+        {
+            var source = $$"""
+                using System;
+                public sealed class C
+                {
+                    public bool M({{parameters}})
+                    {
+                        {{statements}}
+                        return {{expression}};
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrMethodExpressionTest",
                 new[] { syntaxTree },
                 AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

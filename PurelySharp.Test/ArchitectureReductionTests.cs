@@ -1432,6 +1432,9 @@ namespace PurelySharp.Test
             Assert.That(lowererSource, Does.Contain("TryLowerBuiltInViewResultLengthTerm("));
             Assert.That(lowererSource, Does.Contain("TryLowerBuiltInSliceInvocationResultLengthTerm("));
             Assert.That(lowererSource, Does.Contain("TryLowerMemoryExtensionsViewResultLengthTerm("));
+            Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
+            Assert.That(lowererSource, Does.Contain("TryResolveAssignedRangeLengthShape("));
+            Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
             Assert.That(lowererSource, Does.Contain("TryLowerStringInvocationResultLengthTerm("));
             Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
             Assert.That(lowererSource, Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,6 +10,42 @@ namespace PurelySharp.Symbolic.Ir
 {
     internal static partial class SymbolicIrLowerer
     {
+        private readonly struct IndexLengthShape
+        {
+            public IndexLengthShape(ExpressionSyntax valueExpression, bool fromEnd)
+            {
+                ValueExpression = valueExpression;
+                FromEnd = fromEnd;
+            }
+
+            public ExpressionSyntax ValueExpression { get; }
+
+            public bool FromEnd { get; }
+        }
+
+        private readonly struct RangeLengthShape
+        {
+            public RangeLengthShape(
+                bool hasStart,
+                IndexLengthShape start,
+                bool hasEnd,
+                IndexLengthShape end)
+            {
+                HasStart = hasStart;
+                Start = start;
+                HasEnd = hasEnd;
+                End = end;
+            }
+
+            public bool HasStart { get; }
+
+            public IndexLengthShape Start { get; }
+
+            public bool HasEnd { get; }
+
+            public IndexLengthShape End { get; }
+        }
+
         private static bool TryLowerElementAccessTerm(
             ElementAccessExpressionSyntax elementAccess,
             SymbolicLoweringContext context,
@@ -635,7 +672,7 @@ namespace PurelySharp.Symbolic.Ir
             {
                 var argument = invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression;
                 if (allowDirectRangeArgument &&
-                    TryCreateDirectRangeLengthTerm(argument, sourceExpression, context, out term))
+                    TryCreateRangeLengthTerm(argument, sourceExpression, context, out term))
                 {
                     return true;
                 }
@@ -686,7 +723,7 @@ namespace PurelySharp.Symbolic.Ir
             var sourceType = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).ConvertedType ??
                 context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).Type;
             if (!IsSupportedBuiltInRangeLengthSourceType(sourceType) ||
-                !TryCreateDirectRangeLengthTerm(
+                !TryCreateRangeLengthTerm(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     elementAccess.Expression,
                     context,
@@ -712,17 +749,52 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             term = null!;
-            rangeExpression = UnwrapExpression(rangeExpression);
-            if (rangeExpression is not RangeExpressionSyntax rangeSyntax ||
-                !TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
-                !TryLowerDirectRangeEndpointTerm(
-                    rangeSyntax.LeftOperand,
+            if (!TryCreateDirectRangeExpressionShape(rangeExpression, context, out var rangeShape))
+            {
+                return false;
+            }
+
+            return TryCreateRangeLengthTerm(rangeShape, sourceExpression, context, out term);
+        }
+
+        private static bool TryCreateRangeLengthTerm(
+            ExpressionSyntax rangeExpression,
+            ExpressionSyntax sourceExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (TryCreateDirectRangeLengthTerm(rangeExpression, sourceExpression, context, out term))
+            {
+                return true;
+            }
+
+            if (!TryResolveBuiltInRangeLengthShape(rangeExpression, context, out var rangeShape))
+            {
+                return false;
+            }
+
+            return TryCreateRangeLengthTerm(rangeShape, sourceExpression, context, out term);
+        }
+
+        private static bool TryCreateRangeLengthTerm(
+            RangeLengthShape rangeShape,
+            ExpressionSyntax sourceExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
+                !TryLowerRangeEndpointTerm(
+                    rangeShape,
+                    useStart: true,
                     sourceLength,
                     defaultWhenOmitted: new SymbolicIntegerConstantTerm(0),
                     context,
                     out var start) ||
-                !TryLowerDirectRangeEndpointTerm(
-                    rangeSyntax.RightOperand,
+                !TryLowerRangeEndpointTerm(
+                    rangeShape,
+                    useStart: false,
                     sourceLength,
                     defaultWhenOmitted: sourceLength,
                     context,
@@ -735,36 +807,847 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
-        private static bool TryLowerDirectRangeEndpointTerm(
+        private static bool TryCreateDirectRangeExpressionShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is RangeExpressionSyntax rangeExpression)
+            {
+                if (!TryCreateRangeEndpointShape(
+                        rangeExpression.LeftOperand,
+                        context,
+                        out var hasStart,
+                        out var start) ||
+                    !TryCreateRangeEndpointShape(
+                        rangeExpression.RightOperand,
+                        context,
+                        out var hasEnd,
+                        out var end))
+                {
+                    rangeShape = default;
+                    return false;
+                }
+
+                rangeShape = new RangeLengthShape(hasStart, start, hasEnd, end);
+                return true;
+            }
+
+            if (TryCreateRangeInvocationShape(expression, context, out rangeShape) ||
+                TryCreateRangeObjectCreationShape(expression, context, out rangeShape) ||
+                TryCreateRangeAllPropertyShape(expression, context, out rangeShape))
+            {
+                return true;
+            }
+
+            rangeShape = default;
+            return false;
+        }
+
+        private static bool TryCreateRangeEndpointShape(
             ExpressionSyntax? expression,
+            SymbolicLoweringContext context,
+            out bool hasEndpoint,
+            out IndexLengthShape endpoint)
+        {
+            if (expression == null)
+            {
+                hasEndpoint = false;
+                endpoint = default;
+                return true;
+            }
+
+            if (!TryResolveBuiltInIndexLengthShape(expression, context, out endpoint))
+            {
+                hasEndpoint = false;
+                return false;
+            }
+
+            hasEndpoint = true;
+            return true;
+        }
+
+        private static bool TryResolveBuiltInRangeLengthShape(
+            ExpressionSyntax argumentExpression,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            argumentExpression = UnwrapExpression(argumentExpression);
+            if (TryCreateDirectRangeExpressionShape(argumentExpression, context, out rangeShape))
+            {
+                return true;
+            }
+
+            if (!IsSystemRangeExpression(argumentExpression, context) ||
+                !TryGetLocalOrParameterRangeSymbol(argumentExpression, context, out var rangeSymbol))
+            {
+                rangeShape = default;
+                return false;
+            }
+
+            return TryResolveAssignedRangeLengthShape(argumentExpression, rangeSymbol, context, out rangeShape);
+        }
+
+        private static bool TryGetLocalOrParameterRangeSymbol(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out ISymbol rangeSymbol)
+        {
+            var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+            if (symbol is ILocalSymbol localSymbol &&
+                IsSystemRangeType(localSymbol.Type, context.SemanticModel.Compilation))
+            {
+                rangeSymbol = localSymbol;
+                return true;
+            }
+
+            if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
+                IsSystemRangeType(parameterSymbol.Type, context.SemanticModel.Compilation))
+            {
+                rangeSymbol = parameterSymbol;
+                return true;
+            }
+
+            rangeSymbol = null!;
+            return false;
+        }
+
+        private static bool TryResolveAssignedRangeLengthShape(
+            ExpressionSyntax useExpression,
+            ISymbol rangeSymbol,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            rangeShape = default;
+            var foundAssignment = false;
+            foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+            {
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (statement == containingBlock.ContainingStatement)
+                    {
+                        break;
+                    }
+
+                    TryGetRangeAssignmentFromPrecedingStatement(
+                        statement,
+                        rangeSymbol,
+                        context,
+                        out var writesRangeSymbol,
+                        out var assignedRangeShape);
+                    if (!writesRangeSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (!assignedRangeShape.HasValue)
+                    {
+                        rangeShape = default;
+                        return false;
+                    }
+
+                    rangeShape = assignedRangeShape.GetValueOrDefault();
+                    foundAssignment = true;
+                }
+            }
+
+            return foundAssignment;
+        }
+
+        private static void TryGetRangeAssignmentFromPrecedingStatement(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SymbolicLoweringContext context,
+            out bool writesRangeSymbol,
+            out RangeLengthShape? rangeShape)
+        {
+            rangeShape = null;
+            writesRangeSymbol = false;
+
+            if (TryGetRangeAssignmentFromLocalDeclaration(
+                    statement,
+                    rangeSymbol,
+                    context,
+                    out writesRangeSymbol,
+                    out rangeShape))
+            {
+                return;
+            }
+
+            if (TryGetRangeAssignmentFromExpressionStatement(
+                    statement,
+                    rangeSymbol,
+                    context,
+                    out writesRangeSymbol,
+                    out rangeShape))
+            {
+                return;
+            }
+
+            writesRangeSymbol = ContainsSymbolWrite(statement, rangeSymbol, context);
+        }
+
+        private static bool TryGetRangeAssignmentFromLocalDeclaration(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SymbolicLoweringContext context,
+            out bool writesRangeSymbol,
+            out RangeLengthShape? rangeShape)
+        {
+            rangeShape = null;
+            writesRangeSymbol = false;
+            if (statement is not LocalDeclarationStatementSyntax localDeclaration)
+            {
+                return false;
+            }
+
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
+                if (!IsSameSymbol(declaredSymbol, rangeSymbol))
+                {
+                    continue;
+                }
+
+                if (variable.Initializer == null)
+                {
+                    return true;
+                }
+
+                writesRangeSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count != 1 ||
+                    !TryCreateDirectRangeExpressionShape(variable.Initializer.Value, context, out var assignedRangeShape))
+                {
+                    return true;
+                }
+
+                rangeShape = assignedRangeShape;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetRangeAssignmentFromExpressionStatement(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SymbolicLoweringContext context,
+            out bool writesRangeSymbol,
+            out RangeLengthShape? rangeShape)
+        {
+            rangeShape = null;
+            writesRangeSymbol = false;
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !IsSymbolReference(assignment.Left, rangeSymbol, context))
+            {
+                return false;
+            }
+
+            writesRangeSymbol = true;
+            if (TryCreateDirectRangeExpressionShape(assignment.Right, context, out var assignedRangeShape))
+            {
+                rangeShape = assignedRangeShape;
+            }
+
+            return true;
+        }
+
+        private static bool TryLowerRangeEndpointTerm(
+            RangeLengthShape rangeShape,
+            bool useStart,
             SymbolicTerm sourceLength,
             SymbolicTerm defaultWhenOmitted,
             SymbolicLoweringContext context,
             out SymbolicTerm term)
         {
-            if (expression == null)
+            if (useStart ? !rangeShape.HasStart : !rangeShape.HasEnd)
             {
                 term = defaultWhenOmitted;
                 return true;
             }
 
+            return TryLowerIndexShapeTerm(
+                useStart ? rangeShape.Start : rangeShape.End,
+                sourceLength,
+                context,
+                out term);
+        }
+
+        private static bool TryLowerIndexShapeTerm(
+            IndexLengthShape indexShape,
+            SymbolicTerm sourceLength,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            if (!TryLowerTerm(indexShape.ValueExpression, context, out var valueTerm) ||
+                valueTerm.Kind != SmtValueKind.Int)
+            {
+                term = null!;
+                return false;
+            }
+
+            if (!indexShape.FromEnd)
+            {
+                term = valueTerm;
+                return true;
+            }
+
+            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, valueTerm);
+            return true;
+        }
+
+        private static bool TryResolveBuiltInIndexLengthShape(
+            ExpressionSyntax argumentExpression,
+            SymbolicLoweringContext context,
+            out IndexLengthShape indexShape)
+        {
+            argumentExpression = UnwrapExpression(argumentExpression);
+            if (TryCreateDirectIndexExpressionShape(argumentExpression, context, out indexShape))
+            {
+                return true;
+            }
+
+            if (!IsSystemIndexExpression(argumentExpression, context) ||
+                !TryGetLocalOrParameterIndexSymbol(argumentExpression, context, out var indexSymbol))
+            {
+                indexShape = default;
+                return false;
+            }
+
+            return TryResolveAssignedIndexLengthShape(argumentExpression, indexSymbol, context, out indexShape);
+        }
+
+        private static bool TryGetLocalOrParameterIndexSymbol(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out ISymbol indexSymbol)
+        {
+            var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+            if (symbol is ILocalSymbol localSymbol &&
+                IsSystemIndexType(localSymbol.Type, context.SemanticModel.Compilation))
+            {
+                indexSymbol = localSymbol;
+                return true;
+            }
+
+            if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
+                IsSystemIndexType(parameterSymbol.Type, context.SemanticModel.Compilation))
+            {
+                indexSymbol = parameterSymbol;
+                return true;
+            }
+
+            indexSymbol = null!;
+            return false;
+        }
+
+        private static bool TryResolveAssignedIndexLengthShape(
+            ExpressionSyntax useExpression,
+            ISymbol indexSymbol,
+            SymbolicLoweringContext context,
+            out IndexLengthShape indexShape)
+        {
+            indexShape = default;
+            var foundAssignment = false;
+            foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+            {
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (statement == containingBlock.ContainingStatement)
+                    {
+                        break;
+                    }
+
+                    TryGetIndexAssignmentFromPrecedingStatement(
+                        statement,
+                        indexSymbol,
+                        context,
+                        out var writesIndexSymbol,
+                        out var assignedIndexShape);
+                    if (!writesIndexSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (!assignedIndexShape.HasValue)
+                    {
+                        indexShape = default;
+                        return false;
+                    }
+
+                    indexShape = assignedIndexShape.GetValueOrDefault();
+                    foundAssignment = true;
+                }
+            }
+
+            return foundAssignment;
+        }
+
+        private static void TryGetIndexAssignmentFromPrecedingStatement(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SymbolicLoweringContext context,
+            out bool writesIndexSymbol,
+            out IndexLengthShape? indexShape)
+        {
+            indexShape = null;
+            writesIndexSymbol = false;
+
+            if (TryGetIndexAssignmentFromLocalDeclaration(
+                    statement,
+                    indexSymbol,
+                    context,
+                    out writesIndexSymbol,
+                    out indexShape))
+            {
+                return;
+            }
+
+            if (TryGetIndexAssignmentFromExpressionStatement(
+                    statement,
+                    indexSymbol,
+                    context,
+                    out writesIndexSymbol,
+                    out indexShape))
+            {
+                return;
+            }
+
+            writesIndexSymbol = ContainsSymbolWrite(statement, indexSymbol, context);
+        }
+
+        private static bool TryGetIndexAssignmentFromLocalDeclaration(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SymbolicLoweringContext context,
+            out bool writesIndexSymbol,
+            out IndexLengthShape? indexShape)
+        {
+            indexShape = null;
+            writesIndexSymbol = false;
+            if (statement is not LocalDeclarationStatementSyntax localDeclaration)
+            {
+                return false;
+            }
+
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
+                if (!IsSameSymbol(declaredSymbol, indexSymbol))
+                {
+                    continue;
+                }
+
+                if (variable.Initializer == null)
+                {
+                    return true;
+                }
+
+                writesIndexSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count != 1 ||
+                    !TryCreateDirectIndexExpressionShape(variable.Initializer.Value, context, out var assignedIndexShape))
+                {
+                    return true;
+                }
+
+                indexShape = assignedIndexShape;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetIndexAssignmentFromExpressionStatement(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SymbolicLoweringContext context,
+            out bool writesIndexSymbol,
+            out IndexLengthShape? indexShape)
+        {
+            indexShape = null;
+            writesIndexSymbol = false;
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !IsSymbolReference(assignment.Left, indexSymbol, context))
+            {
+                return false;
+            }
+
+            writesIndexSymbol = true;
+            if (TryCreateDirectIndexExpressionShape(assignment.Right, context, out var assignedIndexShape))
+            {
+                indexShape = assignedIndexShape;
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateDirectIndexExpressionShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out IndexLengthShape indexShape)
+        {
             expression = UnwrapExpression(expression);
             if (expression is PrefixUnaryExpressionSyntax fromEndIndex &&
-                fromEndIndex.IsKind(SyntaxKind.IndexExpression) &&
-                TryLowerTerm(fromEndIndex.Operand, context, out var offset) &&
-                offset.Kind == SmtValueKind.Int)
+                (fromEndIndex.IsKind(SyntaxKind.IndexExpression) ||
+                 fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken)))
             {
-                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, offset);
+                indexShape = new IndexLengthShape(fromEndIndex.Operand, fromEnd: true);
                 return true;
             }
 
-            if (TryLowerTerm(expression, context, out term) &&
-                term.Kind == SmtValueKind.Int)
+            if (TryCreateIndexInvocationShape(expression, context, out indexShape) ||
+                TryCreateIndexObjectCreationShape(expression, context, out indexShape))
             {
                 return true;
             }
 
-            term = null!;
+            var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+            if (IsIntegralOrEnumType(typeInfo.Type))
+            {
+                indexShape = new IndexLengthShape(expression, fromEnd: false);
+                return true;
+            }
+
+            indexShape = default;
+            return false;
+        }
+
+        private static bool TryCreateRangeInvocationShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            rangeShape = default;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
+                invocationOperation.TargetMethod.ReturnType is not { } returnType ||
+                !IsSystemRangeType(returnType, context.SemanticModel.Compilation) ||
+                invocationOperation.TargetMethod.ContainingType is not { } containingType ||
+                !IsSystemRangeType(containingType, context.SemanticModel.Compilation))
+            {
+                return false;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "StartAt")
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
+                    !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start))
+                {
+                    return false;
+                }
+
+                rangeShape = new RangeLengthShape(hasStart: true, start, hasEnd: false, end: default);
+                return true;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "EndAt")
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
+                    !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
+                {
+                    return false;
+                }
+
+                rangeShape = new RangeLengthShape(hasStart: false, start: default, hasEnd: true, end);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateRangeObjectCreationShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            rangeShape = default;
+            if (expression is not ObjectCreationExpressionSyntax objectCreation ||
+                context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Constructor == null ||
+                !IsSystemRangeType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var startExpression) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var endExpression) ||
+                !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start) ||
+                !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
+            {
+                return false;
+            }
+
+            rangeShape = new RangeLengthShape(hasStart: true, start, hasEnd: true, end);
+            return true;
+        }
+
+        private static bool TryCreateRangeAllPropertyShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out RangeLengthShape rangeShape)
+        {
+            rangeShape = default;
+            if (context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is not IPropertySymbol
+                {
+                    Name: "All",
+                    IsStatic: true
+                } propertySymbol ||
+                !IsSystemRangeType(propertySymbol.ContainingType, context.SemanticModel.Compilation) ||
+                !IsSystemRangeType(propertySymbol.Type, context.SemanticModel.Compilation))
+            {
+                return false;
+            }
+
+            rangeShape = new RangeLengthShape(hasStart: false, start: default, hasEnd: false, end: default);
+            return true;
+        }
+
+        private static bool TryCreateIndexInvocationShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out IndexLengthShape indexShape)
+        {
+            indexShape = default;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
+                invocationOperation.TargetMethod.ReturnType is not { } returnType ||
+                !IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
+                invocationOperation.TargetMethod.ContainingType is not { } containingType ||
+                !IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
+            {
+                return false;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "FromStart")
+            {
+                indexShape = new IndexLengthShape(valueExpression, fromEnd: false);
+                return true;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "FromEnd")
+            {
+                indexShape = new IndexLengthShape(valueExpression, fromEnd: true);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateIndexObjectCreationShape(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out IndexLengthShape indexShape)
+        {
+            indexShape = default;
+            if (expression is not ObjectCreationExpressionSyntax objectCreation ||
+                context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Constructor == null ||
+                !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 0, out var valueExpression))
+            {
+                return false;
+            }
+
+            if (!TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var fromEndExpression))
+            {
+                indexShape = new IndexLengthShape(valueExpression, fromEnd: false);
+                return true;
+            }
+
+            if (!TryGetConstantBool(fromEndExpression, context, out var fromEnd))
+            {
+                return false;
+            }
+
+            indexShape = new IndexLengthShape(valueExpression, fromEnd);
+            return true;
+        }
+
+        private static bool TryGetInvocationArgumentExpression(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax argumentExpression)
+        {
+            argumentExpression = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax expression)
+                {
+                    argumentExpression = expression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < invocationOperation.Arguments.Length &&
+                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                argumentExpression = fallbackExpression;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetObjectCreationArgumentExpression(
+            IObjectCreationOperation objectCreationOperation,
+            int parameterIndex,
+            out ExpressionSyntax argumentExpression)
+        {
+            argumentExpression = null!;
+            if (objectCreationOperation.Constructor == null ||
+                parameterIndex < 0 ||
+                parameterIndex >= objectCreationOperation.Constructor.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = objectCreationOperation.Constructor.Parameters[parameterIndex];
+            foreach (var argument in objectCreationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax expression)
+                {
+                    argumentExpression = expression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < objectCreationOperation.Arguments.Length &&
+                objectCreationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                argumentExpression = fallbackExpression;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode site)
+        {
+            for (SyntaxNode? current = site; current != null; current = current.Parent)
+            {
+                if (current is StatementSyntax statement &&
+                    statement.Parent is BlockSyntax block)
+                {
+                    yield return (block, statement);
+                }
+            }
+        }
+
+        private static bool ContainsSymbolWrite(
+            SyntaxNode node,
+            ISymbol symbol,
+            SymbolicLoweringContext context)
+        {
+            foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (IsSymbolReference(assignment.Left, symbol, context))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+            {
+                if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                     argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
+                    IsSymbolReference(argument.Expression, symbol, context))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsSymbolReference(
+            ExpressionSyntax expression,
+            ISymbol target,
+            SymbolicLoweringContext context)
+        {
+            return IsSameSymbol(
+                context.SemanticModel.GetSymbolInfo(UnwrapExpression(expression), context.CancellationToken).Symbol,
+                target);
+        }
+
+        private static bool IsSameSymbol(ISymbol? candidate, ISymbol target)
+        {
+            return candidate != null &&
+                (SymbolEqualityComparer.Default.Equals(candidate, target) ||
+                 SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target.OriginalDefinition));
+        }
+
+        private static bool IsSystemRangeExpression(ExpressionSyntax expression, SymbolicLoweringContext context)
+        {
+            var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+            return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
+        }
+
+        private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation)
+        {
+            var rangeType = compilation.GetTypeByMetadataName("System.Range");
+            return typeSymbol != null &&
+                rangeType != null &&
+                SymbolEqualityComparer.Default.Equals(typeSymbol, rangeType);
+        }
+
+        private static bool IsSystemIndexExpression(ExpressionSyntax expression, SymbolicLoweringContext context)
+        {
+            var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+            return IsSystemIndexType(typeInfo.ConvertedType ?? typeInfo.Type, context.SemanticModel.Compilation);
+        }
+
+        private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation)
+        {
+            var indexType = compilation.GetTypeByMetadataName("System.Index");
+            return typeSymbol != null &&
+                indexType != null &&
+                SymbolEqualityComparer.Default.Equals(typeSymbol, indexType);
+        }
+
+        private static bool IsIntegralOrEnumType(ITypeSymbol? type)
+        {
+            return type?.TypeKind == TypeKind.Enum ||
+                type?.SpecialType is SpecialType.System_Char or
+                    SpecialType.System_SByte or
+                    SpecialType.System_Byte or
+                    SpecialType.System_Int16 or
+                    SpecialType.System_UInt16 or
+                    SpecialType.System_Int32 or
+                    SpecialType.System_UInt32 or
+                    SpecialType.System_Int64 or
+                    SpecialType.System_UInt64;
+        }
+
+        private static bool TryGetConstantBool(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out bool value)
+        {
+            var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+            if (constantValue is { HasValue: true, Value: bool boolValue })
+            {
+                value = boolValue;
+                return true;
+            }
+
+            value = false;
             return false;
         }
 
