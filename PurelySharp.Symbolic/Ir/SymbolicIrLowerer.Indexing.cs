@@ -74,6 +74,61 @@ namespace PurelySharp.Symbolic.Ir
                 out term);
         }
 
+        private static bool TryLowerArrayBoundInvocation(
+            InvocationExpressionSyntax invocation,
+            IMethodSymbol method,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                invocation.ArgumentList.Arguments.Count != 1 ||
+                method.ContainingType?.SpecialType != SpecialType.System_Array ||
+                method.Parameters.Length != 1 ||
+                method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
+            {
+                return false;
+            }
+
+            var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
+            if (receiverType is not IArrayTypeSymbol)
+            {
+                return false;
+            }
+
+            var dimensionValue = context.SemanticModel.GetConstantValue(
+                invocation.ArgumentList.Arguments[0].Expression,
+                context.CancellationToken);
+            if (dimensionValue is not { HasValue: true, Value: int dimension })
+            {
+                return false;
+            }
+
+            if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal))
+            {
+                if (!TryLowerArrayDimensionLengthTerm(memberAccess.Expression, dimension, context, out _))
+                {
+                    return false;
+                }
+
+                term = new SymbolicIntegerConstantTerm(0);
+                return true;
+            }
+
+            if (!string.Equals(method.Name, nameof(Array.GetUpperBound), StringComparison.Ordinal) ||
+                !TryLowerArrayDimensionLengthTerm(memberAccess.Expression, dimension, context, out var length))
+            {
+                return false;
+            }
+
+            term = new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Subtract,
+                length,
+                new SymbolicIntegerConstantTerm(1));
+            return true;
+        }
+
         public static bool TryLowerArrayDimensionLengthTerm(
             ExpressionSyntax arrayExpression,
             int dimension,

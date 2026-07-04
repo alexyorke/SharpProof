@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 113,156 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,172 lines,
+- Production inventory currently reports 113,212 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 54,228 lines,
   `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -36,7 +36,7 @@ path-fact, hazard, and ownership flows.
   currently reports 0 analyzer-side and 20 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
-- IR known-API inventory now distinguishes 8 condition lowerings from 3
+- IR known-API inventory now distinguishes 8 condition lowerings from 5
   value-term lowering. Term lowerings are intentionally tracked separately
   because value-returning APIs such as `Nullable<T>.GetValueOrDefault` should
   lower to `SymbolicTerm` rather than boolean path conditions.
@@ -99,6 +99,9 @@ path-fact, hazard, and ownership flows.
 - Constant-dimension `Array.GetLength(int)` and `Array.GetLongLength(int)`
   calls now flow through the declarative known-API term lowering registry and
   the indexing partial before formula fallback.
+- Constant-dimension `Array.GetLowerBound(int)` and `Array.GetUpperBound(int)`
+  calls on statically typed C# arrays now lower through the same registry:
+  lower bound becomes `0`, and upper bound becomes `GetLength(dimension) - 1`.
 - Simple integer range proofs now use
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable

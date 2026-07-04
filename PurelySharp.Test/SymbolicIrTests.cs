@@ -1515,6 +1515,41 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix",
+                "matrix.GetLowerBound(1) == 0");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtIntegerConstant(0)));
+        }
+
+        [Test]
+        public void LowerTerm_ArrayGetUpperBoundInvocationUsesDimensionLengthMinusOne()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix, int columns",
+                "matrix.GetUpperBound(1) == columns - 1");
+            var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var subtract = (SymbolicBinaryTerm)term;
+            Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(subtract.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(((SymbolicArrayDimensionLengthTerm)subtract.Left).Dimension, Is.EqualTo(1));
+            Assert.That(subtract.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(1)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
         public void LowerTerm_ArrayCreationGetLengthInvocationUsesSizeExpression()
         {
             var context = CreateExpressionContext(

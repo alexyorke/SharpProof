@@ -32,7 +32,15 @@ namespace PurelySharp.Symbolic.Ir
                 new KnownApiTermLoweringDescriptor(
                     SpecialType.System_Array,
                     nameof(Array.GetLongLength),
-                    TryLowerArrayGetLengthInvocation));
+                    TryLowerArrayGetLengthInvocation),
+                new KnownApiTermLoweringDescriptor(
+                    SpecialType.System_Array,
+                    nameof(Array.GetLowerBound),
+                    TryLowerArrayBoundInvocation),
+                new KnownApiTermLoweringDescriptor(
+                    SpecialType.System_Array,
+                    nameof(Array.GetUpperBound),
+                    TryLowerArrayBoundInvocation));
 
         private static bool TryLowerKnownApiInvocation(
             InvocationExpressionSyntax invocation,
