@@ -2041,6 +2041,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesNegatedFactConditions()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x");
+            var negatedCondition = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(new SymbolicFactCondition(fact)),
+            });
+            var negativeFactCondition = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(fact.Negate()),
+            });
+
+            Assert.That(negatedCondition.NormalizedProofKey, Is.EqualTo(negativeFactCondition.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeySimplifiesAbsorbingConstants()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -2380,6 +2403,30 @@ namespace PurelySharp.Test
             var result = SymbolicReachabilityService.ClassifyStateImplication(
                 state,
                 new SymbolicFactCondition(fact),
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_NegativeStateFactImpliesNegatedConditionWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.fact");
+            var state = new SymbolicState(new[] { fact.Negate() });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(
+                state,
+                new SymbolicNotCondition(new SymbolicFactCondition(fact)),
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));

@@ -458,10 +458,14 @@ namespace PurelySharp.Symbolic
             }
 
             var conditionKey = SymbolicState.CreateProofConditionKey(condition);
-            return state.PathConditions.Any(candidate => string.Equals(
-                SymbolicState.CreateProofConditionKey(candidate),
-                conditionKey,
-                StringComparison.Ordinal));
+            return state.Facts.Any(candidate => string.Equals(
+                    "fact-condition:" + SymbolicState.CreateProofFactKey(candidate),
+                    conditionKey,
+                    StringComparison.Ordinal)) ||
+                state.PathConditions.Any(candidate => string.Equals(
+                    SymbolicState.CreateProofConditionKey(candidate),
+                    conditionKey,
+                    StringComparison.Ordinal));
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()
