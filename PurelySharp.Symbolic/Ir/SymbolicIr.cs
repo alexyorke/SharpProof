@@ -330,6 +330,12 @@ namespace PurelySharp.Symbolic.Ir
                     continue;
                 }
 
+                if (TryEvaluateFact(fact, out var factValue) &&
+                    factValue)
+                {
+                    continue;
+                }
+
                 var key = CreateFactKey(fact);
                 if (seen.TryGetValue(key, out var existingIndex))
                 {
@@ -405,6 +411,12 @@ namespace PurelySharp.Symbolic.Ir
             var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (var fact in facts)
             {
+                if (TryEvaluateFact(fact, out var factValue) &&
+                    !factValue)
+                {
+                    return true;
+                }
+
                 if (HasOppositePolarity(polarities, fact))
                 {
                     return true;
@@ -426,6 +438,12 @@ namespace PurelySharp.Symbolic.Ir
                 foreach (var fact in EnumerateConditionFacts(condition))
                 {
                     if (HasOppositePolarity(polarities, fact))
+                    {
+                        return true;
+                    }
+
+                    if (TryEvaluateFact(fact, out var factValue) &&
+                        !factValue)
                     {
                         return true;
                     }
@@ -485,6 +503,43 @@ namespace PurelySharp.Symbolic.Ir
 
             polarities.Add(key.AtomKey, key.Polarity);
             return false;
+        }
+
+        private static bool TryEvaluateFact(SymbolicFact fact, out bool value)
+        {
+            if (fact.Atom is SymbolicRelationAtom relation &&
+                TryEvaluateSelfRelation(relation, out value))
+            {
+                value = fact.Polarity ? value : !value;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryEvaluateSelfRelation(SymbolicRelationAtom relation, out bool value)
+        {
+            if (!string.Equals(
+                    CreateTermKey(relation.Left),
+                    CreateTermKey(relation.Right),
+                    StringComparison.Ordinal))
+            {
+                value = false;
+                return false;
+            }
+
+            value = relation.Operator switch
+            {
+                SymbolicRelationOperator.Equal => true,
+                SymbolicRelationOperator.NotEqual => false,
+                SymbolicRelationOperator.LessThan => false,
+                SymbolicRelationOperator.LessThanOrEqual => true,
+                SymbolicRelationOperator.GreaterThan => false,
+                SymbolicRelationOperator.GreaterThanOrEqual => true,
+                _ => false,
+            };
+            return true;
         }
 
         private static bool ContainsFalseConstant(SymbolicCondition condition)
@@ -1039,10 +1094,20 @@ namespace PurelySharp.Symbolic.Ir
                 case SymbolicConstantCondition constant:
                     return "const:" + (constant.Value ? "true" : "false");
                 case SymbolicFactCondition factCondition:
+                    if (TryEvaluateFact(factCondition.Fact, out var factValue))
+                    {
+                        return "const:" + (factValue ? "true" : "false");
+                    }
+
                     return "fact-condition:" + CreateFactKey(factCondition.Fact);
                 case SymbolicNotCondition { Operand: SymbolicConstantCondition constantCondition }:
                     return "const:" + (constantCondition.Value ? "false" : "true");
                 case SymbolicNotCondition { Operand: SymbolicFactCondition factCondition }:
+                    if (TryEvaluateFact(factCondition.Fact, out var negatedFactValue))
+                    {
+                        return "const:" + (negatedFactValue ? "false" : "true");
+                    }
+
                     return "fact-condition:" + CreateFactKey(factCondition.Fact.Negate());
                 case SymbolicNotCondition { Operand: SymbolicNotCondition nestedNotCondition }:
                     return CreateConditionKey(nestedNotCondition.Operand);

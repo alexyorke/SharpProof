@@ -2366,6 +2366,53 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesSelfRelationFacts()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var equalSelf = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    x),
+                SyntaxFactory.ParseExpression("x == x"),
+                "test.equal-self");
+            var lessThanOrEqualSelf = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    x),
+                SyntaxFactory.ParseExpression("x <= x"),
+                "test.less-equal-self");
+            var notEqualSelf = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    x,
+                    x),
+                SyntaxFactory.ParseExpression("x != x"),
+                "test.not-equal-self");
+            var lessThanSelf = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    x,
+                    x),
+                SyntaxFactory.ParseExpression("x < x"),
+                "test.less-self");
+            var empty = new SymbolicState();
+            var tautologicalFacts = new SymbolicState(new[] { equalSelf, lessThanOrEqualSelf });
+            var contradictoryFact = new SymbolicState(new[] { notEqualSelf });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(lessThanSelf),
+            });
+
+            Assert.That(tautologicalFacts.Facts, Is.Empty);
+            Assert.That(tautologicalFacts.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
         {
             var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);
@@ -2635,22 +2682,22 @@ namespace PurelySharp.Test
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), c),
-                    new SymbolicStringConstantTerm("abc")),
-                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"abc\""),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"target\""),
                 "test.left");
             var rightAssociated = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(a, new SymbolicStringConcatTerm(b, c)),
-                    new SymbolicStringConstantTerm("abc")),
-                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"abc\""),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"target\""),
                 "test.right");
             var reordered = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(b, a), c),
-                    new SymbolicStringConstantTerm("bac")),
-                SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"bac\""),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"target\""),
                 "test.reordered");
             var directValue = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
@@ -3379,15 +3426,15 @@ namespace PurelySharp.Test
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), c),
-                    new SymbolicStringConstantTerm("abc")),
-                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"abc\""),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"target\""),
                 "test.stored");
             var queried = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(a, new SymbolicStringConcatTerm(b, c)),
-                    new SymbolicStringConstantTerm("abc")),
-                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"abc\""),
+                    new SymbolicStringConstantTerm("target")),
+                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"target\""),
                 "test.queried");
             var state = new SymbolicState(new[] { stored });
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
