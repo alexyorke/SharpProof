@@ -2580,6 +2580,50 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConstantStringTermFacts()
+        {
+            var prefixConcat = new SymbolicStringConcatTerm(
+                new SymbolicStringConstantTerm("pre"),
+                new SymbolicStringConstantTerm("fix"));
+            var prefixText = new SymbolicStringConstantTerm("prefix");
+            var prefixLength = new SymbolicLengthTerm(prefixConcat);
+            var trueConcatEquality = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    prefixConcat,
+                    prefixText),
+                SyntaxFactory.ParseExpression("\"pre\" + \"fix\" == \"prefix\""),
+                "test.concat-equality");
+            var trueLengthEquality = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    prefixLength,
+                    new SymbolicIntegerConstantTerm(6)),
+                SyntaxFactory.ParseExpression("(\"pre\" + \"fix\").Length == 6"),
+                "test.length-equality");
+            var falseLengthRelation = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    prefixLength,
+                    new SymbolicIntegerConstantTerm(6)),
+                SyntaxFactory.ParseExpression("(\"pre\" + \"fix\").Length < 6"),
+                "test.false-length");
+            var empty = new SymbolicState();
+            var tautologicalFacts = new SymbolicState(new[] { trueConcatEquality, trueLengthEquality });
+            var contradictoryFact = new SymbolicState(new[] { falseLengthRelation });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(falseLengthRelation),
+            });
+
+            Assert.That(tautologicalFacts.Facts, Is.Empty);
+            Assert.That(tautologicalFacts.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
         {
             var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);
@@ -2849,22 +2893,22 @@ namespace PurelySharp.Test
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(a, b), c),
-                    new SymbolicStringConstantTerm("target")),
-                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"target\""),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + \"b\" + \"c\" == \"abc\""),
                 "test.left");
             var rightAssociated = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(a, new SymbolicStringConcatTerm(b, c)),
-                    new SymbolicStringConstantTerm("target")),
-                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"target\""),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"a\" + (\"b\" + \"c\") == \"abc\""),
                 "test.right");
             var reordered = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicStringConcatTerm(new SymbolicStringConcatTerm(b, a), c),
-                    new SymbolicStringConstantTerm("target")),
-                SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"target\""),
+                    new SymbolicStringConstantTerm("abc")),
+                SyntaxFactory.ParseExpression("\"b\" + \"a\" + \"c\" == \"abc\""),
                 "test.reordered");
             var directValue = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
@@ -3652,6 +3696,24 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("missing")),
                 SyntaxFactory.ParseExpression("\"prefix-value\".EndsWith(\"missing\")"),
                 "test.false-string-target");
+            var trueStringLengthTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicLengthTerm(new SymbolicStringConcatTerm(
+                        new SymbolicStringConstantTerm("pre"),
+                        new SymbolicStringConstantTerm("fix"))),
+                    new SymbolicIntegerConstantTerm(6)),
+                SyntaxFactory.ParseExpression("(\"pre\" + \"fix\").Length == 6"),
+                "test.true-string-length-target");
+            var falseStringConcatTarget = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConcatTerm(
+                        new SymbolicStringConstantTerm("pre"),
+                        new SymbolicStringConstantTerm("fix")),
+                    new SymbolicStringConstantTerm("suffix")),
+                SyntaxFactory.ParseExpression("\"pre\" + \"fix\" == \"suffix\""),
+                "test.false-string-concat-target");
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
@@ -3674,6 +3736,14 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseStringTarget,
                 smtAnalysis);
+            var trueStringLengthResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueStringLengthTarget,
+                smtAnalysis);
+            var falseStringConcatResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                falseStringConcatTarget,
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
@@ -3685,6 +3755,10 @@ namespace PurelySharp.Test
             Assert.That(trueStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueStringLengthResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueStringLengthResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseStringConcatResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseStringConcatResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 

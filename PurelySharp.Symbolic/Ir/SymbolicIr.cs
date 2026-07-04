@@ -565,17 +565,17 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool TryEvaluateConstantRelation(SymbolicRelationAtom relation, out bool value)
         {
-            if (relation.Left is SymbolicIntegerConstantTerm leftInteger &&
-                relation.Right is SymbolicIntegerConstantTerm rightInteger)
+            if (TryEvaluateIntegerTerm(relation.Left, out var leftInteger) &&
+                TryEvaluateIntegerTerm(relation.Right, out var rightInteger))
             {
                 value = relation.Operator switch
                 {
-                    SymbolicRelationOperator.Equal => leftInteger.Value == rightInteger.Value,
-                    SymbolicRelationOperator.NotEqual => leftInteger.Value != rightInteger.Value,
-                    SymbolicRelationOperator.LessThan => leftInteger.Value < rightInteger.Value,
-                    SymbolicRelationOperator.LessThanOrEqual => leftInteger.Value <= rightInteger.Value,
-                    SymbolicRelationOperator.GreaterThan => leftInteger.Value > rightInteger.Value,
-                    SymbolicRelationOperator.GreaterThanOrEqual => leftInteger.Value >= rightInteger.Value,
+                    SymbolicRelationOperator.Equal => leftInteger == rightInteger,
+                    SymbolicRelationOperator.NotEqual => leftInteger != rightInteger,
+                    SymbolicRelationOperator.LessThan => leftInteger < rightInteger,
+                    SymbolicRelationOperator.LessThanOrEqual => leftInteger <= rightInteger,
+                    SymbolicRelationOperator.GreaterThan => leftInteger > rightInteger,
+                    SymbolicRelationOperator.GreaterThanOrEqual => leftInteger >= rightInteger,
                     _ => false,
                 };
                 return true;
@@ -615,8 +615,8 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicStringPredicateAtom predicate,
             out bool value)
         {
-            if (predicate.Value is not SymbolicStringConstantTerm valueTerm ||
-                predicate.Argument is not SymbolicStringConstantTerm argumentTerm)
+            if (!TryEvaluateStringTerm(predicate.Value, out var valueText) ||
+                !TryEvaluateStringTerm(predicate.Argument, out var argumentText))
             {
                 value = false;
                 return false;
@@ -624,9 +624,9 @@ namespace PurelySharp.Symbolic.Ir
 
             value = predicate.Predicate switch
             {
-                SymbolicStringPredicateKind.Contains => valueTerm.Value.Contains(argumentTerm.Value, StringComparison.Ordinal),
-                SymbolicStringPredicateKind.StartsWith => valueTerm.Value.StartsWith(argumentTerm.Value, StringComparison.Ordinal),
-                SymbolicStringPredicateKind.EndsWith => valueTerm.Value.EndsWith(argumentTerm.Value, StringComparison.Ordinal),
+                SymbolicStringPredicateKind.Contains => valueText.Contains(argumentText, StringComparison.Ordinal),
+                SymbolicStringPredicateKind.StartsWith => valueText.StartsWith(argumentText, StringComparison.Ordinal),
+                SymbolicStringPredicateKind.EndsWith => valueText.EndsWith(argumentText, StringComparison.Ordinal),
                 _ => false,
             };
 
@@ -641,13 +641,63 @@ namespace PurelySharp.Symbolic.Ir
             switch (term)
             {
                 case SymbolicBooleanConstantTerm:
-                case SymbolicIntegerConstantTerm:
-                case SymbolicStringConstantTerm:
                 case SymbolicNullTerm:
                     key = CreateTermKey(term);
                     return true;
                 default:
+                    if (TryEvaluateIntegerTerm(term, out var integerValue))
+                    {
+                        key = CreateTermKey(new SymbolicIntegerConstantTerm(integerValue));
+                        return true;
+                    }
+
+                    if (TryEvaluateStringTerm(term, out var stringValue))
+                    {
+                        key = CreateTermKey(new SymbolicStringConstantTerm(stringValue));
+                        return true;
+                    }
+
                     key = string.Empty;
+                    return false;
+            }
+        }
+
+        private static bool TryEvaluateIntegerTerm(SymbolicTerm term, out long value)
+        {
+            switch (term)
+            {
+                case SymbolicIntegerConstantTerm integer:
+                    value = integer.Value;
+                    return true;
+                case SymbolicLengthTerm { Value: var lengthValue }
+                    when TryEvaluateStringTerm(lengthValue, out var stringValue):
+                    value = stringValue.Length;
+                    return true;
+                default:
+                    value = 0;
+                    return false;
+            }
+        }
+
+        private static bool TryEvaluateStringTerm(SymbolicTerm term, out string value)
+        {
+            switch (term)
+            {
+                case SymbolicStringConstantTerm stringConstant:
+                    value = stringConstant.Value;
+                    return true;
+                case SymbolicStringConcatTerm concat:
+                    if (TryEvaluateStringTerm(concat.Left, out var left) &&
+                        TryEvaluateStringTerm(concat.Right, out var right))
+                    {
+                        value = left + right;
+                        return true;
+                    }
+
+                    value = string.Empty;
+                    return false;
+                default:
+                    value = string.Empty;
                     return false;
             }
         }
