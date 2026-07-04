@@ -3691,6 +3691,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(element"));
             Assert.That(source, Does.Contain("new SymbolicMemberTerm("));
             Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula"));
+            Assert.That(source, Does.Contain("new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference)"));
             Assert.That(source, Does.Contain("new SymbolicNullableHasValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));

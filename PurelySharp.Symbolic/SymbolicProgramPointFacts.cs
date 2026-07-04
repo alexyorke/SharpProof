@@ -3696,8 +3696,12 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            formula = new SmtVariable(ImplicitThisVariableName + "." + member.Name, kind);
-            return true;
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(
+                new SymbolicMemberTerm(
+                    new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference),
+                    member.Name,
+                    kind),
+                out formula);
         }
 
         private static void AddTopLevelDoesNotReturnIfNormalCompletionFacts(
