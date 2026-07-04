@@ -457,13 +457,13 @@ namespace PurelySharp.Symbolic.Ir
             IDictionary<string, bool> polarities,
             SymbolicFact fact)
         {
-            var key = CreateFactAtomKey(fact);
-            if (polarities.TryGetValue(key, out var existingPolarity))
+            var key = CreateFactCoreKey(fact);
+            if (polarities.TryGetValue(key.AtomKey, out var existingPolarity))
             {
-                return existingPolarity != fact.Polarity;
+                return existingPolarity != key.Polarity;
             }
 
-            polarities.Add(key, fact.Polarity);
+            polarities.Add(key.AtomKey, key.Polarity);
             return false;
         }
 
@@ -588,16 +588,19 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateFactKey(SymbolicFact fact)
         {
+            var key = CreateFactCoreKey(fact);
             return string.Join(
                 "|",
-                CreateFactAtomKey(fact),
-                fact.Polarity ? "true" : "false",
+                key.AtomKey,
+                key.Polarity ? "true" : "false",
                 fact.Confidence.ToString());
         }
 
-        private static string CreateFactAtomKey(SymbolicFact fact)
+        private static (string AtomKey, bool Polarity) CreateFactCoreKey(SymbolicFact fact)
         {
-            return CreateAtomKey(fact.Atom);
+            return fact.Atom is SymbolicRelationAtom relation
+                ? CreateRelationFactCoreKey(relation, fact.Polarity)
+                : (CreateAtomKey(fact.Atom), fact.Polarity);
         }
 
         private static string CreateAtomKey(SymbolicAtom atom)
@@ -607,6 +610,45 @@ namespace PurelySharp.Symbolic.Ir
                 SymbolicRelationAtom relation => CreateRelationAtomKey(relation),
                 _ => atom.ToString() ?? string.Empty,
             };
+        }
+
+        private static (string AtomKey, bool Polarity) CreateRelationFactCoreKey(
+            SymbolicRelationAtom relation,
+            bool polarity)
+        {
+            var left = CreateTermKey(relation.Left);
+            var right = CreateTermKey(relation.Right);
+            var relationOperator = relation.Operator;
+
+            switch (relationOperator)
+            {
+                case SymbolicRelationOperator.NotEqual:
+                    relationOperator = SymbolicRelationOperator.Equal;
+                    polarity = !polarity;
+                    break;
+                case SymbolicRelationOperator.LessThanOrEqual:
+                    relationOperator = SymbolicRelationOperator.LessThan;
+                    (left, right) = (right, left);
+                    polarity = !polarity;
+                    break;
+                case SymbolicRelationOperator.GreaterThan:
+                    relationOperator = SymbolicRelationOperator.LessThan;
+                    (left, right) = (right, left);
+                    break;
+                case SymbolicRelationOperator.GreaterThanOrEqual:
+                    relationOperator = SymbolicRelationOperator.LessThan;
+                    polarity = !polarity;
+                    break;
+            }
+
+            if ((relationOperator == SymbolicRelationOperator.Equal ||
+                    relationOperator == SymbolicRelationOperator.NotEqual) &&
+                string.CompareOrdinal(left, right) > 0)
+            {
+                (left, right) = (right, left);
+            }
+
+            return ("relation:" + relationOperator + "(" + left + "," + right + ")", polarity);
         }
 
         private static string CreateRelationAtomKey(SymbolicRelationAtom relation)

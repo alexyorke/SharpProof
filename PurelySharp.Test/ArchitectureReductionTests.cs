@@ -2096,9 +2096,40 @@ namespace PurelySharp.Test
                     x),
                 SyntaxFactory.ParseExpression("0 == x"),
                 "test.eq.flipped");
+            var notEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x != 0"),
+                "test.ne");
+            var lessThanOrEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x <= 0"),
+                "test.le");
+            var greaterThanOrEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x >= 0"),
+                "test.ge");
+            var lessThanZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x < 0"),
+                "test.lt.zero");
 
             Assert.That(new SymbolicState(new[] { greaterThan }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { lessThan }).NormalizedProofKey));
             Assert.That(new SymbolicState(new[] { equal }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { equalFlipped }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { notEqual }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { equal.Negate() }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { lessThanOrEqual }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { greaterThan.Negate() }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { greaterThanOrEqual }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { lessThanZero.Negate() }).NormalizedProofKey));
         }
 
         [Test]
@@ -2372,7 +2403,8 @@ namespace PurelySharp.Test
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
-            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -2424,7 +2456,8 @@ namespace PurelySharp.Test
                 smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
-            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -2551,6 +2584,65 @@ namespace PurelySharp.Test
             var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_ComplementaryRelationFactProvesFalseWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var stored = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.stored");
+            var queried = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x <= 0"),
+                "test.queried");
+            var state = new SymbolicState(new[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_ComplementaryRelationFactsContradictWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var greaterThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.gt");
+            var lessThanOrEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x <= 0"),
+                "test.le");
+            var state = new SymbolicState(new[] { greaterThan, lessThanOrEqual });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(state.IsContradictory, Is.True);
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
@@ -2729,10 +2821,10 @@ namespace PurelySharp.Test
                 "test.supported");
             var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(
-                    SymbolicRelationOperator.LessThanOrEqual,
+                    SymbolicRelationOperator.LessThan,
                     x,
                     new SymbolicIntegerConstantTerm(0)),
-                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x <= 0"),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("x < 0"),
                 "test.branch"));
             var state = new SymbolicState(new[] { unsupportedFact, supportedFact });
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
@@ -2766,10 +2858,10 @@ namespace PurelySharp.Test
                 "test.upper");
             var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(
-                    SymbolicRelationOperator.LessThanOrEqual,
+                    SymbolicRelationOperator.LessThan,
                     x,
                     new SymbolicIntegerConstantTerm(0)),
-                SyntaxFactory.ParseExpression("proof_cache_x <= 0"),
+                SyntaxFactory.ParseExpression("proof_cache_x < 0"),
                 "test.branch"));
             var options = new SmtAnalysisOptions(
                 SmtAnalysisMode.Bounded,
@@ -2815,10 +2907,10 @@ namespace PurelySharp.Test
                 "test.positive");
             var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
                 new SymbolicRelationAtom(
-                    SymbolicRelationOperator.LessThanOrEqual,
+                    SymbolicRelationOperator.LessThan,
                     x,
                     new SymbolicIntegerConstantTerm(0)),
-                SyntaxFactory.ParseExpression("x <= 0"),
+                SyntaxFactory.ParseExpression("x < 0"),
                 "test.branch"));
 
             var first = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
