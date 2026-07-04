@@ -846,13 +846,38 @@ namespace PurelySharp.Test
 
             Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
-            Assert.That(source, Does.Contain("TryTranslateZeroCondition(divisor"));
+            Assert.That(source, Does.Contain("TryCreateNumericZeroCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison("));
             Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.formula-fallback"));
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
             Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
+        }
+
+        [Test]
+        public void RuntimeHazardDivideByZero_UsesIrZeroConditionBeforeFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var helperIndex = source.IndexOf("TryCreateNumericZeroCondition(\r\n                    divisor,", StringComparison.Ordinal);
+            if (helperIndex < 0)
+            {
+                helperIndex = source.IndexOf("TryCreateNumericZeroCondition(\n                    divisor,", StringComparison.Ordinal);
+            }
+
+            var fallbackIndex = source.IndexOf("TryTranslateZeroCondition(divisor", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(fallbackIndex, Is.GreaterThan(helperIndex));
+            Assert.That(source, Does.Contain("new SymbolicRelationAtom("));
+            Assert.That(source, Does.Contain("new SymbolicConstantCondition(true)"));
+            Assert.That(source, Does.Contain("new SymbolicConstantCondition(false)"));
+            Assert.That(source, Does.Contain("TryCreateDecimalZeroComparableTerm("));
+            Assert.That(source, Does.Contain("SymbolicFactFactory.GetSmtVariableName(symbol)"));
         }
 
         [Test]

@@ -32,13 +32,19 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out RuntimeHazardTrigger trigger)
         {
-            if (TryCreateIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.DivideByZero,
+            if (TryCreateNumericZeroCondition(
                     divisor,
-                    new SymbolicIntegerConstantTerm(0),
-                    "ir.runtime-hazard.divide-by-zero",
                     semanticModel,
                     cancellationToken,
+                    "ir.runtime-hazard.divide-by-zero.trigger",
+                    out var subject,
+                    out var zeroCondition) &&
+                TryEncodeIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    subject,
+                    zeroCondition,
+                    divisor,
+                    "ir.runtime-hazard.divide-by-zero",
                     out trigger))
             {
                 return true;
@@ -57,6 +63,84 @@ namespace PurelySharp.Symbolic
 
             trigger = default;
             return false;
+        }
+
+        private static bool TryCreateNumericZeroCondition(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenance,
+            out SymbolicTerm? subject,
+            out SymbolicCondition condition)
+        {
+            expression = UnwrapExpression(expression);
+            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
+            {
+                if (IsIntegralOrDecimalZero(constant.Value))
+                {
+                    subject = null;
+                    condition = new SymbolicConstantCondition(true);
+                    return true;
+                }
+
+                if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
+                {
+                    subject = null;
+                    condition = new SymbolicConstantCondition(false);
+                    return true;
+                }
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                term.Kind == SmtValueKind.Int)
+            {
+                subject = term;
+                condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(
+                        SymbolicRelationOperator.Equal,
+                        term,
+                        new SymbolicIntegerConstantTerm(0)),
+                    expression,
+                    provenance));
+                return true;
+            }
+
+            if (TryCreateDecimalZeroComparableTerm(expression, semanticModel, cancellationToken, out var decimalTerm))
+            {
+                subject = decimalTerm;
+                condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(
+                        SymbolicRelationOperator.Equal,
+                        decimalTerm,
+                        new SymbolicIntegerConstantTerm(0)),
+                    expression,
+                    provenance));
+                return true;
+            }
+
+            subject = null;
+            condition = null!;
+            return false;
+        }
+
+        private static bool TryCreateDecimalZeroComparableTerm(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm term)
+        {
+            expression = UnwrapExpression(expression);
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is not ILocalSymbol and not IParameterSymbol ||
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
+            return true;
         }
 
         private static bool TryCreateIndexOrRangeTrigger(
