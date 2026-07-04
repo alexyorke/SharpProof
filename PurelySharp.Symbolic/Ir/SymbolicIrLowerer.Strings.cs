@@ -114,9 +114,15 @@ namespace PurelySharp.Symbolic.Ir
             if (!method.IsStatic)
             {
                 if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
-                    invocation.ArgumentList.Arguments.Count != 1 ||
-                    method.Parameters.Length != 1 ||
+                    invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
+                    method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
                     method.Parameters[0].Type.SpecialType != SpecialType.System_String)
+                {
+                    return false;
+                }
+
+                if (invocation.ArgumentList.Arguments.Count == 2 &&
+                    !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[1].Expression, context))
                 {
                     return false;
                 }
