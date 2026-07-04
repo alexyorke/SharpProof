@@ -2033,19 +2033,18 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(8));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(7));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 8,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 7,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
@@ -5667,13 +5666,10 @@ namespace PurelySharp.Test
             Assert.That(comparableHelperSource, Does.Contain("TryTranslateValue("));
             Assert.That(comparableHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(lengthHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression"));
-            Assert.That(lengthHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
-            Assert.That(
-                lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression", StringComparison.Ordinal),
-                Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
+            Assert.That(lengthHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(
                 lengthHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
-                Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
+                Is.GreaterThanOrEqualTo(0));
             Assert.That(
                 stringHelperSource.IndexOf("SymbolicIrLowerer.TryLowerStringTerm(valueExpression", StringComparison.Ordinal),
                 Is.GreaterThanOrEqualTo(0));

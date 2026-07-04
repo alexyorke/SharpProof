@@ -2050,16 +2050,6 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion))
-            {
-                return true;
-            }
-
             formula = null!;
             return false;
         }

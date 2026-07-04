@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 8 symbolic-side
+  currently reports 0 analyzer-side and 7 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
   Comparable-value reachability now routes through the shared typed value
@@ -43,9 +43,9 @@ path-fact, hazard, and ownership flows.
   Condition-truth reachability now also reuses the shared
   `TryTranslateConditionFormula` helper instead of issuing its own direct
   translator call.
-  Built-in-length reachability now uses the shared
-  `TryLowerBuiltInLengthTerm` IR helper before the direct built-in-length
-  translator fallback.
+  Built-in-length reachability now lowers entirely through the shared
+  `TryLowerBuiltInLengthTerm` IR helper; the direct built-in-length
+  translator shim at that boundary is gone.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
   value-term lowering. Term lowerings are intentionally tracked separately
   because value-returning APIs such as `Nullable<T>.GetValueOrDefault` should
@@ -121,10 +121,10 @@ path-fact, hazard, and ownership flows.
   `System.Range` shape resolution paths; the direct reachability translator
   fallback for that boundary is gone.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
-  lower through the IR indexing partial as integer terms before formula
-  fallback. The remaining built-in-length shim is still carrying other
-  domains such as unsupported
-  `System.Range`/`System.Index` symbol flows.
+  lower through the IR indexing partial as integer terms. Unsupported
+  `System.Range`/`System.Index` symbol flows at the reachability boundary now
+  remain conservative instead of using the old built-in-length translator
+  shim.
 - Direct range-result lengths such as `values[1..^1].Length` and
   `text[1..^1].Length` now also lower through the IR indexing partial before
   formula fallback. Resolvable assigned `System.Range` locals and parameters
