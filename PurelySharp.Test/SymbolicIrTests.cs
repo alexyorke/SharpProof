@@ -436,6 +436,23 @@ namespace PurelySharp.Test
             Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
         }
 
+        [TestCase("Contains")]
+        [TestCase("StartsWith")]
+        [TestCase("EndsWith")]
+        public void KnownApiLowering_StringOrdinalPredicateUsesDeclarativeStringPredicate(string methodName)
+        {
+            var context = CreateExpressionContext(
+                "string s",
+                $"""s.{methodName}("A", System.StringComparison.Ordinal)""");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+
+            Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm("A")));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
         [Test]
         public void KnownApiLowering_StringConcatPredicateUsesSharedConcatTerm()
         {

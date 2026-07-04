@@ -17,8 +17,8 @@ namespace PurelySharp.Symbolic.Ir
         {
             condition = null!;
             if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
-                invocation.ArgumentList.Arguments.Count != 1 ||
-                method.Parameters.Length != 1 ||
+                invocation.ArgumentList.Arguments.Count is not 1 and not 2 ||
+                method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
                 !TryLowerStringTerm(memberAccess.Expression, context, out var receiver) ||
                 !TryLowerStringPredicateArgument(
                     invocation.ArgumentList.Arguments[0].Expression,
@@ -38,6 +38,12 @@ namespace PurelySharp.Symbolic.Ir
             };
 
             if (predicate == null)
+            {
+                return false;
+            }
+
+            if (invocation.ArgumentList.Arguments.Count == 2 &&
+                !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[1].Expression, context))
             {
                 return false;
             }
