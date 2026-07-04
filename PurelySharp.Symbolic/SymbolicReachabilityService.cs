@@ -796,20 +796,20 @@ namespace PurelySharp.Symbolic
             IEnumerable<SmtFormula>? pathConditions = null)
         {
             var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
+            if (!ContainsDivisionOrModulo(expression) &&
+                EvaluateConditionTruthWithIr(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    basePathConditions) is { } irTruth)
+            {
+                return irTruth;
+            }
+
             if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
-                if (!ContainsDivisionOrModulo(expression) &&
-                    EvaluateConditionTruthWithIr(
-                        expression,
-                        semanticModel,
-                        cancellationToken,
-                        smtAnalysis,
-                        basePathConditions) is { } irTruth)
-                {
-                    return irTruth;
-                }
-
                 if (IsBranchUnreachable(
                         basePathConditions,
                         expression,

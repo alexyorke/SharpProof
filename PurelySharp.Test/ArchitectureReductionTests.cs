@@ -4876,7 +4876,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicReachabilityService_UsesIrConditionTruthAsLegacyFallback()
+        public void SymbolicReachabilityService_UsesIrConditionTruthBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -4893,7 +4893,7 @@ namespace PurelySharp.Test
             Assert.That(legacyIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
-            Assert.That(irIndex, Is.GreaterThan(legacyIndex));
+            Assert.That(irIndex, Is.LessThan(legacyIndex));
             Assert.That(helperSource, Does.Contain("ClassifyStateConditionTruth(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateBranchFeasibility(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateImplication(state, condition"));
