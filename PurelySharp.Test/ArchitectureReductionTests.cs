@@ -2016,12 +2016,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(15));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(14));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 15,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 14,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2039,7 +2039,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateStringValue("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("] = 1,
                 }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
@@ -5719,7 +5718,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicReachabilityService_UsesIrNullableValuePartsBeforeLegacyFallback()
+        public void SymbolicReachabilityService_UsesIrNullableValuePartsWithoutLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -5736,9 +5735,7 @@ namespace PurelySharp.Test
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-            Assert.That(
-                helperSource.IndexOf("TryTranslateIrNullableValueParts(expression", StringComparison.Ordinal),
-                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("));
             Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression"));
             Assert.That(
                 helperSource,

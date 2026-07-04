@@ -33,7 +33,7 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 15 symbolic-side
+  currently reports 0 analyzer-side and 14 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
@@ -65,6 +65,11 @@ path-fact, hazard, and ownership flows.
   expressions, conditional access, and nullable coalesce with underlying
   fallback values so those cases no longer require the direct nullable
   `HasValue` translator fallback.
+- Nullable value-parts reachability is now IR-only at the
+  `TryTranslateNullableValueParts` boundary. Assigned nullable value mirroring
+  and reachability now use the same IR lowering path for direct nullable
+  terms, null/default, coalesce, conditional expressions, conditional access,
+  and wrapped underlying values.
 - `SymbolicProofService` exists, and the proof spine now normalizes many
   exact constant/string/bounds/conditional/type-test facts before SMT.
   `SymbolicState` also detects contradictory exact ownership, disposal, and

@@ -2766,29 +2766,10 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out NullableValueParts parts,
-            Func<ISymbol, int>? getSymbolVersion = null,
-            int inlineDepth = 0)
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (TryTranslateIrNullableValueParts(expression, context, out parts))
-            {
-                return true;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var translatedParts,
-                    getSymbolVersion,
-                    inlineDepth))
-            {
-                parts = new NullableValueParts(translatedParts.HasValue, translatedParts.Value);
-                return true;
-            }
-
-            parts = default;
-            return false;
+            return TryTranslateIrNullableValueParts(expression, context, out parts);
         }
 
         private static bool TryTranslateIrNullableValueParts(
