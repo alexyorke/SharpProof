@@ -100,6 +100,10 @@ path-fact, hazard, and ownership flows.
   lower through the IR indexing partial as integer terms before formula
   fallback. The remaining built-in-length shim is still carrying other
   domains such as range/slice and count-backed collection lengths.
+- Direct range-result lengths such as `values[1..^1].Length` and
+  `text[1..^1].Length` now also lower through the IR indexing partial before
+  formula fallback. Assigned `System.Range`, `Slice(...)`, and count-backed
+  collection length shapes still remain on the compatibility path.
 - Array-creation dimension lengths such as `new T[rows, columns].GetLength(1)`
   now lower the requested dimension directly to the corresponding size
   expression in `SymbolicIrLowerer.Indexing`, reducing reliance on

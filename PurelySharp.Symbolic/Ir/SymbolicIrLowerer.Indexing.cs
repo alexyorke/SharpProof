@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
@@ -499,6 +500,11 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             expression = UnwrapExpression(expression);
+            if (TryLowerDirectRangeAccessResultLengthTerm(expression, context, out term))
+            {
+                return true;
+            }
+
             if (TryLowerStringInvocationResultLengthTerm(expression, context, out term))
             {
                 return true;
@@ -523,6 +529,103 @@ namespace PurelySharp.Symbolic.Ir
 
             if (TryLowerTerm(expression, context, out var receiver) &&
                 TryCreateBuiltInLengthReferenceTerm(type, receiver, out term))
+            {
+                return true;
+            }
+
+            term = null!;
+            return false;
+        }
+
+        private static bool TryLowerDirectRangeAccessResultLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (expression is not ElementAccessExpressionSyntax elementAccess ||
+                elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var sourceType = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).Type;
+            if (!IsSupportedBuiltInRangeLengthSourceType(sourceType) ||
+                !TryCreateDirectRangeLengthTerm(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess.Expression,
+                    context,
+                    out term))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSupportedBuiltInRangeLengthSourceType(ITypeSymbol? type)
+        {
+            return type?.SpecialType == SpecialType.System_String ||
+                type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type);
+        }
+
+        private static bool TryCreateDirectRangeLengthTerm(
+            ExpressionSyntax rangeExpression,
+            ExpressionSyntax sourceExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            rangeExpression = UnwrapExpression(rangeExpression);
+            if (rangeExpression is not RangeExpressionSyntax rangeSyntax ||
+                !TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
+                !TryLowerDirectRangeEndpointTerm(
+                    rangeSyntax.LeftOperand,
+                    sourceLength,
+                    defaultWhenOmitted: new SymbolicIntegerConstantTerm(0),
+                    context,
+                    out var start) ||
+                !TryLowerDirectRangeEndpointTerm(
+                    rangeSyntax.RightOperand,
+                    sourceLength,
+                    defaultWhenOmitted: sourceLength,
+                    context,
+                    out var end))
+            {
+                return false;
+            }
+
+            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, end, start);
+            return true;
+        }
+
+        private static bool TryLowerDirectRangeEndpointTerm(
+            ExpressionSyntax? expression,
+            SymbolicTerm sourceLength,
+            SymbolicTerm defaultWhenOmitted,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            if (expression == null)
+            {
+                term = defaultWhenOmitted;
+                return true;
+            }
+
+            expression = UnwrapExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.IsKind(SyntaxKind.IndexExpression) &&
+                TryLowerTerm(fromEndIndex.Operand, context, out var offset) &&
+                offset.Kind == SmtValueKind.Int)
+            {
+                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, offset);
+                return true;
+            }
+
+            if (TryLowerTerm(expression, context, out term) &&
+                term.Kind == SmtValueKind.Int)
             {
                 return true;
             }

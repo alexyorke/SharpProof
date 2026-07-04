@@ -1799,6 +1799,48 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerBuiltInLengthTerm_ArrayRangeUsesEndpointDifference()
+        {
+            var context = CreateExpressionContext(
+                "int[] values",
+                "values[1..^1].Length == values.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var subtract = (SymbolicBinaryTerm)term;
+            Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(subtract.Left, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(subtract.Right, Is.TypeOf<SymbolicIntegerConstantTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_StringRangeUsesEndpointDifference()
+        {
+            var context = CreateExpressionContext(
+                "string text",
+                "text[1..^1].Length == text.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var subtract = (SymbolicBinaryTerm)term;
+            Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(subtract.Left, Is.TypeOf<SymbolicBinaryTerm>());
+            Assert.That(subtract.Right, Is.TypeOf<SymbolicIntegerConstantTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
         public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm()
         {
             var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);
