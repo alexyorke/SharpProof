@@ -1915,13 +1915,13 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            SmtFormula? irFormula = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
             if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var term) &&
                 term is SymbolicLengthTerm &&
                 SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
             {
-                irFormula = encodedFormula;
+                formula = encodedFormula;
+                return true;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(
@@ -1934,8 +1934,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = irFormula!;
-            return formula != null;
+            formula = null!;
+            return false;
         }
 
         internal static bool TryTranslateStringValue(
@@ -1945,12 +1945,12 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion = null)
         {
-            SmtFormula? irFormula = null;
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
             if (SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var stringTerm) &&
                 SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out var encodedFormula))
             {
-                irFormula = encodedFormula;
+                formula = encodedFormula;
+                return true;
             }
 
             if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
@@ -1965,8 +1965,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            formula = irFormula!;
-            return formula != null;
+            formula = null!;
+            return false;
         }
 
         internal static bool TryCreateStringNonNullAssignedValueFact(
