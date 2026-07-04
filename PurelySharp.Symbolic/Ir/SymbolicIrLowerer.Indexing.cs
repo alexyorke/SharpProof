@@ -54,8 +54,18 @@ namespace PurelySharp.Symbolic.Ir
                 context.SemanticModel.GetTypeInfo(arrayExpression, context.CancellationToken).Type;
             if (type is not IArrayTypeSymbol arrayType ||
                 dimension < 0 ||
-                dimension >= arrayType.Rank ||
-                !TryLowerTerm(arrayExpression, context, out var arrayTerm) ||
+                dimension >= arrayType.Rank)
+            {
+                term = null!;
+                return false;
+            }
+
+            if (TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term))
+            {
+                return true;
+            }
+
+            if (!TryLowerTerm(arrayExpression, context, out var arrayTerm) ||
                 arrayTerm.Kind != SmtValueKind.Reference)
             {
                 term = null!;
@@ -63,6 +73,33 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension);
+            return true;
+        }
+
+        private static bool TryLowerArrayCreationDimensionLengthTerm(
+            ExpressionSyntax arrayExpression,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (arrayExpression is not ArrayCreationExpressionSyntax arrayCreation ||
+                arrayCreation.Type.RankSpecifiers.Count == 0)
+            {
+                return false;
+            }
+
+            var rankSpecifier = arrayCreation.Type.RankSpecifiers[0];
+            if (rankSpecifier.Sizes.Count != arrayType.Rank ||
+                rankSpecifier.Sizes[dimension].IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.OmittedArraySizeExpression) ||
+                !TryLowerTerm(rankSpecifier.Sizes[dimension], context, out var sizeTerm) ||
+                sizeTerm.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            term = sizeTerm;
             return true;
         }
 

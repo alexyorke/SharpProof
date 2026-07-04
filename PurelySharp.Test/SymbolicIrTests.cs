@@ -1454,6 +1454,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayCreationDimensionLengthUsesSizeExpression()
+        {
+            var context = CreateExpressionContext(
+                "int rows, int columns",
+                "new int[rows, columns].GetLength(1) == columns");
+            var arrayCreation = context.Expression
+                .DescendantNodes()
+                .OfType<ArrayCreationExpressionSyntax>()
+                .Single();
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(arrayCreation, 1, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
+            var variable = (SymbolicVariableTerm)term;
+            Assert.That(variable.Name, Does.StartWith("columns#"));
+            Assert.That(variable.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+        }
+
+        [Test]
         public void SmtFormulaLowerer_ArrayDimensionLengthUsesSharedDimensionLengthAtom()
         {
             var sourceNode = SyntaxFactory.ParseExpression("matrix");
