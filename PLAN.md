@@ -106,10 +106,14 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.TryLowerBuiltInLengthTerm`; reachability and
   runtime-hazard element-access checks no longer carry duplicate length-term
   branches.
+- Built-in length reference lowering now also covers count-backed int
+  indexers such as `IReadOnlyList<T>` by emitting `SymbolicCountTerm`
+  directly from the shared IR helper instead of relying on incidental
+  translator-only count support.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms before formula
   fallback. The remaining built-in-length shim is still carrying other
-  domains such as count-backed collection lengths and unsupported
+  domains such as unsupported
   `System.Range`/`System.Index` symbol flows.
 - Direct range-result lengths such as `values[1..^1].Length` and
   `text[1..^1].Length` now also lower through the IR indexing partial before

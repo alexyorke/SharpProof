@@ -286,8 +286,106 @@ namespace PurelySharp.Symbolic.Ir
                 return CreateLengthTerm(reference, out term);
             }
 
+            if (HasCountBackedIntIndexer(type))
+            {
+                term = new SymbolicCountTerm(reference);
+                return true;
+            }
+
             return type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
                 TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term);
+        }
+
+        private static bool HasCountBackedIntIndexer(ITypeSymbol? typeSymbol)
+        {
+            return HasInstanceInt32Member(typeSymbol, "Count") &&
+                HasInt32Indexer(typeSymbol);
+        }
+
+        private static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInstanceInt32Member(current, memberName))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in typeSymbol.AllInterfaces)
+            {
+                if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName)
+        {
+            foreach (var member in typeSymbol.GetMembers(memberName))
+            {
+                if (member.IsStatic)
+                {
+                    continue;
+                }
+
+                switch (member)
+                {
+                    case IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
+                    case IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 }:
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasInt32Indexer(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInt32Indexer(current))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in typeSymbol.AllInterfaces)
+            {
+                if (HasDeclaredInt32Indexer(interfaceType))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol)
+        {
+            foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
+                    property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TryCreateArrayTotalLengthReferenceTerm(

@@ -1974,6 +1974,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm()
+        {
+            var context = CreateMethodExpressionContext(
+                "IReadOnlyList<int> values",
+                string.Empty,
+                "values.Count > 0");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(
+                    memberAccess.Expression,
+                    context.LoweringContext,
+                    out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicCountTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtVariable>());
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+            Assert.That(formula.ToString(), Does.Contain(".Count"));
+        }
+
+        [Test]
         public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsAssignedRangeStringViews()
         {
             var context = CreateMethodLocalDeclarationContext(

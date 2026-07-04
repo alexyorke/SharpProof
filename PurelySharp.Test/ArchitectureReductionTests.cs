@@ -1437,6 +1437,8 @@ namespace PurelySharp.Test
             Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
             Assert.That(lowererSource, Does.Contain("TryLowerStringInvocationResultLengthTerm("));
             Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
+            Assert.That(lowererSource, Does.Contain("if (HasCountBackedIntIndexer(type))"));
+            Assert.That(lowererSource, Does.Contain("term = new SymbolicCountTerm(reference);"));
             Assert.That(lowererSource, Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
             Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));
             Assert.That(reachabilitySource, Does.Contain("return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);"));
