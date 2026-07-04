@@ -1000,6 +1000,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsConversionLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var conversionSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Conversions.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerSupportedConversionTerm(expression"));
+            Assert.That(coreSource, Does.Contain("TryLowerIdentityPreservingAsTerm(asExpression"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerIdentityPreservingAsTerm"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsIdentityPreservingReferenceConversion"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerSupportedConversionTerm"));
+            Assert.That(conversionSource, Does.Contain("private static bool TryLowerIdentityPreservingAsTerm"));
+            Assert.That(conversionSource, Does.Contain("private static bool IsIdentityPreservingReferenceConversion"));
+            Assert.That(conversionSource, Does.Contain("private static bool TryLowerSupportedConversionTerm"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
