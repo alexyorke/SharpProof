@@ -1549,6 +1549,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LegacyTranslatorShimUsage_IsIsolatedToReachabilityBoundary()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var symbolicDirectory = Path.Combine(repositoryRoot, "PurelySharp.Symbolic");
+            var offenders = Directory.GetFiles(symbolicDirectory, "*.cs", SearchOption.AllDirectories)
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(static file =>
+                    !file.Path.StartsWith("PurelySharp.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
+                    file.Path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs" &&
+                    file.Path != "PurelySharp.Symbolic/SymbolicReachabilityService.cs" &&
+                    file.Source.Contains("CSharpSmtFormulaTranslator.", StringComparison.Ordinal))
+                .Select(static file => file.Path)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
         public void SymbolicCleanBreakDtos_DoNotExposeSmtFormula()
         {
             var dtoTypes = new[]
