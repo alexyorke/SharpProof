@@ -34,10 +34,10 @@ path-fact, hazard, and ownership flows.
   mixed directly into `SymbolicReachabilityService`. Public source-query
   condition proof still delegates formula fallback through reachability, but
   the legacy bridge is now explicit and easier to delete incrementally. The
-  inventory currently reports 0 analyzer-side and 6 symbolic-side
+  inventory currently reports 0 analyzer-side and 5 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn down as IR
   lowerings replace formula-first compatibility. The hotspot inventory still
-  groups those 6 shims into 4 seam families: 2 branch-fact shims, 2 pattern
+  groups those 5 shims into 4 seam families: 1 branch-fact shim, 2 pattern
   shims, 1 condition shim, and 1 value shim.
   Pattern translation now also tries lowering the incoming SMT value back to a
   `SymbolicTerm` and routes supported non-binding pattern conditions through

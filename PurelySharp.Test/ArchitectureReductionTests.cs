@@ -2009,6 +2009,7 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("SymbolicTranslatorCompatibility."));
             Assert.That(reachabilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(compatibilitySource, Does.Contain("CSharpSmtFormulaTranslator."));
+            Assert.That(compatibilitySource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectDomainFacts("));
         }
 
         [Test]
@@ -2097,13 +2098,13 @@ namespace PurelySharp.Test
                     static family => family.GetProperty("count").GetInt32(),
                     StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(6));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(5));
             Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(4));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs"] = 6,
+                    ["PurelySharp.Symbolic/SymbolicTranslatorCompatibility.cs"] = 5,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2112,7 +2113,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryTranslate("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
                 }));
@@ -2120,7 +2120,7 @@ namespace PurelySharp.Test
                 symbolicTranslatorShimFamilyCounts,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["branch-facts"] = 2,
+                    ["branch-facts"] = 1,
                     ["condition"] = 1,
                     ["pattern"] = 2,
                     ["value"] = 1,
