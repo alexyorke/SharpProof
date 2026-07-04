@@ -2064,6 +2064,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var yPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y"));
+            var negatedAnd = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    xPositive,
+                    yPositive)),
+            });
+            var orOfNegatedOperands = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    new SymbolicNotCondition(xPositive),
+                    new SymbolicNotCondition(yPositive)),
+            });
+
+            Assert.That(negatedAnd.NormalizedProofKey, Is.EqualTo(orOfNegatedOperands.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeySimplifiesAbsorbingConstants()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -2428,6 +2465,43 @@ namespace PurelySharp.Test
                 state,
                 new SymbolicNotCondition(new SymbolicFactCondition(fact)),
                 smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_DeMorganEquivalentConditionImpliesWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var yPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    y,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y > 0"),
+                "test.y"));
+            var stored = new SymbolicNotCondition(new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                xPositive,
+                yPositive));
+            var queried = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(yPositive),
+                new SymbolicNotCondition(xPositive));
+            var state = new SymbolicState(pathConditions: new SymbolicCondition[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));

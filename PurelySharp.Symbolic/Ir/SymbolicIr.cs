@@ -614,6 +614,11 @@ namespace PurelySharp.Symbolic.Ir
                     return "fact-condition:" + CreateFactKey(factCondition.Fact.Negate());
                 case SymbolicNotCondition { Operand: SymbolicNotCondition nestedNotCondition }:
                     return CreateConditionKey(nestedNotCondition.Operand);
+                case SymbolicNotCondition { Operand: SymbolicBinaryCondition binaryCondition }:
+                    return CreateConditionKey(new SymbolicBinaryCondition(
+                        NegateConditionOperator(binaryCondition.Operator),
+                        new SymbolicNotCondition(binaryCondition.Left),
+                        new SymbolicNotCondition(binaryCondition.Right)));
                 case SymbolicNotCondition notCondition:
                     return "not(" + CreateConditionKey(notCondition.Operand) + ")";
                 case SymbolicBinaryCondition binaryCondition:
@@ -662,6 +667,13 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             operands.Add(CreateConditionKey(condition));
+        }
+
+        private static SymbolicConditionOperator NegateConditionOperator(SymbolicConditionOperator conditionOperator)
+        {
+            return conditionOperator == SymbolicConditionOperator.And
+                ? SymbolicConditionOperator.Or
+                : SymbolicConditionOperator.And;
         }
     }
 }
