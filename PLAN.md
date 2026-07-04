@@ -122,6 +122,11 @@ path-fact, hazard, and ownership flows.
   helpers, so analyzer path-state updates no longer directly call
   `SymbolicIrFormulaEncoder.TryEncode` for branch conditions or
   `SymbolicSmtFormulaLowerer.TryLowerCondition` for mirrored path conditions.
+  Formula-facing ancestor reachability collection in
+  `SymbolicProgramPointFacts` now projects `CollectAncestorReachabilityState`
+  back through `SymbolicProofService.TryEncodeStatePathConditions` before
+  falling back to the legacy formula-only traversal, so another path-condition
+  entrypoint now prefers the IR-native state pipeline.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

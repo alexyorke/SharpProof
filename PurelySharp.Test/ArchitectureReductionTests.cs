@@ -5804,6 +5804,33 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateBeforeLegacyFormulaFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(",
+                StringComparison.Ordinal);
+            var legacyIndex = source.IndexOf(
+                "private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditionsLegacy(",
+                StringComparison.Ordinal);
+            var stateIndex = source.IndexOf("CollectAncestorReachabilityState(", StringComparison.Ordinal);
+            var encodeIndex = source.IndexOf("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, legacyIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThan(helperIndex));
+            Assert.That(stateIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(encodeIndex, Is.GreaterThan(stateIndex));
+            Assert.That(helperSource, Does.Contain("CollectAncestorReachabilityState("));
+            Assert.That(helperSource, Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)"));
+            Assert.That(helperSource, Does.Contain("return CollectAncestorReachabilityConditionsLegacy("));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_UsesIrConditionTruthBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -6230,6 +6257,25 @@ namespace PurelySharp.Test
 
             Assert.That(added, Is.True);
             Assert.That(branchState.PathConditions.Single(), Is.TypeOf<SymbolicNotCondition>());
+        }
+
+        [Test]
+        public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateToFormulas()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement(
+                "class C { void M(int x) { if (x <= 10) { int y = x; } } }");
+            var statement = ifStatement.Statement
+                .DescendantNodesAndSelf()
+                .OfType<LocalDeclarationStatementSyntax>()
+                .Single();
+
+            var conditions = SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(
+                statement,
+                semanticModel,
+                CancellationToken.None);
+
+            Assert.That(conditions, Has.Length.EqualTo(1));
+            Assert.That(conditions[0].ToString(), Does.Contain("x"));
         }
 
         [Test]

@@ -173,6 +173,26 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            var state = CollectAncestorReachabilityState(
+                syntaxNode,
+                semanticModel,
+                cancellationToken);
+            if (SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions))
+            {
+                return pathConditions;
+            }
+
+            return CollectAncestorReachabilityConditionsLegacy(
+                syntaxNode,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditionsLegacy(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
             var builder = ImmutableArray.CreateBuilder<SmtFormula>();
 
             foreach (var ancestor in syntaxNode.Ancestors())
