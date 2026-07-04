@@ -1420,14 +1420,51 @@ namespace PurelySharp.Test
                     .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
                     .Distinct(StringComparer.Ordinal),
                 Is.Empty);
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.GreaterThan(0));
+            var symbolicTranslatorShimUsages = root.GetProperty("symbolicTranslatorShimUsages")
+                .EnumerateArray()
+                .Select(static usage => new
+                {
+                    Path = usage.GetProperty("path").GetString() ?? string.Empty,
+                    Text = usage.GetProperty("text").GetString() ?? string.Empty,
+                })
+                .ToArray();
+            var symbolicTranslatorShimCountsByPath = symbolicTranslatorShimUsages
+                .GroupBy(static usage => usage.Path, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+            var symbolicTranslatorShimCountsByText = symbolicTranslatorShimUsages
+                .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(20));
             Assert.That(
-                root.GetProperty("symbolicTranslatorShimUsages")
-                    .EnumerateArray()
-                    .Select(static usage => usage.GetProperty("path").GetString() ?? string.Empty)
-                    .All(static path => path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal) &&
-                        path != "PurelySharp.Symbolic/Smt/CSharpSmtFormulaTranslator.cs"),
-                Is.True);
+                symbolicTranslatorShimCountsByPath,
+                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
+                {
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 20,
+                }));
+            Assert.That(
+                symbolicTranslatorShimCountsByText,
+                Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
+                {
+                    ["CSharpSmtFormulaTranslator.TryTranslate("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
+                    ["if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||"] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 3,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateStringValue("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("] = 1,
+                    ["!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("] = 1,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("] = 1,
+                    ["return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("] = 1,
+                }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(
                 root.GetProperty("irKnownApiLoweringLocations")
