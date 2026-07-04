@@ -451,6 +451,12 @@ namespace PurelySharp.Symbolic
 
         private static bool StateContainsCondition(SymbolicState state, SymbolicCondition condition)
         {
+            if (condition is SymbolicFactCondition factCondition &&
+                StateContainsFact(state, factCondition.Fact))
+            {
+                return true;
+            }
+
             var conditionKey = SymbolicState.CreateProofConditionKey(condition);
             return state.PathConditions.Any(candidate => string.Equals(
                 SymbolicState.CreateProofConditionKey(candidate),
