@@ -2413,6 +2413,62 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesConstantFacts()
+        {
+            var trueFact = SymbolicFact.Exact(
+                new SymbolicTruthAtom(new SymbolicBooleanConstantTerm(true)),
+                SyntaxFactory.ParseExpression("true"),
+                "test.true");
+            var falseFact = SymbolicFact.Exact(
+                new SymbolicTruthAtom(new SymbolicBooleanConstantTerm(false)),
+                SyntaxFactory.ParseExpression("false"),
+                "test.false");
+            var integerLessThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    new SymbolicIntegerConstantTerm(1),
+                    new SymbolicIntegerConstantTerm(2)),
+                SyntaxFactory.ParseExpression("1 < 2"),
+                "test.integer-less-than");
+            var stringEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicStringConstantTerm("a"),
+                    new SymbolicStringConstantTerm("a")),
+                SyntaxFactory.ParseExpression("\"a\" == \"a\""),
+                "test.string-equal");
+            var nullNotEqual = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    new SymbolicNullTerm(),
+                    new SymbolicNullTerm()),
+                SyntaxFactory.ParseExpression("null != null"),
+                "test.null-not-equal");
+            var integerGreaterThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicIntegerConstantTerm(1),
+                    new SymbolicIntegerConstantTerm(2)),
+                SyntaxFactory.ParseExpression("1 > 2"),
+                "test.integer-greater-than");
+            var empty = new SymbolicState();
+            var tautologicalFacts = new SymbolicState(new[] { trueFact, integerLessThan, stringEqual });
+            var contradictoryFalseFact = new SymbolicState(new[] { falseFact });
+            var contradictoryNullFact = new SymbolicState(new[] { nullNotEqual });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(integerGreaterThan),
+            });
+
+            Assert.That(tautologicalFacts.Facts, Is.Empty);
+            Assert.That(tautologicalFacts.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryFalseFact.IsContradictory, Is.True);
+            Assert.That(contradictoryNullFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFalseFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyUsesStableNestedTermKeys()
         {
             var array = new SymbolicVariableTerm("items", SmtValueKind.Reference);

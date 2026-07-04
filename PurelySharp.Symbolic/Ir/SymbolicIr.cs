@@ -507,8 +507,15 @@ namespace PurelySharp.Symbolic.Ir
 
         private static bool TryEvaluateFact(SymbolicFact fact, out bool value)
         {
+            if (fact.Atom is SymbolicTruthAtom { Condition: SymbolicBooleanConstantTerm boolean })
+            {
+                value = fact.Polarity ? boolean.Value : !boolean.Value;
+                return true;
+            }
+
             if (fact.Atom is SymbolicRelationAtom relation &&
-                TryEvaluateSelfRelation(relation, out value))
+                (TryEvaluateSelfRelation(relation, out value) ||
+                    TryEvaluateConstantRelation(relation, out value)))
             {
                 value = fact.Polarity ? value : !value;
                 return true;
@@ -540,6 +547,55 @@ namespace PurelySharp.Symbolic.Ir
                 _ => false,
             };
             return true;
+        }
+
+        private static bool TryEvaluateConstantRelation(SymbolicRelationAtom relation, out bool value)
+        {
+            if (relation.Left is SymbolicIntegerConstantTerm leftInteger &&
+                relation.Right is SymbolicIntegerConstantTerm rightInteger)
+            {
+                value = relation.Operator switch
+                {
+                    SymbolicRelationOperator.Equal => leftInteger.Value == rightInteger.Value,
+                    SymbolicRelationOperator.NotEqual => leftInteger.Value != rightInteger.Value,
+                    SymbolicRelationOperator.LessThan => leftInteger.Value < rightInteger.Value,
+                    SymbolicRelationOperator.LessThanOrEqual => leftInteger.Value <= rightInteger.Value,
+                    SymbolicRelationOperator.GreaterThan => leftInteger.Value > rightInteger.Value,
+                    SymbolicRelationOperator.GreaterThanOrEqual => leftInteger.Value >= rightInteger.Value,
+                    _ => false,
+                };
+                return true;
+            }
+
+            if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual &&
+                TryGetConstantEqualityKey(relation.Left, out var leftKey) &&
+                TryGetConstantEqualityKey(relation.Right, out var rightKey))
+            {
+                var equal = string.Equals(leftKey, rightKey, StringComparison.Ordinal);
+                value = relation.Operator == SymbolicRelationOperator.Equal
+                    ? equal
+                    : !equal;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryGetConstantEqualityKey(SymbolicTerm term, out string key)
+        {
+            switch (term)
+            {
+                case SymbolicBooleanConstantTerm:
+                case SymbolicIntegerConstantTerm:
+                case SymbolicStringConstantTerm:
+                case SymbolicNullTerm:
+                    key = CreateTermKey(term);
+                    return true;
+                default:
+                    key = string.Empty;
+                    return false;
+            }
         }
 
         private static bool ContainsFalseConstant(SymbolicCondition condition)
