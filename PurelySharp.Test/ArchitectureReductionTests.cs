@@ -1213,6 +1213,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsSharedUtilitiesInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var utilitySource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Utilities.cs"));
+
+            Assert.That(coreSource, Does.Contain("UnwrapExpression(expression)"));
+            Assert.That(coreSource, Does.Contain("TryGetIntegralConstant(constantValue.Value"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetStableVariableSymbol"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryGetIntegralConstant"));
+            Assert.That(coreSource, Does.Not.Contain("private static ExpressionSyntax UnwrapExpression"));
+            Assert.That(utilitySource, Does.Contain("private static bool TryGetStableVariableSymbol"));
+            Assert.That(utilitySource, Does.Contain("private static bool TryGetIntegralConstant"));
+            Assert.That(utilitySource, Does.Contain("private static ExpressionSyntax UnwrapExpression"));
+        }
+
+        [Test]
         public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
