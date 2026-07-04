@@ -3697,6 +3697,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicStringContentTerm("));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringTerm)"));
+            Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringLengthTerm)"));
             Assert.That(source, Does.Contain("new SymbolicArrayDimensionLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateArrayDimensionLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateTupleElementTerm("));

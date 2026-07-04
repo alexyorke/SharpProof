@@ -7438,6 +7438,13 @@ namespace PurelySharp.Symbolic
                 case SmtStringLengthTerm stringLength:
                     if (TrySubstituteFormula(stringLength.Value, sourceFormula, targetFormula, out var stringLengthValue))
                     {
+                        if (SymbolicSmtFormulaLowerer.TryLowerTerm(stringLengthValue, out var stringLengthTerm) &&
+                            stringLengthTerm.Kind == SmtValueKind.String &&
+                            SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(stringLengthTerm), out substituted))
+                        {
+                            return true;
+                        }
+
                         substituted = new SmtStringLengthTerm(stringLengthValue);
                         return true;
                     }
