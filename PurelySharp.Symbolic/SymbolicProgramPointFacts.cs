@@ -4313,7 +4313,7 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             var formulas = new List<SmtFormula>();
-            if (!CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            if (!TryCollectBranchAssumptionFacts(
                     condition,
                     branchWhenTrue,
                     semanticModel,
@@ -5790,7 +5790,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+            TryCollectBranchAssumptionFacts(
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,
@@ -5811,14 +5811,11 @@ namespace PurelySharp.Symbolic
                     branchWhenTrue,
                     out var isPatternExpression,
                     out var matchedPattern) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
+                !TryCreateValueFormula(
                     isPatternExpression.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var matchedValue,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                matchedValue == null)
+                    out var matchedValue))
             {
                 return;
             }
@@ -9497,19 +9494,32 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool TryCollectBranchAssumptionFacts(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            return CSharpSmtFormulaTranslator.TryCollectBranchAssumptions(
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                facts);
+        }
+
         private static bool TryCreateIntegerValueFormula(
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (TryCreateValueFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    out var translatedFormula) &&
                 translatedFormula is { Kind: SmtValueKind.Int })
             {
                 formula = translatedFormula;
@@ -9526,13 +9536,11 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (TryCreateValueFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var translatedFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
+                    out var translatedFormula) &&
                 translatedFormula is { Kind: SmtValueKind.Reference })
             {
                 formula = translatedFormula;

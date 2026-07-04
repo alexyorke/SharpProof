@@ -88,6 +88,10 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyReachability(SymbolicState state)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
+            Assert.That(proofServiceSource, Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
+            Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
+            Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
+            Assert.That(proofServiceSource, Does.Not.Contain("state = state.Normalize();"));
         }
 
         [Test]
@@ -1625,7 +1629,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicState_NormalizeDeduplicatesFactsAndCreatesStableProofKey()
+        public void SymbolicState_ConstructorDeduplicatesFactsAndCreatesStableProofKey()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
             var first = SymbolicFact.Exact(
@@ -1644,8 +1648,8 @@ namespace PurelySharp.Test
                 SyntaxFactory.ParseExpression("y > 0"),
                 "test.y");
 
-            var left = new SymbolicState(new[] { first, duplicateWithDifferentProvenance, y }).Normalize();
-            var right = new SymbolicState(new[] { y, first }).Normalize();
+            var left = new SymbolicState(new[] { first, duplicateWithDifferentProvenance, y });
+            var right = new SymbolicState(new[] { y, first });
 
             Assert.That(left.Facts, Has.Length.EqualTo(2));
             Assert.That(left.NormalizedProofKey, Is.EqualTo(right.NormalizedProofKey));

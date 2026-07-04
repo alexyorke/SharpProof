@@ -29,7 +29,6 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(state));
             }
 
-            state = state.Normalize();
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -73,7 +72,6 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(fact));
             }
 
-            state = state.Normalize();
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -112,7 +110,6 @@ namespace PurelySharp.Symbolic
                 throw new ArgumentNullException(nameof(condition));
             }
 
-            state = state.Normalize();
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -141,6 +138,11 @@ namespace PurelySharp.Symbolic
 
         public SymbolicIrProofResult ClassifyBranchFeasibility(SymbolicState state, SymbolicCondition branchCondition)
         {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             if (branchCondition == null)
             {
                 throw new ArgumentNullException(nameof(branchCondition));
@@ -162,7 +164,6 @@ namespace PurelySharp.Symbolic
                 return reachability;
             }
 
-            state = state.Normalize();
             return ClassifyWithIrCache(
                 "condition-truth:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofConditionKey(condition),
                 () =>
@@ -193,12 +194,16 @@ namespace PurelySharp.Symbolic
 
         public SymbolicIrProofResult ClassifyHazardTrigger(SymbolicState state, SymbolicFact triggerPrecondition)
         {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             if (triggerPrecondition == null)
             {
                 throw new ArgumentNullException(nameof(triggerPrecondition));
             }
 
-            state = state.Normalize();
             return ClassifyWithIrCache(
                 "hazard-trigger:" + state.NormalizedProofKey + "\n" + SymbolicState.CreateProofFactKey(triggerPrecondition),
                 () =>
@@ -347,12 +352,21 @@ namespace PurelySharp.Symbolic
                 service.CacheEntryCount);
         }
 
-        private static bool TryEncodeState(
+        private bool TryEncodeState(
             SymbolicState state,
             out ImmutableArray<SmtFormula> pathConditions,
             out SymbolicUnknownReason unknownReason)
         {
-            state = state.Normalize();
+            var entry = GetProofResultCache().EncodedStates.GetOrAdd(
+                state.NormalizedProofKey,
+                _ => EncodeStateUncached(state));
+            pathConditions = entry.PathConditions;
+            unknownReason = entry.UnknownReason;
+            return entry.Success;
+        }
+
+        private static EncodedStateCacheEntry EncodeStateUncached(SymbolicState state)
+        {
             var builder = ImmutableArray.CreateBuilder<SmtFormula>(
                 state.Facts.Length + state.PathConditions.Length);
             var skippedUnsupported = false;
@@ -381,20 +395,29 @@ namespace PurelySharp.Symbolic
 
             if (skippedUnsupported && builder.Count == 0)
             {
-                pathConditions = ImmutableArray<SmtFormula>.Empty;
-                unknownReason = SymbolicUnknownReason.UnsupportedIrEncoding;
-                return false;
+                return new EncodedStateCacheEntry(
+                    Success: false,
+                    ImmutableArray<SmtFormula>.Empty,
+                    SymbolicUnknownReason.UnsupportedIrEncoding);
             }
 
-            pathConditions = builder.ToImmutable();
-            unknownReason = SymbolicUnknownReason.None;
-            return true;
+            return new EncodedStateCacheEntry(
+                Success: true,
+                builder.ToImmutable(),
+                SymbolicUnknownReason.None);
         }
 
         private sealed class ProofResultCache
         {
             internal ConcurrentDictionary<string, SymbolicIrProofResult> Results { get; } = new(StringComparer.Ordinal);
+
+            internal ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates { get; } = new(StringComparer.Ordinal);
         }
+
+        private readonly record struct EncodedStateCacheEntry(
+            bool Success,
+            ImmutableArray<SmtFormula> PathConditions,
+            SymbolicUnknownReason UnknownReason);
     }
 
     internal sealed class SymbolicIrProofResult

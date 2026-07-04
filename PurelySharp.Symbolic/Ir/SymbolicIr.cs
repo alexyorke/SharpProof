@@ -227,14 +227,17 @@ namespace PurelySharp.Symbolic.Ir
             IEnumerable<KeyValuePair<string, int>>? symbolVersions = null,
             bool isContradictory = false)
         {
-            Facts = facts?.ToImmutableArray() ?? ImmutableArray<SymbolicFact>.Empty;
-            PathConditions = pathConditions?.ToImmutableArray() ?? ImmutableArray<SymbolicCondition>.Empty;
+            var normalizedFacts = DeduplicateFacts(facts?.ToImmutableArray() ?? ImmutableArray<SymbolicFact>.Empty);
+            var normalizedConditions = DeduplicateConditions(pathConditions?.ToImmutableArray() ?? ImmutableArray<SymbolicCondition>.Empty);
             SymbolVersions = symbolVersions?.ToImmutableDictionary(
                     static pair => pair.Key,
                     static pair => pair.Value,
                     StringComparer.Ordinal) ??
                 ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
-            IsContradictory = isContradictory;
+            Facts = normalizedFacts;
+            PathConditions = normalizedConditions;
+            IsContradictory = isContradictory ||
+                ContainsContradiction(Facts, PathConditions);
             NormalizedProofKey = CreateProofKey(Facts, PathConditions, SymbolVersions, IsContradictory);
         }
 
@@ -255,7 +258,7 @@ namespace PurelySharp.Symbolic.Ir
                 throw new ArgumentNullException(nameof(fact));
             }
 
-            return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory).Normalize();
+            return new SymbolicState(Facts.Add(fact), PathConditions, SymbolVersions, IsContradictory);
         }
 
         public SymbolicState AddPathCondition(SymbolicCondition condition)
@@ -265,7 +268,7 @@ namespace PurelySharp.Symbolic.Ir
                 throw new ArgumentNullException(nameof(condition));
             }
 
-            return new SymbolicState(Facts, PathConditions.Add(condition), SymbolVersions, IsContradictory).Normalize();
+            return new SymbolicState(Facts, PathConditions.Add(condition), SymbolVersions, IsContradictory);
         }
 
         public SymbolicState WithSymbolVersion(string symbolKey, int version)
@@ -279,7 +282,7 @@ namespace PurelySharp.Symbolic.Ir
                 Facts,
                 PathConditions,
                 SymbolVersions.SetItem(symbolKey, version),
-                IsContradictory).Normalize();
+                IsContradictory);
         }
 
         public SymbolicState Normalize()
