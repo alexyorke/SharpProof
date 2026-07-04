@@ -2602,6 +2602,48 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesStringPredicateIdentityFacts()
+        {
+            var text = new SymbolicVariableTerm("text", SmtValueKind.String);
+            var empty = new SymbolicStringConstantTerm(string.Empty);
+            var startsWithSelf = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.StartsWith,
+                    text,
+                    text),
+                SyntaxFactory.ParseExpression("text.StartsWith(text)"),
+                "test.starts-with-self");
+            var endsWithEmpty = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.EndsWith,
+                    text,
+                    empty),
+                SyntaxFactory.ParseExpression("text.EndsWith(\"\")"),
+                "test.ends-with-empty");
+            var containsEmpty = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.Contains,
+                    text,
+                    empty),
+                SyntaxFactory.ParseExpression("text.Contains(\"\")"),
+                "test.contains-empty");
+            var negatedIdentity = startsWithSelf.Negate();
+            var emptyState = new SymbolicState();
+            var tautologicalPredicates = new SymbolicState(new[] { startsWithSelf, endsWithEmpty, containsEmpty });
+            var contradictoryFact = new SymbolicState(new[] { negatedIdentity });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(negatedIdentity),
+            });
+
+            Assert.That(tautologicalPredicates.Facts, Is.Empty);
+            Assert.That(tautologicalPredicates.NormalizedProofKey, Is.EqualTo(emptyState.NormalizedProofKey));
+            Assert.That(contradictoryFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeySimplifiesConstantStringTermFacts()
         {
             var prefixConcat = new SymbolicStringConcatTerm(
@@ -3863,6 +3905,20 @@ namespace PurelySharp.Test
                     new SymbolicStringConstantTerm("missing")),
                 SyntaxFactory.ParseExpression("\"prefix-value\".EndsWith(\"missing\")"),
                 "test.false-string-target");
+            var trueStringIdentityTarget = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.Contains,
+                    new SymbolicVariableTerm("text", SmtValueKind.String),
+                    new SymbolicVariableTerm("text", SmtValueKind.String)),
+                SyntaxFactory.ParseExpression("text.Contains(text)"),
+                "test.true-string-identity-target");
+            var trueStringEmptyTarget = SymbolicFact.Exact(
+                new SymbolicStringPredicateAtom(
+                    SymbolicStringPredicateKind.StartsWith,
+                    new SymbolicVariableTerm("text", SmtValueKind.String),
+                    new SymbolicStringConstantTerm(string.Empty)),
+                SyntaxFactory.ParseExpression("text.StartsWith(\"\")"),
+                "test.true-string-empty-target");
             var trueStringLengthTarget = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
@@ -3932,6 +3988,14 @@ namespace PurelySharp.Test
                 new SymbolicState(),
                 falseStringTarget,
                 smtAnalysis);
+            var trueStringIdentityResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueStringIdentityTarget,
+                smtAnalysis);
+            var trueStringEmptyResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                trueStringEmptyTarget,
+                smtAnalysis);
             var trueStringLengthResult = SymbolicReachabilityService.ClassifyStateImplication(
                 new SymbolicState(),
                 trueStringLengthTarget,
@@ -3967,6 +4031,10 @@ namespace PurelySharp.Test
             Assert.That(trueStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseStringResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseStringResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueStringIdentityResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueStringIdentityResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(trueStringEmptyResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueStringEmptyResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(trueStringLengthResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueStringLengthResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseStringConcatResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));

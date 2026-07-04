@@ -630,6 +630,22 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicStringPredicateAtom predicate,
             out bool value)
         {
+            if (predicate.Predicate is
+                    SymbolicStringPredicateKind.Contains or
+                    SymbolicStringPredicateKind.StartsWith or
+                    SymbolicStringPredicateKind.EndsWith)
+            {
+                if (predicate.Argument is SymbolicStringConstantTerm { Value.Length: 0 } ||
+                    string.Equals(
+                        CreateTermKey(predicate.Value),
+                        CreateTermKey(predicate.Argument),
+                        StringComparison.Ordinal))
+                {
+                    value = true;
+                    return true;
+                }
+            }
+
             if (!TryEvaluateStringTerm(predicate.Value, out var valueText) ||
                 !TryEvaluateStringTerm(predicate.Argument, out var argumentText))
             {
