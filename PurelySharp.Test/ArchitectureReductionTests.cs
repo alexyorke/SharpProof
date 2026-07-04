@@ -3840,9 +3840,11 @@ namespace PurelySharp.Test
                 helperSource,
                 Does.Contain("SymbolicIrLowerer.TryLowerNullableValueTerm(expression"));
             Assert.That(helperSource, Does.Contain("TryTranslateIrNullableCoalesceValueParts("));
+            Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalValueParts("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm"));
             Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm)"));
+            Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm("));
         }
 
         [Test]

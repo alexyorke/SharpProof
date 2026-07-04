@@ -2697,6 +2697,12 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslateIrNullableConditionalValueParts(conditionalExpression, context, out parts))
+            {
+                return true;
+            }
+
             parts = default;
             return false;
         }
@@ -2731,6 +2737,41 @@ namespace PurelySharp.Symbolic
             var valueTerm = new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm);
 
             if (!SymbolicIrFormulaEncoder.TryEncode(hasValueCondition, out var hasValueFormula) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
+            {
+                return false;
+            }
+
+            parts = new NullableValueParts(hasValueFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryTranslateIrNullableConditionalValueParts(
+            ConditionalExpressionSyntax conditionalExpression,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            parts = default;
+            if (!SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) ||
+                !SymbolicIrLowerer.TryLowerNullableHasValueTerm(conditionalExpression.WhenTrue, context, out var whenTrueHasValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableHasValueTerm(conditionalExpression.WhenFalse, context, out var whenFalseHasValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableValueTerm(conditionalExpression.WhenTrue, context, out var whenTrueValueTerm) ||
+                !SymbolicIrLowerer.TryLowerNullableValueTerm(conditionalExpression.WhenFalse, context, out var whenFalseValueTerm) ||
+                whenTrueValueTerm.Kind != whenFalseValueTerm.Kind)
+            {
+                return false;
+            }
+
+            var hasValueTerm = new SymbolicConditionalTerm(
+                condition,
+                whenTrueHasValueTerm,
+                whenFalseHasValueTerm);
+            var valueTerm = new SymbolicConditionalTerm(
+                condition,
+                whenTrueValueTerm,
+                whenFalseValueTerm);
+
+            if (!SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula) ||
                 !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
             {
                 return false;
