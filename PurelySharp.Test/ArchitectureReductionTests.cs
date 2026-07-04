@@ -5831,6 +5831,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TriesIrNotNullWhenBranchAssumptionsBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf("internal static bool TryCollectBranchAssumptions(", StringComparison.Ordinal);
+            var nestedHelperIndex = source.IndexOf("private static void TryCollectIrNotNullWhenBranchAssumptions(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static bool TryCollectPatternBindingFacts(", StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+            var nestedHelperEndIndex = source.IndexOf("private static bool TryCreateIrTypeTestNonNullBranchFact(", StringComparison.Ordinal);
+            var nestedHelperSource = source.Substring(nestedHelperIndex, nestedHelperEndIndex - nestedHelperIndex);
+            var irIndex = helperSource.IndexOf("TryCollectIrNotNullWhenBranchAssumptions(", StringComparison.Ordinal);
+            var legacyIndex = helperSource.IndexOf("LegacyFormulaCompatibility.TryCollectBranchAssumptions(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nestedHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(nestedHelperEndIndex, Is.GreaterThan(nestedHelperIndex));
+            Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(legacyIndex, Is.GreaterThan(irIndex));
+            Assert.That(nestedHelperSource, Does.Contain("AddIrNotNullWhenInvocationBranchFacts("));
+            Assert.That(nestedHelperSource, Does.Contain("TryGetIrNotNullWhenValue("));
+            Assert.That(nestedHelperSource, Does.Contain("TryCreateIrNotNullWhenArgumentFormula("));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_CollectsIrSimplePatternBranchAssumptions()
         {
             static bool IsVariableEquality(SmtFormula formula, string leftName, string rightName)
@@ -5895,6 +5923,123 @@ namespace PurelySharp.Test
                 Is.True);
             Assert.That(formulas.Any(formula => IsVariableEquality(formula, localName, parameterName)), Is.True);
             Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, localName)), Is.True);
+            Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, parameterName)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_CollectsIrNotNullWhenInvocationBranchAssumptions()
+        {
+            static bool IsReferenceNonNullComparison(SmtFormula formula, string variableName)
+            {
+                return formula is SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.NotEqual,
+                    Left: SmtVariable { Name: var name, Kind: SmtValueKind.Reference },
+                    Right: SmtNullConstant,
+                } && name == variableName;
+            }
+
+            var tree = CSharpSyntaxTree.ParseText("""
+                using System.Diagnostics.CodeAnalysis;
+
+                class C
+                {
+                    static bool IsPresent([NotNullWhen(true)] string? value) => value is not null;
+
+                    bool M(string? x)
+                    {
+                        return IsPresent(x);
+                    }
+                }
+                """);
+            var references = new[]
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(System.Diagnostics.CodeAnalysis.NotNullWhenAttribute).Assembly.Location),
+            };
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityNotNullWhenBranchAssumptions",
+                new[] { tree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var invocation = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single();
+            var parameter = semanticModel.GetDeclaredSymbol(
+                tree.GetRoot().DescendantNodes().OfType<ParameterSyntax>().Last(),
+                CancellationToken.None)!;
+            var parameterName = SymbolicFactFactory.GetSmtVariableName(parameter);
+            var formulas = new List<SmtFormula>();
+
+            Assert.That(
+                SymbolicReachabilityService.TryCollectBranchAssumptions(
+                    invocation,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    CancellationToken.None,
+                    formulas),
+                Is.True);
+            Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, parameterName)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_CollectsIrNegatedNotNullWhenBranchAssumptions()
+        {
+            static bool IsReferenceNonNullComparison(SmtFormula formula, string variableName)
+            {
+                return formula is SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.NotEqual,
+                    Left: SmtVariable { Name: var name, Kind: SmtValueKind.Reference },
+                    Right: SmtNullConstant,
+                } && name == variableName;
+            }
+
+            var tree = CSharpSyntaxTree.ParseText("""
+                using System.Diagnostics.CodeAnalysis;
+
+                class C
+                {
+                    static bool IsMissing([NotNullWhen(false)] string? value) => value is null;
+
+                    bool M(string? x)
+                    {
+                        return !IsMissing(x);
+                    }
+                }
+                """);
+            var references = new[]
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(System.Diagnostics.CodeAnalysis.NotNullWhenAttribute).Assembly.Location),
+            };
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityNegatedNotNullWhenBranchAssumptions",
+                new[] { tree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single()
+                .Expression!;
+            var parameter = semanticModel.GetDeclaredSymbol(
+                tree.GetRoot().DescendantNodes().OfType<ParameterSyntax>().Last(),
+                CancellationToken.None)!;
+            var parameterName = SymbolicFactFactory.GetSmtVariableName(parameter);
+            var formulas = new List<SmtFormula>();
+
+            Assert.That(
+                SymbolicReachabilityService.TryCollectBranchAssumptions(
+                    returnExpression,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    CancellationToken.None,
+                    formulas),
+                Is.True);
             Assert.That(formulas.Any(formula => IsReferenceNonNullComparison(formula, parameterName)), Is.True);
         }
 

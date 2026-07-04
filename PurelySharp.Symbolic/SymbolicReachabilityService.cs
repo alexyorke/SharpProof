@@ -15,6 +15,9 @@ namespace PurelySharp.Symbolic
 {
     internal static class SymbolicReachabilityService
     {
+        private const string ImplicitThisVariableName = "this";
+        private const string MemberNotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
+        private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
         private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache> s_structuralPathConditionCache = new();
 
         internal static bool IsSatisfiable(
@@ -453,6 +456,13 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 formulas,
                 getSymbolVersion);
+            TryCollectIrNotNullWhenBranchAssumptions(
+                expression,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
 
             return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
                 expression,
@@ -580,6 +590,276 @@ namespace PurelySharp.Symbolic
             {
                 formulas.Add(operandNonNull);
             }
+        }
+
+        private static void TryCollectIrNotNullWhenBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax negation &&
+                negation.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                TryCollectIrNotNullWhenBranchAssumptions(
+                    negation.Operand,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+                return;
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression &&
+                (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                 binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)))
+            {
+                if (TryGetBoolLiteral(binaryExpression.Left, out var leftValue))
+                {
+                    TryCollectIrNotNullWhenBranchAssumptions(
+                        binaryExpression.Right,
+                        GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+                }
+
+                if (TryGetBoolLiteral(binaryExpression.Right, out var rightValue))
+                {
+                    TryCollectIrNotNullWhenBranchAssumptions(
+                        binaryExpression.Left,
+                        GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+                }
+            }
+
+            if (expression is InvocationExpressionSyntax invocation)
+            {
+                AddIrNotNullWhenInvocationBranchFacts(
+                    invocation,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
+        }
+
+        private static void AddIrNotNullWhenInvocationBranchFacts(
+            InvocationExpressionSyntax invocation,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { IsParams: false } parameter ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
+                    !TryGetIrNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                    notNullWhenValue != branchWhenTrue ||
+                    !TryCreateIrNotNullWhenArgumentFormula(
+                        argumentSyntax.Expression,
+                        argumentSyntax.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        out var argumentFormula))
+                {
+                    continue;
+                }
+
+                formulas.Add(argumentFormula);
+            }
+        }
+
+        private static bool IsSupportedIrNotNullWhenArgument(
+            IParameterSymbol parameter,
+            ArgumentSyntax argument)
+        {
+            return parameter.RefKind switch
+            {
+                RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
+                RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
+                _ => false,
+            };
+        }
+
+        private static bool TryGetIrNotNullWhenValue(IParameterSymbol parameter, out bool value)
+        {
+            if (TryGetIrSymbolNotNullWhenValue(parameter, out value))
+            {
+                return true;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                TryGetIrSymbolNotNullWhenValue(parameter.OriginalDefinition, out value))
+            {
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryGetIrSymbolNotNullWhenValue(IParameterSymbol parameter, out bool value)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        NotNullWhenAttributeMetadataName,
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not bool attributeValue)
+                {
+                    continue;
+                }
+
+                value = attributeValue;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryCreateIrNotNullWhenArgumentFormula(
+            ExpressionSyntax expression,
+            SyntaxNode sourceNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            return TryCreateIrNotNullWhenArgumentCondition(
+                    expression,
+                    sourceNode,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out var condition) &&
+                SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
+        }
+
+        private static bool TryCreateIrNotNullWhenArgumentCondition(
+            ExpressionSyntax expression,
+            SyntaxNode sourceNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryGetLocalOrParameterArgumentSymbol(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var symbol) ||
+                !TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var referenceTerm))
+            {
+                return false;
+            }
+
+            condition = CreateIrRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                referenceTerm,
+                new SymbolicNullTerm(),
+                sourceNode,
+                "ir.not-null-when.argument.non-null");
+            return true;
+        }
+
+        private static bool TryGetLocalOrParameterArgumentSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol symbol)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is DeclarationExpressionSyntax
+                {
+                    Designation: SingleVariableDesignationSyntax singleVariableDesignation
+                } &&
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol declaredLocal)
+            {
+                symbol = declaredLocal.OriginalDefinition;
+                return true;
+            }
+
+            var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
+            if (candidate is ILocalSymbol or IParameterSymbol)
+            {
+                symbol = candidate;
+                return true;
+            }
+
+            symbol = null!;
+            return false;
+        }
+
+        private static bool TryGetBoolLiteral(ExpressionSyntax expression, out bool value)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression.IsKind(SyntaxKind.TrueLiteralExpression))
+            {
+                value = true;
+                return true;
+            }
+
+            if (expression.IsKind(SyntaxKind.FalseLiteralExpression))
+            {
+                value = false;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool GetComparedBranchValue(
+            bool literalValue,
+            BinaryExpressionSyntax comparison,
+            bool branchWhenTrue)
+        {
+            return comparison.IsKind(SyntaxKind.EqualsExpression)
+                ? literalValue == branchWhenTrue
+                : literalValue != branchWhenTrue;
+        }
+
+        private static string? GetFullMetadataName(INamedTypeSymbol? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
+                ? type.ContainingNamespace.ToDisplayString()
+                : string.Empty;
+            return string.IsNullOrEmpty(namespaceName)
+                ? type.MetadataName
+                : namespaceName + "." + type.MetadataName;
         }
 
         private static bool TryCreateIrTypeTestNonNullBranchFact(
@@ -1389,6 +1669,23 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion,
             out SymbolicCondition symbolicCondition)
         {
+            if (TryCreateIrNotNullWhenBranchCondition(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out symbolicCondition) ||
+                TryCreateIrMemberNotNullWhenBranchCondition(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out symbolicCondition))
+            {
+                return true;
+            }
+
             var context = new SymbolicLoweringContext(
                 semanticModel,
                 cancellationToken,
@@ -1404,6 +1701,370 @@ namespace PurelySharp.Symbolic
             }
 
             return true;
+        }
+
+        private static bool TryCreateIrNotNullWhenBranchCondition(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            expression = UnwrapExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax negation &&
+                negation.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                return TryCreateIrNotNullWhenBranchCondition(
+                    negation.Operand,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out condition);
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression &&
+                (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                 binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)))
+            {
+                if (TryGetBoolLiteral(binaryExpression.Left, out var leftValue))
+                {
+                    return TryCreateIrNotNullWhenBranchCondition(
+                        binaryExpression.Right,
+                        GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        out condition);
+                }
+
+                if (TryGetBoolLiteral(binaryExpression.Right, out var rightValue))
+                {
+                    return TryCreateIrNotNullWhenBranchCondition(
+                        binaryExpression.Left,
+                        GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        out condition);
+                }
+            }
+
+            return expression is InvocationExpressionSyntax invocation &&
+                TryCreateIrNotNullWhenInvocationBranchCondition(
+                    invocation,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    out condition);
+        }
+
+        private static bool TryCreateIrNotNullWhenInvocationBranchCondition(
+            InvocationExpressionSyntax invocation,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
+            {
+                return false;
+            }
+
+            var conditions = new List<SymbolicCondition>();
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { IsParams: false } parameter ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
+                    !TryGetIrNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                    notNullWhenValue != branchWhenTrue ||
+                    !TryCreateIrNotNullWhenArgumentCondition(
+                        argumentSyntax.Expression,
+                        argumentSyntax.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        out var argumentCondition))
+                {
+                    continue;
+                }
+
+                conditions.Add(argumentCondition);
+            }
+
+            return TryCombineIrConditions(conditions, out condition);
+        }
+
+        private static bool TryCreateIrMemberNotNullWhenBranchCondition(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            expression = UnwrapExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax negation &&
+                negation.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                return TryCreateIrMemberNotNullWhenBranchCondition(
+                    negation.Operand,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out condition);
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression &&
+                (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                 binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)))
+            {
+                if (TryGetBoolLiteral(binaryExpression.Left, out var leftValue))
+                {
+                    return TryCreateIrMemberNotNullWhenBranchCondition(
+                        binaryExpression.Right,
+                        GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        out condition);
+                }
+
+                if (TryGetBoolLiteral(binaryExpression.Right, out var rightValue))
+                {
+                    return TryCreateIrMemberNotNullWhenBranchCondition(
+                        binaryExpression.Left,
+                        GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        out condition);
+                }
+            }
+
+            return expression is InvocationExpressionSyntax invocation &&
+                TryCreateIrMemberNotNullWhenInvocationBranchCondition(
+                    invocation,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out condition);
+        }
+
+        private static bool TryCreateIrMemberNotNullWhenInvocationBranchCondition(
+            InvocationExpressionSyntax invocation,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean ||
+                invocationOperation.TargetMethod.IsStatic ||
+                !IsCurrentInstanceInvocation(invocation))
+            {
+                return false;
+            }
+
+            var conditions = new List<SymbolicCondition>();
+            foreach (var memberTarget in GetIrMemberNotNullWhenTargets(invocationOperation.TargetMethod, branchWhenTrue))
+            {
+                if (!TryResolveIrMemberNotNullWhenTarget(
+                        invocationOperation.TargetMethod.ContainingType,
+                        memberTarget,
+                        out var member) ||
+                    !TryCreateIrImplicitThisMemberNonNullCondition(
+                        member,
+                        invocation,
+                        out var memberCondition))
+                {
+                    continue;
+                }
+
+                conditions.Add(memberCondition);
+            }
+
+            return TryCombineIrConditions(conditions, out condition);
+        }
+
+        private static bool TryCombineIrConditions(
+            IReadOnlyList<SymbolicCondition> conditions,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (conditions.Count == 0)
+            {
+                return false;
+            }
+
+            condition = conditions[0];
+            for (var index = 1; index < conditions.Count; index++)
+            {
+                condition = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    condition,
+                    conditions[index]);
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateIrImplicitThisMemberNonNullCondition(
+            ISymbol member,
+            SyntaxNode sourceNode,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryGetIrMemberNotNullTargetType(member, out var memberType) ||
+                !SymbolicFactFactory.TryGetValueKind(
+                    memberType,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out var memberKind) ||
+                memberKind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            condition = CreateIrRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                new SymbolicMemberTerm(
+                    new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference),
+                    member.Name,
+                    memberKind),
+                new SymbolicNullTerm(),
+                sourceNode,
+                "ir.member-not-null-when.target.non-null");
+            return true;
+        }
+
+        private static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation)
+        {
+            var invokedExpression = UnwrapExpression(invocation.Expression);
+            return invokedExpression is IdentifierNameSyntax ||
+                invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
+        }
+
+        private static IEnumerable<string> GetIrMemberNotNullWhenTargets(IMethodSymbol method, bool branchWhenTrue)
+        {
+            var targets = new List<string>();
+            AddIrMemberNotNullWhenTargets(method, branchWhenTrue, targets);
+            if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
+            {
+                AddIrMemberNotNullWhenTargets(method.OriginalDefinition, branchWhenTrue, targets);
+            }
+
+            return targets.Distinct(StringComparer.Ordinal);
+        }
+
+        private static void AddIrMemberNotNullWhenTargets(
+            IMethodSymbol method,
+            bool branchWhenTrue,
+            ICollection<string> targets)
+        {
+            foreach (var attribute in method.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        MemberNotNullWhenAttributeMetadataName,
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length < 2 ||
+                    attribute.ConstructorArguments[0].Value is not bool attributeBranch ||
+                    attributeBranch != branchWhenTrue)
+                {
+                    continue;
+                }
+
+                for (var index = 1; index < attribute.ConstructorArguments.Length; index++)
+                {
+                    AddIrMemberNotNullWhenTarget(attribute.ConstructorArguments[index], targets);
+                }
+            }
+        }
+
+        private static void AddIrMemberNotNullWhenTarget(
+            TypedConstant argument,
+            ICollection<string> targets)
+        {
+            if (argument.Kind == TypedConstantKind.Array)
+            {
+                foreach (var item in argument.Values)
+                {
+                    AddIrMemberNotNullWhenTarget(item, targets);
+                }
+
+                return;
+            }
+
+            if (argument.Value is string target &&
+                !string.IsNullOrWhiteSpace(target))
+            {
+                targets.Add(target);
+            }
+        }
+
+        private static bool TryResolveIrMemberNotNullWhenTarget(
+            INamedTypeSymbol containingType,
+            string target,
+            out ISymbol member)
+        {
+            member = null!;
+            var memberName = NormalizeIrMemberNotNullWhenTarget(target);
+            if (memberName == null)
+            {
+                return false;
+            }
+
+            var candidates = containingType.GetMembers(memberName)
+                .Where(candidate =>
+                    candidate is IFieldSymbol or IPropertySymbol &&
+                    !candidate.IsStatic &&
+                    TryGetIrMemberNotNullTargetType(candidate, out var type) &&
+                    SymbolicTypeFacts.IsReferenceLikeType(type))
+                .ToArray();
+            if (candidates.Length != 1)
+            {
+                return false;
+            }
+
+            member = candidates[0].OriginalDefinition;
+            return true;
+        }
+
+        private static string? NormalizeIrMemberNotNullWhenTarget(string target)
+        {
+            target = target.Trim();
+            if (target.StartsWith("this.", StringComparison.Ordinal))
+            {
+                target = target.Substring("this.".Length);
+            }
+
+            return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
+                ? target
+                : null;
+        }
+
+        private static bool TryGetIrMemberNotNullTargetType(ISymbol member, out ITypeSymbol type)
+        {
+            switch (member)
+            {
+                case IFieldSymbol fieldSymbol:
+                    type = fieldSymbol.Type;
+                    return true;
+                case IPropertySymbol propertySymbol:
+                    type = propertySymbol.Type;
+                    return true;
+                default:
+                    type = null!;
+                    return false;
+            }
         }
 
         internal static bool IsBranchReachable(

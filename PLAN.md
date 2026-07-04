@@ -59,6 +59,17 @@ path-fact, hazard, and ownership flows.
   collector for two bounded families: positive type tests / non-null-implying
   patterns, and null-comparison operand implications for `as`, identity-
   preserving reference casts, and conditional access.
+  `NotNullWhen` branch assumptions now also try an IR-first path before the
+  legacy collector for direct boolean-returning invocations plus the cheap
+  boolean wrappers around them (`!call`, `call == true/false`). Member-target
+  `MemberNotNullWhen` propagation still remains on the legacy path.
+  Reachability branch-state construction now also recognizes `NotNullWhen`
+  and current-instance `MemberNotNullWhen` guard branches directly in IR, so
+  public invariant queries no longer depend on formula-only compatibility for
+  those guard families.
+  Switch-expression state collection now also projects simple one-dimensional
+  array list-pattern bindings and `when` guard facts into `SymbolicState`
+  before falling back to formula compatibility.
   Comparable-value reachability now routes through the shared typed value
   helper instead of issuing its own direct translator fallback.
   Typed value-kind reachability now also routes through the shared untyped

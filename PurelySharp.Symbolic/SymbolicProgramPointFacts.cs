@@ -787,6 +787,17 @@ namespace PurelySharp.Symbolic
                             out var armCondition))
                     {
                         AddFormulaPathCondition(ref state, armCondition, matchingArm, "ir.path.switch-expression-arm");
+                        AddSwitchExpressionPatternBindingStateFacts(
+                            ref state,
+                            switchExpressionSyntax.GoverningExpression,
+                            matchingArm,
+                            semanticModel,
+                            cancellationToken);
+                        AddSwitchExpressionGuardStateFacts(
+                            ref state,
+                            matchingArm,
+                            semanticModel,
+                            cancellationToken);
                     }
                 }
             }
@@ -836,6 +847,250 @@ namespace PurelySharp.Symbolic
                 expression,
                 provenance ?? (isNull ? "ir.path.reference-null" : "ir.path.reference-not-null"));
             state = state.AddPathCondition(new SymbolicFactCondition(fact));
+        }
+
+        private static void AddSwitchExpressionPatternBindingStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax governingExpression,
+            SwitchExpressionArmSyntax arm,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (TryAddIrSwitchExpressionPatternBindingStateFacts(
+                    ref state,
+                    governingExpression,
+                    arm.Pattern,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return;
+            }
+
+            if (!SymbolicReachabilityService.TryTranslateValue(
+                    governingExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var matchedValue))
+            {
+                return;
+            }
+
+            var matchedType = semanticModel.GetTypeInfo(governingExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(governingExpression, cancellationToken).Type;
+            var bindingFacts = new List<SmtFormula>();
+            if (!SymbolicReachabilityService.TryCollectPatternBindingFacts(
+                    matchedValue,
+                    matchedType,
+                    arm.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    bindingFacts))
+            {
+                return;
+            }
+
+            AddFormulaPathConditions(ref state, bindingFacts, arm, "ir.path.switch-expression-pattern-binding");
+        }
+
+        private static bool TryAddIrSwitchExpressionPatternBindingStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax governingExpression,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var matchedTerm))
+            {
+                return false;
+            }
+
+            var matchedType = semanticModel.GetTypeInfo(governingExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(governingExpression, cancellationToken).Type;
+            return TryAddIrPatternBindingStateFacts(
+                ref state,
+                matchedTerm,
+                matchedType,
+                pattern,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static bool TryAddIrPatternBindingStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm matchedTerm,
+            ITypeSymbol? matchedType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            pattern = UnwrapPattern(pattern);
+            switch (pattern)
+            {
+                case VarPatternSyntax varPattern:
+                    return TryAddIrDesignationBindingStateFacts(
+                        ref state,
+                        matchedTerm,
+                        varPattern.Designation,
+                        varPattern,
+                        semanticModel,
+                        cancellationToken,
+                        addNonNullFact: false);
+                case DeclarationPatternSyntax declarationPattern:
+                    return TryAddIrDesignationBindingStateFacts(
+                        ref state,
+                        matchedTerm,
+                        declarationPattern.Designation,
+                        declarationPattern,
+                        semanticModel,
+                        cancellationToken,
+                        addNonNullFact: true);
+                case RecursivePatternSyntax recursivePattern
+                    when recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                         recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 }:
+                    return TryAddIrDesignationBindingStateFacts(
+                        ref state,
+                        matchedTerm,
+                        recursivePattern.Designation,
+                        recursivePattern,
+                        semanticModel,
+                        cancellationToken,
+                        addNonNullFact: true);
+                case BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword):
+                    return TryAddIrPatternBindingStateFacts(
+                            ref state,
+                            matchedTerm,
+                            matchedType,
+                            binaryPattern.Left,
+                            semanticModel,
+                            cancellationToken) &&
+                        TryAddIrPatternBindingStateFacts(
+                            ref state,
+                            matchedTerm,
+                            matchedType,
+                            binaryPattern.Right,
+                            semanticModel,
+                            cancellationToken);
+                case ListPatternSyntax listPattern:
+                    return TryAddIrListPatternBindingStateFacts(
+                        ref state,
+                        matchedTerm,
+                        matchedType,
+                        listPattern,
+                        semanticModel,
+                        cancellationToken);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryAddIrListPatternBindingStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm matchedTerm,
+            ITypeSymbol? matchedType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (matchedTerm.Kind != SmtValueKind.Reference ||
+                matchedType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !TryGetValueKind(arrayType.ElementType, out var elementKind))
+            {
+                return false;
+            }
+
+            var addedAny = false;
+            for (var index = 0; index < listPattern.Patterns.Count; index++)
+            {
+                if (listPattern.Patterns[index] is SlicePatternSyntax)
+                {
+                    return false;
+                }
+
+                var elementTerm = new SymbolicElementTerm(
+                    matchedTerm,
+                    new SymbolicIntegerConstantTerm(index),
+                    elementKind);
+                addedAny |= TryAddIrPatternBindingStateFacts(
+                    ref state,
+                    elementTerm,
+                    arrayType.ElementType,
+                    listPattern.Patterns[index],
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            return addedAny;
+        }
+
+        private static bool TryAddIrDesignationBindingStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm matchedTerm,
+            VariableDesignationSyntax? designation,
+            SyntaxNode source,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool addNonNullFact)
+        {
+            if (designation == null)
+            {
+                return false;
+            }
+
+            if (designation is DiscardDesignationSyntax)
+            {
+                return true;
+            }
+
+            if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
+                singleVariableDesignation.Identifier.ValueText == "_" ||
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol ||
+                !TryCreateSymbolTerm(localSymbol.OriginalDefinition, out var localTerm) ||
+                !CanCompareIrTerms(localTerm, matchedTerm))
+            {
+                return false;
+            }
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                localTerm,
+                matchedTerm,
+                source,
+                "ir.path.switch-pattern-binding.designation");
+
+            if (addNonNullFact &&
+                localTerm.Kind == SmtValueKind.Reference)
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.NotEqual,
+                    localTerm,
+                    new SymbolicNullTerm(),
+                    source,
+                    "ir.path.switch-pattern-binding.non-null");
+            }
+
+            return true;
+        }
+
+        private static void AddSwitchExpressionGuardStateFacts(
+            ref SymbolicState state,
+            SwitchExpressionArmSyntax arm,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (arm.WhenClause?.Condition is not { } guardCondition)
+            {
+                return;
+            }
+
+            AddReachabilityCondition(
+                ref state,
+                guardCondition,
+                mustBeTrue: true,
+                semanticModel,
+                cancellationToken);
         }
 
         private static void AddSymbolReferenceNullCondition(
