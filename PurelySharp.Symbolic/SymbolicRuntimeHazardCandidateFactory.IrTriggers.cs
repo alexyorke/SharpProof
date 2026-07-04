@@ -548,11 +548,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     receiver,
                     SymbolicExceptionPreconditionKind.NullDereference,
                     subject: null,
                     formula,
+                    "ir.runtime-hazard.null-dereference.translated",
                     "ir.runtime-hazard.null-dereference.formula-fallback");
                 return true;
             }
@@ -582,11 +583,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     expression,
                     SymbolicExceptionPreconditionKind.UnboxNull,
                     subject: null,
                     formula,
+                    "ir.runtime-hazard.unbox-null.translated",
                     "ir.runtime-hazard.unbox-null.formula-fallback");
                 return true;
             }
@@ -616,11 +618,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     expression,
                     SymbolicExceptionPreconditionKind.ArgumentNull,
                     subject: null,
                     formula,
+                    "ir.runtime-hazard.argument-null.translated",
                     "ir.runtime-hazard.argument-null.formula-fallback");
                 return true;
             }
@@ -658,11 +661,12 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var hasValueFormula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     nullableExpression,
                     SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
                     subject: null,
                     new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
+                    "ir.runtime-hazard.nullable-value.without-value.translated",
                     "ir.runtime-hazard.nullable-value.without-value.formula-fallback");
                 return true;
             }
@@ -728,11 +732,12 @@ namespace PurelySharp.Symbolic
             var triggerFormula = Conjoin(
                 CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
                 new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest));
-            trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                 expression,
                 SymbolicExceptionPreconditionKind.InvalidCast,
                 subject: null,
                 triggerFormula,
+                "ir.runtime-hazard.invalid-cast.translated",
                 "ir.runtime-hazard.invalid-cast.formula-fallback");
             return true;
         }
@@ -763,11 +768,12 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
             {
-                trigger = CreateFormulaBackedExceptionPreconditionTrigger(
+                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
                     receiver,
                     SymbolicExceptionPreconditionKind.DynamicNullBinding,
                     subject: null,
                     formula,
+                    "ir.runtime-hazard.dynamic-null-binding.translated",
                     "ir.runtime-hazard.dynamic-null-binding.formula-fallback");
                 return true;
             }

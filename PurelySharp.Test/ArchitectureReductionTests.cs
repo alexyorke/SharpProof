@@ -1148,6 +1148,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RuntimeHazardNullLikeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var provenances = new[]
+            {
+                "ir.runtime-hazard.null-dereference",
+                "ir.runtime-hazard.unbox-null",
+                "ir.runtime-hazard.argument-null",
+                "ir.runtime-hazard.nullable-value.without-value",
+                "ir.runtime-hazard.invalid-cast",
+                "ir.runtime-hazard.dynamic-null-binding",
+            };
+
+            foreach (var provenance in provenances)
+            {
+                var translatedIndex = source.IndexOf(provenance + ".translated", StringComparison.Ordinal);
+                var fallbackIndex = source.IndexOf("\"" + provenance + ".formula-fallback\"", StringComparison.Ordinal);
+
+                Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0), provenance);
+                Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex), provenance);
+            }
+
+            Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger("));
+        }
+
+        [Test]
         public void RuntimeHazardNullableValue_UsesIrExceptionPreconditionBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
