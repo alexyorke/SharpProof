@@ -2024,12 +2024,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(13));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(12));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 13,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 12,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2043,7 +2043,7 @@ namespace PurelySharp.Test
                     ["if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||"] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 3,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 2,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
                 }));
@@ -5631,6 +5631,7 @@ namespace PurelySharp.Test
             var valueHelperSource = source.Substring(valueHelperIndex, untypedValueHelperIndex - valueHelperIndex);
             var untypedValueHelperSource = source.Substring(untypedValueHelperIndex, valueWithPathFactsHelperIndex - untypedValueHelperIndex);
             var valueWithPathFactsHelperSource = source.Substring(valueWithPathFactsHelperIndex, comparableHelperIndex - valueWithPathFactsHelperIndex);
+            var comparableHelperSource = source.Substring(comparableHelperIndex, stringNonNullIndex - comparableHelperIndex);
             var stringHelperSource = source.Substring(stringHelperIndex, stringNonNullIndex - stringHelperIndex);
 
             Assert.That(lengthHelperIndex, Is.GreaterThanOrEqualTo(0));
@@ -5658,6 +5659,8 @@ namespace PurelySharp.Test
             Assert.That(
                 valueWithPathFactsHelperSource.IndexOf("pathFactArray.Length == 0", StringComparison.Ordinal),
                 Is.LessThan(valueWithPathFactsHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(", StringComparison.Ordinal)));
+            Assert.That(comparableHelperSource, Does.Contain("TryTranslateValue("));
+            Assert.That(comparableHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(
                 lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
                 Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));

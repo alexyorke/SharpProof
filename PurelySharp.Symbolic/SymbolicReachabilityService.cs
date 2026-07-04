@@ -1808,7 +1808,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula,
             SmtValueKind kind,
-            Func<ISymbol, int>? getSymbolVersion = null)
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
             if (!ContainsDivisionOrModulo(expression) &&
@@ -1825,7 +1826,8 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     out var translatedFormula,
-                    getSymbolVersion) &&
+                    getSymbolVersion,
+                    inlineDepth) &&
                 translatedFormula is { } &&
                 translatedFormula.Kind == kind)
             {
@@ -1923,24 +1925,11 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var translatedFormula,
                     targetFormula.Kind,
-                    getSymbolVersion) &&
+                    getSymbolVersion,
+                    inlineDepth) &&
                 SymbolicFactFactory.CanCompareSmtValues(targetFormula, translatedFormula))
             {
                 formula = translatedFormula;
-                return true;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var inlineTranslatedFormula,
-                    getSymbolVersion,
-                    inlineDepth) &&
-                inlineTranslatedFormula is { } &&
-                SymbolicFactFactory.CanCompareSmtValues(targetFormula, inlineTranslatedFormula))
-            {
-                formula = inlineTranslatedFormula;
                 return true;
             }
 
