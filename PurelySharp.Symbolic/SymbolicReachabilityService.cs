@@ -2072,8 +2072,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var term) &&
-                term is SymbolicLengthTerm &&
+            if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var term) &&
                 SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
             {
                 formula = encodedFormula;

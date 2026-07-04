@@ -5658,8 +5658,10 @@ namespace PurelySharp.Test
                 Is.LessThan(valueWithPathFactsHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(", StringComparison.Ordinal)));
             Assert.That(comparableHelperSource, Does.Contain("TryTranslateValue("));
             Assert.That(comparableHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
+            Assert.That(lengthHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression"));
+            Assert.That(lengthHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(
-                lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
+                lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression", StringComparison.Ordinal),
                 Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
             Assert.That(
                 lengthHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),

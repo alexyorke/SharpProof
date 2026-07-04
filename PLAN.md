@@ -43,6 +43,9 @@ path-fact, hazard, and ownership flows.
   Condition-truth reachability now also reuses the shared
   `TryTranslateConditionFormula` helper instead of issuing its own direct
   translator call.
+  Built-in-length reachability now uses the shared
+  `TryLowerBuiltInLengthTerm` IR helper before the direct built-in-length
+  translator fallback.
 - IR known-API inventory now distinguishes 8 condition lowerings from 5
   value-term lowering. Term lowerings are intentionally tracked separately
   because value-returning APIs such as `Nullable<T>.GetValueOrDefault` should
