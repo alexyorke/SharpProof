@@ -359,6 +359,16 @@ namespace PurelySharp.Symbolic
 
             if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
             {
+                if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                        lengthExpression,
+                        kind,
+                        formula,
+                        provenance + ".translated",
+                        out trigger))
+                {
+                    return true;
+                }
+
                 trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                     lengthExpression,
                     kind,
@@ -370,6 +380,33 @@ namespace PurelySharp.Symbolic
 
             trigger = default;
             return false;
+        }
+
+        private static bool TryCreateIrExceptionPreconditionTriggerFromFormula(
+            SyntaxNode site,
+            SymbolicExceptionPreconditionKind kind,
+            SmtFormula formula,
+            string provenance,
+            out RuntimeHazardTrigger trigger)
+        {
+            trigger = default;
+            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    formula,
+                    site,
+                    provenance + ".trigger",
+                    provenance + ".trigger",
+                    out var condition))
+            {
+                return false;
+            }
+
+            return TryEncodeIrExceptionPreconditionTrigger(
+                kind,
+                subject: null,
+                condition,
+                site,
+                provenance,
+                out trigger);
         }
 
         private static bool TryCreateCheckedIntegralOutOfRangeTrigger(

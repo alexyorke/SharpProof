@@ -979,9 +979,31 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("ir.runtime-hazard.stackalloc.negative-length.aggregate"));
             Assert.That(source, Does.Contain("TryTranslateNegativeCondition(lengthExpression"));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateNegativeLengthTrigger("));
+            Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
             Assert.That(source, Does.Contain("provenance + \".formula-fallback\""));
             Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
             Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
+        }
+
+        [Test]
+        public void RuntimeHazardNegativeLengthFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            var translatedIrIndex = source.IndexOf("TryCreateIrExceptionPreconditionTriggerFromFormula(", StringComparison.Ordinal);
+            var formulaBackedIndex = source.IndexOf("CreateFormulaBackedExceptionPreconditionTrigger(\r\n                    lengthExpression,", StringComparison.Ordinal);
+            if (formulaBackedIndex < 0)
+            {
+                formulaBackedIndex = source.IndexOf("CreateFormulaBackedExceptionPreconditionTrigger(\n                    lengthExpression,", StringComparison.Ordinal);
+            }
+
+            Assert.That(translatedIrIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(formulaBackedIndex, Is.GreaterThan(translatedIrIndex));
+            Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition("));
+            Assert.That(source, Does.Contain("TryEncodeIrExceptionPreconditionTrigger("));
         }
 
         [Test]
