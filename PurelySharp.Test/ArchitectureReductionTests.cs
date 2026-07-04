@@ -3068,6 +3068,37 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesSelfAliasFacts()
+        {
+            var owner = new SymbolicVariableTerm("owner", SmtValueKind.Reference);
+            var mayAliasSelf = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                owner,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.alias.self");
+            var cannotAliasSelf = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                owner,
+                mayAlias: false,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.alias.not-self");
+            var empty = new SymbolicState();
+            var tautologicalFact = new SymbolicState(new[] { mayAliasSelf });
+            var contradictoryFact = new SymbolicState(new[] { cannotAliasSelf });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(cannotAliasSelf),
+            });
+
+            Assert.That(tautologicalFact.Facts, Is.Empty);
+            Assert.That(tautologicalFact.NormalizedProofKey, Is.EqualTo(empty.NormalizedProofKey));
+            Assert.That(contradictoryFact.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFact.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -3541,6 +3572,40 @@ namespace PurelySharp.Test
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_SelfAliasFactsClassifyWithoutSmt()
+        {
+            var owner = new SymbolicVariableTerm("owner", SmtValueKind.Reference);
+            var mayAliasSelf = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                owner,
+                mayAlias: true,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.alias.self");
+            var cannotAliasSelf = SymbolicOwnershipFactFactory.CreateAlias(
+                owner,
+                owner,
+                mayAlias: false,
+                SyntaxFactory.ParseExpression("owner"),
+                "test.alias.not-self");
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var trueResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                mayAliasSelf,
+                smtAnalysis);
+            var falseResult = SymbolicReachabilityService.ClassifyStateImplication(
+                new SymbolicState(),
+                cannotAliasSelf,
+                smtAnalysis);
+
+            Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(falseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
+            Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 

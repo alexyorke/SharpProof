@@ -535,6 +535,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (fact.Atom is SymbolicAliasAtom alias &&
+                TryEvaluateSelfAlias(alias, out value))
+            {
+                value = fact.Polarity ? value : !value;
+                return true;
+            }
+
             value = false;
             return false;
         }
@@ -700,6 +707,21 @@ namespace PurelySharp.Symbolic.Ir
                     value = string.Empty;
                     return false;
             }
+        }
+
+        private static bool TryEvaluateSelfAlias(SymbolicAliasAtom alias, out bool value)
+        {
+            if (!string.Equals(
+                    CreateTermKey(alias.Source),
+                    CreateTermKey(alias.Target),
+                    StringComparison.Ordinal))
+            {
+                value = false;
+                return false;
+            }
+
+            value = alias.MayAlias;
+            return true;
         }
 
         private static bool ContainsFalseConstant(SymbolicCondition condition)
