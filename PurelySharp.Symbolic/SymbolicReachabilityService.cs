@@ -336,7 +336,7 @@ namespace PurelySharp.Symbolic
 
             if (collectDomainFactsBeforeBranchAssumptions)
             {
-                CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+                TryCollectDomainFacts(
                     condition,
                     semanticModel,
                     cancellationToken,
@@ -378,6 +378,21 @@ namespace PurelySharp.Symbolic
             }
 
             return pathConditions.Count != originalCount;
+        }
+
+        internal static bool TryCollectDomainFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            return CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+                expression,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
         }
 
         internal static void AddUnsatisfiablePathCondition(ICollection<SmtFormula> pathConditions)
@@ -763,7 +778,7 @@ namespace PurelySharp.Symbolic
                 return null;
             }
 
-            CSharpSmtFormulaTranslator.TryCollectDomainFacts(expression, semanticModel, cancellationToken, basePathConditions);
+            TryCollectDomainFacts(expression, semanticModel, cancellationToken, basePathConditions);
             if (!IsSatisfiable(basePathConditions, smtAnalysis) ||
                 IsFormulaAlwaysFalse(formula, basePathConditions, smtAnalysis))
             {
@@ -1043,7 +1058,7 @@ namespace PurelySharp.Symbolic
                 pathConditions.Add(initializerFact);
             }
 
-            CSharpSmtFormulaTranslator.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
+            TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
             return IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
         }
 

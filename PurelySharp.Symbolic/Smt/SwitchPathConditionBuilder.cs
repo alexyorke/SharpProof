@@ -90,7 +90,7 @@ namespace PurelySharp.Symbolic.Smt
             formula = null!;
             var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
             var domainFacts = new List<SmtFormula>();
-            CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+            SymbolicReachabilityService.TryCollectDomainFacts(
                 governingExpression,
                 semanticModel,
                 cancellationToken,
@@ -329,7 +329,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var domainFacts = new List<SmtFormula>();
-            CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+            SymbolicReachabilityService.TryCollectDomainFacts(
                 governingExpression,
                 semanticModel,
                 cancellationToken,
@@ -1233,7 +1233,7 @@ namespace PurelySharp.Symbolic.Smt
                     bindingFacts,
                     getSymbolVersion);
 
-                CSharpSmtFormulaTranslator.TryCollectDomainFacts(
+                SymbolicReachabilityService.TryCollectDomainFacts(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
