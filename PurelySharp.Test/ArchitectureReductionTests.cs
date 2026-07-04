@@ -1981,6 +1981,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_ReusesFallbackCacheWhenNoSmtServiceIsSupplied()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var x = new SymbolicVariableTerm("proof_fallback_cache_x_" + suffix, SmtValueKind.Int);
+            var positive = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.positive");
+            var impossibleBranch = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x <= 0"),
+                "test.branch"));
+
+            var first = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                new SymbolicState(new[] { positive }),
+                impossibleBranch,
+                smtAnalysis: null);
+            var second = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+                new SymbolicState(new[] { positive, positive }),
+                impossibleBranch,
+                smtAnalysis: null);
+
+            Assert.That(first.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(first.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(first.Info.CacheHit, Is.False);
+            Assert.That(second.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(second.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(second.Info.CacheHit, Is.True);
+        }
+
+        [Test]
         public void SymbolicProofService_CachesUnsupportedIrConservatively()
         {
             var unsupportedFact = SymbolicFact.Exact(
