@@ -1530,6 +1530,46 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_MultidimensionalArrayLengthUsesDimensionProduct()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix, int total",
+                "matrix.Length == total");
+            var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var multiply = (SymbolicBinaryTerm)term;
+            Assert.That(multiply.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Multiply));
+            Assert.That(multiply.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(((SymbolicArrayDimensionLengthTerm)multiply.Left).Dimension, Is.EqualTo(0));
+            Assert.That(multiply.Right, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
+            Assert.That(((SymbolicArrayDimensionLengthTerm)multiply.Right).Dimension, Is.EqualTo(1));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
+        public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct()
+        {
+            var context = CreateExpressionContext(
+                "int rows, int columns",
+                "new int[rows, columns].Length == rows * columns");
+            var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var multiply = (SymbolicBinaryTerm)term;
+            Assert.That(multiply.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Multiply));
+            Assert.That(multiply.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)multiply.Left).Name, Does.StartWith("rows#"));
+            Assert.That(multiply.Right, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)multiply.Right).Name, Does.StartWith("columns#"));
+        }
+
+        [Test]
         public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm()
         {
             var context = CreateExpressionContext(

@@ -1020,11 +1020,13 @@ namespace PurelySharp.Test
             Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayBoundInvocation"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayTotalLengthTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryGetElementAccessValueKind"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
             Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+            Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayTotalLengthTerm"));
             Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLength)"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLongLength)"));
@@ -1082,6 +1084,7 @@ namespace PurelySharp.Test
             Assert.That(memberSource, Does.Contain("new SymbolicLengthTerm"));
             Assert.That(memberSource, Does.Contain("new SymbolicCountTerm"));
             Assert.That(memberSource, Does.Contain("new SymbolicIntegerConstantTerm(arrayType.Rank)"));
+            Assert.That(memberSource, Does.Contain("TryLowerArrayTotalLengthTerm(memberAccess.Expression"));
         }
 
         [Test]

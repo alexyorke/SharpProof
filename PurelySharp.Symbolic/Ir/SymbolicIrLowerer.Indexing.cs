@@ -162,6 +162,36 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        private static bool TryLowerArrayTotalLengthTerm(
+            ExpressionSyntax arrayExpression,
+            IArrayTypeSymbol arrayType,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (arrayType.Rank <= 0 ||
+                !TryLowerArrayDimensionLengthTerm(arrayExpression, 0, context, out var totalLength))
+            {
+                return false;
+            }
+
+            for (var dimension = 1; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var dimensionLength))
+                {
+                    return false;
+                }
+
+                totalLength = new SymbolicBinaryTerm(
+                    SymbolicBinaryTermOperator.Multiply,
+                    totalLength,
+                    dimensionLength);
+            }
+
+            term = totalLength;
+            return true;
+        }
+
         private static bool TryLowerArrayCreationDimensionLengthTerm(
             ExpressionSyntax arrayExpression,
             IArrayTypeSymbol arrayType,

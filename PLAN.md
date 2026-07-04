@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 113,218 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,234 lines,
+- Production inventory currently reports 113,249 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 54,265 lines,
   `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -104,6 +104,9 @@ path-fact, hazard, and ownership flows.
   lower bound becomes `0`, and upper bound becomes `GetLength(dimension) - 1`.
 - Statically typed C# array `Rank` member access now lowers to an exact
   integer IR constant, so rank checks no longer need generic member fallback.
+- Statically typed multidimensional C# array `Length` member access now lowers
+  to an IR product of per-dimension lengths. For array creations, those
+  per-dimension lengths are the actual size expressions.
 - Simple integer range proofs now use
   `SymbolicIrLowerer.CreateIntegerInRangeCondition` before formula fallback,
   giving checked-conversion range checks an IR condition path for lowerable

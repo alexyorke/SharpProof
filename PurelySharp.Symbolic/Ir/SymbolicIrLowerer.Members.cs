@@ -68,6 +68,12 @@ namespace PurelySharp.Symbolic.Ir
                     term = new SymbolicLengthTerm(lengthReceiver);
                     return true;
                 }
+
+                if (receiverType is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
+                    TryLowerArrayTotalLengthTerm(memberAccess.Expression, multiDimensionalArray, context, out term))
+                {
+                    return true;
+                }
             }
 
             if (!TryLowerTerm(memberAccess.Expression, context, out var receiver))
