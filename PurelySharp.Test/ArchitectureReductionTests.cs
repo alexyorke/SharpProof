@@ -1497,11 +1497,19 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("] = 1,
                 }));
             Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("irKnownApiTermLoweringCount").GetInt32(), Is.GreaterThan(0));
             Assert.That(
                 root.GetProperty("irKnownApiLoweringLocations")
                     .EnumerateArray()
                     .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
                     .All(static path => path.StartsWith("PurelySharp.Symbolic/Ir/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                root.GetProperty("irKnownApiLoweringLocations")
+                    .EnumerateArray()
+                    .Select(static location => location.GetProperty("kind").GetString() ?? string.Empty)
+                    .All(static kind => kind is "condition" or "term"),
                 Is.True);
             var runtimeHazardFormulaFallbackLocations = root.GetProperty("runtimeHazardFormulaFallbackLocations")
                 .EnumerateArray()

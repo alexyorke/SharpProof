@@ -310,12 +310,22 @@ function Get-IrKnownApiLoweringLocations
         foreach ($line in Get-Content -LiteralPath $file.FullName)
         {
             $lineNumber++
-            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0 -or
-                $line.IndexOf('new KnownApiTermLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            $descriptorKind = $null
+            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $descriptorKind = 'condition'
+            }
+            elseif ($line.IndexOf('new KnownApiTermLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            {
+                $descriptorKind = 'term'
+            }
+
+            if ($descriptorKind)
             {
                 $locations += [pscustomobject]@{
                     path = Convert-ToRepoPath $file.FullName
                     line = $lineNumber
+                    kind = $descriptorKind
                     text = $line.Trim()
                 }
             }
@@ -368,6 +378,8 @@ try
     $symbolicDirectTranslatorUsages = @(Get-SymbolicDirectTranslatorUsage)
     $symbolicTranslatorShimUsages = @(Get-SymbolicTranslatorShimUsage)
     $irKnownApiLoweringLocations = @(Get-IrKnownApiLoweringLocations)
+    $irKnownApiConditionLoweringLocations = @($irKnownApiLoweringLocations | Where-Object { $_.kind -eq 'condition' })
+    $irKnownApiTermLoweringLocations = @($irKnownApiLoweringLocations | Where-Object { $_.kind -eq 'term' })
     $runtimeHazardFormulaFallbackLocations = @(Get-RuntimeHazardFormulaFallbackLocations)
 
     $report = [ordered]@{
@@ -387,6 +399,8 @@ try
         symbolicTranslatorShimUsageCount = $symbolicTranslatorShimUsages.Count
         symbolicTranslatorShimUsages = @($symbolicTranslatorShimUsages)
         irKnownApiLoweringCount = $irKnownApiLoweringLocations.Count
+        irKnownApiConditionLoweringCount = $irKnownApiConditionLoweringLocations.Count
+        irKnownApiTermLoweringCount = $irKnownApiTermLoweringLocations.Count
         irKnownApiLoweringLocations = @($irKnownApiLoweringLocations)
         runtimeHazardFormulaFallbackCount = $runtimeHazardFormulaFallbackLocations.Count
         runtimeHazardFormulaFallbackLocations = @($runtimeHazardFormulaFallbackLocations)
@@ -404,7 +418,7 @@ try
     "Symbolic formula-shaped compatibility surfaces: $($report.symbolicCompatibilitySurfaceCount) lines"
     "Symbolic direct CSharpConditionToFormula usages: $($report.symbolicDirectTranslatorUsageCount) lines"
     "Symbolic CSharpSmtFormulaTranslator shim usages: $($report.symbolicTranslatorShimUsageCount) lines"
-    "IR known API lowering descriptors: $($report.irKnownApiLoweringCount) entries"
+    "IR known API lowering descriptors: $($report.irKnownApiLoweringCount) entries ($($report.irKnownApiConditionLoweringCount) condition, $($report.irKnownApiTermLoweringCount) term)"
     "Runtime-hazard formula fallback provenances: $($report.runtimeHazardFormulaFallbackCount) lines"
     ''
     $analyzer.hotspots | Format-Table -AutoSize | Out-String
