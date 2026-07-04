@@ -3179,7 +3179,8 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference, getTargetSymbolVersion) &&
+            return TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var targetReferenceTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(targetReferenceTerm, out var targetReference) &&
                 SymbolicFactFactory.TryCreateReferenceBackedLengthFact(
                     targetReference,
                     valueExpression,
@@ -3208,7 +3209,8 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             fact = null!;
-            return TryCreateSymbolSmtValue(targetSymbol, out var targetReference, getTargetSymbolVersion) &&
+            return TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var targetReferenceTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(targetReferenceTerm, out var targetReference) &&
                 SymbolicFactFactory.TryCreateReferenceBackedStringContentFact(
                     targetReference,
                     valueExpression,
@@ -3250,7 +3252,8 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetReference))
+            if (!TryCreateReferenceSymbolTerm(targetSymbol, getSymbolVersion: null, out var targetReferenceTerm) ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(targetReferenceTerm, out var targetReference))
             {
                 return;
             }

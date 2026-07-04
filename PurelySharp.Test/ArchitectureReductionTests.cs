@@ -4302,6 +4302,8 @@ namespace PurelySharp.Test
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryCreateCompoundAssignmentFact("));
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryCreateIncrementOrDecrementFact("));
             Assert.That(pathFactsSource, Does.Not.Contain("private static bool TryGetCurrentSymbolValue("));
+            Assert.That(reachabilitySource, Does.Contain("TryCreateReferenceSymbolTerm(targetSymbol"));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(targetReferenceTerm"));
             Assert.That(symbolicProgramPointFactsSource, Does.Contain("SymbolicReachabilityService.TryCreateNotNullIfNotNullAssignedValueFact("));
             Assert.That(symbolicProgramPointFactsSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("));
             var addCompletedIfFactsIndex = pathFactsSource.IndexOf("private static void AddCompletedIfStatementFacts(", StringComparison.Ordinal);
