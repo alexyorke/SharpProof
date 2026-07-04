@@ -2703,6 +2703,11 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
+            if (TryTranslateIrNullableWrappedValueParts(expression, context, out parts))
+            {
+                return true;
+            }
+
             parts = default;
             return false;
         }
@@ -2778,6 +2783,44 @@ namespace PurelySharp.Symbolic
             }
 
             parts = new NullableValueParts(hasValueFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryTranslateIrNullableWrappedValueParts(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            parts = default;
+            var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+            var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
+                !SymbolicFactFactory.TryGetValueKind(
+                    underlyingType,
+                    SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                    SymbolicTypeFacts.IsReferenceType,
+                    out var expectedKind))
+            {
+                return false;
+            }
+
+            var valueExpression = expression is CastExpressionSyntax castExpression
+                ? castExpression.Expression
+                : expression;
+            if (valueExpression == expression &&
+                SymbolicTypeFacts.TryGetNullableUnderlyingType(typeInfo.Type, out _))
+            {
+                return false;
+            }
+
+            if (!SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm) ||
+                valueTerm.Kind != expectedKind ||
+                !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
+            {
+                return false;
+            }
+
+            parts = new NullableValueParts(new SmtBooleanConstant(true), valueFormula);
             return true;
         }
 
