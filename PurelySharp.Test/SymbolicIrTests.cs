@@ -803,6 +803,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_StringEmptyUsesStaticStringConstantTerm()
+        {
+            var source = """
+                public sealed class C
+                {
+                    public void M()
+                    {
+                        _ = string.Empty;
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrStringEmptyTest",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var expression = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(static memberAccess => memberAccess.ToString() == "string.Empty");
+            var loweringContext = new SymbolicLoweringContext(semanticModel, CancellationToken.None);
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(expression, loweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.EqualTo(new SymbolicStringConstantTerm(string.Empty)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtStringConstant(string.Empty)));
+        }
+
+        [Test]
         public void LowerCondition_NullableHasValueUsesSharedNullableTerm()
         {
             var context = CreateExpressionContext(
