@@ -97,6 +97,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicProofService.TryEncodeStatePathConditions` helper instead of
   constructing a null-scoped proof service ad hoc at the reachability call
   site.
+  Formula-path-to-`SymbolicState` compatibility now also lives behind
+  `SymbolicProofService.CreateStateFromFormulaPath` and
+  `TryCreateStateFromFormulaPath`, so reachability no longer owns its own
+  lowered-path helper copies.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

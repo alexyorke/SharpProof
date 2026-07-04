@@ -689,7 +689,7 @@ namespace PurelySharp.Symbolic
                     provenance,
                     evidenceKey,
                     out var condition) &&
-                TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
+                SymbolicProofService.TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
             {
                 var proof = ClassifyStateConditionTruth(state, condition, smtAnalysis);
                 if (proof.Info.Status != SymbolicProofStatus.Unknown)
@@ -722,7 +722,7 @@ namespace PurelySharp.Symbolic
                     provenance,
                     evidenceKey,
                     out var condition) &&
-                TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
+                SymbolicProofService.TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
             {
                 var proof = ClassifyStateConditionTruth(state, condition, smtAnalysis);
                 if (proof.Info.Status != SymbolicProofStatus.Unknown)
@@ -754,7 +754,7 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
+            if (!SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
             {
                 return false;
             }
@@ -772,7 +772,7 @@ namespace PurelySharp.Symbolic
             out SymbolicProofStatus status)
         {
             status = SymbolicProofStatus.Unknown;
-            if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
+            if (!SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
             {
                 return false;
             }
@@ -797,7 +797,7 @@ namespace PurelySharp.Symbolic
                     condition,
                     new SymbolicLoweringContext(semanticModel, cancellationToken),
                     out var symbolicCondition) ||
-                !TryCreateStateFromFormulaPath(pathConditions, condition, provenance, evidenceKey, out var state))
+                !SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, condition, provenance, evidenceKey, out var state))
             {
                 return false;
             }
@@ -914,7 +914,7 @@ namespace PurelySharp.Symbolic
                 return null;
             }
 
-            var state = CreateStateFromFormulaPath(pathConditions, expression);
+            var state = SymbolicProofService.CreateStateFromFormulaPath(pathConditions, expression);
             var truth = ClassifyStateConditionTruth(state, condition, smtAnalysis);
             return truth.Info.Status switch
             {
@@ -923,54 +923,6 @@ namespace PurelySharp.Symbolic
                 SymbolicProofStatus.ProvenFalse => false,
                 _ => null,
             };
-        }
-
-        private static SymbolicState CreateStateFromFormulaPath(
-            IEnumerable<SmtFormula> pathConditions,
-            SyntaxNode sourceNode)
-        {
-            var state = new SymbolicState();
-            foreach (var pathCondition in pathConditions)
-            {
-                if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                        pathCondition,
-                        sourceNode,
-                        "legacy_path_condition",
-                        "legacy-path-condition",
-                        out var condition))
-                {
-                    state = state.AddPathCondition(condition);
-                }
-            }
-
-            return state;
-        }
-
-        private static bool TryCreateStateFromFormulaPath(
-            IEnumerable<SmtFormula> pathConditions,
-            SyntaxNode sourceNode,
-            string provenance,
-            string evidenceKey,
-            out SymbolicState state)
-        {
-            state = new SymbolicState();
-            foreach (var pathCondition in pathConditions)
-            {
-                if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                        pathCondition,
-                        sourceNode,
-                        provenance,
-                        evidenceKey,
-                        out var condition))
-                {
-                    state = new SymbolicState();
-                    return false;
-                }
-
-                state = state.AddPathCondition(condition);
-            }
-
-            return true;
         }
 
         internal static bool? EvaluateKnownConditionTruth(

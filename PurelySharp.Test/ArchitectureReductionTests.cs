@@ -81,6 +81,10 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("new SymbolicProofService(smtAnalysis).ClassifyFormula"));
             Assert.That(reachabilitySource, Does.Not.Contain("new SymbolicProofService(smtAnalysis: null)"));
             Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out pathConditions)"));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.CreateStateFromFormulaPath(pathConditions, expression)"));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.TryCreateStateFromFormulaPath("));
+            Assert.That(reachabilitySource, Does.Not.Contain("private static SymbolicState CreateStateFromFormulaPath("));
+            Assert.That(reachabilitySource, Does.Not.Contain("private static bool TryCreateStateFromFormulaPath("));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeReachable("));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeUnreachable("));
             Assert.That(proofServiceSource, Does.Contain("internal SymbolicIrProofResult ClassifyFormulaReachability"));
@@ -92,6 +96,10 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
             Assert.That(proofServiceSource, Does.Contain("new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);"));
+            Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState CreateStateFromFormulaPath("));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryCreateStateFromFormulaPath("));
+            Assert.That(proofServiceSource, Does.Contain("\"legacy_path_condition\""));
+            Assert.That(proofServiceSource, Does.Contain("\"legacy-path-condition\""));
             Assert.That(proofServiceSource, Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
             Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
             Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
@@ -5614,7 +5622,7 @@ namespace PurelySharp.Test
             var methodIndex = source.IndexOf("internal static bool? EvaluateConditionTruth(", StringComparison.Ordinal);
             var irIndex = source.IndexOf("EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
             var helperIndex = source.IndexOf("private static bool? EvaluateConditionTruthWithIr(", StringComparison.Ordinal);
-            var helperEndIndex = source.IndexOf("private static SymbolicState CreateStateFromFormulaPath", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("internal static bool? EvaluateKnownConditionTruth(", StringComparison.Ordinal);
             var methodSource = source.Substring(methodIndex, helperIndex - methodIndex);
             var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
 
@@ -5626,6 +5634,7 @@ namespace PurelySharp.Test
             Assert.That(methodSource, Does.Contain("TryTranslateConditionFormula("));
             Assert.That(methodSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslate(expression"));
             Assert.That(helperSource, Does.Contain("ClassifyStateConditionTruth(state"));
+            Assert.That(helperSource, Does.Contain("SymbolicProofService.CreateStateFromFormulaPath(pathConditions, expression)"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateBranchFeasibility(state"));
             Assert.That(helperSource, Does.Not.Contain("ClassifyStateImplication(state, condition"));
         }

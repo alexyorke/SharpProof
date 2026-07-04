@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Microsoft.CodeAnalysis;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -73,6 +74,54 @@ namespace PurelySharp.Symbolic
         internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
         {
             return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
+        }
+
+        internal static SymbolicState CreateStateFromFormulaPath(
+            IEnumerable<SmtFormula> pathConditions,
+            SyntaxNode sourceNode)
+        {
+            var state = new SymbolicState();
+            foreach (var pathCondition in pathConditions)
+            {
+                if (SymbolicSmtFormulaLowerer.TryLowerCondition(
+                        pathCondition,
+                        sourceNode,
+                        "legacy_path_condition",
+                        "legacy-path-condition",
+                        out var condition))
+                {
+                    state = state.AddPathCondition(condition);
+                }
+            }
+
+            return state;
+        }
+
+        internal static bool TryCreateStateFromFormulaPath(
+            IEnumerable<SmtFormula> pathConditions,
+            SyntaxNode sourceNode,
+            string provenance,
+            string evidenceKey,
+            out SymbolicState state)
+        {
+            state = new SymbolicState();
+            foreach (var pathCondition in pathConditions)
+            {
+                if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                        pathCondition,
+                        sourceNode,
+                        provenance,
+                        evidenceKey,
+                        out var condition))
+                {
+                    state = new SymbolicState();
+                    return false;
+                }
+
+                state = state.AddPathCondition(condition);
+            }
+
+            return true;
         }
 
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)
