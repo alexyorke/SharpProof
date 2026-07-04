@@ -409,6 +409,8 @@ namespace PurelySharp.Symbolic.Ir
             ImmutableArray<SymbolicCondition> conditions)
         {
             var polarities = new Dictionary<string, bool>(StringComparer.Ordinal);
+            var disposalStates = new Dictionary<string, SymbolicDisposalState>(StringComparer.Ordinal);
+            var resourceLifetimeStates = new Dictionary<string, SymbolicResourceLifetimeState>(StringComparer.Ordinal);
             foreach (var fact in facts)
             {
                 if (TryEvaluateFact(fact, out var factValue) &&
@@ -418,6 +420,11 @@ namespace PurelySharp.Symbolic.Ir
                 }
 
                 if (HasOppositePolarity(polarities, fact))
+                {
+                    return true;
+                }
+
+                if (HasExclusiveResourceStateContradiction(disposalStates, resourceLifetimeStates, fact))
                 {
                     return true;
                 }
@@ -442,6 +449,11 @@ namespace PurelySharp.Symbolic.Ir
                         return true;
                     }
 
+                    if (HasExclusiveResourceStateContradiction(disposalStates, resourceLifetimeStates, fact))
+                    {
+                        return true;
+                    }
+
                     if (TryEvaluateFact(fact, out var factValue) &&
                         !factValue)
                     {
@@ -450,6 +462,49 @@ namespace PurelySharp.Symbolic.Ir
                 }
             }
 
+            return false;
+        }
+
+        private static bool HasExclusiveResourceStateContradiction(
+            IDictionary<string, SymbolicDisposalState> disposalStates,
+            IDictionary<string, SymbolicResourceLifetimeState> resourceLifetimeStates,
+            SymbolicFact fact)
+        {
+            if (!fact.Polarity ||
+                fact.Confidence != SymbolicFactConfidence.Exact)
+            {
+                return false;
+            }
+
+            switch (fact.Atom)
+            {
+                case SymbolicDisposalAtom { State: not SymbolicDisposalState.MaybeDisposed } disposal:
+                    return HasExclusiveStateContradiction(
+                        disposalStates,
+                        CreateTermKey(disposal.Resource),
+                        disposal.State);
+                case SymbolicResourceLifetimeAtom resourceLifetime:
+                    return HasExclusiveStateContradiction(
+                        resourceLifetimeStates,
+                        CreateTermKey(resourceLifetime.Resource),
+                        resourceLifetime.State);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool HasExclusiveStateContradiction<TState>(
+            IDictionary<string, TState> states,
+            string resourceKey,
+            TState state)
+            where TState : struct, Enum
+        {
+            if (states.TryGetValue(resourceKey, out var existingState))
+            {
+                return !EqualityComparer<TState>.Default.Equals(existingState, state);
+            }
+
+            states.Add(resourceKey, state);
             return false;
         }
 

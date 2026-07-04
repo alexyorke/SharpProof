@@ -3638,6 +3638,94 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_DetectsContradictoryExactDisposalStates()
+        {
+            var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+            var disposed = SymbolicOwnershipFactFactory.CreateDisposal(
+                resource,
+                SymbolicDisposalState.Disposed,
+                SyntaxFactory.ParseExpression("resource.Dispose()"),
+                "test.disposed");
+            var notDisposed = SymbolicOwnershipFactFactory.CreateDisposal(
+                resource,
+                SymbolicDisposalState.NotDisposed,
+                SyntaxFactory.ParseExpression("resource"),
+                "test.not-disposed");
+            var maybeDisposed = SymbolicOwnershipFactFactory.CreateDisposal(
+                resource,
+                SymbolicDisposalState.MaybeDisposed,
+                SyntaxFactory.ParseExpression("resource"),
+                "test.maybe-disposed");
+
+            var contradictoryFacts = new SymbolicState(new[] { disposed, notDisposed });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(disposed),
+                new SymbolicFactCondition(notDisposed),
+            });
+            var maybeState = new SymbolicState(new[] { disposed, maybeDisposed });
+
+            Assert.That(contradictoryFacts.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFacts.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+            Assert.That(maybeState.IsContradictory, Is.False);
+        }
+
+        [Test]
+        public void SymbolicState_DetectsContradictoryExactResourceLifetimeStates()
+        {
+            var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+            var owned = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                resource,
+                SymbolicResourceLifetimeState.Owned,
+                SyntaxFactory.ParseExpression("resource"),
+                "test.owned");
+            var released = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                resource,
+                SymbolicResourceLifetimeState.Released,
+                SyntaxFactory.ParseExpression("resource.Dispose()"),
+                "test.released");
+            var approximateReleased = released with { Confidence = SymbolicFactConfidence.Approximate };
+
+            var contradictoryFacts = new SymbolicState(new[] { owned, released });
+            var contradictoryPath = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicFactCondition(owned),
+                new SymbolicFactCondition(released),
+            });
+            var approximateState = new SymbolicState(new[] { owned, approximateReleased });
+
+            Assert.That(contradictoryFacts.IsContradictory, Is.True);
+            Assert.That(contradictoryPath.IsContradictory, Is.True);
+            Assert.That(contradictoryFacts.NormalizedProofKey, Is.EqualTo(contradictoryPath.NormalizedProofKey));
+            Assert.That(approximateState.IsContradictory, Is.False);
+        }
+
+        [Test]
+        public void SymbolicProofService_ContradictoryResourceStateShortCircuitsWithoutSmt()
+        {
+            var resource = new SymbolicVariableTerm("resource", SmtValueKind.Reference);
+            var owned = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                resource,
+                SymbolicResourceLifetimeState.Owned,
+                SyntaxFactory.ParseExpression("resource"),
+                "test.owned");
+            var released = SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                resource,
+                SymbolicResourceLifetimeState.Released,
+                SyntaxFactory.ParseExpression("resource.Dispose()"),
+                "test.released");
+            var state = new SymbolicState(new[] { owned, released });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeySimplifiesNullTypeTestFacts()
         {
             var nullIsString = SymbolicFact.Exact(
