@@ -896,6 +896,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicIrLowerer_KeepsPatternLoweringsInDedicatedPartial()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var coreSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.cs"));
+            var patternSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Patterns.cs"));
+
+            Assert.That(coreSource, Does.Contain("TryLowerBinaryPatternCondition(isPatternExpression"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerBinaryPatternCondition"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTypeTestCondition"));
+            Assert.That(coreSource, Does.Not.Contain("private static PatternSyntax UnwrapPattern"));
+            Assert.That(patternSource, Does.Contain("private static bool TryLowerBinaryPatternCondition"));
+            Assert.That(patternSource, Does.Contain("private static bool TryLowerTypeTestCondition"));
+            Assert.That(patternSource, Does.Contain("private static PatternSyntax UnwrapPattern"));
+            Assert.That(patternSource, Does.Contain("ir.pattern.type.test"));
+        }
+
+        [Test]
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
