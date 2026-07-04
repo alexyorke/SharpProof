@@ -110,6 +110,9 @@ path-fact, hazard, and ownership flows.
   indexers such as `IReadOnlyList<T>` by emitting `SymbolicCountTerm`
   directly from the shared IR helper instead of relying on incidental
   translator-only count support.
+- One-dimensional built-in element and range access guards now lower through
+  a shared IR helper that reuses the common `System.Index` and `System.Range`
+  shape resolution paths before the remaining translator fallback.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms before formula
   fallback. The remaining built-in-length shim is still carrying other

@@ -1361,7 +1361,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(reachabilitySource, Does.Contain("TryCreateIrBuiltInElementAccessInRangeCondition("));
-            Assert.That(reachabilitySource, Does.Contain("new SymbolicBoundsAtom("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
             Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
@@ -1401,7 +1401,13 @@ namespace PurelySharp.Test
             Assert.That(helperEnd, Is.GreaterThan(helperStart));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(fallbackIndex, Is.GreaterThan(irIndex));
+            Assert.That(reachabilitySource, Does.Not.Contain("TryCreateIrBuiltInElementAccessLengthTerm("));
             Assert.That(reachabilitySource, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessInRangeCondition("));
+            Assert.That(lowererSource, Does.Contain("public static bool TryCreateBuiltInElementAccessInRangeCondition("));
+            Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
+            Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
+            Assert.That(lowererSource, Does.Contain("ApplyWellFormedPrecondition("));
+            Assert.That(lowererSource, Does.Contain("RequiresNonNegativeValue"));
             Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
             Assert.That(reachabilitySource, Does.Contain("ir.element-access.multidimensional-bounds.in-range"));
             Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
@@ -1441,7 +1447,7 @@ namespace PurelySharp.Test
             Assert.That(lowererSource, Does.Contain("term = new SymbolicCountTerm(reference);"));
             Assert.That(lowererSource, Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
             Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));
-            Assert.That(reachabilitySource, Does.Contain("return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);"));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var term)"));
             Assert.That(irTriggerSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)"));
             Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
         }

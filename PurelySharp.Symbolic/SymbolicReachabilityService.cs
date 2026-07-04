@@ -1535,40 +1535,20 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
-            if ((semanticModel.GetTypeInfo(indexExpression, cancellationToken).ConvertedType ??
-                 semanticModel.GetTypeInfo(indexExpression, cancellationToken).Type)?.SpecialType != SpecialType.System_Int32)
-            {
-                return false;
-            }
-
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
-                index.Kind != SmtValueKind.Int ||
-                !TryCreateIrBuiltInElementAccessLengthTerm(elementAccess, semanticModel, cancellationToken, context, out var length))
+            if (!SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+                    elementAccess.Expression,
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess,
+                    "ir.element-access.bounds.in-range",
+                    context,
+                    out var condition) ||
+                !SymbolicIrFormulaEncoder.TryEncode(condition, out formula))
             {
                 return false;
             }
 
-            var inRangeFact = SymbolicFact.Exact(
-                new SymbolicBoundsAtom(
-                    index,
-                    length,
-                    IncludeLowerBound: true,
-                    IncludeUpperBound: true),
-                elementAccess,
-                "ir.element-access.bounds.in-range");
-            return SymbolicIrFormulaEncoder.TryEncode(inRangeFact, out formula);
-        }
-
-        private static bool TryCreateIrBuiltInElementAccessLengthTerm(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SymbolicLoweringContext context,
-            out SymbolicTerm length)
-        {
-            return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);
+            return true;
         }
 
         private static bool TryCreateIrMultidimensionalArrayElementAccessInRangeCondition(

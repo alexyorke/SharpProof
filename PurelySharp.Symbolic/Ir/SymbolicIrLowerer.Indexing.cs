@@ -12,15 +12,21 @@ namespace PurelySharp.Symbolic.Ir
     {
         private readonly struct IndexLengthShape
         {
-            public IndexLengthShape(ExpressionSyntax valueExpression, bool fromEnd)
+            public IndexLengthShape(
+                ExpressionSyntax valueExpression,
+                bool fromEnd,
+                bool requiresNonNegativeValue = false)
             {
                 ValueExpression = valueExpression;
                 FromEnd = fromEnd;
+                RequiresNonNegativeValue = requiresNonNegativeValue;
             }
 
             public ExpressionSyntax ValueExpression { get; }
 
             public bool FromEnd { get; }
+
+            public bool RequiresNonNegativeValue { get; }
         }
 
         private readonly struct RangeLengthShape
@@ -528,6 +534,64 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             condition = combined;
+            return true;
+        }
+
+        public static bool TryCreateBuiltInElementAccessInRangeCondition(
+            ExpressionSyntax receiverExpression,
+            ExpressionSyntax argumentExpression,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            receiverExpression = UnwrapExpression(receiverExpression);
+            argumentExpression = UnwrapExpression(argumentExpression);
+            var receiverType = context.SemanticModel.GetTypeInfo(receiverExpression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(receiverExpression, context.CancellationToken).Type;
+            if (!IsSupportedBuiltInElementAccessReceiver(receiverType) ||
+                !TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength))
+            {
+                return false;
+            }
+
+            if (TryResolveBuiltInRangeLengthShape(argumentExpression, context, out var rangeShape))
+            {
+                return TryCreateBuiltInRangeAccessInRangeCondition(
+                    rangeShape,
+                    sourceLength,
+                    source,
+                    provenance,
+                    context,
+                    out condition);
+            }
+
+            if (!TryResolveBuiltInIndexLengthShape(argumentExpression, context, out var indexShape) ||
+                !TryCreateEffectiveBuiltInIndexTerm(indexShape, sourceLength, context, out var effectiveIndex))
+            {
+                return false;
+            }
+
+            var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicBoundsAtom(
+                    effectiveIndex,
+                    sourceLength,
+                    IncludeLowerBound: true,
+                    IncludeUpperBound: true),
+                source,
+                provenance));
+            if (!TryCreateIndexShapeWellFormedCondition(
+                    indexShape,
+                    source,
+                    provenance + ".well-formed",
+                    context,
+                    out var wellFormed))
+            {
+                return false;
+            }
+
+            condition = ApplyWellFormedPrecondition(wellFormed, inRange);
             return true;
         }
 
@@ -1199,6 +1263,197 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        private static bool TryCreateEffectiveBuiltInIndexTerm(
+            IndexLengthShape indexShape,
+            SymbolicTerm sourceLength,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            return TryLowerIndexShapeTerm(indexShape, sourceLength, context, out term);
+        }
+
+        private static bool TryCreateIndexShapeWellFormedCondition(
+            IndexLengthShape indexShape,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            out SymbolicCondition? condition)
+        {
+            condition = null;
+            if (!indexShape.RequiresNonNegativeValue)
+            {
+                return true;
+            }
+
+            if (!TryLowerTerm(indexShape.ValueExpression, context, out var rawIndex) ||
+                rawIndex.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    rawIndex,
+                    new SymbolicIntegerConstantTerm(0)),
+                source,
+                provenance));
+            return true;
+        }
+
+        private static bool TryCreateBuiltInRangeAccessInRangeCondition(
+            RangeLengthShape rangeShape,
+            SymbolicTerm sourceLength,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryCreateEffectiveRangeEndpointTerm(
+                    rangeShape,
+                    useStart: true,
+                    sourceLength,
+                    new SymbolicIntegerConstantTerm(0),
+                    context,
+                    out var start) ||
+                !TryCreateEffectiveRangeEndpointTerm(
+                    rangeShape,
+                    useStart: false,
+                    sourceLength,
+                    sourceLength,
+                    context,
+                    out var end))
+            {
+                return false;
+            }
+
+            var nonNegativeStart = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    start,
+                    new SymbolicIntegerConstantTerm(0)),
+                source,
+                provenance + ".start-nonnegative"));
+            var orderedEndpoints = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    start,
+                    end),
+                source,
+                provenance + ".ordered-endpoints"));
+            var endWithinLength = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    end,
+                    sourceLength),
+                source,
+                provenance + ".end-within-length"));
+            var inRange = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                nonNegativeStart,
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    orderedEndpoints,
+                    endWithinLength));
+            if (!TryCreateRangeShapeWellFormedCondition(
+                    rangeShape,
+                    source,
+                    provenance + ".well-formed",
+                    context,
+                    out var wellFormed))
+            {
+                return false;
+            }
+
+            condition = ApplyWellFormedPrecondition(wellFormed, inRange);
+            return true;
+        }
+
+        private static bool TryCreateEffectiveRangeEndpointTerm(
+            RangeLengthShape rangeShape,
+            bool useStart,
+            SymbolicTerm sourceLength,
+            SymbolicTerm defaultWhenOmitted,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            var hasEndpoint = useStart ? rangeShape.HasStart : rangeShape.HasEnd;
+            if (!hasEndpoint)
+            {
+                term = defaultWhenOmitted;
+                return true;
+            }
+
+            return TryCreateEffectiveBuiltInIndexTerm(
+                useStart ? rangeShape.Start : rangeShape.End,
+                sourceLength,
+                context,
+                out term);
+        }
+
+        private static bool TryCreateRangeShapeWellFormedCondition(
+            RangeLengthShape rangeShape,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            out SymbolicCondition? condition)
+        {
+            condition = null;
+            SymbolicCondition? startWellFormedCondition = null;
+            SymbolicCondition? endWellFormedCondition = null;
+            if (rangeShape.HasStart &&
+                !TryCreateIndexShapeWellFormedCondition(
+                    rangeShape.Start,
+                    source,
+                    provenance + ".start",
+                    context,
+                    out startWellFormedCondition))
+            {
+                return false;
+            }
+
+            if (rangeShape.HasEnd &&
+                !TryCreateIndexShapeWellFormedCondition(
+                    rangeShape.End,
+                    source,
+                    provenance + ".end",
+                    context,
+                    out endWellFormedCondition))
+            {
+                return false;
+            }
+
+            if (startWellFormedCondition != null)
+            {
+                condition = startWellFormedCondition;
+            }
+
+            if (endWellFormedCondition != null)
+            {
+                condition = condition == null
+                    ? endWellFormedCondition
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        condition,
+                        endWellFormedCondition);
+            }
+
+            return true;
+        }
+
+        private static SymbolicCondition ApplyWellFormedPrecondition(
+            SymbolicCondition? wellFormed,
+            SymbolicCondition inRange)
+        {
+            return wellFormed == null
+                ? inRange
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    new SymbolicNotCondition(wellFormed),
+                    inRange);
+        }
+
         private static bool TryResolveBuiltInIndexLengthShape(
             ExpressionSyntax argumentExpression,
             SymbolicLoweringContext context,
@@ -1398,7 +1653,10 @@ namespace PurelySharp.Symbolic.Ir
                 (fromEndIndex.IsKind(SyntaxKind.IndexExpression) ||
                  fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken)))
             {
-                indexShape = new IndexLengthShape(fromEndIndex.Operand, fromEnd: true);
+                indexShape = new IndexLengthShape(
+                    fromEndIndex.Operand,
+                    fromEnd: true,
+                    requiresNonNegativeValue: true);
                 return true;
             }
 
@@ -1526,13 +1784,19 @@ namespace PurelySharp.Symbolic.Ir
 
             if (invocationOperation.TargetMethod.Name == "FromStart")
             {
-                indexShape = new IndexLengthShape(valueExpression, fromEnd: false);
+                indexShape = new IndexLengthShape(
+                    valueExpression,
+                    fromEnd: false,
+                    requiresNonNegativeValue: true);
                 return true;
             }
 
             if (invocationOperation.TargetMethod.Name == "FromEnd")
             {
-                indexShape = new IndexLengthShape(valueExpression, fromEnd: true);
+                indexShape = new IndexLengthShape(
+                    valueExpression,
+                    fromEnd: true,
+                    requiresNonNegativeValue: true);
                 return true;
             }
 
@@ -1556,7 +1820,10 @@ namespace PurelySharp.Symbolic.Ir
 
             if (!TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var fromEndExpression))
             {
-                indexShape = new IndexLengthShape(valueExpression, fromEnd: false);
+                indexShape = new IndexLengthShape(
+                    valueExpression,
+                    fromEnd: false,
+                    requiresNonNegativeValue: true);
                 return true;
             }
 
@@ -1565,8 +1832,19 @@ namespace PurelySharp.Symbolic.Ir
                 return false;
             }
 
-            indexShape = new IndexLengthShape(valueExpression, fromEnd);
+            indexShape = new IndexLengthShape(
+                valueExpression,
+                fromEnd,
+                requiresNonNegativeValue: true);
             return true;
+        }
+
+        private static bool IsSupportedBuiltInElementAccessReceiver(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is IArrayTypeSymbol { Rank: 1 } ||
+                typeSymbol?.SpecialType == SpecialType.System_String ||
+                SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol) ||
+                HasCountBackedIntIndexer(typeSymbol);
         }
 
         private static bool TryGetInvocationArgumentExpression(

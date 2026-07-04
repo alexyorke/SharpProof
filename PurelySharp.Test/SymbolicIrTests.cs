@@ -1977,7 +1977,7 @@ namespace PurelySharp.Test
         public void LowerBuiltInLengthTerm_CountBackedIndexerUsesCountTerm()
         {
             var context = CreateMethodExpressionContext(
-                "IReadOnlyList<int> values",
+                "System.Collections.Generic.IReadOnlyList<int> values",
                 string.Empty,
                 "values.Count > 0");
             var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
@@ -1994,6 +1994,55 @@ namespace PurelySharp.Test
             Assert.That(formula, Is.TypeOf<SmtVariable>());
             Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
             Assert.That(formula.ToString(), Does.Contain(".Count"));
+        }
+
+        [Test]
+        public void BuiltInElementAccessInRangeCondition_SupportsAssignedIndexShape()
+        {
+            var context = CreateMethodExpressionContext(
+                "int[] values",
+                """
+                Index index = ^1;
+                """,
+                "values[index] == 0");
+            var elementAccess = (ElementAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+                    elementAccess.Expression,
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess,
+                    "test.element-access.in-range",
+                    context.LoweringContext,
+                    out var condition),
+                Is.True);
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void BuiltInElementAccessInRangeCondition_SupportsRangeShape()
+        {
+            var context = CreateMethodExpressionContext(
+                "int[] values",
+                """
+                Range slice = 1..^1;
+                """,
+                "values[slice].Length == values.Length - 2");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+            var elementAccess = (ElementAccessExpressionSyntax)memberAccess.Expression;
+
+            Assert.That(
+                SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+                    elementAccess.Expression,
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess,
+                    "test.range-access.in-range",
+                    context.LoweringContext,
+                    out var condition),
+                Is.True);
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
         }
 
         [Test]
