@@ -391,6 +391,82 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        internal static bool TryLowerStringNonNullCondition(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            expression = UnwrapExpression(expression);
+
+            var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+            if (constantValue.HasValue)
+            {
+                if (constantValue.Value is string)
+                {
+                    condition = new SymbolicConstantCondition(true);
+                    return true;
+                }
+
+                if (constantValue.Value == null)
+                {
+                    condition = new SymbolicConstantCondition(false);
+                    return true;
+                }
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                IsStringExpression(expression, context) &&
+                TryLowerStringNonNullCondition(coalesceExpression.Left, context, out var coalesceLeftNonNull) &&
+                TryLowerStringNonNullCondition(coalesceExpression.Right, context, out var coalesceRightNonNull))
+            {
+                condition = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    coalesceLeftNonNull,
+                    coalesceRightNonNull);
+                return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryLowerCondition(conditionalExpression.Condition, context, out var branchCondition) &&
+                TryLowerStringNonNullCondition(conditionalExpression.WhenTrue, context, out var whenTrueNonNull) &&
+                TryLowerStringNonNullCondition(conditionalExpression.WhenFalse, context, out var whenFalseNonNull))
+            {
+                condition = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        branchCondition,
+                        whenTrueNonNull),
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        new SymbolicNotCondition(branchCondition),
+                        whenFalseNonNull));
+                return true;
+            }
+
+            if (TryLowerStringTerm(expression, context, out var stringTerm))
+            {
+                switch (stringTerm)
+                {
+                    case SymbolicStringConstantTerm:
+                    case SymbolicStringConcatTerm:
+                        condition = new SymbolicConstantCondition(true);
+                        return true;
+                    case SymbolicStringContentTerm stringContent:
+                        condition = CreateReferenceNullCondition(
+                            stringContent.Reference,
+                            equalToNull: false,
+                            expression,
+                            "ir.string.non-null.reference");
+                        return true;
+                }
+            }
+
+            condition = null!;
+            return false;
+        }
+
         internal static bool TryLowerStringTerm(
             ExpressionSyntax expression,
             SymbolicLoweringContext context,

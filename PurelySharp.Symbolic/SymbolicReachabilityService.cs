@@ -2195,25 +2195,18 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion = null,
-            int inlineDepth = 0)
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                term.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var referenceFormula))
+            if (SymbolicIrLowerer.TryLowerStringNonNullCondition(expression, context, out var condition) &&
+                SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded))
             {
-                formula = SmtFormulaFactory.CreateReferenceNullComparison(referenceFormula, isNull: false);
+                formula = encoded;
                 return true;
             }
 
-            return CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out formula,
-                getSymbolVersion,
-                inlineDepth);
+            formula = null;
+            return false;
         }
 
         internal static bool TryCreateNotNullIfNotNullAssignedValueFact(

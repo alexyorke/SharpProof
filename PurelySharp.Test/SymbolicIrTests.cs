@@ -852,6 +852,71 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_StringNonNullHelper_TreatsConcatAsAlwaysNonNull()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "left + right");
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerStringNonNullCondition(
+                    context.Expression,
+                    context.LoweringContext,
+                    out var condition),
+                Is.True);
+
+            Assert.That(condition, Is.EqualTo(new SymbolicConstantCondition(true)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtBooleanConstant(true)));
+        }
+
+        [Test]
+        public void LowerCondition_StringNonNullHelper_LowersCoalesceToOperandDisjunction()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "left ?? right");
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerStringNonNullCondition(
+                    context.Expression,
+                    context.LoweringContext,
+                    out var condition),
+                Is.True);
+
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var disjunction = (SymbolicBinaryCondition)condition;
+            Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+            Assert.That(disjunction.Left, Is.TypeOf<SymbolicFactCondition>());
+            Assert.That(disjunction.Right, Is.TypeOf<SymbolicFactCondition>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_StringNonNullHelper_LowersConditionalToBranchSensitiveCondition()
+        {
+            var context = CreateExpressionContext(
+                "bool flag, string first, string second",
+                "flag ? first : second");
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerStringNonNullCondition(
+                    context.Expression,
+                    context.LoweringContext,
+                    out var condition),
+                Is.True);
+
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            var outerOr = (SymbolicBinaryCondition)condition;
+            Assert.That(outerOr.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+            Assert.That(outerOr.Left, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(outerOr.Right, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void LowerCondition_NullableHasValueUsesSharedNullableTerm()
         {
             var context = CreateExpressionContext(

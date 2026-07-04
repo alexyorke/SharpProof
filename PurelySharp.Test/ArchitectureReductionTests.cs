@@ -2016,12 +2016,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(20));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(19));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 20,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 19,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2039,7 +2039,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateStringValue("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("] = 1,
                     ["if (!CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("] = 2,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("] = 1,
@@ -5813,7 +5812,7 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SymbolicReachabilityService_UsesIrStringNonNullBeforeLegacyFallback()
+        public void SymbolicReachabilityService_UsesIrStringNonNullWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = File.ReadAllText(Path.Combine(
@@ -5830,10 +5829,9 @@ namespace PurelySharp.Test
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-            Assert.That(
-                helperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(expression", StringComparison.Ordinal),
-                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(", StringComparison.Ordinal)));
-            Assert.That(helperSource, Does.Contain("SmtFormulaFactory.CreateReferenceNullComparison(referenceFormula"));
+            Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerStringNonNullCondition(expression, context, out var condition)"));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded)"));
+            Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
         }
 
         [Test]
