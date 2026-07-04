@@ -505,6 +505,11 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (TryLowerBuiltInViewResultLengthTerm(expression, context, out term))
+            {
+                return true;
+            }
+
             if (TryLowerStringInvocationResultLengthTerm(expression, context, out term))
             {
                 return true;
@@ -535,6 +540,135 @@ namespace PurelySharp.Symbolic.Ir
 
             term = null!;
             return false;
+        }
+
+        private static bool TryLowerBuiltInViewResultLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            return TryLowerBuiltInSliceInvocationResultLengthTerm(expression, context, out term) ||
+                TryLowerMemoryExtensionsViewResultLengthTerm(expression, context, out term);
+        }
+
+        private static bool TryLowerBuiltInSliceInvocationResultLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                method.Name != "Slice" ||
+                !IsBuiltInSpanOrMemoryType(method.ContainingType) ||
+                !IsBuiltInSpanOrMemoryType(method.ReturnType) ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
+            {
+                return false;
+            }
+
+            return TryLowerViewLengthFromInvocationArguments(
+                invocationExpression,
+                invocationOperation,
+                sourceExpression,
+                firstArgumentIndex: 0,
+                allowDirectRangeArgument: false,
+                context,
+                out term);
+        }
+
+        private static bool TryLowerMemoryExtensionsViewResultLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not IInvocationOperation invocationOperation ||
+                !IsMemoryExtensionsViewMethod(invocationOperation.TargetMethod) ||
+                !IsBuiltInSpanOrMemoryType(invocationOperation.TargetMethod.ReturnType) ||
+                !TryGetMemoryExtensionsViewSourceExpression(invocationExpression, context, out var sourceExpression, out var firstArgumentIndex) ||
+                !IsSupportedMemoryExtensionsViewSource(sourceExpression, context))
+            {
+                return false;
+            }
+
+            return TryLowerViewLengthFromInvocationArguments(
+                invocationExpression,
+                invocationOperation,
+                sourceExpression,
+                firstArgumentIndex,
+                allowDirectRangeArgument: true,
+                context,
+                out term);
+        }
+
+        private static bool TryLowerViewLengthFromInvocationArguments(
+            InvocationExpressionSyntax invocationExpression,
+            IInvocationOperation invocationOperation,
+            ExpressionSyntax sourceExpression,
+            int firstArgumentIndex,
+            bool allowDirectRangeArgument,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength))
+            {
+                return false;
+            }
+
+            var remainingArgumentCount = invocationExpression.ArgumentList.Arguments.Count - firstArgumentIndex;
+            if (remainingArgumentCount == 0)
+            {
+                term = sourceLength;
+                return true;
+            }
+
+            if (remainingArgumentCount == 1)
+            {
+                var argument = invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression;
+                if (allowDirectRangeArgument &&
+                    TryCreateDirectRangeLengthTerm(argument, sourceExpression, context, out term))
+                {
+                    return true;
+                }
+
+                if (!TryLowerTerm(argument, context, out var start) ||
+                    start.Kind != SmtValueKind.Int)
+                {
+                    return false;
+                }
+
+                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
+                return true;
+            }
+
+            if (remainingArgumentCount != 2 ||
+                !TryLowerInvocationArgument(
+                    invocationOperation,
+                    parameterIndex: firstArgumentIndex,
+                    context,
+                    out var translatedStart) ||
+                translatedStart.Kind != SmtValueKind.Int ||
+                !TryLowerInvocationArgument(
+                    invocationOperation,
+                    parameterIndex: firstArgumentIndex + 1,
+                    context,
+                    out var resultLength) ||
+                resultLength.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            term = resultLength;
+            return true;
         }
 
         private static bool TryLowerDirectRangeAccessResultLengthTerm(
@@ -687,6 +821,82 @@ namespace PurelySharp.Symbolic.Ir
 
             term = countValue;
             return true;
+        }
+
+        private static bool IsMemoryExtensionsViewMethod(IMethodSymbol method)
+        {
+            var definition = method.ReducedFrom ?? method;
+            return definition.Name is "AsSpan" or "AsMemory" &&
+                definition.IsExtensionMethod &&
+                definition.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
+        }
+
+        private static bool TryGetMemoryExtensionsViewSourceExpression(
+            InvocationExpressionSyntax invocationExpression,
+            SymbolicLoweringContext context,
+            out ExpressionSyntax sourceExpression,
+            out int firstArgumentIndex)
+        {
+            if (invocationExpression.Expression is MemberAccessExpressionSyntax memberAccess &&
+                context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type != null)
+            {
+                sourceExpression = memberAccess.Expression;
+                firstArgumentIndex = 0;
+                return true;
+            }
+
+            if (invocationExpression.ArgumentList.Arguments.Count == 0)
+            {
+                sourceExpression = null!;
+                firstArgumentIndex = 0;
+                return false;
+            }
+
+            sourceExpression = invocationExpression.ArgumentList.Arguments[0].Expression;
+            firstArgumentIndex = 1;
+            return true;
+        }
+
+        private static bool IsSupportedMemoryExtensionsViewSource(
+            ExpressionSyntax sourceExpression,
+            SymbolicLoweringContext context)
+        {
+            var sourceTypeInfo = context.SemanticModel.GetTypeInfo(sourceExpression, context.CancellationToken);
+            var sourceType = sourceTypeInfo.ConvertedType ?? sourceTypeInfo.Type;
+            return sourceType?.SpecialType == SpecialType.System_String ||
+                sourceType is IArrayTypeSymbol { Rank: 1 };
+        }
+
+        private static bool TryLowerInvocationArgument(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    return TryLowerTerm(argumentExpression, context, out term);
+                }
+            }
+
+            if (parameterIndex < invocationOperation.Arguments.Length &&
+                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                return TryLowerTerm(fallbackExpression, context, out term);
+            }
+
+            return false;
         }
     }
 }

@@ -3108,6 +3108,64 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringAsSpanOneArgumentResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.AsSpan(start).Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "StringAsSpanOneArgumentResultLength.cs",
+                FindLine(source, "return text.AsSpan(start).Length;"),
+                20,
+                "text.AsSpan(start).Length == text.Length - start",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesReadOnlySpanSliceTwoArgumentResultLength()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= values.Length)
+        {
+            return values.Slice(start, length).Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ReadOnlySpanSliceTwoArgumentResultLength.cs",
+                FindLine(source, "return values.Slice(start, length).Length;"),
+                20,
+                "values.Slice(start, length).Length == length",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull()
         {
             const string source = @"
