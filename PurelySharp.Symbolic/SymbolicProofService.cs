@@ -355,9 +355,9 @@ namespace PurelySharp.Symbolic
 
                     if (triggerCondition.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable)
                     {
-                        return SymbolicIrProofResult.Syntactic(
-                            SymbolicProofStatus.Unreachable,
-                            triggerCondition.Info.Reason);
+                        return triggerCondition.Info.Status == SymbolicProofStatus.Unreachable
+                            ? triggerCondition
+                            : triggerCondition.WithStatus(SymbolicProofStatus.Unreachable);
                     }
 
                     var proven = ClassifyImplication(state, triggerPrecondition);
@@ -786,6 +786,22 @@ namespace PurelySharp.Symbolic
                     Info.Reason,
                     cacheHit: true,
                     budget ?? Info.Budget,
+                    Info.Target,
+                    Info.ConditionText,
+                    Info.DisplayKind));
+        }
+
+        internal SymbolicIrProofResult WithStatus(SymbolicProofStatus status)
+        {
+            return new SymbolicIrProofResult(
+                RawResult,
+                new SymbolicProofInfo(
+                    status,
+                    Info.Backend,
+                    Info.UnknownReason,
+                    Info.Reason,
+                    Info.CacheHit,
+                    Info.Budget,
                     Info.Target,
                     Info.ConditionText,
                     Info.DisplayKind));

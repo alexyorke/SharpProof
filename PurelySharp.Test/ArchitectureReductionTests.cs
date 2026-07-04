@@ -3393,6 +3393,45 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_SmtFalseExceptionTriggerKeepsSmtProvenance()
+        {
+            var divisor = new SymbolicVariableTerm("divisor", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var greaterThanOne = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    divisor,
+                    new SymbolicIntegerConstantTerm(1)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("divisor > 1"),
+                "test.positive");
+            var equalsZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    divisor,
+                    zero),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("divisor == 0"),
+                "test.zero");
+            var triggerPrecondition = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    divisor,
+                    new SymbolicFactCondition(equalsZero)),
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression("10 / divisor"),
+                "test.trigger");
+            var state = new SymbolicState(new[] { greaterThanOne });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateHazardTrigger(
+                state,
+                triggerPrecondition,
+                smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unreachable));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.GreaterThan(0));
+        }
+
+        [Test]
         public void SymbolicProofService_UnsupportedIrStaysConservative()
         {
             var unsupportedFact = SymbolicFact.Exact(
