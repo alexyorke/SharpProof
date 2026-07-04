@@ -20,8 +20,8 @@ path-fact, hazard, and ownership flows.
   `PurelySharp` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
-- Production inventory currently reports 112,162 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 53,417 lines,
+- Production inventory currently reports 112,235 C# production lines across
+  181 files. The largest modules are `PurelySharp.Symbolic` at 53,490 lines,
   `PurelySharp.Analyzer` at 37,050 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
@@ -64,6 +64,11 @@ path-fact, hazard, and ownership flows.
   `SymbolicState` also detects contradictory exact ownership, disposal, and
   resource-lifetime states syntactically. The proof spine must keep growing
   into the only internal bridge from IR facts to solver formulas.
+- Multidimensional array element-access runtime hazards now emit IR
+  `SymbolicExceptionPreconditionAtom` bounds triggers before formula-backed
+  compatibility. The fallback inventory count is unchanged because
+  Index/Range and other unsupported element-access shapes still keep the
+  legacy path alive.
 - Ownership/resource IR atoms exist, but analyzer rules still own much of the
   real borrow, disposal, escape, and mutation behavior.
 - Declarative known-API lowerings are currently a string/regex seed, not the
@@ -133,6 +138,8 @@ path-fact, hazard, and ownership flows.
   first for divide-by-zero, null dereference, nullable value, invalid cast,
   index/range, checked overflow, negative length, direct throw, and dynamic
   null binding.
+- Built-in one-dimensional and multidimensional element-access index hazards
+  now use IR bounds preconditions before formula fallback.
 - Route analyzer `PS0010` and `PS0011` site checks through shared symbolic
   hazard results where equivalent.
 - Keep analyzer-only exception summary propagation separate until it is
