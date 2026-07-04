@@ -105,6 +105,7 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeTermWithPathState("));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeConditionWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);"));
             Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState CreateStateFromFormulaPath("));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryCreateStateFromFormulaPath("));
@@ -5631,6 +5632,75 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TranslatesConstantDivisionValueThroughSafeIrEncoding()
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                """
+                public class TestClass
+                {
+                    public int TestMethod()
+                    {
+                        return 10 / 2;
+                    }
+                }
+                """);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityConstantDivisionValue",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var divisionExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<BinaryExpressionSyntax>()
+                .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
+
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateValue(
+                    divisionExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var translatedFormula),
+                Is.True);
+            Assert.That(translatedFormula, Is.Not.Null);
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_TranslatesConstantDivisionConditionThroughSafeIrEncoding()
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                """
+                public class TestClass
+                {
+                    public bool TestMethod()
+                    {
+                        return 10 / 2 == 5;
+                    }
+                }
+                """);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityConstantDivisionCondition",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single()
+                .Expression!;
+
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateConditionFormula(
+                    returnExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var translatedFormula),
+                Is.True);
+            Assert.That(translatedFormula, Is.Not.Null);
+        }
+
+        [Test]
         public void SymbolicReachabilityService_TriesIrBranchFactsBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -5752,7 +5822,8 @@ namespace PurelySharp.Test
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThan(irIndex));
-            Assert.That(helperSource, Does.Contain("!ContainsDivisionOrModulo(condition)"));
+            Assert.That(helperSource, Does.Contain("SymbolicProofService.TryEncodeConditionWithPathState("));
+            Assert.That(helperSource, Does.Not.Contain("!ContainsDivisionOrModulo(condition)"));
             Assert.That(helperSource, Does.Contain("formula = encodedFormula;"));
             Assert.That(helperSource, Does.Contain("return true;"));
         }
@@ -5802,8 +5873,9 @@ namespace PurelySharp.Test
             Assert.That(stringNonNullIndex, Is.GreaterThan(stringHelperIndex));
             Assert.That(valueHelperSource, Does.Contain("TryTranslateValue("));
             Assert.That(valueHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
-            Assert.That(untypedValueHelperSource, Does.Contain("!ContainsDivisionOrModulo(expression)"));
             Assert.That(untypedValueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
+            Assert.That(untypedValueHelperSource, Does.Contain("SymbolicProofService.TryEncodeTermWithPathState("));
+            Assert.That(untypedValueHelperSource, Does.Not.Contain("!ContainsDivisionOrModulo(expression)"));
             Assert.That(untypedValueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(
                 untypedValueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),

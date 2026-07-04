@@ -1142,9 +1142,12 @@ namespace PurelySharp.Symbolic
             int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (!ContainsDivisionOrModulo(condition) &&
-                SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
-                SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
+            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+                SymbolicProofService.TryEncodeConditionWithPathState(
+                    symbolicCondition,
+                    new SymbolicState(),
+                    condition,
+                    out var encodedFormula))
             {
                 formula = encodedFormula;
                 return true;
@@ -1768,9 +1771,12 @@ namespace PurelySharp.Symbolic
             int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (!ContainsDivisionOrModulo(expression) &&
-                SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                SymbolicProofService.TryEncodeTermWithPathState(
+                    term,
+                    new SymbolicState(),
+                    expression,
+                    out var encodedFormula))
             {
                 formula = encodedFormula;
                 return true;

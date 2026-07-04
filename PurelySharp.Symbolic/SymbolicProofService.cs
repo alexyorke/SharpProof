@@ -114,6 +114,43 @@ namespace PurelySharp.Symbolic
             return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
         }
 
+        internal static bool TryEncodeConditionWithPathState(
+            SymbolicCondition condition,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            out SmtFormula formula)
+        {
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition));
+            }
+
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            if (sourceNode == null)
+            {
+                throw new ArgumentNullException(nameof(sourceNode));
+            }
+
+            state = NormalizeState(state);
+            if (state.IsContradictory)
+            {
+                return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
+            }
+
+            var proofService = new SymbolicProofService(smtAnalysis: null);
+            if (!HasSafeIntegerDivisors(condition, state, sourceNode, proofService))
+            {
+                formula = null!;
+                return false;
+            }
+
+            return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
+        }
+
         internal static SymbolicState CreateStateFromFormulaPath(
             IEnumerable<SmtFormula> pathConditions,
             SyntaxNode sourceNode)

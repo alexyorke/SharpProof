@@ -110,6 +110,9 @@ path-fact, hazard, and ownership flows.
   from lowered path state before encoding divide or remainder terms, so the
   old reachability-side `TryTranslateValueWithPathFacts` translator shim is
   gone.
+  Plain reachability value and condition translation now also route safe
+  divide/modulo IR encoding through `SymbolicProofService` instead of using
+  blanket local `ContainsDivisionOrModulo` gates before fallback.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count
