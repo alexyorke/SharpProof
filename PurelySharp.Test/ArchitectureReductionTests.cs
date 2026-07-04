@@ -2435,6 +2435,78 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyFlattensAssociativeCommutativeBinaryTerms()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var y = new SymbolicVariableTerm("y", SmtValueKind.Int);
+            var z = new SymbolicVariableTerm("z", SmtValueKind.Int);
+            var addLeftAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Add,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, x, y),
+                        z),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("(x + y) + z == 0"),
+                "test.add.left");
+            var addRightAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Add,
+                        y,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, z, x)),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("y + (z + x) == 0"),
+                "test.add.right");
+            var multiplyLeftAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Multiply,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, x, y),
+                        z),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("(x * y) * z == 1"),
+                "test.multiply.left");
+            var multiplyRightAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Multiply,
+                        z,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, y, x)),
+                    new SymbolicIntegerConstantTerm(1)),
+                SyntaxFactory.ParseExpression("z * (y * x) == 1"),
+                "test.multiply.right");
+            var subtractLeftAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Subtract,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, x, y),
+                        z),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("(x - y) - z == 0"),
+                "test.subtract.left");
+            var subtractRightAssociated = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Subtract,
+                        x,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, y, z)),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x - (y - z) == 0"),
+                "test.subtract.right");
+
+            Assert.That(new SymbolicState(new[] { addLeftAssociated }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { addRightAssociated }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { multiplyLeftAssociated }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { multiplyRightAssociated }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { subtractLeftAssociated }).NormalizedProofKey, Is.Not.EqualTo(new SymbolicState(new[] { subtractRightAssociated }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyFlattensStringConcatTerms()
         {
             var a = new SymbolicStringConstantTerm("a");

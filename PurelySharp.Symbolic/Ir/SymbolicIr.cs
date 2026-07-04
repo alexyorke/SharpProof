@@ -887,6 +887,14 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateBinaryTermKey(SymbolicBinaryTerm binary)
         {
+            if (IsAssociativeCommutativeBinaryTermOperator(binary.Operator))
+            {
+                var operands = new List<string>();
+                CollectAssociativeBinaryTermKeys(binary, binary.Operator, operands);
+                operands.Sort(StringComparer.Ordinal);
+                return "binary-term:" + binary.Operator + "(" + string.Join(",", operands) + ")";
+            }
+
             var left = CreateTermKey(binary.Left);
             var right = CreateTermKey(binary.Right);
             if (IsCommutativeBinaryTermOperator(binary.Operator) &&
@@ -896,6 +904,27 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             return "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
+        }
+
+        private static void CollectAssociativeBinaryTermKeys(
+            SymbolicTerm term,
+            SymbolicBinaryTermOperator binaryOperator,
+            ICollection<string> operands)
+        {
+            if (term is SymbolicBinaryTerm nested &&
+                nested.Operator == binaryOperator)
+            {
+                CollectAssociativeBinaryTermKeys(nested.Left, binaryOperator, operands);
+                CollectAssociativeBinaryTermKeys(nested.Right, binaryOperator, operands);
+                return;
+            }
+
+            operands.Add(CreateTermKey(term));
+        }
+
+        private static bool IsAssociativeCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)
+        {
+            return binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Multiply;
         }
 
         private static bool IsCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)
