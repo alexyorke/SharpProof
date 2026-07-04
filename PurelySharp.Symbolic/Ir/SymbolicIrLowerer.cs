@@ -94,7 +94,8 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
-                TryLowerTypePatternCondition(isPatternExpression, context, out condition))
+                (TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerTypePatternCondition(isPatternExpression, context, out condition)))
             {
                 return true;
             }
@@ -113,6 +114,53 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             condition = null!;
+            return false;
+        }
+
+        private static bool TryLowerNullPatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerNullPattern(expression.Pattern, context, out var negate) ||
+                !TryLowerTerm(expression.Expression, context, out var value) ||
+                value.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            condition = CreateRelationCondition(
+                negate ? SymbolicRelationOperator.NotEqual : SymbolicRelationOperator.Equal,
+                value,
+                new SymbolicNullTerm(),
+                expression,
+                "ir.pattern.null");
+            return true;
+        }
+
+        private static bool TryLowerNullPattern(
+            PatternSyntax pattern,
+            SymbolicLoweringContext context,
+            out bool negate)
+        {
+            pattern = UnwrapPattern(pattern);
+            negate = false;
+
+            if (pattern is ConstantPatternSyntax constantPattern &&
+                context.SemanticModel.GetConstantValue(constantPattern.Expression, context.CancellationToken) is { HasValue: true, Value: null })
+            {
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryLowerNullPattern(unaryPattern.Pattern, context, out var nestedNegate))
+            {
+                negate = !nestedNegate;
+                return true;
+            }
+
             return false;
         }
 

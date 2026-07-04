@@ -161,6 +161,40 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_NullPatternUsesSharedNullRelation()
+        {
+            var context = CreateExpressionContext(
+                "object value",
+                "value is null");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void LowerCondition_NegatedNullPatternUsesSharedNullRelation()
+        {
+            var context = CreateExpressionContext(
+                "object value",
+                "value is not null");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(
