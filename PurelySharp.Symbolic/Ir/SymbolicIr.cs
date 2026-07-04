@@ -931,14 +931,25 @@ namespace PurelySharp.Symbolic.Ir
         {
             if (IsAssociativeCommutativeBinaryTermOperator(binary.Operator))
             {
-                var operands = new List<string>();
-                CollectAssociativeBinaryTermKeys(binary, binary.Operator, operands);
+                var terms = new List<SymbolicTerm>();
+                CollectAssociativeBinaryTerms(binary, binary.Operator, terms);
+                var operands = CreateNormalizedAssociativeBinaryTermKeys(binary.Operator, terms);
+                if (operands.Count == 1)
+                {
+                    return operands[0];
+                }
+
                 operands.Sort(StringComparer.Ordinal);
                 return "binary-term:" + binary.Operator + "(" + string.Join(",", operands) + ")";
             }
 
             var left = CreateTermKey(binary.Left);
             var right = CreateTermKey(binary.Right);
+            if (IsRightIdentityBinaryTerm(binary.Operator, binary.Right))
+            {
+                return left;
+            }
+
             if (IsCommutativeBinaryTermOperator(binary.Operator) &&
                 string.CompareOrdinal(left, right) > 0)
             {
@@ -948,20 +959,67 @@ namespace PurelySharp.Symbolic.Ir
             return "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
         }
 
-        private static void CollectAssociativeBinaryTermKeys(
+        private static void CollectAssociativeBinaryTerms(
             SymbolicTerm term,
             SymbolicBinaryTermOperator binaryOperator,
-            ICollection<string> operands)
+            ICollection<SymbolicTerm> terms)
         {
             if (term is SymbolicBinaryTerm nested &&
                 nested.Operator == binaryOperator)
             {
-                CollectAssociativeBinaryTermKeys(nested.Left, binaryOperator, operands);
-                CollectAssociativeBinaryTermKeys(nested.Right, binaryOperator, operands);
+                CollectAssociativeBinaryTerms(nested.Left, binaryOperator, terms);
+                CollectAssociativeBinaryTerms(nested.Right, binaryOperator, terms);
                 return;
             }
 
-            operands.Add(CreateTermKey(term));
+            terms.Add(term);
+        }
+
+        private static List<string> CreateNormalizedAssociativeBinaryTermKeys(
+            SymbolicBinaryTermOperator binaryOperator,
+            IEnumerable<SymbolicTerm> terms)
+        {
+            var operands = terms
+                .Where(term => !IsIdentityOperand(binaryOperator, term))
+                .Select(CreateTermKey)
+                .ToList();
+            if (operands.Count == 0)
+            {
+                operands.Add(CreateTermKey(new SymbolicIntegerConstantTerm(
+                    binaryOperator == SymbolicBinaryTermOperator.Add ? 0 : 1)));
+            }
+
+            return operands;
+        }
+
+        private static bool IsIdentityOperand(
+            SymbolicBinaryTermOperator binaryOperator,
+            SymbolicTerm term)
+        {
+            return binaryOperator switch
+            {
+                SymbolicBinaryTermOperator.Add => IsIntegerConstant(term, 0),
+                SymbolicBinaryTermOperator.Multiply => IsIntegerConstant(term, 1),
+                _ => false,
+            };
+        }
+
+        private static bool IsRightIdentityBinaryTerm(
+            SymbolicBinaryTermOperator binaryOperator,
+            SymbolicTerm right)
+        {
+            return binaryOperator switch
+            {
+                SymbolicBinaryTermOperator.Subtract => IsIntegerConstant(right, 0),
+                SymbolicBinaryTermOperator.Divide => IsIntegerConstant(right, 1),
+                _ => false,
+            };
+        }
+
+        private static bool IsIntegerConstant(SymbolicTerm term, long value)
+        {
+            return term is SymbolicIntegerConstantTerm integer &&
+                integer.Value == value;
         }
 
         private static bool IsAssociativeCommutativeBinaryTermOperator(SymbolicBinaryTermOperator binaryOperator)

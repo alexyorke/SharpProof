@@ -2555,6 +2555,75 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesArithmeticIdentityTerms()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var one = new SymbolicIntegerConstantTerm(1);
+            var direct = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("x == 10"),
+                "test.direct");
+            var addZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Add,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, zero, x),
+                        zero),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("0 + x + 0 == 10"),
+                "test.add-zero");
+            var multiplyOne = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Multiply,
+                        new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, one, x),
+                        one),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("1 * x * 1 == 10"),
+                "test.multiply-one");
+            var subtractZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, x, zero),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("x - 0 == 10"),
+                "test.subtract-zero");
+            var divideOne = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Divide, x, one),
+                    new SymbolicIntegerConstantTerm(10)),
+                SyntaxFactory.ParseExpression("x / 1 == 10"),
+                "test.divide-one");
+            var multiplyZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Multiply, x, zero),
+                    zero),
+                SyntaxFactory.ParseExpression("x * 0 == 0"),
+                "test.multiply-zero");
+            var directZero = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    zero,
+                    zero),
+                SyntaxFactory.ParseExpression("0 == 0"),
+                "test.direct-zero");
+
+            Assert.That(new SymbolicState(new[] { direct }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { addZero }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { direct }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { multiplyOne }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { direct }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { subtractZero }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { direct }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { divideOne }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { multiplyZero }).NormalizedProofKey, Is.Not.EqualTo(new SymbolicState(new[] { directZero }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyFlattensStringConcatTerms()
         {
             var a = new SymbolicStringConstantTerm("a");
