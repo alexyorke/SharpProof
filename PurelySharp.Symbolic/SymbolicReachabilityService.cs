@@ -300,7 +300,7 @@ namespace PurelySharp.Symbolic
             SymbolicState state,
             out ImmutableArray<SmtFormula> pathConditions)
         {
-            return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
+            return SymbolicProofService.TryEncodeStatePathConditions(state, out pathConditions);
         }
 
         internal static List<SmtFormula>? TryCollectBranchConditions(

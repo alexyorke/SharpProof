@@ -88,6 +88,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicState` also detects contradictory exact ownership, disposal, and
   resource-lifetime states syntactically. The proof spine must keep growing
   into the only internal bridge from IR facts to solver formulas.
+  Reachability state-path encoding now delegates through a shared
+  `SymbolicProofService.TryEncodeStatePathConditions` helper instead of
+  constructing a null-scoped proof service ad hoc at the reachability call
+  site.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

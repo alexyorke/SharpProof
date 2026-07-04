@@ -70,6 +70,11 @@ namespace PurelySharp.Symbolic
             return TryEncodeState(state, out pathConditions, out _);
         }
 
+        internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)
+        {
+            return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
+        }
+
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)
         {
             if (state == null)

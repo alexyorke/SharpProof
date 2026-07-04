@@ -79,6 +79,8 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, factFormula, smtAnalysis).Info.Status"));
             Assert.That(reachabilitySource, Does.Contain("ClassifyFormulaConditionTruth(pathConditions, formula, smtAnalysis).Info.Status"));
             Assert.That(reachabilitySource, Does.Contain("new SymbolicProofService(smtAnalysis).ClassifyFormula"));
+            Assert.That(reachabilitySource, Does.Not.Contain("new SymbolicProofService(smtAnalysis: null)"));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out pathConditions)"));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeReachable("));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeUnreachable("));
             Assert.That(proofServiceSource, Does.Contain("internal SymbolicIrProofResult ClassifyFormulaReachability"));
@@ -88,6 +90,8 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyReachability(SymbolicState state)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
+            Assert.That(proofServiceSource, Does.Contain("new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);"));
             Assert.That(proofServiceSource, Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
             Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
             Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
