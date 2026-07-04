@@ -1895,7 +1895,7 @@ namespace PurelySharp.Symbolic
                     SymbolicTypeFacts.IsReferenceType,
                     out var targetReferenceFormula) ||
                 targetReferenceFormula is not { Kind: SmtValueKind.Reference } ||
-                !CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
+                !TryCreateStringNonNullFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
@@ -1910,6 +1910,32 @@ namespace PurelySharp.Symbolic
                 SmtFormulaFactory.CreateReferenceNullComparison(targetReferenceFormula, isNull: false),
                 valueNonNullFormula);
             return true;
+        }
+
+        private static bool TryCreateStringNonNullFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                term.Kind == SmtValueKind.Reference &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var referenceFormula))
+            {
+                formula = SmtFormulaFactory.CreateReferenceNullComparison(referenceFormula, isNull: false);
+                return true;
+            }
+
+            return CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
         }
 
         internal static bool TryCreateNotNullIfNotNullAssignedValueFact(

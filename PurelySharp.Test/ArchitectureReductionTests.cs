@@ -2145,6 +2145,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrStringNonNullBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "private static bool TryCreateStringNonNullFormula(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal static bool TryCreateNotNullIfNotNullAssignedValueFact(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(expression", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SmtFormulaFactory.CreateReferenceNullComparison(referenceFormula"));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
         {
             var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");
