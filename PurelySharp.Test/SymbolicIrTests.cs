@@ -1760,6 +1760,45 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerBuiltInLengthTerm_StringSubstringOneArgumentUsesSourceLengthDelta()
+        {
+            var context = CreateExpressionContext(
+                "string text, int start",
+                "text.Substring(start).Length == text.Length - start");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicBinaryTerm>());
+            var subtract = (SymbolicBinaryTerm)term;
+            Assert.That(subtract.Operator, Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+            Assert.That(subtract.Left, Is.TypeOf<SymbolicLengthTerm>());
+            Assert.That(subtract.Right, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        }
+
+        [Test]
+        public void LowerBuiltInLengthTerm_StringSubstringTwoArgumentUsesRequestedLength()
+        {
+            var context = CreateExpressionContext(
+                "string text, int start, int length",
+                "text.Substring(start, length).Length == length");
+            var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context.LoweringContext, out var term),
+                Is.True);
+
+            Assert.That(term, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(((SymbolicVariableTerm)term).Name, Does.StartWith("length#"));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
         public void StringContentReferenceHelper_CreatesReferenceBackedStringTerm()
         {
             var reference = new SymbolicVariableTerm("text#1", SmtValueKind.Reference);

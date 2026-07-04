@@ -96,6 +96,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicIrLowerer.TryLowerBuiltInLengthTerm`; reachability and
   runtime-hazard element-access checks no longer carry duplicate length-term
   branches.
+- String `Substring(start).Length` and `Substring(start, length).Length` now
+  lower through the IR indexing partial as integer terms before formula
+  fallback. The remaining built-in-length shim is still carrying other
+  domains such as range/slice and count-backed collection lengths.
 - Array-creation dimension lengths such as `new T[rows, columns].GetLength(1)`
   now lower the requested dimension directly to the corresponding size
   expression in `SymbolicIrLowerer.Indexing`, reducing reliance on

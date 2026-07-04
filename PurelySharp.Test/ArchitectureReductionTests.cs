@@ -1428,6 +1428,7 @@ namespace PurelySharp.Test
                 "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(lowererSource, Does.Contain("public static bool TryLowerBuiltInLengthTerm("));
+            Assert.That(lowererSource, Does.Contain("TryLowerStringInvocationResultLengthTerm("));
             Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
             Assert.That(lowererSource, Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
             Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));

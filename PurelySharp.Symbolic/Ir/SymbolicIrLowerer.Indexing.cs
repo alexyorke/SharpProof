@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Ir
@@ -498,6 +499,11 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             expression = UnwrapExpression(expression);
+            if (TryLowerStringInvocationResultLengthTerm(expression, context, out term))
+            {
+                return true;
+            }
+
             var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).ConvertedType ??
                 context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
             if (type?.SpecialType == SpecialType.System_String)
@@ -523,6 +529,61 @@ namespace PurelySharp.Symbolic.Ir
 
             term = null!;
             return false;
+        }
+
+        private static bool TryLowerStringInvocationResultLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.ReturnType.SpecialType != SpecialType.System_String ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
+            {
+                return false;
+            }
+
+            if (!string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (method.Parameters.Length == 1)
+            {
+                if (invocationOperation.Arguments.Length != 1 ||
+                    !TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
+                    !TryLowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ?? invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax ?? invocationExpression.ArgumentList.Arguments[0].Expression, context, out var start) ||
+                    start.Kind != SmtValueKind.Int)
+                {
+                    return false;
+                }
+
+                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
+                return true;
+            }
+
+            if (method.Parameters.Length != 2 ||
+                invocationOperation.Arguments.Length != 2 ||
+                !TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
+                !TryLowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ?? invocationExpression.ArgumentList.Arguments[0].Expression, context, out var startValue) ||
+                startValue.Kind != SmtValueKind.Int ||
+                !TryLowerTerm(invocationOperation.Arguments[1].Syntax as ExpressionSyntax ?? invocationExpression.ArgumentList.Arguments[1].Expression, context, out var countValue) ||
+                countValue.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            term = countValue;
+            return true;
         }
     }
 }
