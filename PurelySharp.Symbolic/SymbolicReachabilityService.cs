@@ -2690,6 +2690,11 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
+            if (TryTranslateIrNullLikeNullableValueParts(expression, context, out parts))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryTranslateIrNullableCoalesceValueParts(coalesceExpression, context, out parts))
@@ -2709,6 +2714,50 @@ namespace PurelySharp.Symbolic
             }
 
             parts = default;
+            return false;
+        }
+
+        private static bool TryTranslateIrNullLikeNullableValueParts(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out NullableValueParts parts)
+        {
+            parts = default;
+            var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+            var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
+                !TryCreateIrDefaultUnderlyingValueFormula(underlyingType, out var defaultValue))
+            {
+                return false;
+            }
+
+            var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+            if (constant is not { HasValue: true, Value: null } &&
+                !expression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+                expression is not DefaultExpressionSyntax)
+            {
+                return false;
+            }
+
+            parts = new NullableValueParts(new SmtBooleanConstant(false), defaultValue);
+            return true;
+        }
+
+        private static bool TryCreateIrDefaultUnderlyingValueFormula(ITypeSymbol underlyingType, out SmtFormula formula)
+        {
+            if (underlyingType.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtBooleanConstant(false);
+                return true;
+            }
+
+            if (SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(underlyingType))
+            {
+                formula = new SmtIntegerConstant(0);
+                return true;
+            }
+
+            formula = null!;
             return false;
         }
 

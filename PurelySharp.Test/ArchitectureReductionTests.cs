@@ -3842,11 +3842,13 @@ namespace PurelySharp.Test
             Assert.That(helperSource, Does.Contain("TryTranslateIrNullableCoalesceValueParts("));
             Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalValueParts("));
             Assert.That(helperSource, Does.Contain("TryTranslateIrNullableWrappedValueParts("));
+            Assert.That(helperSource, Does.Contain("TryTranslateIrNullLikeNullableValueParts("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm"));
             Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm)"));
             Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm("));
             Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(true)"));
+            Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(false)"));
         }
 
         [Test]
