@@ -168,6 +168,42 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void KnownApiLowering_StaticStringEqualsUsesSharedEqualityFacts()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "string.Equals(left, right)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_StaticStringEqualsOrdinalUsesSharedEqualityFacts()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "string.Equals(left, right, System.StringComparison.Ordinal)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
+        public void KnownApiLowering_StaticStringEqualsIgnoreCaseStaysOnLegacyPath()
+        {
+            var context = CreateExpressionContext(
+                "string left, string right",
+                "string.Equals(left, right, System.StringComparison.OrdinalIgnoreCase)");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
+        }
+
+        [Test]
         public void KnownApiLowering_RegexIsMatchEmitsDeclarativeRegexPredicate()
         {
             var context = CreateExpressionContext(

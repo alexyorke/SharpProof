@@ -16,6 +16,7 @@ namespace PurelySharp.Symbolic.Ir
                 new KnownApiLoweringDescriptor("string", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrEmpty), TryLowerStringNullOrPredicateInvocation),
                 new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrWhiteSpace), TryLowerStringNullOrPredicateInvocation),
+                new KnownApiLoweringDescriptor("string", nameof(string.Equals), TryLowerStringEqualsInvocation),
                 new KnownApiLoweringDescriptor("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch), TryLowerRegexIsMatchInvocation));
 
         public static bool TryLowerCondition(
@@ -106,11 +107,38 @@ namespace PurelySharp.Symbolic.Ir
             SymbolicLoweringContext context,
             out SymbolicCondition condition)
         {
+            if (!TryCreateStringEqualityCondition(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    binaryExpression,
+                    context,
+                    "ir.string.equality",
+                    out condition))
+            {
+                return false;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))
+            {
+                condition = new SymbolicNotCondition(condition);
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateStringEqualityCondition(
+            ExpressionSyntax leftExpression,
+            ExpressionSyntax rightExpression,
+            SyntaxNode sourceNode,
+            SymbolicLoweringContext context,
+            string provenancePrefix,
+            out SymbolicCondition condition)
+        {
             condition = null!;
-            if (!IsStringExpression(binaryExpression.Left, context) ||
-                !IsStringExpression(binaryExpression.Right, context) ||
-                !TryLowerStringTerm(binaryExpression.Left, context, out var leftValue) ||
-                !TryLowerStringTerm(binaryExpression.Right, context, out var rightValue))
+            if (!IsStringExpression(leftExpression, context) ||
+                !IsStringExpression(rightExpression, context) ||
+                !TryLowerStringTerm(leftExpression, context, out var leftValue) ||
+                !TryLowerStringTerm(rightExpression, context, out var rightValue))
             {
                 return false;
             }
@@ -119,11 +147,11 @@ namespace PurelySharp.Symbolic.Ir
                 SymbolicRelationOperator.Equal,
                 leftValue,
                 rightValue,
-                binaryExpression,
-                "ir.string.equality.value");
-            if (TryLowerTerm(binaryExpression.Left, context, out var leftReference) &&
+                sourceNode,
+                provenancePrefix + ".value");
+            if (TryLowerTerm(leftExpression, context, out var leftReference) &&
                 leftReference.Kind == SmtValueKind.Reference &&
-                TryLowerTerm(binaryExpression.Right, context, out var rightReference) &&
+                TryLowerTerm(rightExpression, context, out var rightReference) &&
                 rightReference.Kind == SmtValueKind.Reference)
             {
                 var bothNull = new SymbolicBinaryCondition(
@@ -132,65 +160,68 @@ namespace PurelySharp.Symbolic.Ir
                         SymbolicRelationOperator.Equal,
                         leftReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Left,
-                        "ir.string.equality.left-null"),
+                        leftExpression,
+                        provenancePrefix + ".left-null"),
                     CreateRelationCondition(
                         SymbolicRelationOperator.Equal,
                         rightReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Right,
-                        "ir.string.equality.right-null"));
+                        rightExpression,
+                        provenancePrefix + ".right-null"));
                 var bothNonNull = new SymbolicBinaryCondition(
                     SymbolicConditionOperator.And,
                     CreateRelationCondition(
                         SymbolicRelationOperator.NotEqual,
                         leftReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Left,
-                        "ir.string.equality.left-not-null"),
+                        leftExpression,
+                        provenancePrefix + ".left-not-null"),
                     CreateRelationCondition(
                         SymbolicRelationOperator.NotEqual,
                         rightReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Right,
-                        "ir.string.equality.right-not-null"));
-                valuesEqual = new SymbolicBinaryCondition(
+                        rightExpression,
+                        provenancePrefix + ".right-not-null"));
+                condition = new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
                     bothNull,
                     new SymbolicBinaryCondition(SymbolicConditionOperator.And, bothNonNull, valuesEqual));
+                return true;
             }
-            else if (TryLowerTerm(binaryExpression.Left, context, out leftReference) &&
-                     leftReference.Kind == SmtValueKind.Reference &&
-                     rightValue is SymbolicStringConstantTerm)
+
+            if (TryLowerTerm(leftExpression, context, out leftReference) &&
+                leftReference.Kind == SmtValueKind.Reference &&
+                rightValue is SymbolicStringConstantTerm)
             {
-                valuesEqual = new SymbolicBinaryCondition(
+                condition = new SymbolicBinaryCondition(
                     SymbolicConditionOperator.And,
                     CreateRelationCondition(
                         SymbolicRelationOperator.NotEqual,
                         leftReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Left,
-                        "ir.string.equality.left-not-null"),
+                        leftExpression,
+                        provenancePrefix + ".left-not-null"),
                     valuesEqual);
+                return true;
             }
-            else if (TryLowerTerm(binaryExpression.Right, context, out rightReference) &&
-                     rightReference.Kind == SmtValueKind.Reference &&
-                     leftValue is SymbolicStringConstantTerm)
+
+            if (TryLowerTerm(rightExpression, context, out rightReference) &&
+                rightReference.Kind == SmtValueKind.Reference &&
+                leftValue is SymbolicStringConstantTerm)
             {
-                valuesEqual = new SymbolicBinaryCondition(
+                condition = new SymbolicBinaryCondition(
                     SymbolicConditionOperator.And,
                     CreateRelationCondition(
                         SymbolicRelationOperator.NotEqual,
                         rightReference,
                         new SymbolicNullTerm(),
-                        binaryExpression.Right,
-                        "ir.string.equality.right-not-null"),
+                        rightExpression,
+                        provenancePrefix + ".right-not-null"),
                     valuesEqual);
+                return true;
             }
 
-            condition = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
-                ? valuesEqual
-                : new SymbolicNotCondition(valuesEqual);
+            condition = valuesEqual;
             return true;
         }
 

@@ -495,6 +495,38 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_StaticStringEqualsNullGuardUsesIrPrecondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        string? other = null;
+        if (string.Equals(value, other))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.Length;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.null-dereference");
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesWithExpressionNullReceiverDereference()
         {
             const string source = @"

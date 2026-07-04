@@ -104,6 +104,37 @@ namespace PurelySharp.Symbolic.Ir
             return true;
         }
 
+        private static bool TryLowerStringEqualsInvocation(
+            InvocationExpressionSyntax invocation,
+            IMethodSymbol method,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!method.IsStatic ||
+                invocation.ArgumentList.Arguments.Count is not 2 and not 3 ||
+                method.Parameters.Length != invocation.ArgumentList.Arguments.Count ||
+                method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
+                method.Parameters[1].Type.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            if (invocation.ArgumentList.Arguments.Count == 3 &&
+                !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[2].Expression, context))
+            {
+                return false;
+            }
+
+            return TryCreateStringEqualityCondition(
+                invocation.ArgumentList.Arguments[0].Expression,
+                invocation.ArgumentList.Arguments[1].Expression,
+                invocation,
+                context,
+                "ir.known-api.string.equals",
+                out condition);
+        }
+
         private static bool TryLowerStringNullOrPredicateInvocation(
             InvocationExpressionSyntax invocation,
             IMethodSymbol method,
@@ -433,6 +464,23 @@ namespace PurelySharp.Symbolic.Ir
 
             return (options & RegexOptions.IgnoreCase) == 0 ||
                 (options & RegexOptions.CultureInvariant) != 0;
+        }
+
+        private static bool IsOrdinalStringComparisonArgument(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context)
+        {
+            var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
+            if (!string.Equals(type?.ToDisplayString(), "System.StringComparison", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+            return constantValue.HasValue &&
+                constantValue.Value != null &&
+                TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
+                rawComparison == (int)StringComparison.Ordinal;
         }
 
         private static bool IsStringExpression(
