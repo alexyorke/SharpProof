@@ -96,6 +96,7 @@ namespace PurelySharp.Symbolic.Ir
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
                 (TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerTypePatternCondition(isPatternExpression, context, out condition)))
             {
                 return true;
@@ -213,6 +214,80 @@ namespace PurelySharp.Symbolic.Ir
 
             constantExpression = null!;
             return false;
+        }
+
+        private static bool TryLowerRelationalPatternCondition(
+            IsPatternExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerRelationalPattern(expression.Pattern, out var operatorKind, out var relationalExpression, out var negate) ||
+                !TryGetRelationalPatternOperator(operatorKind, negate, out var relationOperator) ||
+                !TryLowerTerm(expression.Expression, context, out var value) ||
+                value.Kind != SmtValueKind.Int ||
+                !TryLowerTerm(relationalExpression, context, out var relationalValue) ||
+                relationalValue.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            condition = CreateRelationCondition(
+                relationOperator,
+                value,
+                relationalValue,
+                expression,
+                "ir.pattern.relational");
+            return true;
+        }
+
+        private static bool TryLowerRelationalPattern(
+            PatternSyntax pattern,
+            out SyntaxKind operatorKind,
+            out ExpressionSyntax relationalExpression,
+            out bool negate)
+        {
+            pattern = UnwrapPattern(pattern);
+            negate = false;
+
+            if (pattern is RelationalPatternSyntax relationalPattern)
+            {
+                operatorKind = relationalPattern.OperatorToken.Kind();
+                relationalExpression = relationalPattern.Expression;
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryLowerRelationalPattern(unaryPattern.Pattern, out operatorKind, out relationalExpression, out var nestedNegate))
+            {
+                negate = !nestedNegate;
+                return true;
+            }
+
+            operatorKind = default;
+            relationalExpression = null!;
+            return false;
+        }
+
+        private static bool TryGetRelationalPatternOperator(
+            SyntaxKind operatorKind,
+            bool negate,
+            out SymbolicRelationOperator relationOperator)
+        {
+            relationOperator = operatorKind switch
+            {
+                SyntaxKind.GreaterThanToken => negate ? SymbolicRelationOperator.LessThanOrEqual : SymbolicRelationOperator.GreaterThan,
+                SyntaxKind.GreaterThanEqualsToken => negate ? SymbolicRelationOperator.LessThan : SymbolicRelationOperator.GreaterThanOrEqual,
+                SyntaxKind.LessThanToken => negate ? SymbolicRelationOperator.GreaterThanOrEqual : SymbolicRelationOperator.LessThan,
+                SyntaxKind.LessThanEqualsToken => negate ? SymbolicRelationOperator.GreaterThan : SymbolicRelationOperator.LessThanOrEqual,
+                _ => default,
+            };
+            return operatorKind is
+                SyntaxKind.GreaterThanToken or
+                SyntaxKind.GreaterThanEqualsToken or
+                SyntaxKind.LessThanToken or
+                SyntaxKind.LessThanEqualsToken;
         }
 
         private static bool TryLowerTypePatternCondition(

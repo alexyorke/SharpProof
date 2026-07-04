@@ -247,6 +247,41 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_RelationalPatternUsesSharedRelation()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is > 42");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
+            Assert.That(CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None, out var legacyFormula), Is.True);
+            Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        }
+
+        [Test]
+        public void LowerCondition_NegatedRelationalPatternInvertsRelation()
+        {
+            var context = CreateExpressionContext(
+                "int value",
+                "value is not >= 42");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
+
+            Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.LessThan));
+            Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
+            Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+            Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
+        }
+
+        [Test]
         public void KnownApiLowering_StringStartsWithEmitsDeclarativeStringPredicate()
         {
             var context = CreateExpressionContext(
