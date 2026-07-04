@@ -77,6 +77,43 @@ namespace PurelySharp.Symbolic
             return new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);
         }
 
+        internal static bool TryEncodeTermWithPathState(
+            SymbolicTerm term,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            out SmtFormula formula)
+        {
+            if (term == null)
+            {
+                throw new ArgumentNullException(nameof(term));
+            }
+
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            if (sourceNode == null)
+            {
+                throw new ArgumentNullException(nameof(sourceNode));
+            }
+
+            state = NormalizeState(state);
+            if (state.IsContradictory)
+            {
+                return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
+            }
+
+            var proofService = new SymbolicProofService(smtAnalysis: null);
+            if (!HasSafeIntegerDivisors(term, state, sourceNode, proofService))
+            {
+                formula = null!;
+                return false;
+            }
+
+            return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
+        }
+
         internal static SymbolicState CreateStateFromFormulaPath(
             IEnumerable<SmtFormula> pathConditions,
             SyntaxNode sourceNode)
@@ -123,6 +160,142 @@ namespace PurelySharp.Symbolic
             }
 
             return true;
+        }
+
+        private static bool HasSafeIntegerDivisors(
+            SymbolicTerm term,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            SymbolicProofService proofService)
+        {
+            switch (term)
+            {
+                case SymbolicConditionalTerm conditional:
+                    return HasSafeIntegerDivisors(conditional.Condition, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(conditional.WhenTrue, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(conditional.WhenFalse, state, sourceNode, proofService);
+                case SymbolicBinaryTerm binary:
+                    return HasSafeIntegerDivisors(binary.Left, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(binary.Right, state, sourceNode, proofService) &&
+                        (binary.Operator is not (SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) ||
+                         IsTermProvablyNonZero(binary.Right, state, sourceNode, proofService));
+                case SymbolicMemberTerm member:
+                    return HasSafeIntegerDivisors(member.Receiver, state, sourceNode, proofService);
+                case SymbolicElementTerm element:
+                    return HasSafeIntegerDivisors(element.Receiver, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(element.Index, state, sourceNode, proofService);
+                case SymbolicStringContentTerm stringContent:
+                    return HasSafeIntegerDivisors(stringContent.Reference, state, sourceNode, proofService);
+                case SymbolicStringConcatTerm stringConcat:
+                    return HasSafeIntegerDivisors(stringConcat.Left, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(stringConcat.Right, state, sourceNode, proofService);
+                case SymbolicLengthTerm length:
+                    return HasSafeIntegerDivisors(length.Value, state, sourceNode, proofService);
+                case SymbolicArrayDimensionLengthTerm arrayLength:
+                    return HasSafeIntegerDivisors(arrayLength.Value, state, sourceNode, proofService);
+                case SymbolicCountTerm count:
+                    return HasSafeIntegerDivisors(count.Value, state, sourceNode, proofService);
+                default:
+                    return true;
+            }
+        }
+
+        private static bool HasSafeIntegerDivisors(
+            SymbolicCondition condition,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            SymbolicProofService proofService)
+        {
+            switch (condition)
+            {
+                case SymbolicFactCondition factCondition:
+                    return HasSafeIntegerDivisors(factCondition.Fact, state, sourceNode, proofService);
+                case SymbolicNotCondition notCondition:
+                    return HasSafeIntegerDivisors(notCondition.Operand, state, sourceNode, proofService);
+                case SymbolicBinaryCondition binaryCondition:
+                    return HasSafeIntegerDivisors(binaryCondition.Left, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(binaryCondition.Right, state, sourceNode, proofService);
+                default:
+                    return true;
+            }
+        }
+
+        private static bool HasSafeIntegerDivisors(
+            SymbolicFact fact,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            SymbolicProofService proofService)
+        {
+            return HasSafeIntegerDivisors(fact.Atom, state, sourceNode, proofService);
+        }
+
+        private static bool HasSafeIntegerDivisors(
+            SymbolicAtom atom,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            SymbolicProofService proofService)
+        {
+            switch (atom)
+            {
+                case SymbolicTruthAtom truth:
+                    return HasSafeIntegerDivisors(truth.Condition, state, sourceNode, proofService);
+                case SymbolicRelationAtom relation:
+                    return HasSafeIntegerDivisors(relation.Left, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(relation.Right, state, sourceNode, proofService);
+                case SymbolicStringPredicateAtom predicate:
+                    return HasSafeIntegerDivisors(predicate.Value, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(predicate.Argument, state, sourceNode, proofService);
+                case SymbolicBoundsAtom bounds:
+                    return HasSafeIntegerDivisors(bounds.Index, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(bounds.Length, state, sourceNode, proofService);
+                case SymbolicFreshnessAtom freshness:
+                    return HasSafeIntegerDivisors(freshness.Value, state, sourceNode, proofService);
+                case SymbolicOwnershipAtom ownership:
+                    return HasSafeIntegerDivisors(ownership.Value, state, sourceNode, proofService);
+                case SymbolicAliasAtom alias:
+                    return HasSafeIntegerDivisors(alias.Source, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(alias.Target, state, sourceNode, proofService);
+                case SymbolicBorrowAtom borrow:
+                    return HasSafeIntegerDivisors(borrow.Owner, state, sourceNode, proofService) &&
+                        HasSafeIntegerDivisors(borrow.Borrow, state, sourceNode, proofService);
+                case SymbolicEscapeAtom escape:
+                    return HasSafeIntegerDivisors(escape.Value, state, sourceNode, proofService);
+                case SymbolicReturnedOwnershipAtom returnedOwnership:
+                    return HasSafeIntegerDivisors(returnedOwnership.Value, state, sourceNode, proofService);
+                case SymbolicMutationAtom mutation:
+                    return HasSafeIntegerDivisors(mutation.Target, state, sourceNode, proofService);
+                case SymbolicDisposalAtom disposal:
+                    return HasSafeIntegerDivisors(disposal.Resource, state, sourceNode, proofService);
+                case SymbolicResourceLifetimeAtom lifetime:
+                    return HasSafeIntegerDivisors(lifetime.Resource, state, sourceNode, proofService);
+                case SymbolicTypeTestAtom typeTest:
+                    return HasSafeIntegerDivisors(typeTest.Value, state, sourceNode, proofService);
+                case SymbolicExceptionPreconditionAtom precondition:
+                    return (precondition.Subject == null ||
+                            HasSafeIntegerDivisors(precondition.Subject, state, sourceNode, proofService)) &&
+                        HasSafeIntegerDivisors(precondition.Trigger, state, sourceNode, proofService);
+                default:
+                    return true;
+            }
+        }
+
+        private static bool IsTermProvablyNonZero(
+            SymbolicTerm term,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            SymbolicProofService proofService)
+        {
+            if (term is SymbolicIntegerConstantTerm integerConstant)
+            {
+                return integerConstant.Value != 0;
+            }
+
+            var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
+                term,
+                sourceNode,
+                "ir.safe-divisor.zero");
+            var proof = proofService.ClassifyConditionTruth(state, zeroCondition);
+            return proof.Info.Status == SymbolicProofStatus.ProvenFalse;
         }
 
         internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFirst(

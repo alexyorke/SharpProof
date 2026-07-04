@@ -104,11 +104,13 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeStatePathConditions(SymbolicState state, out ImmutableArray<SmtFormula> pathConditions)"));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryEncodeTermWithPathState("));
             Assert.That(proofServiceSource, Does.Contain("new SymbolicProofService(smtAnalysis: null).TryEncode(state, out pathConditions);"));
             Assert.That(proofServiceSource, Does.Contain("internal static SymbolicState CreateStateFromFormulaPath("));
             Assert.That(proofServiceSource, Does.Contain("internal static bool TryCreateStateFromFormulaPath("));
             Assert.That(proofServiceSource, Does.Contain("\"legacy_path_condition\""));
             Assert.That(proofServiceSource, Does.Contain("\"legacy-path-condition\""));
+            Assert.That(proofServiceSource, Does.Contain("private static bool IsTermProvablyNonZero("));
             Assert.That(proofServiceSource, Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
             Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
             Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
@@ -2060,13 +2062,13 @@ namespace PurelySharp.Test
                     static family => family.GetProperty("count").GetInt32(),
                     StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(7));
-            Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(5));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(6));
+            Assert.That(root.GetProperty("symbolicTranslatorShimFamilyCount").GetInt32(), Is.EqualTo(4));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 7,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 6,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2078,7 +2080,6 @@ namespace PurelySharp.Test
                     ["return CSharpSmtFormulaTranslator.TryCollectDomainFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryCollectPatternBindingFacts("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslatePattern("] = 1,
-                    ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                 }));
             Assert.That(
                 symbolicTranslatorShimFamilyCounts,
@@ -2086,7 +2087,6 @@ namespace PurelySharp.Test
                 {
                     ["branch-facts"] = 2,
                     ["condition"] = 1,
-                    ["path-fact-value"] = 1,
                     ["pattern"] = 2,
                     ["value"] = 1,
                 }));
@@ -5546,6 +5546,91 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_TranslatesDivisionValueWithLoweredNonZeroPathFacts()
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                """
+                public class TestClass
+                {
+                    public int TestMethod(int dividend, int divisor)
+                    {
+                        if (divisor != 0)
+                        {
+                            return dividend / divisor;
+                        }
+
+                        return 0;
+                    }
+                }
+                """);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilitySafeDivision",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var ifStatement = tree.GetRoot().DescendantNodes().OfType<IfStatementSyntax>().Single();
+            var divisionExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<BinaryExpressionSyntax>()
+                .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
+
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateConditionFormula(
+                    ifStatement.Condition,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateValueWithPathFacts(
+                    divisionExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    new[] { guardFormula! },
+                    out var translatedFormula),
+                Is.True);
+            Assert.That(translatedFormula, Is.TypeOf<SmtIntegerBinaryTerm>());
+            Assert.That(((SmtIntegerBinaryTerm)translatedFormula!).Operator, Is.EqualTo(SmtIntegerBinaryOperator.Divide));
+        }
+
+        [Test]
+        public void SymbolicReachabilityService_DoesNotTranslateDivisionValueWithoutNonZeroPathFacts()
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                """
+                public class TestClass
+                {
+                    public int TestMethod(int dividend, int divisor)
+                    {
+                        return dividend / divisor;
+                    }
+                }
+                """);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicReachabilityUnsafeDivision",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var divisionExpression = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<BinaryExpressionSyntax>()
+                .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
+
+            Assert.That(
+                SymbolicReachabilityService.TryTranslateValueWithPathFacts(
+                    divisionExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    Array.Empty<SmtFormula>(),
+                    out var translatedFormula),
+                Is.False);
+            Assert.That(translatedFormula, Is.Null);
+        }
+
+        [Test]
         public void SymbolicReachabilityService_TriesIrBranchFactsBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -5667,6 +5752,7 @@ namespace PurelySharp.Test
             Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
             Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(legacyIndex, Is.GreaterThan(irIndex));
+            Assert.That(helperSource, Does.Contain("!ContainsDivisionOrModulo(condition)"));
             Assert.That(helperSource, Does.Contain("formula = encodedFormula;"));
             Assert.That(helperSource, Does.Contain("return true;"));
         }
@@ -5722,12 +5808,14 @@ namespace PurelySharp.Test
             Assert.That(
                 untypedValueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
                 Is.LessThan(untypedValueHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal)));
-            Assert.That(valueWithPathFactsHelperSource, Does.Contain("pathFactArray.Length == 0"));
             Assert.That(valueWithPathFactsHelperSource, Does.Contain("TryTranslateValue("));
-            Assert.That(valueWithPathFactsHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("pathFactArray.Length != 0"));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("SymbolicProofService.CreateStateFromFormulaPath(pathFactArray, expression)"));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("SymbolicProofService.TryEncodeTermWithPathState("));
+            Assert.That(valueWithPathFactsHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));
             Assert.That(
-                valueWithPathFactsHelperSource.IndexOf("pathFactArray.Length == 0", StringComparison.Ordinal),
-                Is.LessThan(valueWithPathFactsHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(", StringComparison.Ordinal)));
+                valueWithPathFactsHelperSource.IndexOf("TryTranslateValue(", StringComparison.Ordinal),
+                Is.LessThan(valueWithPathFactsHelperSource.IndexOf("SymbolicProofService.TryEncodeTermWithPathState(", StringComparison.Ordinal)));
             Assert.That(comparableHelperSource, Does.Contain("TryTranslateValue("));
             Assert.That(comparableHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(lengthHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression"));

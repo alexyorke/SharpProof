@@ -33,12 +33,12 @@ path-fact, hazard, and ownership flows.
   switch/path-fact compatibility, and path-fact compatibility paths. Public
   source-query condition proof now delegates formula fallback through
   reachability instead of calling translator shims directly. The inventory
-  currently reports 0 analyzer-side and 7 symbolic-side
+  currently reports 0 analyzer-side and 6 symbolic-side
   `CSharpSmtFormulaTranslator` shim usages that should burn
   down as IR lowerings replace formula-first compatibility.
-  The hotspot inventory now also groups those 7 reachability shims into 5
+  The hotspot inventory now also groups those 6 reachability shims into 4
   seam families: 2 branch-fact shims, 2 pattern shims, 1 condition shim,
-  1 value shim, and 1 path-fact-aware value shim.
+  and 1 value shim.
   Pattern translation now also tries lowering the incoming SMT value back to a
   `SymbolicTerm` and routes supported non-binding pattern conditions through
   `SymbolicIrLowerer.TryLowerPatternCondition` before the legacy translator
@@ -105,6 +105,11 @@ path-fact, hazard, and ownership flows.
   `SymbolicProofService` helpers for condition truth, formula-path
   feasibility, and branch-condition truth, with reachability remaining only as
   the facade layer for callers.
+  Path-fact-aware value translation now also uses
+  `SymbolicProofService.TryEncodeTermWithPathState` to prove non-zero divisors
+  from lowered path state before encoding divide or remainder terms, so the
+  old reachability-side `TryTranslateValueWithPathFacts` translator shim is
+  gone.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
   triggers before formula-backed compatibility. The fallback inventory count

@@ -1142,7 +1142,8 @@ namespace PurelySharp.Symbolic
             int inlineDepth = 0)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+            if (!ContainsDivisionOrModulo(condition) &&
+                SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
                 SymbolicIrFormulaEncoder.TryEncode(symbolicCondition, out var encodedFormula))
             {
                 formula = encodedFormula;
@@ -1805,8 +1806,7 @@ namespace PurelySharp.Symbolic
                 ? Array.Empty<SmtFormula>()
                 : pathFacts as SmtFormula[] ?? pathFacts.ToArray();
 
-            if (pathFactArray.Length == 0 &&
-                TryTranslateValue(
+            if (TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
@@ -1819,14 +1819,23 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(
-                expression,
-                semanticModel,
-                cancellationToken,
-                pathFactArray,
-                out formula,
-                getSymbolVersion,
-                inlineDepth);
+            if (pathFactArray.Length != 0)
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+                if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+                    SymbolicProofService.TryEncodeTermWithPathState(
+                        term,
+                        SymbolicProofService.CreateStateFromFormulaPath(pathFactArray, expression),
+                        expression,
+                        out var encodedFormula))
+                {
+                    formula = encodedFormula;
+                    return true;
+                }
+            }
+
+            formula = null;
+            return false;
         }
 
         private static bool TryTranslateComparableValue(
