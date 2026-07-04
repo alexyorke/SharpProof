@@ -2227,7 +2227,6 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     out var valueNonNullFormula,
                     getSymbolVersion,
-                    inlineDepth: 0,
                     requireLocalOrParameterSource: true))
             {
                 return false;
@@ -2245,27 +2244,14 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula,
             Func<ISymbol, int>? getSymbolVersion = null,
-            int inlineDepth = 0,
             bool requireLocalOrParameterSource = false)
         {
-            if (TryCreateIrNotNullIfNotNullResultNonNullFormula(
-                    resultExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion,
-                    requireLocalOrParameterSource))
-            {
-                return true;
-            }
-
-            return CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula(
+            return TryCreateIrNotNullIfNotNullResultNonNullFormula(
                 resultExpression,
                 semanticModel,
                 cancellationToken,
                 out formula,
                 getSymbolVersion,
-                inlineDepth,
                 requireLocalOrParameterSource);
         }
 
