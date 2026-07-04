@@ -3696,6 +3696,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicStringContentTerm("));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
+            Assert.That(source, Does.Contain("new SymbolicArrayDimensionLengthTerm("));
+            Assert.That(source, Does.Contain("TryCreateArrayDimensionLengthTerm("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));

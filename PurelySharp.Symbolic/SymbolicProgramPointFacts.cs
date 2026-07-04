@@ -9358,6 +9358,14 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            if (TryCreateSymbolTerm(symbol, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                TryCreateArrayDimensionLengthTerm(receiver, arrayType, dimension, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            {
+                return true;
+            }
+
             return SymbolicFactFactory.TryCreateArrayDimensionLengthFormula(
                 SymbolicFactFactory.GetSmtVariableName(symbol),
                 arrayType,
@@ -9429,11 +9437,36 @@ namespace PurelySharp.Symbolic
             int dimension,
             out SmtFormula formula)
         {
+            if (SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
+                receiver.Kind == SmtValueKind.Reference &&
+                TryCreateArrayDimensionLengthTerm(receiver, arrayType, dimension, out var lengthTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(lengthTerm, out formula))
+            {
+                return true;
+            }
+
             return SymbolicFactFactory.TryCreateArrayDimensionLengthFormulaForReference(
                 receiverFormula,
                 arrayType,
                 dimension,
                 out formula);
+        }
+
+        private static bool TryCreateArrayDimensionLengthTerm(
+            SymbolicTerm receiver,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            out SymbolicTerm term)
+        {
+            if (dimension < 0 ||
+                dimension >= arrayType.Rank)
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicArrayDimensionLengthTerm(receiver, dimension);
+            return true;
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(
