@@ -1745,6 +1745,25 @@ namespace PurelySharp.Symbolic
             return formula != null;
         }
 
+        internal static bool TryTranslateValueWithPathFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            IEnumerable<SmtFormula>? pathFacts,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(
+                expression,
+                semanticModel,
+                cancellationToken,
+                pathFacts,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
         private static bool TryTranslateComparableValue(
             ExpressionSyntax expression,
             SmtFormula targetFormula,

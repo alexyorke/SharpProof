@@ -7786,7 +7786,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(
+            if (SymbolicReachabilityService.TryTranslateValueWithPathFacts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
