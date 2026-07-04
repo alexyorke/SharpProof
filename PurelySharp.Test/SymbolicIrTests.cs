@@ -44,6 +44,20 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerCondition_IdentityPreservingAsValueMatchesLegacyTranslator()
+        {
+            var context = CreateExpressionContext(
+                "string text",
+                "(text as object) == text");
+
+            Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
+            Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
+            Assert.That(CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None, out var legacyFormula), Is.True);
+
+            Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        }
+
+        [Test]
         public void LowerCondition_StringLiteralEqualityEmitsNullSafeContentFacts()
         {
             var context = CreateExpressionContext(

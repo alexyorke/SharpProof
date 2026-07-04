@@ -809,6 +809,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax asExpression &&
+                asExpression.IsKind(SyntaxKind.AsExpression) &&
+                TryLowerIdentityPreservingAsTerm(asExpression, context, out term))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binary &&
                 TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
                 TryLowerTerm(binary.Left, context, out var left) &&
@@ -836,6 +843,67 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             term = null!;
+            return false;
+        }
+
+        private static bool TryLowerIdentityPreservingAsTerm(
+            BinaryExpressionSyntax asExpression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
+                !IsIdentityPreservingReferenceConversion(asExpression.Left, targetTypeSyntax, context) ||
+                !TryLowerTerm(asExpression.Left, context, out var operand) ||
+                operand.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            term = operand;
+            return true;
+        }
+
+        private static bool IsIdentityPreservingReferenceConversion(
+            ExpressionSyntax expression,
+            TypeSyntax targetTypeSyntax,
+            SymbolicLoweringContext context)
+        {
+            var sourceType = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
+            var targetType = context.SemanticModel.GetTypeInfo(targetTypeSyntax, context.CancellationToken).Type;
+            if (sourceType == null ||
+                targetType == null ||
+                !sourceType.IsReferenceType ||
+                !targetType.IsReferenceType)
+            {
+                return false;
+            }
+
+            if (SymbolEqualityComparer.Default.Equals(sourceType, targetType) ||
+                targetType.SpecialType == SpecialType.System_Object)
+            {
+                return true;
+            }
+
+            if (sourceType is INamedTypeSymbol sourceNamedType)
+            {
+                for (var current = sourceNamedType.BaseType; current != null; current = current.BaseType)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(current, targetType))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            foreach (var candidate in sourceType.AllInterfaces)
+            {
+                if (SymbolEqualityComparer.Default.Equals(candidate, targetType))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
