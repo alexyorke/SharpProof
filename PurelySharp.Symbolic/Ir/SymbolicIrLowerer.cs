@@ -99,7 +99,8 @@ namespace PurelySharp.Symbolic.Ir
                     TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
                     TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
-                    TryLowerTypePatternCondition(isPatternExpression, context, out condition)))
+                    TryLowerTypePatternCondition(isPatternExpression, context, out condition) ||
+                    TryLowerUnaryPatternCondition(isPatternExpression.Expression, isPatternExpression.Pattern, context, out condition)))
             {
                 return true;
             }
@@ -141,7 +142,8 @@ namespace PurelySharp.Symbolic.Ir
                 TryLowerConstantPatternCondition(expression, pattern, sourceNode, context, out condition) ||
                 TryLowerRelationalPatternCondition(expression, pattern, sourceNode, context, out condition) ||
                 TryLowerEmptyRecursivePatternCondition(expression, pattern, sourceNode, context, out condition) ||
-                TryLowerTypePatternCondition(expression, pattern, sourceNode, context, out condition);
+                TryLowerTypePatternCondition(expression, pattern, sourceNode, context, out condition) ||
+                TryLowerUnaryPatternCondition(expression, pattern, context, out condition);
         }
 
         private static bool TryLowerBinaryPatternCondition(
@@ -171,6 +173,24 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             return false;
+        }
+
+        private static bool TryLowerUnaryPatternCondition(
+            ExpressionSyntax expression,
+            PatternSyntax pattern,
+            SymbolicLoweringContext context,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (UnwrapPattern(pattern) is not UnaryPatternSyntax unaryPattern ||
+                !unaryPattern.IsKind(SyntaxKind.NotPattern) ||
+                !TryLowerPatternCondition(expression, unaryPattern.Pattern, unaryPattern.Pattern, context, out var operand))
+            {
+                return false;
+            }
+
+            condition = new SymbolicNotCondition(operand);
+            return true;
         }
 
         private static bool TryLowerNullPatternCondition(
