@@ -1755,11 +1755,29 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
+            var pathFactArray = pathFacts == null
+                ? Array.Empty<SmtFormula>()
+                : pathFacts as SmtFormula[] ?? pathFacts.ToArray();
+
+            if (pathFactArray.Length == 0 &&
+                TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var irFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                irFormula != null)
+            {
+                formula = irFormula;
+                return true;
+            }
+
             return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(
                 expression,
                 semanticModel,
                 cancellationToken,
-                pathFacts,
+                pathFactArray,
                 out formula,
                 getSymbolVersion,
                 inlineDepth);

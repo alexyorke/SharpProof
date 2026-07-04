@@ -2396,6 +2396,9 @@ namespace PurelySharp.Test
             var untypedValueHelperIndex = source.IndexOf(
                 "internal static bool TryTranslateValue(",
                 StringComparison.Ordinal);
+            var valueWithPathFactsHelperIndex = source.IndexOf(
+                "internal static bool TryTranslateValueWithPathFacts(",
+                StringComparison.Ordinal);
             var comparableHelperIndex = source.IndexOf(
                 "private static bool TryTranslateComparableValue(",
                 StringComparison.Ordinal);
@@ -2404,14 +2407,16 @@ namespace PurelySharp.Test
                 StringComparison.Ordinal);
             var lengthHelperSource = source.Substring(lengthHelperIndex, stringHelperIndex - lengthHelperIndex);
             var valueHelperSource = source.Substring(valueHelperIndex, untypedValueHelperIndex - valueHelperIndex);
-            var untypedValueHelperSource = source.Substring(untypedValueHelperIndex, comparableHelperIndex - untypedValueHelperIndex);
+            var untypedValueHelperSource = source.Substring(untypedValueHelperIndex, valueWithPathFactsHelperIndex - untypedValueHelperIndex);
+            var valueWithPathFactsHelperSource = source.Substring(valueWithPathFactsHelperIndex, comparableHelperIndex - valueWithPathFactsHelperIndex);
             var stringHelperSource = source.Substring(stringHelperIndex, stringNonNullIndex - stringHelperIndex);
 
             Assert.That(lengthHelperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(stringHelperIndex, Is.GreaterThan(lengthHelperIndex));
             Assert.That(valueHelperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(untypedValueHelperIndex, Is.GreaterThan(valueHelperIndex));
-            Assert.That(comparableHelperIndex, Is.GreaterThan(untypedValueHelperIndex));
+            Assert.That(valueWithPathFactsHelperIndex, Is.GreaterThan(untypedValueHelperIndex));
+            Assert.That(comparableHelperIndex, Is.GreaterThan(valueWithPathFactsHelperIndex));
             Assert.That(stringNonNullIndex, Is.GreaterThan(stringHelperIndex));
             Assert.That(valueHelperSource, Does.Contain("!ContainsDivisionOrModulo(expression)"));
             Assert.That(valueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
@@ -2425,6 +2430,12 @@ namespace PurelySharp.Test
             Assert.That(
                 untypedValueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
                 Is.LessThan(untypedValueHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal)));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("pathFactArray.Length == 0"));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("TryTranslateValue("));
+            Assert.That(valueWithPathFactsHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("));
+            Assert.That(
+                valueWithPathFactsHelperSource.IndexOf("pathFactArray.Length == 0", StringComparison.Ordinal),
+                Is.LessThan(valueWithPathFactsHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts(", StringComparison.Ordinal)));
             Assert.That(
                 lengthHelperSource.IndexOf("SymbolicIrLowerer.TryLowerTerm(valueExpression", StringComparison.Ordinal),
                 Is.LessThan(lengthHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue(", StringComparison.Ordinal)));
