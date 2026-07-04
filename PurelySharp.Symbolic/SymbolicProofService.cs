@@ -169,6 +169,20 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            if (state.IsContradictory)
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.Unreachable,
+                    "ir_state_contradictory");
+            }
+
+            if (TryClassifySyntacticConditionTruth(condition, out var syntacticStatus))
+            {
+                return SymbolicIrProofResult.Syntactic(
+                    syntacticStatus,
+                    "ir_condition_syntactic_truth");
+            }
+
             var reachability = ClassifyReachability(state);
             if (reachability.Info.Status == SymbolicProofStatus.Unreachable)
             {
@@ -356,6 +370,24 @@ namespace PurelySharp.Symbolic
         private static SymbolicState NormalizeState(SymbolicState state)
         {
             return state.Normalize();
+        }
+
+        private static bool TryClassifySyntacticConditionTruth(
+            SymbolicCondition condition,
+            out SymbolicProofStatus status)
+        {
+            switch (SymbolicState.CreateProofConditionKey(condition))
+            {
+                case "const:true":
+                    status = SymbolicProofStatus.ProvenTrue;
+                    return true;
+                case "const:false":
+                    status = SymbolicProofStatus.ProvenFalse;
+                    return true;
+                default:
+                    status = SymbolicProofStatus.Unknown;
+                    return false;
+            }
         }
 
         private SymbolicBudgetInfo? CreateBudgetInfo()

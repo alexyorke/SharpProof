@@ -608,6 +608,8 @@ namespace PurelySharp.Symbolic.Ir
                     return "const:" + (constant.Value ? "true" : "false");
                 case SymbolicFactCondition factCondition:
                     return "fact-condition:" + CreateFactKey(factCondition.Fact);
+                case SymbolicNotCondition { Operand: SymbolicConstantCondition constantCondition }:
+                    return "const:" + (constantCondition.Value ? "false" : "true");
                 case SymbolicNotCondition { Operand: SymbolicNotCondition nestedNotCondition }:
                     return CreateConditionKey(nestedNotCondition.Operand);
                 case SymbolicNotCondition notCondition:

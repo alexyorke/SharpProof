@@ -2067,9 +2067,19 @@ namespace PurelySharp.Test
             {
                 new SymbolicBinaryCondition(SymbolicConditionOperator.Or, xPositive, new SymbolicConstantCondition(true)),
             });
+            var notTrueState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(new SymbolicConstantCondition(true)),
+            });
+            var notFalseState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicNotCondition(new SymbolicConstantCondition(false)),
+            });
 
             Assert.That(falseState.NormalizedProofKey, Is.EqualTo(andFalseState.NormalizedProofKey));
+            Assert.That(falseState.NormalizedProofKey, Is.EqualTo(notTrueState.NormalizedProofKey));
             Assert.That(trueState.NormalizedProofKey, Is.EqualTo(orTrueState.NormalizedProofKey));
+            Assert.That(trueState.NormalizedProofKey, Is.EqualTo(notFalseState.NormalizedProofKey));
         }
 
         [Test]
@@ -2266,12 +2276,19 @@ namespace PurelySharp.Test
                 state,
                 new SymbolicConstantCondition(false),
                 smtAnalysis);
+            var notFalseResult = SymbolicReachabilityService.ClassifyStateConditionTruth(
+                state,
+                new SymbolicNotCondition(new SymbolicConstantCondition(false)),
+                smtAnalysis);
 
             Assert.That(trueResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(trueResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
             Assert.That(falseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenFalse));
             Assert.That(falseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
-            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(executedAfterTrue));
+            Assert.That(notFalseResult.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(notFalseResult.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(executedAfterTrue, Is.EqualTo(0));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
