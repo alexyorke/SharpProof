@@ -292,6 +292,16 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
+                TryLowerTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
+                TryLowerTerm(conditionalExpression.WhenFalse, context, out var whenFalse) &&
+                whenTrue.Kind == whenFalse.Kind)
+            {
+                term = new SymbolicConditionalTerm(condition, whenTrue, whenFalse);
+                return true;
+            }
+
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
                 TryLowerTerm(prefixUnary.Operand, context, out var unaryOperand) &&
