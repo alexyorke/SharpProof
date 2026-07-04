@@ -2509,8 +2509,7 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getTargetSymbolVersion = null)
         {
             facts = ImmutableArray<SmtFormula>.Empty;
-            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula, getTargetSymbolVersion) ||
-                targetFormula is not { Kind: SmtValueKind.Reference })
+            if (!TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var targetTerm))
             {
                 facts = ImmutableArray<SmtFormula>.Empty;
                 return false;
@@ -2518,7 +2517,7 @@ namespace PurelySharp.Symbolic
 
             if (TryCreateIrAsExpressionAssignmentFacts(
                     valueExpression,
-                    targetFormula,
+                    targetTerm,
                     semanticModel,
                     cancellationToken,
                     out facts,
@@ -2533,7 +2532,7 @@ namespace PurelySharp.Symbolic
 
         private static bool TryCreateIrAsExpressionAssignmentFacts(
             ExpressionSyntax valueExpression,
-            SmtFormula targetFormula,
+            SymbolicTerm target,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out ImmutableArray<SmtFormula> facts,
@@ -2544,7 +2543,6 @@ namespace PurelySharp.Symbolic
             if (valueExpression is not BinaryExpressionSyntax asExpression ||
                 !asExpression.IsKind(SyntaxKind.AsExpression) ||
                 asExpression.Right is not TypeSyntax typeSyntax ||
-                !SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula, out var target) ||
                 target.Kind != SmtValueKind.Reference)
             {
                 return false;

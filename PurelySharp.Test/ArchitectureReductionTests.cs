@@ -6198,6 +6198,8 @@ namespace PurelySharp.Test
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
             Assert.That(helperSource, Does.Contain("TryCreateIrAsExpressionAssignmentFacts("));
             Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("));
+            Assert.That(helperSource, Does.Contain("TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var targetTerm)"));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula"));
             Assert.That(helperSource, Does.Contain("new SymbolicTypeTestAtom(source, typeKey)"));
             Assert.That(helperSource, Does.Contain("CreateIrRelationCondition("));
             Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));

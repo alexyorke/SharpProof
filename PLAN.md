@@ -111,6 +111,9 @@ path-fact, hazard, and ownership flows.
   Array `Length == Count` alias reachability now also delegates derived
   receiver-term re-encoding through `SymbolicProofService.TryEncodeDerivedFormulaTerm`
   instead of lowering the SMT receiver term directly at that boundary.
+  `as`-expression assigned-value facts now also create the symbolic target
+  reference term directly instead of lowering an SMT target formula back into
+  a term before building IR facts.
   IR-first formula proof orchestration now also lives behind
   `SymbolicProofService` helpers for condition truth, formula-path
   feasibility, and branch-condition truth, with reachability remaining only as
