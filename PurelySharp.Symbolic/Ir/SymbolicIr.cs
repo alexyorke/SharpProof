@@ -597,7 +597,50 @@ namespace PurelySharp.Symbolic.Ir
 
         private static string CreateFactAtomKey(SymbolicFact fact)
         {
-            return fact.Atom.ToString() ?? string.Empty;
+            return CreateAtomKey(fact.Atom);
+        }
+
+        private static string CreateAtomKey(SymbolicAtom atom)
+        {
+            return atom switch
+            {
+                SymbolicRelationAtom relation => CreateRelationAtomKey(relation),
+                _ => atom.ToString() ?? string.Empty,
+            };
+        }
+
+        private static string CreateRelationAtomKey(SymbolicRelationAtom relation)
+        {
+            var left = CreateTermKey(relation.Left);
+            var right = CreateTermKey(relation.Right);
+            var relationOperator = relation.Operator;
+
+            switch (relationOperator)
+            {
+                case SymbolicRelationOperator.Equal:
+                case SymbolicRelationOperator.NotEqual:
+                    if (string.CompareOrdinal(left, right) > 0)
+                    {
+                        (left, right) = (right, left);
+                    }
+
+                    break;
+                case SymbolicRelationOperator.GreaterThan:
+                    relationOperator = SymbolicRelationOperator.LessThan;
+                    (left, right) = (right, left);
+                    break;
+                case SymbolicRelationOperator.GreaterThanOrEqual:
+                    relationOperator = SymbolicRelationOperator.LessThanOrEqual;
+                    (left, right) = (right, left);
+                    break;
+            }
+
+            return "relation:" + relationOperator + "(" + left + "," + right + ")";
+        }
+
+        private static string CreateTermKey(SymbolicTerm term)
+        {
+            return term.ToString() ?? string.Empty;
         }
 
         private static string CreateConditionKey(SymbolicCondition condition)

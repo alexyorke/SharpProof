@@ -2064,6 +2064,44 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeyCanonicalizesEquivalentRelationAtoms()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var greaterThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.gt");
+            var lessThan = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    zero,
+                    x),
+                SyntaxFactory.ParseExpression("0 < x"),
+                "test.lt");
+            var equal = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x == 0"),
+                "test.eq");
+            var equalFlipped = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    zero,
+                    x),
+                SyntaxFactory.ParseExpression("0 == x"),
+                "test.eq.flipped");
+
+            Assert.That(new SymbolicState(new[] { greaterThan }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { lessThan }).NormalizedProofKey));
+            Assert.That(new SymbolicState(new[] { equal }).NormalizedProofKey, Is.EqualTo(new SymbolicState(new[] { equalFlipped }).NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesDeMorganConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
@@ -2465,6 +2503,35 @@ namespace PurelySharp.Test
                 state,
                 new SymbolicNotCondition(new SymbolicFactCondition(fact)),
                 smtAnalysis);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SymbolicProofService_EquivalentRelationFactImpliesWithoutSmt()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var zero = new SymbolicIntegerConstantTerm(0);
+            var stored = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    zero),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.stored");
+            var queried = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.LessThan,
+                    zero,
+                    x),
+                SyntaxFactory.ParseExpression("0 < x"),
+                "test.queried");
+            var state = new SymbolicState(new[] { stored });
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queried, smtAnalysis);
 
             Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
             Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
