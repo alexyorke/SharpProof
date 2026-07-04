@@ -9,6 +9,12 @@ namespace PurelySharp.Symbolic.Ir
         SymbolicLoweringContext context,
         out SymbolicCondition condition);
 
+    internal delegate bool KnownApiTermLoweringHandler(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term);
+
     internal sealed class KnownApiLoweringDescriptor
     {
         public KnownApiLoweringDescriptor(
@@ -31,6 +37,31 @@ namespace PurelySharp.Symbolic.Ir
         {
             return string.Equals(method.Name, MethodName, StringComparison.Ordinal) &&
                 string.Equals(method.ContainingType?.ToDisplayString(), ContainingTypeMetadataName, StringComparison.Ordinal);
+        }
+    }
+
+    internal sealed class KnownApiTermLoweringDescriptor
+    {
+        public KnownApiTermLoweringDescriptor(
+            SpecialType containingTypeSpecialType,
+            string methodName,
+            KnownApiTermLoweringHandler handler)
+        {
+            ContainingTypeSpecialType = containingTypeSpecialType;
+            MethodName = methodName;
+            Handler = handler;
+        }
+
+        public SpecialType ContainingTypeSpecialType { get; }
+
+        public string MethodName { get; }
+
+        public KnownApiTermLoweringHandler Handler { get; }
+
+        public bool Matches(IMethodSymbol method)
+        {
+            return string.Equals(method.Name, MethodName, StringComparison.Ordinal) &&
+                method.ContainingType?.OriginalDefinition.SpecialType == ContainingTypeSpecialType;
         }
     }
 }

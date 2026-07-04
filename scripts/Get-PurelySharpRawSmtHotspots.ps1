@@ -310,7 +310,8 @@ function Get-IrKnownApiLoweringLocations
         foreach ($line in Get-Content -LiteralPath $file.FullName)
         {
             $lineNumber++
-            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0 -or
+                $line.IndexOf('new KnownApiTermLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
             {
                 $locations += [pscustomobject]@{
                     path = Convert-ToRepoPath $file.FullName
