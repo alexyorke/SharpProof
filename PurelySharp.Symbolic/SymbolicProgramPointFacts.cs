@@ -8722,8 +8722,15 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         out var stringFormula))
                 {
-                    formula = new SmtStringLengthTerm(stringFormula);
-                    return true;
+                    if (SymbolicSmtFormulaLowerer.TryLowerTerm(stringFormula, out var stringTerm) &&
+                        stringTerm.Kind == SmtValueKind.String &&
+                        SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(stringTerm), out formula))
+                    {
+                        return true;
+                    }
+
+                    formula = null!;
+                    return false;
                 }
 
                 return TryCreateMemberSmtValue(receiverFormula, memberSymbol, out formula);
