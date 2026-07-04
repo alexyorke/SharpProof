@@ -1577,6 +1577,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.CreateSignedDivisionOverflowCondition("));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.translated"));

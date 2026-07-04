@@ -505,24 +505,12 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var leftIsMinValue = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    left,
-                    new SymbolicIntegerConstantTerm(minValue)),
-                leftExpression,
-                provenance + ".left-min"));
-            var rightIsMinusOne = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    right,
-                    new SymbolicIntegerConstantTerm(-1)),
-                rightExpression,
-                provenance + ".right-minus-one"));
-            var overflowCondition = new SymbolicBinaryCondition(
-                SymbolicConditionOperator.And,
-                leftIsMinValue,
-                rightIsMinusOne);
+            var overflowCondition = SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
+                left,
+                right,
+                minValue,
+                site,
+                provenance);
 
             return TryEncodeIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
