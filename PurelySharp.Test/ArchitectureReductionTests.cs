@@ -6123,9 +6123,10 @@ namespace PurelySharp.Test
 
             Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-            Assert.That(helperSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
-            Assert.That(helperSource, Does.Contain("new SymbolicCountTerm(receiver)"));
-            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm("));
+            Assert.That(helperSource, Does.Contain("new SymbolicLengthTerm(input)"));
+            Assert.That(helperSource, Does.Contain("new SymbolicCountTerm(input)"));
+            Assert.That(helperSource, Does.Contain("SymbolicProofService.TryEncodeDerivedFormulaTerm("));
+            Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm("));
             Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Length\""));
             Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Count\""));
         }

@@ -1194,10 +1194,14 @@ namespace PurelySharp.Symbolic
                     out var receiverFormula,
                     SmtValueKind.Reference,
                     getSymbolVersion) &&
-                SymbolicSmtFormulaLowerer.TryLowerTerm(receiverFormula, out var receiver) &&
-                receiver.Kind == SmtValueKind.Reference &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicLengthTerm(receiver), out var lengthFormula) &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(new SymbolicCountTerm(receiver), out var countFormula))
+                SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    TryCreateReferenceLengthDerivedTerm,
+                    out var lengthFormula) &&
+                SymbolicProofService.TryEncodeDerivedFormulaTerm(
+                    receiverFormula,
+                    TryCreateReferenceCountDerivedTerm,
+                    out var countFormula))
             {
                 aliasFact = new SmtBinaryFormula(
                     SmtBinaryOperator.Equal,
@@ -1208,6 +1212,30 @@ namespace PurelySharp.Symbolic
 
             aliasFact = new SmtBooleanConstant(true);
             return false;
+        }
+
+        private static bool TryCreateReferenceLengthDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
+        {
+            output = null!;
+            if (input.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            output = new SymbolicLengthTerm(input);
+            return true;
+        }
+
+        private static bool TryCreateReferenceCountDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
+        {
+            output = null!;
+            if (input.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
+            output = new SymbolicCountTerm(input);
+            return true;
         }
 
         internal static bool TryCreateReferenceNullComparison(

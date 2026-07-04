@@ -108,6 +108,9 @@ path-fact, hazard, and ownership flows.
   length, member access, built-in length, and array-dimension length now also
   delegates through `SymbolicProofService.TryEncodeDerivedFormulaTerm`
   instead of lowering SMT terms directly at those call sites.
+  Array `Length == Count` alias reachability now also delegates derived
+  receiver-term re-encoding through `SymbolicProofService.TryEncodeDerivedFormulaTerm`
+  instead of lowering the SMT receiver term directly at that boundary.
   IR-first formula proof orchestration now also lives behind
   `SymbolicProofService` helpers for condition truth, formula-path
   feasibility, and branch-condition truth, with reachability remaining only as
