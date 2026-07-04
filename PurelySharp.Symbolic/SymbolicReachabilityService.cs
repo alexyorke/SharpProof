@@ -682,23 +682,13 @@ namespace PurelySharp.Symbolic
             string provenance,
             string evidenceKey)
         {
-            var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    conditionFormula,
-                    sourceNode,
-                    provenance,
-                    evidenceKey,
-                    out var condition) &&
-                SymbolicProofService.TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
-            {
-                var proof = ClassifyStateConditionTruth(state, condition, smtAnalysis);
-                if (proof.Info.Status != SymbolicProofStatus.Unknown)
-                {
-                    return proof;
-                }
-            }
-
-            return ClassifyFormulaConditionTruth(pathConditionList, conditionFormula, smtAnalysis);
+            return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFirst(
+                pathConditions,
+                conditionFormula,
+                sourceNode,
+                smtAnalysis,
+                provenance,
+                evidenceKey);
         }
 
         internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFallback(
@@ -709,29 +699,13 @@ namespace PurelySharp.Symbolic
             string provenance,
             string evidenceKey)
         {
-            var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-            var formulaProof = ClassifyFormulaConditionTruth(pathConditionList, conditionFormula, smtAnalysis);
-            if (formulaProof.Info.Status != SymbolicProofStatus.Unknown)
-            {
-                return formulaProof;
-            }
-
-            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    conditionFormula,
-                    sourceNode,
-                    provenance,
-                    evidenceKey,
-                    out var condition) &&
-                SymbolicProofService.TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
-            {
-                var proof = ClassifyStateConditionTruth(state, condition, smtAnalysis);
-                if (proof.Info.Status != SymbolicProofStatus.Unknown)
-                {
-                    return proof;
-                }
-            }
-
-            return formulaProof;
+            return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFallback(
+                pathConditions,
+                conditionFormula,
+                sourceNode,
+                smtAnalysis,
+                provenance,
+                evidenceKey);
         }
 
         internal static bool TryClassifyFormulaConditionTruthWithIr(
@@ -743,24 +717,14 @@ namespace PurelySharp.Symbolic
             string evidenceKey,
             out SymbolicProofStatus status)
         {
-            status = SymbolicProofStatus.Unknown;
-            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    conditionFormula,
-                    sourceNode,
-                    provenance,
-                    evidenceKey,
-                    out var condition))
-            {
-                return false;
-            }
-
-            if (!SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
-            {
-                return false;
-            }
-
-            status = ClassifyStateConditionTruth(state, condition, smtAnalysis).Info.Status;
-            return status != SymbolicProofStatus.Unknown;
+            return SymbolicProofService.TryClassifyFormulaConditionTruthWithIr(
+                pathConditions,
+                conditionFormula,
+                sourceNode,
+                smtAnalysis,
+                provenance,
+                evidenceKey,
+                out status);
         }
 
         internal static bool TryClassifyFormulaPathFeasibilityWithIr(
@@ -771,14 +735,13 @@ namespace PurelySharp.Symbolic
             string evidenceKey,
             out SymbolicProofStatus status)
         {
-            status = SymbolicProofStatus.Unknown;
-            if (!SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
-            {
-                return false;
-            }
-
-            status = ClassifyStateFeasibility(state, smtAnalysis).Info.Status;
-            return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
+            return SymbolicProofService.TryClassifyFormulaPathFeasibilityWithIr(
+                pathConditions,
+                sourceNode,
+                smtAnalysis,
+                provenance,
+                evidenceKey,
+                out status);
         }
 
         internal static bool TryClassifyBranchConditionTruthWithIr(
@@ -792,23 +755,16 @@ namespace PurelySharp.Symbolic
             string evidenceKey,
             out SymbolicProofStatus status)
         {
-            status = SymbolicProofStatus.Unknown;
-            if (!SymbolicIrLowerer.TryLowerCondition(
-                    condition,
-                    new SymbolicLoweringContext(semanticModel, cancellationToken),
-                    out var symbolicCondition) ||
-                !SymbolicProofService.TryCreateStateFromFormulaPath(pathConditions, condition, provenance, evidenceKey, out var state))
-            {
-                return false;
-            }
-
-            if (!branchWhenTrue)
-            {
-                symbolicCondition = new SymbolicNotCondition(symbolicCondition);
-            }
-
-            status = ClassifyStateConditionTruth(state, symbolicCondition, smtAnalysis).Info.Status;
-            return status != SymbolicProofStatus.Unknown;
+            return SymbolicProofService.TryClassifyBranchConditionTruthWithIr(
+                pathConditions,
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                provenance,
+                evidenceKey,
+                out status);
         }
 
         internal static bool IsFormulaAlwaysFalse(

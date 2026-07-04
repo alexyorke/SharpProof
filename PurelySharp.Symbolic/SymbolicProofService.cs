@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic.Ir;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -122,6 +123,144 @@ namespace PurelySharp.Symbolic
             }
 
             return true;
+        }
+
+        internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFirst(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula,
+            SyntaxNode sourceNode,
+            SmtAnalysisService? smtAnalysis,
+            string provenance,
+            string evidenceKey)
+        {
+            var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
+            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    conditionFormula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var condition) &&
+                TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
+            {
+                var proof = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition);
+                if (proof.Info.Status != SymbolicProofStatus.Unknown)
+                {
+                    return proof;
+                }
+            }
+
+            return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
+        }
+
+        internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFallback(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula,
+            SyntaxNode sourceNode,
+            SmtAnalysisService? smtAnalysis,
+            string provenance,
+            string evidenceKey)
+        {
+            var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
+            var proofService = new SymbolicProofService(smtAnalysis);
+            var formulaProof = proofService.ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
+            if (formulaProof.Info.Status != SymbolicProofStatus.Unknown)
+            {
+                return formulaProof;
+            }
+
+            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    conditionFormula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var condition) &&
+                TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
+            {
+                var proof = proofService.ClassifyConditionTruth(state, condition);
+                if (proof.Info.Status != SymbolicProofStatus.Unknown)
+                {
+                    return proof;
+                }
+            }
+
+            return formulaProof;
+        }
+
+        internal static bool TryClassifyFormulaConditionTruthWithIr(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula conditionFormula,
+            SyntaxNode sourceNode,
+            SmtAnalysisService? smtAnalysis,
+            string provenance,
+            string evidenceKey,
+            out SymbolicProofStatus status)
+        {
+            status = SymbolicProofStatus.Unknown;
+            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                    conditionFormula,
+                    sourceNode,
+                    provenance,
+                    evidenceKey,
+                    out var condition))
+            {
+                return false;
+            }
+
+            if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
+            {
+                return false;
+            }
+
+            status = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition).Info.Status;
+            return status != SymbolicProofStatus.Unknown;
+        }
+
+        internal static bool TryClassifyFormulaPathFeasibilityWithIr(
+            IEnumerable<SmtFormula> pathConditions,
+            SyntaxNode sourceNode,
+            SmtAnalysisService? smtAnalysis,
+            string provenance,
+            string evidenceKey,
+            out SymbolicProofStatus status)
+        {
+            status = SymbolicProofStatus.Unknown;
+            if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
+            {
+                return false;
+            }
+
+            status = new SymbolicProofService(smtAnalysis).ClassifyReachability(state).Info.Status;
+            return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
+        }
+
+        internal static bool TryClassifyBranchConditionTruthWithIr(
+            IEnumerable<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis,
+            string provenance,
+            string evidenceKey,
+            out SymbolicProofStatus status)
+        {
+            status = SymbolicProofStatus.Unknown;
+            if (!SymbolicIrLowerer.TryLowerCondition(
+                    condition,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var symbolicCondition) ||
+                !TryCreateStateFromFormulaPath(pathConditions, condition, provenance, evidenceKey, out var state))
+            {
+                return false;
+            }
+
+            if (!branchWhenTrue)
+            {
+                symbolicCondition = new SymbolicNotCondition(symbolicCondition);
+            }
+
+            status = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, symbolicCondition).Info.Status;
+            return status != SymbolicProofStatus.Unknown;
         }
 
         public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)

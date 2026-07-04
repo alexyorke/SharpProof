@@ -82,7 +82,11 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Not.Contain("new SymbolicProofService(smtAnalysis: null)"));
             Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out pathConditions)"));
             Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.CreateStateFromFormulaPath(pathConditions, expression)"));
-            Assert.That(reachabilitySource, Does.Contain("SymbolicProofService.TryCreateStateFromFormulaPath("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFirst("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFallback("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.TryClassifyFormulaConditionTruthWithIr("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.TryClassifyFormulaPathFeasibilityWithIr("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.TryClassifyBranchConditionTruthWithIr("));
             Assert.That(reachabilitySource, Does.Not.Contain("private static SymbolicState CreateStateFromFormulaPath("));
             Assert.That(reachabilitySource, Does.Not.Contain("private static bool TryCreateStateFromFormulaPath("));
             Assert.That(reachabilitySource, Does.Not.Contain("IsNodeReachable("));
@@ -91,6 +95,11 @@ namespace PurelySharp.Test
             Assert.That(proofServiceSource, Does.Contain("internal SymbolicIrProofResult ClassifyFormulaConditionTruth"));
             Assert.That(proofServiceSource, Does.Contain("internal PurityProofResult ClassifyFormulaImplication"));
             Assert.That(proofServiceSource, Does.Contain("internal PurityProofResult ClassifyFormulaBranchReachability"));
+            Assert.That(proofServiceSource, Does.Contain("internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFirst("));
+            Assert.That(proofServiceSource, Does.Contain("internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFallback("));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryClassifyFormulaConditionTruthWithIr("));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryClassifyFormulaPathFeasibilityWithIr("));
+            Assert.That(proofServiceSource, Does.Contain("internal static bool TryClassifyBranchConditionTruthWithIr("));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyReachability(SymbolicState state)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)"));
             Assert.That(proofServiceSource, Does.Contain("public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicCondition condition)"));
@@ -2388,6 +2397,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"source.query.condition\""));
             Assert.That(reachabilitySource, Does.Contain("TryTranslateConditionFormula("));
             Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslate("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFallback("));
         }
 
         [Test]
@@ -6140,6 +6150,10 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var proofServiceSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProofService.cs"));
             var symbolicProgramPointFactsSource = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "PurelySharp.Symbolic",
@@ -6267,9 +6281,11 @@ namespace PurelySharp.Test
             Assert.That(addNonNullFactSource, Does.Contain("SymbolicReachabilityService.TryCreateReferenceNullComparison("));
             Assert.That(addNonNullFactSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(addNonNullFactSource, Does.Not.Contain("SmtFormulaFactory.CreateReferenceNullComparison("));
-            Assert.That(reachabilitySource, Does.Contain("TryCreateStateFromFormulaPath("));
-            Assert.That(reachabilitySource, Does.Contain("ClassifyStateFeasibility(state"));
-            Assert.That(reachabilitySource, Does.Contain("ClassifyStateConditionTruth(state"));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.TryClassifyFormulaPathFeasibilityWithIr("));
+            Assert.That(reachabilitySource, Does.Contain("return SymbolicProofService.TryClassifyFormulaConditionTruthWithIr("));
+            Assert.That(proofServiceSource, Does.Contain("TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state)"));
+            Assert.That(proofServiceSource, Does.Contain("ClassifyConditionTruth(state, condition)"));
+            Assert.That(proofServiceSource, Does.Contain("ClassifyReachability(state)"));
             var negativeArrayLengthIndex = exceptionSitesSource.IndexOf("private static bool IsDefinitelyNegativeArrayLength(", StringComparison.Ordinal);
             var checkedOperatorIndex = exceptionSitesSource.IndexOf("private static bool TryGetCheckedIntegralBinaryOperator(", StringComparison.Ordinal);
             Assert.That(negativeArrayLengthIndex, Is.GreaterThanOrEqualTo(0));
