@@ -548,6 +548,14 @@ namespace PurelySharp.Symbolic.Ir
                     var identityOperand = binaryCondition.Operator == SymbolicConditionOperator.And
                         ? "const:true"
                         : "const:false";
+                    var absorbingOperand = binaryCondition.Operator == SymbolicConditionOperator.And
+                        ? "const:false"
+                        : "const:true";
+                    if (operands.Any(operand => string.Equals(operand, absorbingOperand, StringComparison.Ordinal)))
+                    {
+                        return absorbingOperand;
+                    }
+
                     operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
                     if (operands.Count == 0)
                     {

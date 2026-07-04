@@ -2012,6 +2012,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesAbsorbingConstants()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var falseState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicConstantCondition(false),
+            });
+            var andFalseState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, xPositive, new SymbolicConstantCondition(false)),
+            });
+            var trueState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicConstantCondition(true),
+            });
+            var orTrueState = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, xPositive, new SymbolicConstantCondition(true)),
+            });
+
+            Assert.That(falseState.NormalizedProofKey, Is.EqualTo(andFalseState.NormalizedProofKey));
+            Assert.That(trueState.NormalizedProofKey, Is.EqualTo(orTrueState.NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicProofService_ContradictoryStateShortCircuitsWithoutSmt()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
