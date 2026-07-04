@@ -2121,6 +2121,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicReachabilityService_UsesIrNullableHasValueBeforeLegacyFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicReachabilityService.cs"));
+            var helperIndex = source.IndexOf(
+                "internal static bool TryCreateNullableHasValueCondition(",
+                StringComparison.Ordinal);
+            var nextHelperIndex = source.IndexOf(
+                "internal static bool TryCreateRuntimeTypeTestCondition(",
+                StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
+            Assert.That(
+                helperSource.IndexOf("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression", StringComparison.Ordinal),
+                Is.LessThan(helperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(", StringComparison.Ordinal)));
+            Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
+        }
+
+        [Test]
         public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
         {
             var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");

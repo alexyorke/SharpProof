@@ -1261,6 +1261,13 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
+                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out formula))
+            {
+                return true;
+            }
+
             return CSharpSmtFormulaTranslator.TryTranslateNullableHasValue(
                 expression,
                 semanticModel,
