@@ -1125,8 +1125,39 @@ namespace PurelySharp.Symbolic
                     out var startExpression,
                     out var countExpression,
                     out var oneArgumentUpperBoundIsInclusive,
-                    out var category) ||
-                !SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
+                    out var category))
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
+                    sourceExpression,
+                    startExpression,
+                    countExpression,
+                    invocation,
+                    "ir.runtime-hazard.slicing.in-range",
+                    context,
+                    oneArgumentUpperBoundIsInclusive,
+                    out var inRangeCondition) &&
+                TryEncodeIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                    subject: null,
+                    new SymbolicNotCondition(inRangeCondition),
+                    invocation,
+                    "ir.runtime-hazard.slicing.argument-out-of-range",
+                    out var irTrigger))
+            {
+                candidate = new RuntimeHazardCandidate(
+                    invocation,
+                    SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+                    irTrigger,
+                    ExceptionTypes.ArgumentOutOfRangeException,
+                    category);
+                return true;
+            }
+
+            if (!SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
                     sourceExpression,
                     startExpression,
                     countExpression,

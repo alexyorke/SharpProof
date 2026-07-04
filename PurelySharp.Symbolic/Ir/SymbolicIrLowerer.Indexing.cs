@@ -120,5 +120,142 @@ namespace PurelySharp.Symbolic.Ir
             condition = combined;
             return true;
         }
+
+        public static bool TryCreateSubsequenceInRangeCondition(
+            ExpressionSyntax receiverExpression,
+            ExpressionSyntax startExpression,
+            ExpressionSyntax? lengthExpression,
+            SyntaxNode source,
+            string provenance,
+            SymbolicLoweringContext context,
+            bool oneArgumentUpperBoundIsInclusive,
+            out SymbolicCondition condition)
+        {
+            condition = null!;
+            if (!TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength) ||
+                !TryLowerTerm(startExpression, context, out var start) ||
+                start.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            var startNonNegative = CreateRelationCondition(
+                SymbolicRelationOperator.GreaterThanOrEqual,
+                start,
+                new SymbolicIntegerConstantTerm(0),
+                source,
+                provenance + ".start-non-negative");
+
+            if (lengthExpression == null)
+            {
+                var upperBound = CreateRelationCondition(
+                    oneArgumentUpperBoundIsInclusive
+                        ? SymbolicRelationOperator.LessThanOrEqual
+                        : SymbolicRelationOperator.LessThan,
+                    start,
+                    sourceLength,
+                    source,
+                    provenance + ".start-within-length");
+                condition = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    startNonNegative,
+                    upperBound);
+                return true;
+            }
+
+            if (!TryLowerTerm(lengthExpression, context, out var count) ||
+                count.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            var countNonNegative = CreateRelationCondition(
+                SymbolicRelationOperator.GreaterThanOrEqual,
+                count,
+                new SymbolicIntegerConstantTerm(0),
+                source,
+                provenance + ".count-non-negative");
+            var startWithinLength = CreateRelationCondition(
+                SymbolicRelationOperator.LessThanOrEqual,
+                start,
+                sourceLength,
+                source,
+                provenance + ".start-within-length");
+            var remainingLength = new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Subtract,
+                sourceLength,
+                start);
+            var countWithinRemainingLength = CreateRelationCondition(
+                SymbolicRelationOperator.LessThanOrEqual,
+                count,
+                remainingLength,
+                source,
+                provenance + ".count-within-remaining-length");
+            var additionDoesNotOverflow = count is SymbolicIntegerConstantTerm { Value: 0 }
+                ? new SymbolicConstantCondition(true)
+                : CreateRelationCondition(
+                    SymbolicRelationOperator.LessThanOrEqual,
+                    start,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Subtract,
+                        new SymbolicIntegerConstantTerm(int.MaxValue),
+                        count),
+                    source,
+                    provenance + ".addition-does-not-overflow");
+
+            condition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                startNonNegative,
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    countNonNegative,
+                    new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        startWithinLength,
+                        new SymbolicBinaryCondition(
+                            SymbolicConditionOperator.And,
+                            countWithinRemainingLength,
+                            additionDoesNotOverflow))));
+            return true;
+        }
+
+        private static bool TryLowerBuiltInLengthTerm(
+            ExpressionSyntax expression,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            expression = UnwrapExpression(expression);
+            var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                if (TryLowerStringTerm(expression, context, out var stringValue))
+                {
+                    term = new SymbolicLengthTerm(stringValue);
+                    return true;
+                }
+
+                if (TryLowerTerm(expression, context, out var reference) &&
+                    reference.Kind == SmtValueKind.Reference)
+                {
+                    term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
+                    return true;
+                }
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
+            {
+                if (TryLowerTerm(expression, context, out var receiver) &&
+                    receiver.Kind == SmtValueKind.Reference)
+                {
+                    term = new SymbolicLengthTerm(receiver);
+                    return true;
+                }
+            }
+
+            term = null!;
+            return false;
+        }
     }
 }

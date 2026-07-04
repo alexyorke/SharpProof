@@ -1423,6 +1423,24 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            if (getSymbolVersion == null)
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+                if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
+                        receiverExpression,
+                        startExpression,
+                        lengthExpression,
+                        receiverExpression,
+                        "ir.subsequence.in-range",
+                        context,
+                        oneArgumentUpperBoundIsInclusive,
+                        out var irCondition) &&
+                    SymbolicIrFormulaEncoder.TryEncode(irCondition, out formula))
+                {
+                    return true;
+                }
+            }
+
             if (!TryTranslateBuiltInLengthValue(
                     receiverExpression,
                     semanticModel,

@@ -1329,6 +1329,11 @@ namespace PurelySharp.Test
                 repositoryRoot,
                 "PurelySharp.Symbolic",
                 "SymbolicReachabilityService.cs"));
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
@@ -1337,7 +1342,9 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
+            Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
             Assert.That(reachabilitySource, Does.Contain("SmtFormulaFactory.CreateSubsequenceInRangeFormula("));
+            Assert.That(lowererSource, Does.Contain("public static bool TryCreateSubsequenceInRangeCondition("));
         }
 
         [Test]
@@ -1384,13 +1391,23 @@ namespace PurelySharp.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
+            var lowererSource = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "Ir",
+                "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
+            Assert.That(source, Does.Contain("TryEncodeIrExceptionPreconditionTrigger("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.in-range"));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
             Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.argument-out-of-range"));
+            Assert.That(lowererSource, Does.Contain("provenance + \".count-within-remaining-length\""));
+            Assert.That(lowererSource, Does.Contain("provenance + \".addition-does-not-overflow\""));
         }
 
         [Test]
