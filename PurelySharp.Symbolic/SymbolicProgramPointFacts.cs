@@ -7647,14 +7647,11 @@ namespace PurelySharp.Symbolic
             out SmtFormula formula)
         {
             formula = null!;
-            if (!CSharpSmtFormulaTranslator.TryTranslate(
+            if (!TryCreateConditionFormula(
                     conditionalExpression.Condition,
                     semanticModel,
                     cancellationToken,
-                    out var conditionFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                conditionFormula == null ||
+                    out var conditionFormula) ||
                 !TryCreateReferenceNullStateFormula(
                     conditionalExpression.WhenTrue,
                     semanticModel,
@@ -7765,14 +7762,11 @@ namespace PurelySharp.Symbolic
             }
 
             if (valueExpression is ConditionalExpressionSyntax conditionalExpression &&
-                CSharpSmtFormulaTranslator.TryTranslate(
+                TryCreateConditionFormula(
                     conditionalExpression.Condition,
                     semanticModel,
                     cancellationToken,
-                    out var conditionFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                conditionFormula != null &&
+                    out var conditionFormula) &&
                 TryTranslateAssignedValueExpression(
                     conditionalExpression.WhenTrue,
                     semanticModel,
@@ -7910,22 +7904,13 @@ namespace PurelySharp.Symbolic
 
             var receiverSymbols = GetReferencedLocalAndParameterSymbols(elementAccess.Expression, semanticModel, cancellationToken);
             if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken) ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
+                !TryCreateComparableValueFormula(
                     elementAccess,
-                    semanticModel,
-                    cancellationToken,
-                    out var targetFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                targetFormula == null ||
-                !TryTranslateAssignedValueExpression(
                     assignment.Right,
                     semanticModel,
                     cancellationToken,
-                    assignedSymbol: null,
-                    out var valueFormula) ||
-                valueFormula == null ||
-                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
+                    out var targetFormula,
+                    out var valueFormula))
             {
                 return;
             }
@@ -8067,15 +8052,12 @@ namespace PurelySharp.Symbolic
                     facts);
 
                 if (!TryCreateTupleElementSmtValue(assignedSymbol, elementNames[index], out var targetFormula) ||
-                    !CSharpSmtFormulaTranslator.TryTranslateValue(
+                    !TryCreateComparableValueFormula(
                         argumentExpression,
+                        targetFormula,
                         semanticModel,
                         cancellationToken,
-                        out var valueFormula,
-                        getSymbolVersion: null,
-                        inlineDepth: 0) ||
-                    valueFormula == null ||
-                    !SymbolicFactFactory.CanCompareSmtValues(targetFormula, valueFormula))
+                        out var valueFormula))
                 {
                     continue;
                 }
@@ -8643,14 +8625,11 @@ namespace PurelySharp.Symbolic
         {
             valueExpression = UnwrapExpression(valueExpression);
             if (valueExpression is not ConditionalAccessExpressionSyntax conditionalAccess ||
-                !CSharpSmtFormulaTranslator.TryTranslateValue(
+                !TryCreateReferenceValueFormula(
                     conditionalAccess.Expression,
                     semanticModel,
                     cancellationToken,
-                    out var receiverFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                receiverFormula is not { Kind: SmtValueKind.Reference })
+                    out var receiverFormula))
             {
                 return;
             }
@@ -8806,14 +8785,11 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (TryCreateValueFormula(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var translatedValue,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                translatedValue != null)
+                    out var translatedValue))
             {
                 valueFormula = translatedValue;
                 return true;
@@ -9415,6 +9391,97 @@ namespace PurelySharp.Symbolic
         {
             if (CSharpSmtFormulaTranslator.TryTranslateStringValue(
                     valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedFormula != null)
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateComparableValueFormula(
+            ExpressionSyntax targetExpression,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula targetFormula,
+            out SmtFormula valueFormula)
+        {
+            targetFormula = null!;
+            valueFormula = null!;
+            if (!TryCreateValueFormula(targetExpression, semanticModel, cancellationToken, out targetFormula) ||
+                !TryTranslateAssignedValueExpression(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    assignedSymbol: null,
+                    out var translatedValue) ||
+                translatedValue == null ||
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, translatedValue))
+            {
+                return false;
+            }
+
+            valueFormula = translatedValue;
+            return true;
+        }
+
+        private static bool TryCreateComparableValueFormula(
+            ExpressionSyntax valueExpression,
+            SmtFormula targetFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula valueFormula)
+        {
+            valueFormula = null!;
+            if (!TryCreateValueFormula(valueExpression, semanticModel, cancellationToken, out var translatedValue) ||
+                !SymbolicFactFactory.CanCompareSmtValues(targetFormula, translatedValue))
+            {
+                return false;
+            }
+
+            valueFormula = translatedValue;
+            return true;
+        }
+
+        private static bool TryCreateValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedFormula != null)
+            {
+                formula = translatedFormula;
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateConditionFormula(
+            ExpressionSyntax condition,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpSmtFormulaTranslator.TryTranslate(
+                    condition,
                     semanticModel,
                     cancellationToken,
                     out var translatedFormula,
