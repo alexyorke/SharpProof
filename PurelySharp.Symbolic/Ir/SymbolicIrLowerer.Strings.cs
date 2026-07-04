@@ -520,5 +520,31 @@ namespace PurelySharp.Symbolic.Ir
             var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
             return type?.SpecialType == SpecialType.System_String;
         }
+
+        private static bool TryLowerStringStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
+        {
+            if (memberSymbol is IFieldSymbol
+                {
+                    IsStatic: true,
+                    Name: nameof(string.Empty),
+                    Type.SpecialType: SpecialType.System_String,
+                } stringField &&
+                IsSystemStringType(stringField.ContainingType))
+            {
+                term = new SymbolicStringConstantTerm(string.Empty);
+                return true;
+            }
+
+            term = null!;
+            return false;
+        }
+
+        private static bool IsSystemStringType(ITypeSymbol? type)
+        {
+            return type?.SpecialType == SpecialType.System_String ||
+                type is INamedTypeSymbol namedType &&
+                string.Equals(namedType.MetadataName, "String", StringComparison.Ordinal) &&
+                string.Equals(namedType.ContainingNamespace?.ToDisplayString(), "System", StringComparison.Ordinal);
+        }
     }
 }

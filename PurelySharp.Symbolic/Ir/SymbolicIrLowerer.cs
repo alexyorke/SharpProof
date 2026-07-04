@@ -1277,27 +1277,12 @@ namespace PurelySharp.Symbolic.Ir
             var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol ??
                 context.SemanticModel.GetSymbolInfo(memberAccess.Name, context.CancellationToken).Symbol;
 
-            if (memberSymbol is IFieldSymbol
-                {
-                    IsStatic: true,
-                    Name: nameof(string.Empty),
-                    Type.SpecialType: SpecialType.System_String,
-                } stringField &&
-                IsSystemStringType(stringField.ContainingType))
+            if (TryLowerStringStaticValueMember(memberSymbol, out term))
             {
-                term = new SymbolicStringConstantTerm(string.Empty);
                 return true;
             }
 
             return TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
-        }
-
-        private static bool IsSystemStringType(ITypeSymbol? type)
-        {
-            return type?.SpecialType == SpecialType.System_String ||
-                type is INamedTypeSymbol namedType &&
-                string.Equals(namedType.MetadataName, "String", StringComparison.Ordinal) &&
-                string.Equals(namedType.ContainingNamespace?.ToDisplayString(), "System", StringComparison.Ordinal);
         }
 
         private static SymbolicCondition CreateFactCondition(SymbolicAtom atom, SyntaxNode node, string provenance)

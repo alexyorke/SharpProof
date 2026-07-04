@@ -863,10 +863,15 @@ namespace PurelySharp.Test
                 "SymbolicIrLowerer.Strings.cs"));
 
             Assert.That(coreSource, Does.Contain("internal static partial class SymbolicIrLowerer"));
+            Assert.That(coreSource, Does.Contain("TryLowerStringStaticValueMember(memberSymbol, out term)"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerRegexIsMatchInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringPredicateInvocation"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringStaticValueMember"));
+            Assert.That(coreSource, Does.Not.Contain("private static bool IsSystemStringType"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerRegexIsMatchInvocation"));
             Assert.That(stringSource, Does.Contain("private static bool TryLowerStringPredicateInvocation"));
+            Assert.That(stringSource, Does.Contain("private static bool TryLowerStringStaticValueMember"));
+            Assert.That(stringSource, Does.Contain("private static bool IsSystemStringType"));
         }
 
         [Test]
