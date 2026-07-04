@@ -169,15 +169,91 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             term = null!;
+            arrayExpression = UnwrapExpression(arrayExpression);
+            if (arrayType.Rank <= 0)
+            {
+                return false;
+            }
+
+            if (TryLowerArrayCreationTotalLengthTerm(arrayExpression, arrayType, context, out term))
+            {
+                return true;
+            }
+
+            return TryLowerTerm(arrayExpression, context, out var arrayTerm) &&
+                TryCreateArrayTotalLengthReferenceTerm(arrayTerm, arrayType, out term);
+        }
+
+        internal static bool TryCreateBuiltInLengthReferenceTerm(
+            ITypeSymbol? type,
+            SymbolicTerm reference,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (reference.Kind != SmtValueKind.Reference ||
+                type == null)
+            {
+                return false;
+            }
+
+            if (type.SpecialType == SpecialType.System_String)
+            {
+                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
+            {
+                term = new SymbolicLengthTerm(reference);
+                return true;
+            }
+
+            return type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
+                TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term);
+        }
+
+        private static bool TryCreateArrayTotalLengthReferenceTerm(
+            SymbolicTerm arrayTerm,
+            IArrayTypeSymbol arrayType,
+            out SymbolicTerm term)
+        {
+            term = null!;
+            if (arrayTerm.Kind != SmtValueKind.Reference ||
+                arrayType.Rank <= 0)
+            {
+                return false;
+            }
+
+            SymbolicTerm totalLength = new SymbolicArrayDimensionLengthTerm(arrayTerm, 0);
+            for (var dimension = 1; dimension < arrayType.Rank; dimension++)
+            {
+                totalLength = new SymbolicBinaryTerm(
+                    SymbolicBinaryTermOperator.Multiply,
+                    totalLength,
+                    new SymbolicArrayDimensionLengthTerm(arrayTerm, dimension));
+            }
+
+            term = totalLength;
+            return true;
+        }
+
+        private static bool TryLowerArrayCreationTotalLengthTerm(
+            ExpressionSyntax arrayExpression,
+            IArrayTypeSymbol arrayType,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
             if (arrayType.Rank <= 0 ||
-                !TryLowerArrayDimensionLengthTerm(arrayExpression, 0, context, out var totalLength))
+                !TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, 0, context, out var totalLength))
             {
                 return false;
             }
 
             for (var dimension = 1; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var dimensionLength))
+                if (!TryLowerArrayCreationDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out var dimensionLength))
                 {
                     return false;
                 }
@@ -389,26 +465,14 @@ namespace PurelySharp.Symbolic.Ir
                 }
 
                 if (TryLowerTerm(expression, context, out var reference) &&
-                    reference.Kind == SmtValueKind.Reference)
+                    TryCreateBuiltInLengthReferenceTerm(type, reference, out term))
                 {
-                    term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
                     return true;
                 }
             }
 
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                IsBuiltInSpanOrMemoryType(type))
-            {
-                if (TryLowerTerm(expression, context, out var receiver) &&
-                    receiver.Kind == SmtValueKind.Reference)
-                {
-                    term = new SymbolicLengthTerm(receiver);
-                    return true;
-                }
-            }
-
-            if (type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
-                TryLowerArrayTotalLengthTerm(expression, multiDimensionalArray, context, out term))
+            if (TryLowerTerm(expression, context, out var receiver) &&
+                TryCreateBuiltInLengthReferenceTerm(type, receiver, out term))
             {
                 return true;
             }

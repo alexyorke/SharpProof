@@ -1595,6 +1595,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsMultidimensionalArrayTargets()
+        {
+            var context = CreateLocalDeclarationContext(
+                "int[,] values",
+                "int[,] copy = values;");
+
+            Assert.That(
+                SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
+                    context.Symbol,
+                    context.ValueExpression,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    out var fact),
+                Is.True);
+
+            Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
+            var equality = (SmtBinaryFormula)fact;
+            Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
+            Assert.That(equality.Left, Is.TypeOf<SmtIntegerBinaryTerm>());
+            Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        }
+
+        [Test]
         public void LowerTerm_MultidimensionalArrayCreationLengthUsesSizeProduct()
         {
             var context = CreateExpressionContext(
@@ -1783,9 +1806,44 @@ namespace PurelySharp.Test
                 new SymbolicLoweringContext(semanticModel, CancellationToken.None));
         }
 
+        private static LocalDeclarationContext CreateLocalDeclarationContext(string parameters, string declaration, string declarations = "")
+        {
+            var source = $$"""
+                {{declarations}}
+                public sealed class C
+                {
+                    public void M({{parameters}})
+                    {
+                        {{declaration}}
+                    }
+                }
+                """;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicIrLocalDeclarationTest",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var declarator = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<VariableDeclaratorSyntax>()
+                .Single();
+
+            return new LocalDeclarationContext(
+                (ILocalSymbol)semanticModel.GetDeclaredSymbol(declarator)!,
+                declarator.Initializer!.Value,
+                semanticModel);
+        }
+
         private sealed record ExpressionContext(
             ExpressionSyntax Expression,
             SemanticModel SemanticModel,
             SymbolicLoweringContext LoweringContext);
+
+        private sealed record LocalDeclarationContext(
+            ILocalSymbol Symbol,
+            ExpressionSyntax ValueExpression,
+            SemanticModel SemanticModel);
     }
 }

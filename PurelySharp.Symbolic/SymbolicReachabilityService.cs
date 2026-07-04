@@ -2059,34 +2059,10 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion,
             out SymbolicTerm term)
         {
-            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-            if (type == null ||
-                type.SpecialType != SpecialType.System_String &&
-                type is not IArrayTypeSymbol { Rank: 1 } &&
-                !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
-            {
-                term = null!;
-                return false;
-            }
-
-            var reference = new SymbolicVariableTerm(
-                GetVersionedSmtVariableName(symbol, getSymbolVersion),
-                SmtValueKind.Reference);
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(reference));
-                return true;
-            }
-
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
-            {
-                term = new SymbolicLengthTerm(reference);
-                return true;
-            }
-
             term = null!;
-            return false;
+            var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
+            return TryCreateReferenceSymbolTerm(symbol, getSymbolVersion, out var reference) &&
+                SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, reference, out term);
         }
 
         private static bool TryCreateStringContentTerm(

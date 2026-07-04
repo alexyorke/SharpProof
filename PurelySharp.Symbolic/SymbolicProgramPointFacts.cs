@@ -9425,21 +9425,7 @@ namespace PurelySharp.Symbolic
             ITypeSymbol? type,
             out SymbolicTerm term)
         {
-            if (type?.SpecialType == SpecialType.System_String)
-            {
-                term = new SymbolicLengthTerm(new SymbolicStringContentTerm(receiver));
-                return true;
-            }
-
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
-            {
-                term = new SymbolicLengthTerm(receiver);
-                return true;
-            }
-
-            term = null!;
-            return false;
+            return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out term);
         }
 
         private static bool TryCreateArrayDimensionLengthFormulaForReference(

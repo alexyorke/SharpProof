@@ -1022,13 +1022,15 @@ namespace PurelySharp.Test
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayBoundInvocation"));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayTotalLengthTerm"));
+            Assert.That(coreSource, Does.Not.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryGetElementAccessValueKind"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
             Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
             Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayTotalLengthTerm"));
-            Assert.That(indexingSource, Does.Contain("TryLowerArrayTotalLengthTerm(expression, multiDimensionalArray, context, out term)"));
+            Assert.That(indexingSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
+            Assert.That(indexingSource, Does.Contain("TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term)"));
             Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLength)"));
             Assert.That(knownApisSource, Does.Contain("nameof(Array.GetLongLength)"));
@@ -1424,8 +1426,9 @@ namespace PurelySharp.Test
                 "SymbolicIrLowerer.Indexing.cs"));
 
             Assert.That(lowererSource, Does.Contain("public static bool TryLowerBuiltInLengthTerm("));
+            Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
             Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(new SymbolicStringContentTerm(reference))"));
-            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
+            Assert.That(lowererSource, Does.Contain("new SymbolicLengthTerm(reference)"));
             Assert.That(reachabilitySource, Does.Contain("return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length);"));
             Assert.That(irTriggerSource, Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)"));
             Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
@@ -5533,6 +5536,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("new SymbolicNullableValueTerm("));
             Assert.That(source, Does.Contain("new SymbolicStringContentTerm("));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out term)"));
             Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringTerm)"));
             Assert.That(source, Does.Contain("new SymbolicLengthTerm(stringLengthTerm)"));
             Assert.That(source, Does.Contain("new SymbolicArrayDimensionLengthTerm("));
@@ -5664,7 +5668,7 @@ namespace PurelySharp.Test
                 Is.LessThan(stringHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateStringValue(", StringComparison.Ordinal)));
             Assert.That(source, Does.Contain("TryCreateBuiltInLengthTerm("));
             Assert.That(source, Does.Contain("TryCreateStringContentTerm("));
-            Assert.That(source, Does.Contain("new SymbolicLengthTerm(new SymbolicStringContentTerm(reference))"));
+            Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, reference, out term)"));
             Assert.That(source, Does.Contain("new SymbolicStringContentTerm(reference)"));
         }
 
