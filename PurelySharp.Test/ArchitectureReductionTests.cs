@@ -1029,8 +1029,14 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition("));
             Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition("));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.increment-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.decrement-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated"));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated"));
+            Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.translated"));
             Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
             Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
             Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
@@ -1062,6 +1068,36 @@ namespace PurelySharp.Test
             Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex));
             Assert.That(compoundTranslatedIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(compoundFallbackIndex, Is.GreaterThan(compoundTranslatedIndex));
+            Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
+        }
+
+        [Test]
+        public void RuntimeHazardCheckedOverflowRangeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicRuntimeHazardCandidateFactory.cs"));
+            var provenances = new[]
+            {
+                "ir.runtime-hazard.checked-integral.binary-overflow",
+                "ir.runtime-hazard.checked-integral.unary-minus-overflow",
+                "ir.runtime-hazard.checked-integral.increment-overflow",
+                "ir.runtime-hazard.checked-integral.decrement-overflow",
+                "ir.runtime-hazard.checked-integral.compound-assignment-overflow",
+                "ir.runtime-hazard.checked-conversion.overflow",
+            };
+
+            foreach (var provenance in provenances)
+            {
+                var translatedIndex = source.IndexOf(provenance + ".translated", StringComparison.Ordinal);
+                var fallbackIndex = source.IndexOf("\"" + provenance + ".formula-fallback\"", StringComparison.Ordinal);
+
+                Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0), provenance);
+                Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex), provenance);
+            }
+
             Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
         }
 

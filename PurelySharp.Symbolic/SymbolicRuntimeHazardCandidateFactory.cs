@@ -1545,11 +1545,22 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    binaryExpression,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    outOfRangeFormula,
+                    "ir.runtime-hazard.checked-integral.binary-overflow.translated",
+                    out trigger))
+            {
+                return true;
+            }
+
             trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                 binaryExpression,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
             return true;
         }
@@ -1592,11 +1603,22 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    unaryExpression,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    outOfRangeFormula,
+                    "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated",
+                    out trigger))
+            {
+                return true;
+            }
+
             trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                 unaryExpression,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
             return true;
         }
@@ -1639,11 +1661,25 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
+                ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
+                : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
+            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    site,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    outOfRangeFormula,
+                    translatedProvenance,
+                    out trigger))
+            {
+                return true;
+            }
+
             trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                 site,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                outOfRangeFormula,
                 smtOperator == SmtIntegerBinaryOperator.Add
                     ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
                     : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
@@ -1719,11 +1755,22 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    assignment,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    outOfRangeFormula,
+                    "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated",
+                    out trigger))
+            {
+                return true;
+            }
+
             trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                 assignment,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                outOfRangeFormula,
                 "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
             return true;
         }
@@ -1761,11 +1808,22 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                    castExpression,
+                    SymbolicExceptionPreconditionKind.CheckedOverflow,
+                    outOfRangeFormula,
+                    "ir.runtime-hazard.checked-conversion.overflow.translated",
+                    out trigger))
+            {
+                return true;
+            }
+
             trigger = CreateFormulaBackedExceptionPreconditionTrigger(
                 castExpression,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+                outOfRangeFormula,
                 "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
             return true;
         }
