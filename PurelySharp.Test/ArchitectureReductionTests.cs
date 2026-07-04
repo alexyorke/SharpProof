@@ -2024,12 +2024,12 @@ namespace PurelySharp.Test
                 .GroupBy(static usage => usage.Text, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(12));
+            Assert.That(root.GetProperty("symbolicTranslatorShimUsageCount").GetInt32(), Is.EqualTo(11));
             Assert.That(
                 symbolicTranslatorShimCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 12,
+                    ["PurelySharp.Symbolic/SymbolicReachabilityService.cs"] = 11,
                 }));
             Assert.That(
                 symbolicTranslatorShimCountsByText,
@@ -2043,7 +2043,7 @@ namespace PurelySharp.Test
                     ["if (!CSharpSmtFormulaTranslator.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||"] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslate("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("] = 1,
-                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 2,
+                    ["if (CSharpSmtFormulaTranslator.TryTranslateValue("] = 1,
                     ["return CSharpSmtFormulaTranslator.TryTranslateValueWithPathFacts("] = 1,
                     ["if (CSharpSmtFormulaTranslator.TryTranslateBuiltInLengthValue("] = 1,
                 }));
@@ -5641,12 +5641,8 @@ namespace PurelySharp.Test
             Assert.That(valueWithPathFactsHelperIndex, Is.GreaterThan(untypedValueHelperIndex));
             Assert.That(comparableHelperIndex, Is.GreaterThan(valueWithPathFactsHelperIndex));
             Assert.That(stringNonNullIndex, Is.GreaterThan(stringHelperIndex));
-            Assert.That(valueHelperSource, Does.Contain("!ContainsDivisionOrModulo(expression)"));
-            Assert.That(valueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
-            Assert.That(valueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
-            Assert.That(
-                valueHelperSource.IndexOf("formula = encodedFormula;", StringComparison.Ordinal),
-                Is.LessThan(valueHelperSource.IndexOf("CSharpSmtFormulaTranslator.TryTranslateValue(", StringComparison.Ordinal)));
+            Assert.That(valueHelperSource, Does.Contain("TryTranslateValue("));
+            Assert.That(valueHelperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
             Assert.That(untypedValueHelperSource, Does.Contain("!ContainsDivisionOrModulo(expression)"));
             Assert.That(untypedValueHelperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
             Assert.That(untypedValueHelperSource, Does.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));

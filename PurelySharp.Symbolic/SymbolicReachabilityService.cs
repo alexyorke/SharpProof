@@ -1811,24 +1811,13 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (!ContainsDivisionOrModulo(expression) &&
-                SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                term.Kind == kind &&
-                SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
-            {
-                formula = encodedFormula;
-                return true;
-            }
-
-            if (CSharpSmtFormulaTranslator.TryTranslateValue(
+            if (TryTranslateValue(
                     expression,
                     semanticModel,
                     cancellationToken,
                     out var translatedFormula,
                     getSymbolVersion,
                     inlineDepth) &&
-                translatedFormula is { } &&
                 translatedFormula.Kind == kind)
             {
                 formula = translatedFormula;
