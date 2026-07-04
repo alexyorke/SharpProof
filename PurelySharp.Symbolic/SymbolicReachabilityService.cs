@@ -1704,6 +1704,28 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            if (smtOperator == SmtIntegerUnaryOperator.Negate)
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+                if (!ContainsDivisionOrModulo(expression) &&
+                    SymbolicIrLowerer.TryLowerTerm(expression, context, out var operand) &&
+                    operand.Kind == SmtValueKind.Int &&
+                    SymbolicIrFormulaEncoder.TryEncode(
+                        SymbolicIrLowerer.CreateIntegerInRangeCondition(
+                            new SymbolicBinaryTerm(
+                                SymbolicBinaryTermOperator.Subtract,
+                                new SymbolicIntegerConstantTerm(0),
+                                operand),
+                            minValue,
+                            maxValue,
+                            expression,
+                            "ir.integer.unary.in-range"),
+                        out formula))
+                {
+                    return true;
+                }
+            }
+
             if (!TryTranslateIntegerValue(
                     expression,
                     semanticModel,
@@ -1730,6 +1752,27 @@ namespace PurelySharp.Symbolic
             Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            if (!ContainsDivisionOrModulo(operandExpression) &&
+                SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
+                binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract &&
+                SymbolicIrLowerer.TryLowerTerm(operandExpression, context, out var operand) &&
+                operand.Kind == SmtValueKind.Int &&
+                SymbolicIrFormulaEncoder.TryEncode(
+                    SymbolicIrLowerer.CreateIntegerInRangeCondition(
+                        new SymbolicBinaryTerm(
+                            binaryOperator,
+                            operand,
+                            new SymbolicIntegerConstantTerm(1)),
+                        minValue,
+                        maxValue,
+                        operandExpression,
+                        "ir.integer.update.in-range"),
+                    out formula))
+            {
+                return true;
+            }
+
             if (!TryTranslateIntegerValue(
                     operandExpression,
                     semanticModel,

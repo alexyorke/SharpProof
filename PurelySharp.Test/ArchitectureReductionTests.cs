@@ -1591,6 +1591,10 @@ namespace PurelySharp.Test
             Assert.That(reachabilitySource, Does.Contain("\"ir.integer.in-range\""));
             Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator)"));
             Assert.That(reachabilitySource, Does.Contain("\"ir.integer.binary.in-range\""));
+            Assert.That(reachabilitySource, Does.Contain("smtOperator == SmtIntegerUnaryOperator.Negate"));
+            Assert.That(reachabilitySource, Does.Contain("\"ir.integer.unary.in-range\""));
+            Assert.That(reachabilitySource, Does.Contain("binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract"));
+            Assert.That(reachabilitySource, Does.Contain("\"ir.integer.update.in-range\""));
             Assert.That(lowererSource, Does.Contain("public static SymbolicCondition CreateIntegerInRangeCondition("));
             Assert.That(lowererSource, Does.Contain("provenance + \".lower-bound\""));
             Assert.That(lowererSource, Does.Contain("provenance + \".upper-bound\""));
