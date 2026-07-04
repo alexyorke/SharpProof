@@ -1081,6 +1081,7 @@ namespace PurelySharp.Test
             Assert.That(memberSource, Does.Contain("private static bool IsBuiltInSpanOrMemoryType"));
             Assert.That(memberSource, Does.Contain("new SymbolicLengthTerm"));
             Assert.That(memberSource, Does.Contain("new SymbolicCountTerm"));
+            Assert.That(memberSource, Does.Contain("new SymbolicIntegerConstantTerm(arrayType.Rank)"));
         }
 
         [Test]

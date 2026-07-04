@@ -25,6 +25,13 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (string.Equals(memberName, nameof(Array.Rank), StringComparison.Ordinal) &&
+                receiverType is IArrayTypeSymbol { Rank: > 0 } arrayType)
+            {
+                term = new SymbolicIntegerConstantTerm(arrayType.Rank);
+                return true;
+            }
+
             if (string.Equals(memberName, "HasValue", StringComparison.Ordinal) &&
                 TryLowerNullableHasValueTerm(memberAccess.Expression, context, out term))
             {

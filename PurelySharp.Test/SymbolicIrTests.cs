@@ -1515,6 +1515,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void LowerTerm_ArrayRankMemberUsesStaticArrayRank()
+        {
+            var context = CreateExpressionContext(
+                "int[,] matrix",
+                "matrix.Rank == 2");
+            var memberAccess = ((BinaryExpressionSyntax)context.Expression).Left;
+
+            Assert.That(SymbolicIrLowerer.TryLowerTerm(memberAccess, context.LoweringContext, out var term), Is.True);
+
+            Assert.That(term, Is.EqualTo(new SymbolicIntegerConstantTerm(2)));
+            Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtIntegerConstant(2)));
+        }
+
+        [Test]
         public void LowerTerm_ArrayGetLowerBoundInvocationUsesZeroTerm()
         {
             var context = CreateExpressionContext(
