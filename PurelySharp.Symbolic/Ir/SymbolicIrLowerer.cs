@@ -1274,6 +1274,12 @@ namespace PurelySharp.Symbolic.Ir
                     term = new SymbolicIntegerConstantTerm(1);
                     return true;
                 }
+
+                if (string.Equals(property.Name, "MinusOne", StringComparison.Ordinal))
+                {
+                    term = new SymbolicIntegerConstantTerm(-1);
+                    return true;
+                }
             }
 
             term = null!;

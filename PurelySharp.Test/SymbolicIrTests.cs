@@ -795,7 +795,7 @@ namespace PurelySharp.Test
         {
             var context = CreateExpressionContext(
                 "System.Numerics.BigInteger value",
-                "value > System.Numerics.BigInteger.Zero && value <= System.Numerics.BigInteger.One");
+                "value >= System.Numerics.BigInteger.MinusOne && value > System.Numerics.BigInteger.Zero && value <= System.Numerics.BigInteger.One");
 
             Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition), Is.True);
             Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
