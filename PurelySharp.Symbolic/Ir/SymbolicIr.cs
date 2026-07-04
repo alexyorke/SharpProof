@@ -885,6 +885,11 @@ namespace PurelySharp.Symbolic.Ir
                         return absorbingOperand;
                     }
 
+                    if (ContainsComplementaryConditionOperands(binaryCondition))
+                    {
+                        return absorbingOperand;
+                    }
+
                     operands.RemoveAll(operand => string.Equals(operand, identityOperand, StringComparison.Ordinal));
                     operands = operands.Distinct(StringComparer.Ordinal).ToList();
                     if (operands.Count == 0)
@@ -918,6 +923,43 @@ namespace PurelySharp.Symbolic.Ir
             }
 
             operands.Add(CreateConditionKey(condition));
+        }
+
+        private static bool ContainsComplementaryConditionOperands(SymbolicBinaryCondition condition)
+        {
+            var operands = new List<SymbolicCondition>();
+            CollectBinaryConditionOperands(condition, condition.Operator, operands);
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var operand in operands)
+            {
+                var key = CreateConditionKey(operand);
+                var negatedKey = CreateConditionKey(new SymbolicNotCondition(operand));
+                if (seen.Contains(negatedKey))
+                {
+                    return true;
+                }
+
+                seen.Add(key);
+            }
+
+            return false;
+        }
+
+        private static void CollectBinaryConditionOperands(
+            SymbolicCondition condition,
+            SymbolicConditionOperator binaryOperator,
+            ICollection<SymbolicCondition> operands)
+        {
+            if (condition is SymbolicBinaryCondition nested &&
+                nested.Operator == binaryOperator)
+            {
+                CollectBinaryConditionOperands(nested.Left, binaryOperator, operands);
+                CollectBinaryConditionOperands(nested.Right, binaryOperator, operands);
+                return;
+            }
+
+            operands.Add(condition);
         }
 
         private static SymbolicConditionOperator NegateConditionOperator(SymbolicConditionOperator conditionOperator)

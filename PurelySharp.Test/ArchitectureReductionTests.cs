@@ -2069,6 +2069,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicState_NormalizedProofKeySimplifiesComplementaryConditionOperands()
+        {
+            var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
+            var xPositive = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    x,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("x > 0"),
+                "test.x"));
+            var contradiction = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    xPositive,
+                    new SymbolicNotCondition(xPositive)),
+            });
+            var tautology = new SymbolicState(pathConditions: new SymbolicCondition[]
+            {
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    xPositive,
+                    new SymbolicNotCondition(xPositive)),
+            });
+
+            Assert.That(contradiction.NormalizedProofKey, Is.EqualTo(new SymbolicState(pathConditions: new[] { new SymbolicConstantCondition(false) }).NormalizedProofKey));
+            Assert.That(tautology.NormalizedProofKey, Is.EqualTo(new SymbolicState().NormalizedProofKey));
+        }
+
+        [Test]
         public void SymbolicState_NormalizedProofKeyCanonicalizesNegatedFactConditions()
         {
             var x = new SymbolicVariableTerm("x", SmtValueKind.Int);
