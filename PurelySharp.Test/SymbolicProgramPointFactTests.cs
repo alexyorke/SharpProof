@@ -379,6 +379,26 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_SelfReferentialPriorAssignmentUsesPriorIntegerValueTerm()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int input)
+    {
+        var divisor = input;
+        divisor = divisor + 1;
+        return divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == input + 1");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_NullableCoalesceAssignmentPreservesValueParts()
         {
             const string source = @"

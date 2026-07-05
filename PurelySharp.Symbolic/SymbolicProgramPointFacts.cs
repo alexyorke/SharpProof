@@ -8506,6 +8506,10 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             string provenanceRoot)
         {
+            var hadPreviousValueTerm = TryGetCurrentStateSymbolValueTerm(
+                state,
+                assignedSymbol,
+                out var previousValueTerm);
             state = RemoveStateFactsReferencingSymbol(state, assignedSymbol);
 
             var hasThrowGuard = TryGetThrowGuardedValue(
@@ -8517,13 +8521,37 @@ namespace PurelySharp.Symbolic
             var effectiveValueExpression = hasThrowGuard
                 ? throwGuardedValue
                 : valueExpression;
-            if (ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            var isSelfReferential = ExpressionReferencesSymbol(
+                effectiveValueExpression,
+                assignedSymbol,
+                semanticModel,
+                cancellationToken);
+            SymbolicTerm? selfReferentialValueTerm = null;
+            if (isSelfReferential &&
+                (!hadPreviousValueTerm ||
+                 !TryCreateSelfReferentialAssignedValueStateTerm(
+                     previousValueTerm,
+                     assignedSymbol,
+                     effectiveValueExpression,
+                     semanticModel,
+                     cancellationToken,
+                     out selfReferentialValueTerm)))
             {
                 return;
             }
 
             var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            SymbolicTerm? assignedValueTerm = null;
+            if (isSelfReferential)
+            {
+                assignedValueTerm = selfReferentialValueTerm;
+            }
+            else if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var loweredValueTerm))
+            {
+                assignedValueTerm = loweredValueTerm;
+            }
+
             if (assignedType?.SpecialType == SpecialType.System_String)
             {
                 AddAssignedStringStateFacts(
@@ -8534,14 +8562,15 @@ namespace PurelySharp.Symbolic
                     provenanceRoot);
             }
             else if (TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
-                     SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var valueTerm) &&
-                     CanCompareIrTerms(targetTerm, valueTerm))
+                     assignedValueTerm != null &&
+                     assignedValueTerm.Kind == targetTerm.Kind &&
+                     CanCompareIrTerms(targetTerm, assignedValueTerm))
             {
                 AddRelationPathFact(
                     ref state,
                     SymbolicRelationOperator.Equal,
                     targetTerm,
-                    valueTerm,
+                    assignedValueTerm,
                     effectiveValueExpression,
                     provenanceRoot + ".assigned-value");
             }
@@ -8574,6 +8603,97 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
+        }
+
+        private static bool TryCreateSelfReferentialAssignedValueStateTerm(
+            SymbolicTerm previousValueTerm,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm updatedValueTerm)
+        {
+            updatedValueTerm = null!;
+            valueExpression = UnwrapExpression(valueExpression);
+            if (previousValueTerm.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            if (IsSymbolReference(valueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                updatedValueTerm = previousValueTerm;
+                return true;
+            }
+
+            if (valueExpression is not BinaryExpressionSyntax binaryExpression)
+            {
+                return false;
+            }
+
+            if (!TryMapSelfReferentialAssignmentOperator(
+                    binaryExpression.Kind(),
+                    out var binaryOperator,
+                    out var operatorCanCommute))
+            {
+                return false;
+            }
+
+            var leftIsSelf = IsSymbolReference(binaryExpression.Left, assignedSymbol, semanticModel, cancellationToken);
+            var rightIsSelf = IsSymbolReference(binaryExpression.Right, assignedSymbol, semanticModel, cancellationToken);
+            if (leftIsSelf == rightIsSelf)
+            {
+                return false;
+            }
+
+            if (!leftIsSelf && !operatorCanCommute)
+            {
+                return false;
+            }
+
+            var otherOperand = leftIsSelf
+                ? binaryExpression.Right
+                : binaryExpression.Left;
+            if (ExpressionReferencesSymbol(otherOperand, assignedSymbol, semanticModel, cancellationToken) ||
+                !SymbolicIrLowerer.TryLowerTerm(
+                    otherOperand,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var otherValueTerm) ||
+                otherValueTerm.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            updatedValueTerm = leftIsSelf
+                ? new SymbolicBinaryTerm(binaryOperator, previousValueTerm, otherValueTerm)
+                : new SymbolicBinaryTerm(binaryOperator, otherValueTerm, previousValueTerm);
+            return true;
+        }
+
+        private static bool TryMapSelfReferentialAssignmentOperator(
+            SyntaxKind syntaxKind,
+            out SymbolicBinaryTermOperator binaryOperator,
+            out bool operatorCanCommute)
+        {
+            switch (syntaxKind)
+            {
+                case SyntaxKind.AddExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Add;
+                    operatorCanCommute = true;
+                    return true;
+                case SyntaxKind.SubtractExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Subtract;
+                    operatorCanCommute = false;
+                    return true;
+                case SyntaxKind.MultiplyExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Multiply;
+                    operatorCanCommute = true;
+                    return true;
+                default:
+                    binaryOperator = default;
+                    operatorCanCommute = false;
+                    return false;
+            }
         }
 
         private static void AddAssignedNonNullStateFacts(
