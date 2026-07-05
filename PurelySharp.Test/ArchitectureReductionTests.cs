@@ -6956,6 +6956,26 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_ContainsNormalCompletionStateBuilders()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("AddNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelNotNullParameterNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelDoesNotReturnIfNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelMemberNotNullNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelArrayCreationNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelThrowGuardNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddTopLevelDereferenceNormalCompletionStateFacts("));
+            Assert.That(source, Does.Contain("AddStableReferenceNonNullStateFact("));
+            Assert.That(source, Does.Contain("\"ir.path.normal-completion.element-access.in-range\""));
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_ContainsNativeDivideModuloCompoundAssignmentStateOperators()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -7228,6 +7248,111 @@ namespace PurelySharp.Test
             var condition = FindFactByProvenance(
                 analysis.PathState,
                 "ir.path.prior-statement.coalesce-assignment.assigned-non-null");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesCompletedReceiverNonNullState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M(object value) { var hash = value.GetHashCode(); if (value == null) { return 1; } return hash; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicCompletedReceiverState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var ifStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<IfStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                ifStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var condition = FindFactByProvenance(
+                analysis.PathState,
+                "ir.path.normal-completion.dereference.receiver-not-null");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesNotNullParameterCompletionState()
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                """
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+public static class Guard { public static void Require([NotNull] object? value) { } }
+class C { int M(string? value) { Guard.Require(value); return value.Length; } }
+""");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicNotNullParameterCompletionState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var condition = FindFactByProvenance(
+                analysis.PathState,
+                "ir.path.normal-completion.parameter-not-null");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesArrayCreationCompletionState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int[] M(int length) { var values = new int[length]; if (length < 0) { return new int[0]; } return values; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicArrayCreationCompletionState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var ifStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<IfStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                ifStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var condition = FindFactByProvenance(
+                analysis.PathState,
+                "ir.path.normal-completion.array-length.non-negative");
 
             Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
             var proof = SymbolicReachabilityService.ClassifyStateImplication(

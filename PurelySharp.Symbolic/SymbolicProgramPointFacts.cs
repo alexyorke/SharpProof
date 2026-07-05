@@ -4201,6 +4201,14 @@ namespace PurelySharp.Symbolic
                             cancellationToken,
                             "ir.path.prior-statement");
                     }
+
+                    AddNormalCompletionStateFacts(
+                        ref state,
+                        declarator.Initializer.Value,
+                        localDeclaration,
+                        includeThrowGuardFacts: false,
+                        semanticModel,
+                        cancellationToken);
                 }
 
                 return;
@@ -4308,6 +4316,14 @@ namespace PurelySharp.Symbolic
                         "ir.path.prior-statement.compound-assignment");
                 }
 
+                AddNormalCompletionStateFacts(
+                    ref state,
+                    assignment.Right,
+                    expressionStatement,
+                    assignedSymbol is not ILocalSymbol and not IParameterSymbol,
+                    semanticModel,
+                    cancellationToken);
+
                 return;
             }
 
@@ -4347,6 +4363,16 @@ namespace PurelySharp.Symbolic
                 statement,
                 semanticModel,
                 cancellationToken);
+            if (statement is ExpressionStatementSyntax completedExpressionStatement)
+            {
+                AddNormalCompletionStateFacts(
+                    ref state,
+                    completedExpressionStatement.Expression,
+                    completedExpressionStatement,
+                    includeThrowGuardFacts: true,
+                    semanticModel,
+                    cancellationToken);
+            }
         }
 
         private static void AddCompletedScopedBlockFacts(
@@ -4661,6 +4687,55 @@ namespace PurelySharp.Symbolic
             AddTopLevelDereferenceNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
         }
 
+        private static void AddNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            bool includeThrowGuardFacts,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (includeThrowGuardFacts)
+            {
+                AddTopLevelThrowGuardNormalCompletionStateFacts(
+                    ref state,
+                    expression,
+                    statement,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            AddTopLevelNotNullParameterNormalCompletionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelMemberNotNullNormalCompletionStateFacts(
+                ref state,
+                expression,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelArrayCreationNormalCompletionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelDereferenceNormalCompletionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken);
+        }
+
         private static void AddTopLevelNotNullParameterNormalCompletionFacts(
             ExpressionSyntax expression,
             StatementSyntax statement,
@@ -4687,6 +4762,41 @@ namespace PurelySharp.Symbolic
                 }
 
                 AddStableReferenceNonNullFact(argumentSyntax.Expression, statement, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddTopLevelNotNullParameterNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !ParameterHasNotNullAttribute(parameter) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
+                {
+                    continue;
+                }
+
+                AddStableReferenceNonNullStateFact(
+                    ref state,
+                    argumentSyntax.Expression,
+                    statement,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.normal-completion.parameter-not-null");
             }
         }
 
@@ -4736,6 +4846,45 @@ namespace PurelySharp.Symbolic
                         SmtBinaryOperator.NotEqual,
                         memberFormula,
                         new SmtNullConstant()));
+            }
+        }
+
+        private static void AddTopLevelMemberNotNullNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.IsStatic ||
+                !IsCurrentInstanceInvocation(invocation))
+            {
+                return;
+            }
+
+            var memberTargets = GetMemberNotNullTargets(invocationOperation.TargetMethod);
+            foreach (var memberTarget in memberTargets)
+            {
+                if (!TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, memberTarget, out var member) ||
+                    !TryGetMemberNotNullTargetType(member, out var type) ||
+                    !TryGetValueKind(type, out var kind) ||
+                    kind != SmtValueKind.Reference)
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.NotEqual,
+                    new SymbolicMemberTerm(
+                        new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference),
+                        member.Name,
+                        kind),
+                    new SymbolicNullTerm(),
+                    invocation,
+                    "ir.path.normal-completion.member-not-null");
             }
         }
 
@@ -4907,6 +5056,41 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static void AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
+                    AnyConditionSymbolInvalidatedInStatement(argumentSyntax.Expression, statement, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddReachabilityCondition(
+                    ref state,
+                    argumentSyntax.Expression,
+                    mustBeTrue: !doesNotReturnWhen,
+                    semanticModel,
+                    cancellationToken);
+            }
+        }
+
         private static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
         {
             return TryGetDoesNotReturnIfValueFromSymbol(parameter, out value) ||
@@ -5001,6 +5185,39 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static void AddTopLevelArrayCreationNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not ArrayCreationExpressionSyntax arrayCreation)
+            {
+                return;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
+            {
+                if (AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
+                    !SymbolicIrLowerer.TryLowerTerm(sizeExpression, context, out var sizeTerm) ||
+                    sizeTerm.Kind != SmtValueKind.Int)
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    sizeTerm,
+                    new SymbolicIntegerConstantTerm(0),
+                    sizeExpression,
+                    "ir.path.normal-completion.array-length.non-negative");
+            }
+        }
+
         private static void AddTopLevelThrowGuardNormalCompletionFacts(
             ExpressionSyntax expression,
             StatementSyntax statement,
@@ -5010,6 +5227,22 @@ namespace PurelySharp.Symbolic
         {
             expression = UnwrapAwaitedNormalCompletionExpression(expression);
             AddThrowGuardedExpressionFacts(expression, statement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddTopLevelThrowGuardNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddThrowGuardedExpressionStateFacts(
+                ref state,
+                expression,
+                statement,
+                semanticModel,
+                cancellationToken,
+                "ir.path.normal-completion.throw-guarded-not-null");
         }
 
         private static void AddTopLevelDereferenceNormalCompletionFacts(
@@ -5045,6 +5278,58 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static void AddTopLevelDereferenceNormalCompletionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is AwaitExpressionSyntax awaitExpression)
+            {
+                var awaitableExpression = UnwrapExpression(awaitExpression.Expression);
+                AddStableReferenceNonNullStateFact(
+                    ref state,
+                    awaitableExpression,
+                    statement,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.normal-completion.awaitable-not-null");
+                expression = awaitableExpression;
+            }
+
+            if (expression is ElementAccessExpressionSyntax elementAccess &&
+                !AnyConditionSymbolInvalidatedInStatement(elementAccess, statement, semanticModel, cancellationToken) &&
+                elementAccess.ArgumentList.Arguments.Count == 1)
+            {
+                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+                if (SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+                        elementAccess.Expression,
+                        elementAccess.ArgumentList.Arguments[0].Expression,
+                        elementAccess,
+                        "ir.path.normal-completion.element-access.in-range",
+                        context,
+                        out var inRangeCondition))
+                {
+                    state = state.AddPathCondition(inRangeCondition);
+                }
+            }
+
+            if (!TryGetTopLevelDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver))
+            {
+                return;
+            }
+
+            AddStableReferenceNonNullStateFact(
+                ref state,
+                receiver,
+                statement,
+                semanticModel,
+                cancellationToken,
+                "ir.path.normal-completion.dereference.receiver-not-null");
+        }
+
         private static bool AddStableReferenceNonNullFact(
             ExpressionSyntax expression,
             StatementSyntax statement,
@@ -5070,6 +5355,30 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool AddStableReferenceNonNullStateFact(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenance)
+        {
+            if (!IsLocalOrParameterReference(expression, semanticModel, cancellationToken) ||
+                AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            AddReferenceNullCondition(
+                ref state,
+                expression,
+                isNull: false,
+                semanticModel,
+                cancellationToken,
+                provenance);
+            return true;
         }
 
         private static bool TryGetTopLevelDereferenceReceiver(

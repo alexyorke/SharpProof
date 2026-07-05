@@ -426,9 +426,14 @@ path-fact, hazard, and ownership flows.
   string-content, non-null, built-in-length, and multidimensional
   dimension-length facts for bounded element shapes, and tuple source
   snapshots plus tuple deconstruction targets now emit native element
-  equality facts into `SymbolicState`. The remaining work is to replace the
-  other lowered formula families, especially completion and
-  self-referential assignment shapes, with native IR construction.
+  equality facts into `SymbolicState`. Top-level normal-completion facts now
+  also emit native state facts for throw-guarded non-null, `[NotNull]`
+  parameters, `DoesNotReturnIf` argument reachability, `MemberNotNull`
+  instance members, successful array-creation non-negative lengths, completed
+  dereference receiver non-null, and one-argument built-in element-access
+  in-range conditions. The remaining work is to replace the
+  other lowered formula families, especially self-referential assignment
+  shapes, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.
