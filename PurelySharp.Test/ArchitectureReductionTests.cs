@@ -6938,6 +6938,128 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("\"ir.path.prior-statement.coalesce-assignment\""));
         }
 
+        [Test]
+        public void SymbolicProgramPointFacts_ContainsNativeDivideModuloCompoundAssignmentStateOperators()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("SyntaxKind.DivideAssignmentExpression"));
+            Assert.That(source, Does.Contain("SyntaxKind.ModuloAssignmentExpression"));
+            Assert.That(source, Does.Contain("SymbolicBinaryTermOperator.Divide"));
+            Assert.That(source, Does.Contain("SymbolicBinaryTermOperator.Remainder"));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_ProjectsDivideAssignmentState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int x = 10; x /= 2; return x; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicDivideAssignmentState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var localSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "x", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
+            var condition = FindIntegerEqualityFact(analysis.PathState, variableName, 5);
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_ProjectsModuloAssignmentState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int x = 17; x %= 5; return x; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicModuloAssignmentState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var localSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "x", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
+            var condition = FindIntegerEqualityFact(analysis.PathState, variableName, 2);
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        private static bool IsIntegerEqualityFact(SymbolicFact fact, string variableName, long expectedValue)
+        {
+            return fact.Atom switch
+            {
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicVariableTerm { Name: var name, Kind: SmtValueKind.Int },
+                    Right: SymbolicIntegerConstantTerm { Value: var value }
+                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedValue => true,
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicIntegerConstantTerm { Value: var value },
+                    Right: SymbolicVariableTerm { Name: var name, Kind: SmtValueKind.Int }
+                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedValue => true,
+                _ => false
+            };
+        }
+
+        private static SymbolicFact? FindIntegerEqualityFact(SymbolicState state, string variableName, long expectedValue)
+        {
+            return state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .Select(condition => condition.Fact)
+                .Concat(state.Facts)
+                .SingleOrDefault(candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue));
+        }
+
         private static bool IsLengthEqualityFact(SymbolicFact fact, string variableName, long expectedLength)
         {
             return fact.Atom switch

@@ -2361,7 +2361,29 @@ namespace PurelySharp.Symbolic
                     case SymbolicBinaryTermOperator.Multiply:
                         updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value * rightConstant.Value);
                         return true;
+                    case SymbolicBinaryTermOperator.Divide:
+                        if (rightConstant.Value == 0)
+                        {
+                            return false;
+                        }
+
+                        updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value / rightConstant.Value);
+                        return true;
+                    case SymbolicBinaryTermOperator.Remainder:
+                        if (rightConstant.Value == 0)
+                        {
+                            return false;
+                        }
+
+                        updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value % rightConstant.Value);
+                        return true;
                 }
+            }
+
+            if ((binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) &&
+                rightTerm is SymbolicIntegerConstantTerm { Value: 0 })
+            {
+                return false;
             }
 
             updatedValue = new SymbolicBinaryTerm(binaryOperator, previousValue, rightTerm);
@@ -2382,6 +2404,12 @@ namespace PurelySharp.Symbolic
                     return true;
                 case SyntaxKind.MultiplyAssignmentExpression:
                     binaryOperator = SymbolicBinaryTermOperator.Multiply;
+                    return true;
+                case SyntaxKind.DivideAssignmentExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Divide;
+                    return true;
+                case SyntaxKind.ModuloAssignmentExpression:
+                    binaryOperator = SymbolicBinaryTermOperator.Remainder;
                     return true;
                 default:
                     binaryOperator = default;

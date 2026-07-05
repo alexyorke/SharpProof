@@ -143,11 +143,13 @@ path-fact, hazard, and ownership flows.
   native `SymbolicState` when the previous integer value term is recoverable,
   and the legacy formula path now reuses the shared reachability helper
   instead of a duplicate local increment/decrement builder.
-  Prior-assignment simple integer compound assignments such as `+=`, `-=`, and
-  `*=` now also project into native `SymbolicState` when the previous integer
-  value term and the right-hand side term are both recoverable without
-  self-reference, reducing reliance on the legacy formula shadow for that
-  bounded family.
+  Prior-assignment simple integer compound assignments such as `+=`, `-=`,
+  `*=`, `/=`, and `%=` now also project into native `SymbolicState` when the
+  previous integer value term and the right-hand side term are both
+  recoverable without self-reference, reducing reliance on the legacy
+  formula shadow for that bounded family. Division and remainder compound
+  assignments include constant folding for non-zero divisors and
+  conservative fallback for symbol-valued divisors.
   Prior-assignment coalesce assignment (`??=`) updates now also project into
   native `SymbolicState` for the bounded no-op and known-definite-replacement
   families. Known non-null reference and known-`HasValue` nullable targets skip
@@ -412,13 +414,14 @@ path-fact, hazard, and ownership flows.
   Recoverable unary increment/decrement updates now also emit native integer
   progression facts. Recoverable simple integer compound assignments now also
   emit native progression facts for bounded non-self-referential `+=`, `-=`,
-  and `*=` shapes. Recoverable coalesce assignment (`??=`) updates now also
+  `*=`, `/=`, and `%=` shapes, including constant folding for non-zero
+  divisors and conservative fallback for symbol-valued divisors. Recoverable
+  coalesce assignment (`??=`) updates now also
   emit native no-op and known-definite-replacement facts for the bounded
   reference-non-null, nullable-`HasValue`, nullable-`!HasValue`, and
   null-reference families. The remaining work is to replace the other
-  lowered formula families, especially tuple, completion, division or
-  remainder compound assignments, and self-referential assignment shapes,
-  with native IR construction.
+  lowered formula families, especially tuple, completion, and
+  self-referential assignment shapes, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.
