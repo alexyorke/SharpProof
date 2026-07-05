@@ -189,9 +189,8 @@ Consumers can use those fields to reject summaries generated from a different ru
 
 ## Remaining work tracking
 
-Backlog items for the effect-summary pipeline now live only in
-`REMAINING_ANALYZER_BACKLOG.md`.
+Public roadmap items now live in `README.md`.
 
-This document should stay descriptive: how the tool works, what evidence it
-emits, and how the analyzer consumes that evidence. It should not carry a
-parallel todo or status list.
+This document stays descriptive: how the tool works, what evidence it emits,
+and how the analyzer consumes that evidence. It should not carry a parallel
+todo or status list.

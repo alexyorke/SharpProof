@@ -2201,21 +2201,26 @@ namespace SharpProof.Test
             var root = document.RootElement;
             var modules = root.GetProperty("modules")
                 .EnumerateArray()
-                .Select(static module => module.GetProperty("module").GetString() ?? string.Empty)
+                .Select(static module => new
+                {
+                    Name = module.GetProperty("module").GetString() ?? string.Empty,
+                    Lines = module.GetProperty("lines").GetInt32(),
+                })
                 .ToArray();
             var largestFiles = root.GetProperty("largestFiles")
                 .EnumerateArray()
                 .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
                 .ToArray();
+            var otherModule = modules.SingleOrDefault(static module => module.Name == "Other");
 
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
             Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(100));
             Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(100000));
-            Assert.That(modules, Does.Contain("Symbolic"));
-            Assert.That(modules, Does.Contain("Analyzer"));
-            Assert.That(modules, Does.Contain("Tools"));
-            Assert.That(modules, Does.Contain("SearchLib"));
-            Assert.That(modules, Does.Not.Contain("Other"));
+            Assert.That(modules.Select(static module => module.Name), Does.Contain("Symbolic"));
+            Assert.That(modules.Select(static module => module.Name), Does.Contain("Analyzer"));
+            Assert.That(modules.Select(static module => module.Name), Does.Contain("Tools"));
+            Assert.That(modules.Select(static module => module.Name), Does.Contain("SearchLib"));
+            Assert.That(otherModule == null || otherModule.Lines < 100, Is.True, "Unexpected production code growth fell into the catch-all 'Other' bucket.");
             Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicProgramPointFacts.cs"));
             Assert.That(largestFiles, Does.Contain("SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs"));
             Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicSourceQueryService.cs"));
@@ -2240,8 +2245,11 @@ namespace SharpProof.Test
                 "SharpProof.Vsix",
                 "source.extension.vsixmanifest"));
             var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
+            var readmeSource = File.ReadAllText(Path.Combine(repositoryRoot, "README.source.md"));
             var capabilityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
             var complexityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
+            var effectSummaryDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
+            var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
             var shippedReleaseNotes = File.ReadAllText(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
@@ -2272,6 +2280,7 @@ namespace SharpProof.Test
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("SharpProof"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("SharpProof bounded symbolic C# analysis"));
             Assert.That(readme, Does.Contain("SharpProof"));
+            Assert.That(readme, Does.Contain("Generated from README.source.md"));
             Assert.That(readme, Does.Contain("alpha/beta quality"));
             Assert.That(readme, Does.Contain("AI-assisted iteration"));
             Assert.That(readme, Does.Contain("\"vibe-coded\""));
@@ -2288,14 +2297,30 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("--complexity"));
             Assert.That(readme, Does.Contain(@".\build-nuget.ps1"));
             Assert.That(readme, Does.Contain(@"artifacts\nuget"));
+            Assert.That(readme, Does.Contain("## Selected Examples"));
+            Assert.That(readme, Does.Contain("ReadmeGeneratedExamplesTests.ZeroAllocationsAnalyzerExample_MatchesSnapshot"));
+            Assert.That(readme, Does.Contain("ReadmeGeneratedExamplesTests.CapabilitiesCliExample_MatchesSnapshot"));
+            Assert.That(readme, Does.Contain("ReadmeGeneratedExamplesTests.ComplexityCliExample_MatchesSnapshot"));
+            Assert.That(readme, Does.Contain("docs/readme-examples/zero-allocations/input.cs"));
+            Assert.That(readme, Does.Contain("docs/readme-examples/capabilities-console/input.cs"));
+            Assert.That(readme, Does.Contain("docs/readme-examples/complexity-linear/input.cs"));
             Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
             Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
+            Assert.That(readme, Does.Contain("Separate tracked planning"));
+            Assert.That(readme, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
+            Assert.That(readmeSource, Does.Contain("## Selected Examples"));
+            Assert.That(readmeSource, Does.Contain("<!-- README_EXAMPLES -->"));
+            Assert.That(File.Exists(readmeGeneratorScript), Is.True);
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "REMAINING_ANALYZER_BACKLOG.md")), Is.False);
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "PLAN.md")), Is.False);
             Assert.That(capabilityDoc, Does.Contain("SP0015"));
             Assert.That(capabilityDoc, Does.Contain("SP0016"));
             Assert.That(capabilityDoc, Does.Contain("SP0017"));
             Assert.That(capabilityDoc, Does.Contain("--capabilities"));
             Assert.That(complexityDoc, Does.Contain("QueryComplexity"));
             Assert.That(complexityDoc, Does.Contain("--complexity"));
+            Assert.That(effectSummaryDoc, Does.Contain("Public roadmap items now live in `README.md`."));
+            Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
             Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));

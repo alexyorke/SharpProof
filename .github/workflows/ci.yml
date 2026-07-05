@@ -22,6 +22,10 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Verify generated README
+        shell: pwsh
+        run: .\scripts\Generate-Readme.ps1 -Verify
+
       - name: Validate shipping projects warning-free
         shell: pwsh
         run: .\scripts\Invoke-SharpProofReleaseValidation.ps1 -Configuration Release -NoRestore

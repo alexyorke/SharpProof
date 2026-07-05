@@ -1,0 +1,8 @@
+docs/readme-examples/capabilities-console/input.cs
+Method: Example.Log()
+Declaration kind: MethodDeclarationSyntax
+Span: 5:5-8:6
+Capabilities: IO, Console
+Conservative: False
+Sites:
+  - [invocation] IO, Console via System.Console.WriteLine(System.String? value) @ 7:9
