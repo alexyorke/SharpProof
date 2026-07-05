@@ -38,11 +38,10 @@ and method budgets, native-load fallback, and conservative unknown results.
 ## Naming Direction
 
 The codebase now uses SharpProof across packages, namespaces, diagnostics,
-configuration keys, scripts, and effect-summary file conventions. The remaining
-old-name surface is historical only: local clones or the current repository URL
-may still use the former name until hosting is renamed.
+configuration keys, scripts, effect-summary file conventions, and the GitHub
+repository. The remaining old-name surface is historical only.
 
-Suggested GitHub repository metadata for the current staged rebrand:
+Suggested GitHub repository metadata:
 
 - About: `Bounded symbolic C# analysis platform for purity, invariants, runtime hazards, ownership/resource facts, and Z3-backed proofs.`
 - Topics: `csharp`, `roslyn-analyzer`, `static-analysis`, `symbolic-execution`, `smt`, `z3`, `purity`, `runtime-hazards`, `invariants`, `dotnet`, `sharpproof`.
