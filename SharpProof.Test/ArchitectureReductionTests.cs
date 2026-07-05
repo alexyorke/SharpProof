@@ -2258,7 +2258,7 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("SharpProof"));
             Assert.That(readme, Does.Not.Contain("previously called"));
             Assert.That(readme, Does.Contain("packages, namespaces, diagnostics"));
-            Assert.That(readme, Does.Contain("scripts, and effect-summary file conventions"));
+            Assert.That(readme, Does.Contain("scripts, effect-summary file conventions, and the GitHub"));
             Assert.That(readme, Does.Contain("historical only"));
         }
 
