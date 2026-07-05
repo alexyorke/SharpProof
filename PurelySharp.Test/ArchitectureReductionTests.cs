@@ -6764,6 +6764,27 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_CollectsInlineAssignmentBranchStateBeforeSharedReachabilityFallback()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+            var helperIndex = source.IndexOf("private static void AddReachabilityCondition(", StringComparison.Ordinal);
+            var helperEndIndex = source.IndexOf("private static bool TryAddInlineAssignmentReachabilityState(", helperIndex, StringComparison.Ordinal);
+            var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+            var inlineAssignmentIndex = helperSource.IndexOf("if (TryAddInlineAssignmentReachabilityState(", StringComparison.Ordinal);
+            var sharedReachabilityIndex = helperSource.IndexOf("SymbolicReachabilityService.TryCollectBranchState(", StringComparison.Ordinal);
+
+            Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(helperEndIndex, Is.GreaterThan(helperIndex));
+            Assert.That(inlineAssignmentIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(sharedReachabilityIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(inlineAssignmentIndex, Is.LessThan(sharedReachabilityIndex));
+        }
+
+        [Test]
         public void SymbolicProgramPointAnalysis_CarriesIrAncestorState()
         {
             var (semanticModel, ifStatement) = CreateSingleIfStatement(
@@ -6787,6 +6808,52 @@ namespace PurelySharp.Test
                 condition.Fact,
                 smtAnalysis);
             Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrInlineAssignmentAncestorState()
+        {
+            var (semanticModel, ifStatement) = CreateSingleIfStatement(
+                "class C { int M(int input) { int divisor = input; if ((divisor = divisor + 1) == 0) { return divisor; } return 0; } }");
+            var returnStatement = ifStatement.Statement
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var state = analysis.PathState;
+            var assignedValueCondition = state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.inline-assignment.assigned-value",
+                    StringComparison.Ordinal));
+            var comparisonCondition = state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.inline-assignment.comparison",
+                    StringComparison.Ordinal));
+
+            Assert.That(assignedValueCondition, Is.Not.Null);
+            Assert.That(comparisonCondition, Is.Not.Null);
+            Assert.That(
+                SymbolicReachabilityService.ClassifyStateImplication(
+                    state,
+                    assignedValueCondition!.Fact,
+                    smtAnalysis).Info.Status,
+                Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(
+                SymbolicReachabilityService.ClassifyStateImplication(
+                    state,
+                    comparisonCondition!.Fact,
+                    smtAnalysis).Info.Status,
+                Is.EqualTo(SymbolicProofStatus.ProvenTrue));
         }
 
         [Test]

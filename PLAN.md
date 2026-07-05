@@ -426,6 +426,12 @@ path-fact, hazard, and ownership flows.
   `foreach` bodies now also emits native path facts before the formula shadow,
   including foreach entry non-null and length-positive facts plus loop-entry
   invariants for direct `CollectPriorAssignmentState` queries.
+  Bounded inline condition-assignment comparisons now also emit native branch
+  state in both ancestor reachability and prior-assignment block-entry paths:
+  one simple local/parameter assignment operand inside a comparison can project
+  assigned-value facts plus the post-assignment comparison relation into
+  `SymbolicState`, including right-hand assignments without old-value aliasing
+  and self-referential integer updates when a prior symbol term is known.
   Recoverable unary increment/decrement updates now also emit native integer
   progression facts. Recoverable simple integer compound assignments now also
   emit native progression facts for bounded non-self-referential `+=`, `-=`,
@@ -447,8 +453,9 @@ path-fact, hazard, and ownership flows.
   instance members, successful array-creation non-negative lengths, completed
   dereference receiver non-null, and one-argument built-in element-access
   in-range conditions. The remaining work is to replace the
-  other lowered formula families, especially self-referential assignment
-  shapes, with native IR construction.
+  other lowered formula families, especially unsupported self-referential
+  assignment shapes outside the bounded comparison-entry slice and
+  non-comparison condition-side assignments, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node
   queries can expose loop initializer facts as symbolic facts.

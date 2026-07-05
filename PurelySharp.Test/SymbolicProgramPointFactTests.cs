@@ -355,7 +355,7 @@ public class TestClass
         }
 
         [Test]
-        public void ProgramPointFacts_SelfReferentialInlineAssignmentRemainsConservative()
+        public void ProgramPointFacts_SelfReferentialInlineAssignmentUsesPriorIntegerValueTerm()
         {
             const string source = @"
 public class TestClass
@@ -375,7 +375,7 @@ public class TestClass
             var marker = FindMarker(source, "return divisor;");
             var proof = ProveAtMarker(source, marker, "divisor == 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }
 
         [Test]

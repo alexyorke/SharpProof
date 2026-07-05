@@ -118,16 +118,23 @@ namespace PurelySharp.Symbolic
                     containingBlock.Block,
                     semanticModel,
                     cancellationToken);
-                RemoveStateFactsInvalidatedByContainingBlockEntry(
-                    ref state,
-                    containingBlock.Block,
-                    semanticModel,
-                    cancellationToken);
-                AddContainingBlockEntryStateFacts(
-                    ref state,
-                    containingBlock.Block,
-                    semanticModel,
-                    cancellationToken);
+                if (!TryAddContainingBlockEntryInlineAssignmentStateFacts(
+                        ref state,
+                        containingBlock.Block,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    RemoveStateFactsInvalidatedByContainingBlockEntry(
+                        ref state,
+                        containingBlock.Block,
+                        semanticModel,
+                        cancellationToken);
+                    AddContainingBlockEntryStateFacts(
+                        ref state,
+                        containingBlock.Block,
+                        semanticModel,
+                        cancellationToken);
+                }
                 foreach (var statement in containingBlock.Block.Statements)
                 {
                     if (ReferenceEquals(statement, containingBlock.ContainingStatement))
@@ -161,16 +168,23 @@ namespace PurelySharp.Symbolic
                     siteBlock,
                     semanticModel,
                     cancellationToken);
-                RemoveStateFactsInvalidatedByContainingBlockEntry(
-                    ref state,
-                    siteBlock,
-                    semanticModel,
-                    cancellationToken);
-                AddContainingBlockEntryStateFacts(
-                    ref state,
-                    siteBlock,
-                    semanticModel,
-                    cancellationToken);
+                if (!TryAddContainingBlockEntryInlineAssignmentStateFacts(
+                        ref state,
+                        siteBlock,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    RemoveStateFactsInvalidatedByContainingBlockEntry(
+                        ref state,
+                        siteBlock,
+                        semanticModel,
+                        cancellationToken);
+                    AddContainingBlockEntryStateFacts(
+                        ref state,
+                        siteBlock,
+                        semanticModel,
+                        cancellationToken);
+                }
             }
 
             return state;
@@ -958,6 +972,16 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            if (TryAddInlineAssignmentReachabilityState(
+                    ref state,
+                    condition,
+                    mustBeTrue,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return;
+            }
+
             if (SymbolicReachabilityService.TryCollectBranchState(
                     state,
                     condition,
@@ -967,6 +991,212 @@ namespace PurelySharp.Symbolic
                     out var branchState))
             {
                 state = branchState;
+            }
+        }
+
+        private static bool TryAddInlineAssignmentReachabilityState(
+            ref SymbolicState state,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!TryCollectInlineAssignmentBranchState(
+                    state,
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var branchState))
+            {
+                return false;
+            }
+
+            state = branchState;
+            return true;
+        }
+
+        private static bool TryCollectInlineAssignmentBranchState(
+            SymbolicState state,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicState branchState)
+        {
+            branchState = state;
+            condition = UnwrapExpression(condition);
+            if (condition is PrefixUnaryExpressionSyntax negation &&
+                negation.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                return TryCollectInlineAssignmentBranchState(
+                    state,
+                    negation.Operand,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out branchState);
+            }
+
+            if (condition is not BinaryExpressionSyntax comparison ||
+                !TryGetInlineAssignmentComparisonRelationOperator(
+                    comparison.Kind(),
+                    out var relationOperator))
+            {
+                return false;
+            }
+
+            var leftAssignment = UnwrapExpression(comparison.Left) as AssignmentExpressionSyntax;
+            var rightAssignment = UnwrapExpression(comparison.Right) as AssignmentExpressionSyntax;
+            if ((leftAssignment is null) == (rightAssignment is null))
+            {
+                return false;
+            }
+
+            var assignmentIsLeft = leftAssignment != null;
+            var assignment = assignmentIsLeft ? leftAssignment! : rightAssignment!;
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
+                assignedSymbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                return false;
+            }
+
+            assignedSymbol = assignedSymbol.OriginalDefinition;
+            var siblingExpression = assignmentIsLeft
+                ? comparison.Right
+                : comparison.Left;
+            if (!assignmentIsLeft &&
+                ExpressionReferencesSymbol(
+                    siblingExpression,
+                    assignedSymbol,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return false;
+            }
+
+            if (!TryCreateAssignedValueComparisonTerm(
+                    state,
+                    assignedSymbol,
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out _) ||
+                !TryCreateSymbolTerm(assignedSymbol, out var assignedTerm))
+            {
+                return false;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (!SymbolicIrLowerer.TryLowerTerm(siblingExpression, context, out var siblingTerm))
+            {
+                return false;
+            }
+
+            var leftTerm = assignmentIsLeft
+                ? assignedTerm
+                : siblingTerm;
+            var rightTerm = assignmentIsLeft
+                ? siblingTerm
+                : assignedTerm;
+            if (!CanCompareIrTerms(leftTerm, rightTerm))
+            {
+                return false;
+            }
+
+            branchState = state;
+            AddAssignedValueStateFacts(
+                ref branchState,
+                assignedSymbol,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                "ir.path.inline-assignment");
+            var branchCondition = (SymbolicCondition)new SymbolicFactCondition(
+                SymbolicFact.Exact(
+                    new SymbolicRelationAtom(relationOperator, leftTerm, rightTerm),
+                    comparison,
+                    "ir.path.inline-assignment.comparison"));
+            if (!branchWhenTrue)
+            {
+                branchCondition = new SymbolicNotCondition(branchCondition);
+            }
+
+            branchState = branchState.AddPathCondition(branchCondition);
+            return true;
+        }
+
+        private static bool TryCreateAssignedValueComparisonTerm(
+            SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicTerm assignedValueTerm)
+        {
+            assignedValueTerm = null!;
+            var hasThrowGuard = TryGetThrowGuardedValue(
+                valueExpression,
+                out var throwGuardedValue,
+                out _,
+                out _,
+                out _);
+            var effectiveValueExpression = hasThrowGuard
+                ? throwGuardedValue
+                : valueExpression;
+            if (ExpressionReferencesSymbol(
+                    effectiveValueExpression,
+                    assignedSymbol,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return TryGetCurrentStateSymbolValueTerm(
+                        state,
+                        assignedSymbol,
+                        out var previousValueTerm) &&
+                    TryCreateSelfReferentialAssignedValueStateTerm(
+                        previousValueTerm,
+                        assignedSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out assignedValueTerm);
+            }
+
+            return SymbolicIrLowerer.TryLowerTerm(
+                effectiveValueExpression,
+                new SymbolicLoweringContext(semanticModel, cancellationToken),
+                out assignedValueTerm);
+        }
+
+        private static bool TryGetInlineAssignmentComparisonRelationOperator(
+            SyntaxKind syntaxKind,
+            out SymbolicRelationOperator relationOperator)
+        {
+            switch (syntaxKind)
+            {
+                case SyntaxKind.EqualsExpression:
+                    relationOperator = SymbolicRelationOperator.Equal;
+                    return true;
+                case SyntaxKind.NotEqualsExpression:
+                    relationOperator = SymbolicRelationOperator.NotEqual;
+                    return true;
+                case SyntaxKind.GreaterThanExpression:
+                    relationOperator = SymbolicRelationOperator.GreaterThan;
+                    return true;
+                case SyntaxKind.GreaterThanOrEqualExpression:
+                    relationOperator = SymbolicRelationOperator.GreaterThanOrEqual;
+                    return true;
+                case SyntaxKind.LessThanExpression:
+                    relationOperator = SymbolicRelationOperator.LessThan;
+                    return true;
+                case SyntaxKind.LessThanOrEqualExpression:
+                    relationOperator = SymbolicRelationOperator.LessThanOrEqual;
+                    return true;
+                default:
+                    relationOperator = default;
+                    return false;
             }
         }
 
@@ -3913,6 +4143,71 @@ namespace PurelySharp.Symbolic
             foreach (var symbol in GetContainingBlockEntryAssignedSymbols(block, semanticModel, cancellationToken))
             {
                 state = RemoveStateFactsReferencingSymbol(state, symbol);
+            }
+        }
+
+        private static bool TryAddContainingBlockEntryInlineAssignmentStateFacts(
+            ref SymbolicState state,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            switch (block.Parent)
+            {
+                case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
+                    return TryAddInlineAssignmentReachabilityState(
+                        ref state,
+                        ifStatement.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken);
+                case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
+                    when ReferenceEquals(statement, block):
+                    return TryAddInlineAssignmentReachabilityState(
+                        ref state,
+                        ifStatement.Condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken);
+                case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
+                    if (!TryAddInlineAssignmentReachabilityState(
+                            ref state,
+                            whileStatement.Condition,
+                            branchWhenTrue: true,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        return false;
+                    }
+
+                    AddPreLoopBodyInvariantStateFacts(
+                        ref state,
+                        whileStatement,
+                        whileStatement.Statement,
+                        "ir.path.while-loop-invariant",
+                        semanticModel,
+                        cancellationToken);
+                    return true;
+                case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
+                    if (forStatement.Condition == null ||
+                        !TryAddInlineAssignmentReachabilityState(
+                            ref state,
+                            forStatement.Condition,
+                            branchWhenTrue: true,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        return false;
+                    }
+
+                    AddForLoopBodyInvariantStateFacts(
+                        ref state,
+                        forStatement,
+                        semanticModel,
+                        cancellationToken);
+                    return true;
+                default:
+                    return false;
             }
         }
 
