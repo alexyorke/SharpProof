@@ -29,6 +29,8 @@ while (($line = [Console]::In.ReadLine()) -ne $null)
         continue
     }
 
+    $line = $line.TrimStart([char]0xFEFF)
+
     try
     {
         $request = $line | ConvertFrom-Json

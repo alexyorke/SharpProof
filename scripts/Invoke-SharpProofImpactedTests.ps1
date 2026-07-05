@@ -105,6 +105,15 @@ function Convert-ToRepoPath
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $normalized = $Path.Replace('\', '/')
+    if (-not [string]::IsNullOrWhiteSpace($script:RepoRoot))
+    {
+        $repoRootNormalized = $script:RepoRoot.Replace('\', '/').TrimEnd('/')
+        if ($normalized.StartsWith($repoRootNormalized + '/', [StringComparison]::OrdinalIgnoreCase))
+        {
+            $normalized = $normalized.Substring($repoRootNormalized.Length + 1)
+        }
+    }
+
     while ($normalized.StartsWith('./', [StringComparison]::Ordinal))
     {
         $normalized = $normalized.Substring(2)
@@ -1082,11 +1091,11 @@ function Format-TestWrapperCommand
     return ($parts -join ' ')
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-Push-Location $repoRoot
+$script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Push-Location $script:RepoRoot
 try
 {
-    $resolvedImpactInventoryPath = Resolve-TestImpactInventoryPath -RepoRoot $repoRoot -RequestedPath $ImpactInventoryPath
+    $resolvedImpactInventoryPath = Resolve-TestImpactInventoryPath -RepoRoot $script:RepoRoot -RequestedPath $ImpactInventoryPath
     $impactInventory = Get-TestImpactInventory -Path $resolvedImpactInventoryPath
     $inventorySummary = [ordered]@{
         loaded = $null -ne $impactInventory

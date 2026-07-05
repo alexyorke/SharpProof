@@ -11,6 +11,7 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
     {
         PropertyNameCaseInsensitive = true
     };
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly Process _process;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -45,9 +46,9 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            StandardInputEncoding = Encoding.UTF8,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardInputEncoding = Utf8NoBom,
+            StandardOutputEncoding = Utf8NoBom,
+            StandardErrorEncoding = Utf8NoBom
         };
 
         startInfo.ArgumentList.Add("-NoLogo");
