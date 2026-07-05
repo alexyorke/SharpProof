@@ -713,9 +713,24 @@ function Add-TestFilesReferencingTokens
         [string[]]$Tokens
     )
 
+    $ripgrep = Get-Command -Name 'rg' -ErrorAction SilentlyContinue
+
     foreach ($token in $Tokens)
     {
-        $matches = @(& rg -l -F $token SharpProof.Test -g '*.cs' 2>$null)
+        if ($null -ne $ripgrep)
+        {
+            $matches = @(& $ripgrep.Source -l -F $token SharpProof.Test SharpProof.ToolingTest -g '*.cs' 2>$null)
+        }
+        else
+        {
+            $matches = @(
+                Get-ChildItem -Path (Join-Path $PSScriptRoot '..\SharpProof.Test'), (Join-Path $PSScriptRoot '..\SharpProof.ToolingTest') -Recurse -Filter '*.cs' -File |
+                    Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+                    Select-String -SimpleMatch -Pattern $token -List |
+                    ForEach-Object { $_.Path }
+            )
+        }
+
         foreach ($match in $matches)
         {
             $repoPath = Convert-ToRepoPath $match
