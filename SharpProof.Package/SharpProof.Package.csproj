@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <PackageId>SharpProof</PackageId>
-    <PackageVersion>0.0.4</PackageVersion>
+    <PackageVersion>0.1.0-preview.1</PackageVersion>
     <Authors>Alex Yorke</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
@@ -18,12 +18,11 @@
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Title>SharpProof</Title>
-    <Description>SharpProof bounded symbolic C# analysis platform for purity, side effects, invariants, runtime hazards, ownership facts, and Z3-backed proofs.</Description>
-    <PackageReleaseNotes>Complete the SharpProof clean break across package IDs, diagnostics, config keys, scripts, namespaces, and effect-summary conventions.</PackageReleaseNotes>
+    <Description>SharpProof bounded symbolic C# analysis platform for purity, zero-allocation and capability contracts, invariants, runtime hazards, complexity queries, and Z3-backed proofs.</Description>
+    <PackageReleaseNotes>Public preview release of SharpProof as a bounded symbolic C# analysis platform with capability contracts, zero-allocation contracts, runtime-hazard queries, symbolic invariants, and complexity queries.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards</PackageTags>
+    <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <DevelopmentDependency>true</DevelopmentDependency>
     <NoPackageAnalysis>true</NoPackageAnalysis>
 
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAnalyzersToOutput</TargetsForTfmSpecificContentInPackage>

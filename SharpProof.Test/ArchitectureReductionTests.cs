@@ -2240,19 +2240,35 @@ namespace SharpProof.Test
                 "SharpProof.Vsix",
                 "source.extension.vsixmanifest"));
             var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
+            var capabilityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
+            var complexityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
+            var shippedReleaseNotes = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "AnalyzerReleases.Shipped.md"));
 
             Assert.That(ReadProjectElement(packageMetadata, "PackageId"), Is.EqualTo("SharpProof"));
             Assert.That(ReadProjectElement(packageMetadata, "Title"), Is.EqualTo("SharpProof"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageVersion"), Is.EqualTo("0.1.0-preview.1"));
             Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("SharpProof bounded symbolic C# analysis platform"));
-            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("SharpProof bounded symbolic C# analysis platform"));
+            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("zero-allocation and capability contracts"));
+            Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("complexity queries"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageReleaseNotes"), Does.Contain("Public preview release"));
             Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SharpProof"));
             Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
             Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("RuntimeHazards"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("Capabilities"));
+            Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("Complexity"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageId"), Is.EqualTo("SharpProof.Attributes"));
             Assert.That(ReadProjectElement(attributesMetadata, "Title"), Is.EqualTo("SharpProof Attributes"));
-            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("SharpProof symbolic C# analysis"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Version"), Is.EqualTo("0.1.0-preview.1"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("SharpProof contract attributes for bounded symbolic C# analysis"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("ZeroAllocationsAttribute"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("AllowedCapabilitiesAttribute"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SharpProof"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("Capabilities"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("ZeroAllocations"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("SharpProof"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("SharpProof bounded symbolic C# analysis"));
             Assert.That(readme, Does.Contain("SharpProof"));
@@ -2260,6 +2276,26 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("packages, namespaces, diagnostics"));
             Assert.That(readme, Does.Contain("scripts, effect-summary file conventions, and the GitHub"));
             Assert.That(readme, Does.Contain("historical only"));
+            Assert.That(readme, Does.Contain("0.1.0-preview.1"));
+            Assert.That(readme, Does.Contain("SP0013"));
+            Assert.That(readme, Does.Contain("SP0017"));
+            Assert.That(readme, Does.Contain("[ZeroAllocations]"));
+            Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
+            Assert.That(readme, Does.Contain("--capabilities"));
+            Assert.That(readme, Does.Contain("--complexity"));
+            Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
+            Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
+            Assert.That(capabilityDoc, Does.Contain("SP0015"));
+            Assert.That(capabilityDoc, Does.Contain("SP0016"));
+            Assert.That(capabilityDoc, Does.Contain("SP0017"));
+            Assert.That(capabilityDoc, Does.Contain("--capabilities"));
+            Assert.That(complexityDoc, Does.Contain("QueryComplexity"));
+            Assert.That(complexityDoc, Does.Contain("--complexity"));
+            Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
+            Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
+            Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));
+            Assert.That(shippedReleaseNotes, Does.Contain("--capabilities"));
+            Assert.That(shippedReleaseNotes, Does.Contain("--complexity"));
         }
 
         [Test]

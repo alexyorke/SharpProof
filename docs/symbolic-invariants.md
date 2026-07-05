@@ -1,5 +1,10 @@
 # Symbolic Invariant Queries
 
+Sibling symbolic query surfaces are documented separately:
+
+- [Capability analysis](capability-analysis.md)
+- [Complexity queries](complexity-queries.md)
+
 SharpProof exposes a Roslyn-based invariant query surface through the current
 `SharpProof.Symbolic` assembly. It can be used without the
 analyzer package.
@@ -129,3 +134,7 @@ Text output includes total line count, lines with program points, total program 
 For line and file aggregates, prefer `MergedInvariant` when a caller needs a conservative summary. Prefer `ObservedInvariant` or `Facts` when a caller needs every fact seen at any retained program point. `Facts` remains the raw SMT text from the symbolic engine; source-like condition text is exposed through typed path conditions and compact conservative invariant summaries. An `unknown(target)` entry means the query layer saw path facts about that target, but those facts were not common to every retained reachable-or-unknown point, so the aggregate cannot soundly claim one concrete fact.
 
 Use `--json` or `--compact-json` for machine-readable output. The CLI does not hardcode BCL predicates; it only reports facts produced from the Roslyn syntax and semantic model.
+
+Invalid source/target combinations are API misuse. The library currently throws
+`NotSupportedException` for unsupported combinations, and the CLI exits with an
+argument error for unsupported flag combinations.

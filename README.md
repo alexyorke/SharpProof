@@ -48,8 +48,8 @@ Suggested GitHub repository metadata:
 
 ## Current State
 
-- Current package metadata: `SharpProof` `0.0.4` and
-  `SharpProof.Attributes` `0.0.4`.
+- Current package metadata: `SharpProof` `0.1.0-preview.1` and
+  `SharpProof.Attributes` `0.1.0-preview.1`.
 - Product positioning is broader than the analyzer package name: the analyzer
   is one delivery surface for the symbolic analysis platform.
 - Analyzer and symbolic library target `netstandard2.0`; the symbolic CLI
@@ -75,6 +75,8 @@ the entire test surface.
 ## Common Use Cases
 
 - Enforce C# method purity with `[EnforcePure]` and `[Pure]` attributes.
+- Enforce direct zero-allocation contracts with `[ZeroAllocations]`.
+- Enforce proven capability contracts with `[AllowedCapabilities(...)]`.
 - Find side effects, unknown external calls, mutable state access, and unsafe
   purity gaps during build or in the IDE.
 - Use Z3 SMT solving to prove bounded path facts such as null guards, numeric
@@ -83,6 +85,8 @@ the entire test surface.
   preconditions as first-class query results.
 - Query symbolic invariants at a source line or syntax position from a
   standalone .NET library or CLI.
+- Query conservative method capabilities and asymptotic complexity from the
+  same symbolic library or CLI.
 - Audit runtime-failure risks such as uncaught throws, divide-by-zero,
   null dereferences, and index hazards.
 - Calibrate .NET SDK and BCL purity behavior with regenerated effect-summary
@@ -93,7 +97,7 @@ the entire test surface.
 Install the analyzer package in projects that should be checked:
 
 ```powershell
-dotnet add package SharpProof --version 0.0.4
+dotnet add package SharpProof --version 0.1.0-preview.1
 ```
 
 Use the attributes in source:
@@ -115,7 +119,7 @@ Add `SharpProof.Attributes` only when a project needs the attributes without
 installing the analyzer package:
 
 ```powershell
-dotnet add package SharpProof.Attributes --version 0.0.4
+dotnet add package SharpProof.Attributes --version 0.1.0-preview.1
 ```
 
 ## Capability Matrix
@@ -123,8 +127,10 @@ dotnet add package SharpProof.Attributes --version 0.0.4
 | Area | Status | What works today | Evidence |
 | --- | --- | --- | --- |
 | Attribute contracts | [x] | `[EnforcePure]` and `[Pure]` mark source methods for purity enforcement. `[PureExternal]` and `[Impure]` model trusted or rejected boundaries. `[AllowSynchronization]` can permit synchronization inside otherwise pure methods. | [BoundaryAttributeTests.cs](SharpProof.Test/BoundaryAttributeTests.cs), [SharpProofCodeFixTests.cs](SharpProof.Test/SharpProofCodeFixTests.cs) |
+| Zero-allocation contracts | [x] | `[ZeroAllocations]` reports one warning per direct source-visible allocation site in an annotated method-like body. The first tranche covers object creation, array creation, anonymous objects, collection expressions that materialize heap-backed values, delegate creation, boxing, and supported reference-type `with` expressions. | [ZeroAllocationContractTests.cs](SharpProof.Test/ZeroAllocationContractTests.cs), [MethodAllocationAnalyzer.cs](SharpProof.Analyzer/MethodAllocationAnalyzer.cs) |
+| Capability contracts | [x] | `[AllowedCapabilities]` enforces proven capability categories such as `FileRead`, `FileWrite`, `Network`, `Console`, `Process`, `Environment`, `Registry`, `Clock`, `Randomness`, `Reflection`, `Synchronization`, `NativeInterop`, and derived `IO`. Violations and conservative unknowns are reported per site. | [CapabilityContractTests.cs](SharpProof.Test/CapabilityContractTests.cs), [MethodCapabilityAnalyzer.cs](SharpProof.Analyzer/MethodCapabilityAnalyzer.cs) |
 | Purity diagnostics | [x] | `SP0002` reports marked methods whose bodies cannot be proven pure. `SP0003` reports misplaced purity attributes. `SP0004` suggests missing purity attributes on methods that appear pure. `SP0005` through `SP0008` cover conflicting purity attributes and synchronization attribute misuse. | [SharpProofDiagnostics.cs](SharpProof.Analyzer/SharpProofDiagnostics.cs), [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs) |
-| Optional explanation diagnostics | [x] | `SP0009` emits structured explanation data when `sharpproof_emit_explanations = true`. `SP0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence and either explanations or `sharpproof_report_bcl_fallback_guesses` are enabled. | [AnalyzerReleases.Unshipped.md](SharpProof.Analyzer/AnalyzerReleases.Unshipped.md), [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs) |
+| Optional explanation diagnostics | [x] | `SP0009` emits structured explanation data when `sharpproof_emit_explanations = true`. `SP0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence and either explanations or `sharpproof_report_bcl_fallback_guesses` are enabled. | [AnalyzerReleases.Shipped.md](SharpProof.Analyzer/AnalyzerReleases.Shipped.md), [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs) |
 | Code fixes | [x] | Code fixes add `[EnforcePure]`, remove conflicting attributes, remove invalid purity attributes, and clean up synchronization attributes. | [SharpProofCodeFixTests.cs](SharpProof.Test/SharpProofCodeFixTests.cs) |
 | Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, runtime-hazard reporting, exception summaries, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](SharpProof.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs) |
 | Baseline suppression | [x] | `SharpProof.Baseline.json` additional files can suppress known diagnostics by ID, symbol documentation ID, and path for incremental adoption. | [BaselineSuppressionTests.cs](SharpProof.Test/BaselineSuppressionTests.cs) |
@@ -137,7 +143,9 @@ dotnet add package SharpProof.Attributes --version 0.0.4
 | String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](SharpProof.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](SharpProof.Test/RegexTests.cs) |
 | Symbolic invariant API | [~] | `SharpProof.Symbolic` can query merged invariants at a line, column, syntax position, span, node, or all source lines through `SymbolicQueryService`, and can use SMT to check reachability or implication. Query results expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](SharpProof.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicQueryApi.cs](SharpProof.Symbolic/SymbolicQueryApi.cs) |
 | Symbolic runtime-hazard API | [~] | `SharpProof.Symbolic` can query proven runtime hazards at a line, span, syntax tree, or file, including direct throws, rethrows, divide-by-zero, null dereference, nullable value access, index/range hazards, casts, array covariance stores, checked overflow, negative array lengths, and dynamic null-binding hazards. Unknown candidates stay hidden by default unless explicitly requested. | [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs), [SymbolicRuntimeHazardQueryService.cs](SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs) |
-| Symbolic CLI | [x] | `Tools/SharpProof.SymbolicCli` exposes line, position, span, and all-lines invariant queries, runtime-hazard queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs), [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs), [Program.cs](Tools/SharpProof.SymbolicCli/Program.cs) |
+| Symbolic capability API | [x] | `SharpProof.Symbolic` can query the containing method-like body's proven capability categories plus per-site evidence and conservative unknown reasons. The same classification spine backs `[AllowedCapabilities]` diagnostics and CLI capability queries. | [SymbolicCapabilityQueryTests.cs](SharpProof.ToolingTest/SymbolicCapabilityQueryTests.cs), [SymbolicCapabilityService.cs](SharpProof.Symbolic/SymbolicCapabilityService.cs), [docs/capability-analysis.md](docs/capability-analysis.md) |
+| Symbolic complexity API | [~] | `SharpProof.Symbolic` can query a conservative asymptotic complexity summary such as `O(1)`, `O(n)`, `O(n * m)`, `O(n^2)`, `Unknown`, or `RecursiveUnknown` for the containing method-like body. It handles straight-line code, bounded `for` loops, supported `foreach`, some monotone `while` loops, and bounded callee composition; unsupported loop shapes or unknown callees stay conservative. | [SymbolicComplexityTests.cs](SharpProof.Test/SymbolicComplexityTests.cs), [SymbolicComplexityService.cs](SharpProof.Symbolic/SymbolicComplexityService.cs), [docs/complexity-queries.md](docs/complexity-queries.md) |
+| Symbolic CLI | [x] | `Tools/SharpProof.SymbolicCli` exposes invariant queries, runtime-hazard queries, capability queries, complexity queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs), [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs), [Program.cs](Tools/SharpProof.SymbolicCli/Program.cs) |
 | Runtime hazards and exception flow | [~] | `sharpproof_runtime_hazard_mode = sites` reports `SP0011` operation-site hazards without requiring purity attributes. `all` also emits `SP0010` method summaries. Legacy `sharpproof_report_exceptions` and `sharpproof_checked_exceptions` remain supported. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, dynamic null binding, negative array lengths, index hazards, catch filters, and some resource disposal flows. | [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs), [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](SharpProof.Test/RecursiveExceptionFlowTests.cs) |
 | Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](SharpProof.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](SharpProof.Test/DelegateTests.cs), [LinqOperationsTests.cs](SharpProof.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](SharpProof.Test/LinqSoundnessStressTests.cs) |
 | Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](SharpProof.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](SharpProof.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](SharpProof.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
@@ -162,6 +170,11 @@ dotnet add package SharpProof.Attributes --version 0.0.4
 | `SP0010` | Info | Optional escaping-exception summary emitted when `sharpproof_report_exceptions = true` or `sharpproof_runtime_hazard_mode = summaries/all`. |
 | `SP0011` | Warning | Optional uncaught operation-site exception/runtime-hazard warning emitted when `sharpproof_checked_exceptions = true` or `sharpproof_runtime_hazard_mode = sites/all`. |
 | `SP0012` | Info | Optional non-authoritative BCL purity fallback guess emitted when `sharpproof_emit_explanations = true` or `sharpproof_report_bcl_fallback_guesses = true`. |
+| `SP0013` | Warning | A method marked `[ZeroAllocations]` contains a direct source-visible allocation site. |
+| `SP0014` | Error | `[ZeroAllocations]` is applied to a non-method declaration. |
+| `SP0015` | Warning | A method marked `[AllowedCapabilities]` contains an operation or proven transitive callee that exceeds the declared capability set. |
+| `SP0016` | Warning | A method marked `[AllowedCapabilities]` contains an operation whose capability requirements could not be fully verified conservatively. |
+| `SP0017` | Error | `[AllowedCapabilities]` is applied to a non-method declaration. |
 
 ## Configuration
 
@@ -301,6 +314,39 @@ for hazard scopes, filters, and compact output notes.
 This is source-analysis infrastructure rather than a compiler modification: it
 can be pointed at user code or compiler source, but IDE/compiler inline surfacing
 is separate integration work.
+
+## Capability, Allocation, And Complexity Queries
+
+SharpProof now exposes three additional user-facing bounded analysis surfaces
+beyond purity and invariants:
+
+- `[ZeroAllocations]` is a cheap analyzer contract for direct source-visible
+  heap allocations inside a method-like body. It is intentionally syntactic and
+  does not claim whole-call-graph allocation freedom.
+- `[AllowedCapabilities(...)]` is a conservative analyzer contract over proven
+  capability categories such as `Console`, `FileRead`, `FileWrite`, `Network`,
+  `Process`, `Environment`, `Clock`, `Randomness`, `Reflection`,
+  `Synchronization`, `NativeInterop`, and derived `IO`.
+- `SymbolicQueryService.QueryCapabilities(...)` and the CLI `--capabilities`
+  mode return the containing method-like body's merged capability set, per-site
+  evidence, and conservative unknown reasons.
+- `SymbolicQueryService.QueryComplexity(...)` and the CLI `--complexity` mode
+  return a conservative method-level Big-O summary plus drivers, unknown
+  reasons, and callee summaries.
+
+Current request-shape rules are intentionally narrow:
+
+- Library capability queries support point, position, line, and node targets.
+- Library complexity queries support point, position, line, and node targets.
+- CLI `--capabilities` and `--complexity` support `--line`, `--line` with
+  `--column`, or `--position`.
+- Invalid source/target combinations are API misuse and currently throw
+  `NotSupportedException` in the library or exit with an argument error in the
+  CLI.
+
+See [docs/capability-analysis.md](docs/capability-analysis.md) and
+[docs/complexity-queries.md](docs/complexity-queries.md) for examples, target
+support, and conservative fallback details.
 
 ## Effect Summaries
 

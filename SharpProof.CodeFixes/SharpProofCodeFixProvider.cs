@@ -265,16 +265,16 @@ namespace SharpProof
         private static bool IsAllowSynchronizationAttribute(INamedTypeSymbol? t) =>
             t != null && t.Name == "AllowSynchronizationAttribute" && t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
 
-        private async Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr, CancellationToken cancellationToken)
+        private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr, CancellationToken cancellationToken)
         {
             var host = GetHostForAttribute(attr);
             if (host == null)
-                return document;
+                return Task.FromResult(document);
             var newHost = RemoveAttributeFromHost(host, attr);
             if (ReferenceEquals(host, newHost))
-                return document;
+                return Task.FromResult(document);
             var newRoot = root.ReplaceNode(host, newHost);
-            return document.WithSyntaxRoot(newRoot);
+            return Task.FromResult(document.WithSyntaxRoot(newRoot));
         }
 
         private async Task<Document> RemoveAttributesMatchingAsync(

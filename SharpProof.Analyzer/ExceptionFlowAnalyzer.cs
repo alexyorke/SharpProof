@@ -380,7 +380,8 @@ namespace SharpProof.Analyzer
                 yield break;
             }
 
-            if (TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals, out var exactReceiverType))
+            if (propertyReferenceOperation.Property != null &&
+                TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals, out var exactReceiverType))
             {
                 var exactAccessor = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
                     propertyReferenceOperation.Property,
@@ -455,7 +456,7 @@ namespace SharpProof.Analyzer
             {
                 if (TryGetOperatorOrConversionMethod(operation, out var method))
                 {
-                    var key = method.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) +
+                    var key = method!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) +
                         "@" +
                         operation.Syntax.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                         ":" +

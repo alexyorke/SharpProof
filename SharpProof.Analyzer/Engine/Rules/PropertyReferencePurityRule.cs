@@ -146,7 +146,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 hasTrustedGeneratedPurity &&
                 generatedPurity.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol?.ToDisplayString() ?? propertySymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -202,7 +202,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (!generatedPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
+                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol?.ToDisplayString() ?? propertySymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         propertyReferenceOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(

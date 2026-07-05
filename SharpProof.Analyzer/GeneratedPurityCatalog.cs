@@ -396,7 +396,7 @@ namespace SharpProof.Analyzer
                     }
 
                     yield return new SummaryEntry(
-                        symbol.Trim(),
+                        symbol!.Trim(),
                         purityEntry,
                         SummaryAssemblyIdentity.FromJson(entryElement),
                         SummaryMethodIdentity.FromJson(entryElement),
@@ -457,11 +457,11 @@ namespace SharpProof.Analyzer
             var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
             var effectVisibilityClassification = CompatibilityHelpers.GetTrimmedStringProperty(element, "EffectVisibilityClassification") ?? "unknown";
             purityEntry = new PurityEntry(
-                classification.Trim(),
+                classification!.Trim(),
                 categories,
                 string.IsNullOrWhiteSpace(primaryCategory)
                     ? PrimaryCategoryFallback(categories)
-                    : primaryCategory.Trim(),
+                    : primaryCategory!.Trim(),
                 ReadBooleanProperty(element, "HasFreshArrayAllocationEvidence"),
                 freshnessClassification,
                 ReadBooleanProperty(element, "HasUnsupportedEffects"),
@@ -499,7 +499,7 @@ namespace SharpProof.Analyzer
                 var value = valueElement.GetString();
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    var trimmedValue = value.Trim();
+                    var trimmedValue = value!.Trim();
                     if (seen.Add(trimmedValue))
                     {
                         builder.Add(trimmedValue);
@@ -519,7 +519,7 @@ namespace SharpProof.Analyzer
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
-                var trimmed = value.Trim();
+                var trimmed = value!.Trim();
                 keys.Add(trimmed);
 
                 foreach (var compatibilityKey in GetMetadataRefKindCompatibilityKeys(trimmed))

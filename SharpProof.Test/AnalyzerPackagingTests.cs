@@ -106,6 +106,8 @@ namespace TestNamespace {
             Assert.That(properties["RepositoryUrl"], Is.EqualTo("https://github.com/alexyorke/SharpProof"));
             Assert.That(properties["RepositoryType"], Is.EqualTo("git"));
             Assert.That(properties["PackageReadmeFile"], Is.EqualTo("README.md"));
+            Assert.That(properties.ContainsKey("DevelopmentDependency"), Is.False,
+                "The public SharpProof analyzer package should not be marked as a development-only dependency.");
             Assert.That(properties.Values, Has.None.Contains("HERE_OR_DELETE"));
         }
 
@@ -385,7 +387,10 @@ namespace TestNamespace {
         public void BuiltAnalyzerPackage_ShouldShip_SymbolicSearchLibAndZ3Dependencies_WhenPackageExists()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var packagePath = Path.Combine(repositoryRoot, "SharpProof.Package", "bin", "Release", "SharpProof.0.0.4.nupkg");
+            var packageVersion = ReadPackageVersion(
+                Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
+                "PackageVersion");
+            var packagePath = Path.Combine(repositoryRoot, "SharpProof.Package", "bin", "Release", $"SharpProof.{packageVersion}.nupkg");
             if (!File.Exists(packagePath))
             {
                 Assert.Inconclusive("Build the package before verifying package contents.");
@@ -398,6 +403,19 @@ namespace TestNamespace {
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SearchLib.dll"));
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
+
+            var nuspecEntry = archive.Entries.Single(entry =>
+                string.Equals(entry.FullName, "SharpProof.nuspec", StringComparison.Ordinal));
+            using var nuspecStream = nuspecEntry.Open();
+            var nuspecDocument = XDocument.Load(nuspecStream);
+            var developmentDependencyValue = nuspecDocument
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "developmentDependency", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .SingleOrDefault();
+
+            Assert.That(string.IsNullOrWhiteSpace(developmentDependencyValue), Is.True,
+                "The public SharpProof analyzer package should not ship developmentDependency metadata.");
         }
 
         [Test]
@@ -742,6 +760,18 @@ public static class TestClass
             Assert.That(properties["PackageReadmeFile"], Is.EqualTo("README.md"));
             Assert.That(properties["Description"], Does.Contain("PureExternal"));
             Assert.That(properties["Description"], Does.Contain("Impure"));
+        }
+
+        private static string ReadPackageVersion(string projectPath, string elementName)
+        {
+            var document = XDocument.Load(projectPath);
+            var value = document
+                .Descendants(elementName)
+                .Select(static element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(string.IsNullOrWhiteSpace(value), Is.False,
+                $"Expected {elementName} in project file '{projectPath}'.");
+            return value!;
         }
 
         private static string FindRepositoryRoot()

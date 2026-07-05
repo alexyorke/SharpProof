@@ -445,15 +445,23 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
+                    var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
+                    if (selectedBranch == null)
+                    {
+                        return false;
+                    }
+
                     return HasStableFreshMutableObjectValueInOperation(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        selectedBranch,
                         initializerSyntax,
                         semanticModel,
                         visitedLocals);
                 }
 
-                return HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenTrue, initializerSyntax, semanticModel, visitedLocals) ||
-                       HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenFalse, initializerSyntax, semanticModel, visitedLocals);
+                return (conditionalOperation.WhenTrue != null &&
+                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenTrue, initializerSyntax, semanticModel, visitedLocals)) ||
+                       (conditionalOperation.WhenFalse != null &&
+                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenFalse, initializerSyntax, semanticModel, visitedLocals));
             }
 
             if (initializerOperation is ICoalesceOperation coalesceOperation)

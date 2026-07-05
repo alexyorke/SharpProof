@@ -1268,8 +1268,17 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
+                    var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
+                    if (selectedBranch == null)
+                    {
+                        escapeSyntax = null!;
+                        escapeSymbol = null!;
+                        catalogSource = string.Empty;
+                        return false;
+                    }
+
                     return TryFindMutableCollectionReturnEscape(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        selectedBranch,
                         semanticModel,
                         out escapeSyntax,
                         out escapeSymbol,
@@ -1277,17 +1286,18 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
 
                 return TryFindMutableCollectionReturnEscape(
-                           conditionalOperation.WhenTrue,
+                           conditionalOperation.WhenTrue!,
                            semanticModel,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
-                       TryFindMutableCollectionReturnEscape(
+                       (conditionalOperation.WhenFalse != null &&
+                        TryFindMutableCollectionReturnEscape(
                            conditionalOperation.WhenFalse,
                            semanticModel,
                            out escapeSyntax,
                            out escapeSymbol,
-                           out catalogSource);
+                           out catalogSource));
             }
 
             if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
@@ -1445,8 +1455,17 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
+                    var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
+                    if (selectedBranch == null)
+                    {
+                        escapeSyntax = null!;
+                        escapeSymbol = null!;
+                        catalogSource = string.Empty;
+                        return false;
+                    }
+
                     return TryFindFreshMutableObjectReturnEscape(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        selectedBranch,
                         semanticModel,
                         currentState,
                         out escapeSyntax,
@@ -1455,19 +1474,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
 
                 return TryFindFreshMutableObjectReturnEscape(
-                           conditionalOperation.WhenTrue,
+                           conditionalOperation.WhenTrue!,
                            semanticModel,
                            currentState,
                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
-                       TryFindFreshMutableObjectReturnEscape(
+                       (conditionalOperation.WhenFalse != null &&
+                        TryFindFreshMutableObjectReturnEscape(
                            conditionalOperation.WhenFalse,
                            semanticModel,
                            currentState,
                            out escapeSyntax,
                            out escapeSymbol,
-                           out catalogSource);
+                           out catalogSource));
             }
 
             if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)

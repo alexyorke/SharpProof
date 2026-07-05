@@ -32,7 +32,12 @@ namespace SharpProof.Analyzer
             }
 
             var value = valueElement.GetString();
-            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value!.Trim();
         }
 
         private static char ToHexChar(int value)

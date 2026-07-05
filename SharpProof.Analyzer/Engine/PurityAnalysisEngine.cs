@@ -3401,8 +3401,14 @@ namespace SharpProof.Analyzer.Engine
             }
 
             returnedSemanticModel = semanticModel.Compilation.GetSemanticModel(callableSyntax.SyntaxTree);
-            returnedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax));
-            return returnedOperation != null;
+            var extractedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax)!);
+            if (extractedOperation == null)
+            {
+                return false;
+            }
+
+            returnedOperation = extractedOperation;
+            return true;
         }
 
         private static bool CanExtractSingleReturnedValue(IMethodSymbol methodSymbol)
@@ -4531,7 +4537,7 @@ namespace SharpProof.Analyzer.Engine
         {
             concreteType = null!;
 
-            if (!IsSystemTypeSymbol(typeSymbol))
+            if (typeSymbol == null || !IsSystemTypeSymbol(typeSymbol))
             {
                 return false;
             }
@@ -4543,7 +4549,8 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var containingAssembly = typeSymbol.ContainingAssembly;
-            if (containingAssembly?.GetTypeByMetadataName("System.RuntimeType") is not INamedTypeSymbol runtimeType)
+            if (containingAssembly == null ||
+                containingAssembly.GetTypeByMetadataName("System.RuntimeType") is not INamedTypeSymbol runtimeType)
             {
                 return false;
             }

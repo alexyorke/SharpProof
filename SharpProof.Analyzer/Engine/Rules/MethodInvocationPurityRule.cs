@@ -3466,7 +3466,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (hasExactReceiverType &&
                 knownReceiverType != null &&
                 (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, methodSymbol.ContainingType?.OriginalDefinition) ||
-                 DerivesFrom(knownReceiverType, methodSymbol.ContainingType)))
+                 (methodSymbol.ContainingType != null && DerivesFrom(knownReceiverType, methodSymbol.ContainingType))))
             {
                 return false;
             }

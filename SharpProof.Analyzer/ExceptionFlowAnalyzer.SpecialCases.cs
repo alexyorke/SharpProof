@@ -29,7 +29,7 @@ namespace SharpProof.Analyzer
 
                 if (TryResolveDelegateTarget(invocation, semanticModel, cancellationToken, knownTargets, out var targetMethod))
                 {
-                    yield return new MethodCallCandidate(invocation, targetMethod);
+                    yield return new MethodCallCandidate(invocation, targetMethod!);
                 }
             }
         }
@@ -49,24 +49,24 @@ namespace SharpProof.Analyzer
                         continue;
                     }
 
-                    if (variable.Initializer?.Value is ExpressionSyntax initializer &&
-                        semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol targetMethod)
-                    {
-                        knownTargets[localSymbol.OriginalDefinition] = targetMethod;
-                    }
+                if (variable.Initializer?.Value is ExpressionSyntax initializer &&
+                    semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol targetMethod)
+                {
+                    knownTargets[localSymbol.OriginalDefinition] = targetMethod;
                 }
             }
+        }
             else if (node is AssignmentExpressionSyntax assignment &&
                      TryGetInvokedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var localSymbol))
             {
                 if (assignment.Right is ExpressionSyntax rightExpression &&
                     semanticModel.GetSymbolInfo(rightExpression, cancellationToken).Symbol is IMethodSymbol targetMethod)
                 {
-                    knownTargets[localSymbol] = targetMethod;
+                    knownTargets[localSymbol!] = targetMethod;
                 }
                 else
                 {
-                    knownTargets.Remove(localSymbol);
+                    knownTargets.Remove(localSymbol!);
                 }
             }
         }
@@ -84,7 +84,7 @@ namespace SharpProof.Analyzer
                 return false;
             }
 
-            return knownTargets.TryGetValue(localSymbol, out targetMethod);
+            return knownTargets.TryGetValue(localSymbol!, out targetMethod);
         }
 
         private static bool TryGetInvokedLocalSymbol(

@@ -22,6 +22,10 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Validate shipping projects warning-free
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofReleaseValidation.ps1 -Configuration Release -NoRestore
+
       - name: Build solution
         run: dotnet build SharpProof.sln --configuration Release --no-restore
 

@@ -99,7 +99,7 @@ namespace SharpProof.Analyzer
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
-                var trimmed = value.Trim();
+                var trimmed = value!.Trim();
                 keys.Add(trimmed);
 
                 foreach (var compatibilityKey in GetMetadataRefKindCompatibilityKeys(trimmed))

@@ -8,11 +8,14 @@
 		<AssemblyName>SharpProof.Demo</AssemblyName>
 		<RootNamespace>SharpProof.Demo</RootNamespace>
 		<IsPackable>false</IsPackable>
+		<NoWarn>$(NoWarn);SP0002</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
 		<ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\SearchLib\SearchLib.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 		<ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
