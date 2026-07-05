@@ -4,7 +4,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using SearchLib.Smt;
 
 namespace SharpProof.Test
 {
@@ -4055,6 +4057,91 @@ public class TestClass
             {
                 File.Delete(sourcePath);
             }
+        }
+
+        [Test]
+        public void ClassifyTriggerCore_RejectsFormulaFallbackHazardPreconditions()
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");
+            var node = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var subject = new SymbolicVariableTerm("value", SmtValueKind.Int);
+            var zeroFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    subject,
+                    new SymbolicIntegerConstantTerm(0)),
+                node,
+                "path.zero");
+            var fallbackTrigger = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    subject,
+                    new SymbolicFactCondition(zeroFact)),
+                node,
+                "ir.runtime-hazard.divide-by-zero.formula-fallback");
+            var analysis = new SymbolicProgramPointAnalysis(
+                node.SpanStart,
+                Array.Empty<SmtFormula>(),
+                new SymbolicState(new[] { zeroFact }, new SymbolicCondition[] { new SymbolicFactCondition(zeroFact) }),
+                SymbolicReachability.Reachable,
+                "reachable",
+                SymbolicSmtDiagnostics.NotConfigured,
+                node);
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+                analysis,
+                node,
+                new SmtVariable("trigger#1_2", SmtValueKind.Bool),
+                fallbackTrigger,
+                smtAnalysis);
+
+            Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unsupported));
+            Assert.That(reason, Is.EqualTo("unsupported_formula_fallback"));
+            Assert.That(proof, Is.Null);
+        }
+
+        [Test]
+        public void ClassifyTriggerCore_PreservesIrBackedHazardProofs()
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");
+            var node = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var subject = new SymbolicVariableTerm("value", SmtValueKind.Int);
+            var zeroFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    subject,
+                    new SymbolicIntegerConstantTerm(0)),
+                node,
+                "path.zero");
+            var irTrigger = SymbolicFact.Exact(
+                new SymbolicExceptionPreconditionAtom(
+                    SymbolicExceptionPreconditionKind.DivideByZero,
+                    subject,
+                    new SymbolicFactCondition(zeroFact)),
+                node,
+                "ir.runtime-hazard.divide-by-zero");
+            var analysis = new SymbolicProgramPointAnalysis(
+                node.SpanStart,
+                Array.Empty<SmtFormula>(),
+                new SymbolicState(new[] { zeroFact }, new SymbolicCondition[] { new SymbolicFactCondition(zeroFact) }),
+                SymbolicReachability.Reachable,
+                "reachable",
+                SymbolicSmtDiagnostics.NotConfigured,
+                node);
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+                analysis,
+                node,
+                new SmtVariable("trigger#1_2", SmtValueKind.Bool),
+                irTrigger,
+                smtAnalysis);
+
+            Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(reason, Is.Not.Empty);
+            Assert.That(proof, Is.Not.Null);
+            Assert.That(proof!.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
         }
 
         private static SymbolicRuntimeHazardQueryResult QueryLine(

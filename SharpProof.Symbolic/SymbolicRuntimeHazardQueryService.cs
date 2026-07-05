@@ -409,7 +409,7 @@ namespace SharpProof.Symbolic
                 category = ExceptionCategories.DefiniteThrowNull;
             }
 
-            var (status, reason, proofInfo) = ClassifyTrigger(
+            var (status, reason, proofInfo) = ClassifyTriggerCore(
                 analysis,
                 candidate.Site,
                 triggerCondition,
@@ -523,7 +523,7 @@ namespace SharpProof.Symbolic
                 : null;
         }
 
-        private static (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo? Proof) ClassifyTrigger(
+        internal static (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo? Proof) ClassifyTriggerCore(
             SymbolicProgramPointAnalysis analysis,
             SyntaxNode sourceNode,
             SmtFormula triggerCondition,
@@ -555,6 +555,11 @@ namespace SharpProof.Symbolic
                 return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false", null);
             }
 
+            if (IsFallbackDerivedTriggerPrecondition(triggerPrecondition))
+            {
+                return (SymbolicRuntimeHazardStatus.Unsupported, "unsupported_formula_fallback", null);
+            }
+
             if (triggerPrecondition != null &&
                 TryClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis, out var irResult))
             {
@@ -580,6 +585,17 @@ namespace SharpProof.Symbolic
             }
 
             return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason, formulaTruth.Info);
+        }
+
+        private static bool IsFallbackDerivedTriggerPrecondition(SymbolicFact? triggerPrecondition)
+        {
+            if (triggerPrecondition == null)
+            {
+                return false;
+            }
+
+            return triggerPrecondition.Provenance.EndsWith(".formula-fallback", StringComparison.Ordinal) ||
+                   triggerPrecondition.Provenance.EndsWith(".fallback", StringComparison.Ordinal);
         }
 
         private static bool TryClassifyIrTrigger(

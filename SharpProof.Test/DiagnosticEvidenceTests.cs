@@ -11373,6 +11373,28 @@ public class TestClass
         }
 
         [Test]
+        public async Task Sp0004_MetadataBclFallbackGuessOnly_DoesNotSuggestMissingPurityAttribute()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return System.Experimental.NumericFacts.Normalize(value);
+    }
+}",
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId),
+                Is.False);
+        }
+
+        [Test]
         public async Task Sp0012_MetadataBclFallback_CanBeReportedWithoutFullExplanations()
         {
             using var fixture = CreateMetadataOnlyAssemblyFixture(
