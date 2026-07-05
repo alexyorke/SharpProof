@@ -6935,6 +6935,7 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("coalesceAssignmentIsKnownNoOp"));
             Assert.That(source, Does.Contain("IsKnownNullReferenceSymbol(state, assignedSymbol.OriginalDefinition)"));
             Assert.That(source, Does.Contain("IsKnownNullableNoValueSymbol(state, assignedSymbol.OriginalDefinition)"));
+            Assert.That(source, Does.Contain("AddAssignedNonNullStateFacts("));
             Assert.That(source, Does.Contain("\"ir.path.prior-statement.coalesce-assignment\""));
         }
 
@@ -7060,35 +7061,13 @@ namespace PurelySharp.Test
                 .SingleOrDefault(candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue));
         }
 
-        private static bool IsLengthEqualityFact(SymbolicFact fact, string variableName, long expectedLength)
-        {
-            return fact.Atom switch
-            {
-                SymbolicRelationAtom
-                {
-                    Operator: SymbolicRelationOperator.Equal,
-                    Left: SymbolicLengthTerm { Value: SymbolicVariableTerm { Name: var name } },
-                    Right: SymbolicIntegerConstantTerm { Value: var value }
-                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
-                       value == expectedLength => true,
-                SymbolicRelationAtom
-                {
-                    Operator: SymbolicRelationOperator.Equal,
-                    Left: SymbolicIntegerConstantTerm { Value: var value },
-                    Right: SymbolicLengthTerm { Value: SymbolicVariableTerm { Name: var name } }
-                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
-                       value == expectedLength => true,
-                _ => false
-            };
-        }
-
-        private static SymbolicFact? FindLengthEqualityFact(SymbolicState state, string variableName, long expectedLength)
+        private static SymbolicFact? FindFactByProvenance(SymbolicState state, string provenance)
         {
             return state.PathConditions
                 .OfType<SymbolicFactCondition>()
                 .Select(condition => condition.Fact)
                 .Concat(state.Facts)
-                .SingleOrDefault(candidate => IsLengthEqualityFact(candidate, variableName, expectedLength));
+                .SingleOrDefault(candidate => string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal));
         }
 
         private static string DescribeState(SymbolicState state)
@@ -7118,12 +7097,6 @@ namespace PurelySharp.Test
                 .DescendantNodesAndSelf()
                 .OfType<ReturnStatementSyntax>()
                 .Single();
-            var localSymbol = tree.GetRoot()
-                .DescendantNodesAndSelf()
-                .OfType<VariableDeclaratorSyntax>()
-                .Select(node => semanticModel.GetDeclaredSymbol(node))
-                .OfType<ILocalSymbol>()
-                .Single(symbol => string.Equals(symbol.Name, "values", StringComparison.Ordinal));
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var analysis = new SymbolicInvariantService().AnalyzeAt(
@@ -7131,8 +7104,9 @@ namespace PurelySharp.Test
                 semanticModel,
                 smtAnalysis,
                 CancellationToken.None);
-            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
-            var condition = FindLengthEqualityFact(analysis.PathState, variableName, 1);
+            var condition = FindFactByProvenance(
+                analysis.PathState,
+                "ir.path.prior-statement.coalesce-assignment.assigned-non-null");
 
             Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
             var proof = SymbolicReachabilityService.ClassifyStateImplication(
@@ -7156,12 +7130,6 @@ namespace PurelySharp.Test
                 .DescendantNodesAndSelf()
                 .OfType<ReturnStatementSyntax>()
                 .Single();
-            var localSymbol = tree.GetRoot()
-                .DescendantNodesAndSelf()
-                .OfType<VariableDeclaratorSyntax>()
-                .Select(node => semanticModel.GetDeclaredSymbol(node))
-                .OfType<ILocalSymbol>()
-                .Single(symbol => string.Equals(symbol.Name, "values", StringComparison.Ordinal));
             using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
             var analysis = new SymbolicInvariantService().AnalyzeAt(
@@ -7169,8 +7137,9 @@ namespace PurelySharp.Test
                 semanticModel,
                 smtAnalysis,
                 CancellationToken.None);
-            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
-            var condition = FindLengthEqualityFact(analysis.PathState, variableName, 2);
+            var condition = FindFactByProvenance(
+                analysis.PathState,
+                "ir.path.prior-statement.assigned-non-null");
 
             Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
             var proof = SymbolicReachabilityService.ClassifyStateImplication(

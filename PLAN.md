@@ -419,7 +419,10 @@ path-fact, hazard, and ownership flows.
   coalesce assignment (`??=`) updates now also
   emit native no-op and known-definite-replacement facts for the bounded
   reference-non-null, nullable-`HasValue`, nullable-`!HasValue`, and
-  null-reference families. The remaining work is to replace the other
+  null-reference families, and native assigned-value state now mirrors the
+  legacy formula-side definitely-non-null reference projection so those
+  coalesce branches can preserve or re-establish IR non-null facts directly.
+  The remaining work is to replace the other
   lowered formula families, especially tuple, completion, and
   self-referential assignment shapes, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and

@@ -8227,6 +8227,13 @@ namespace PurelySharp.Symbolic
                     provenanceRoot + ".assigned-value");
             }
 
+            AddAssignedNonNullStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
             AddAssignedLengthStateFacts(
                 ref state,
                 assignedSymbol,
@@ -8234,6 +8241,30 @@ namespace PurelySharp.Symbolic
                 assignedType,
                 context,
                 provenanceRoot);
+        }
+
+        private static void AddAssignedNonNullStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
+            if (!IsDefinitelyNonNullReferenceValue(valueExpression, semanticModel, cancellationToken) ||
+                !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
+                targetReference.Kind != SmtValueKind.Reference)
+            {
+                return;
+            }
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.NotEqual,
+                targetReference,
+                new SymbolicNullTerm(),
+                valueExpression,
+                provenanceRoot + ".assigned-non-null");
         }
 
         private static void AddAssignedStringStateFacts(
