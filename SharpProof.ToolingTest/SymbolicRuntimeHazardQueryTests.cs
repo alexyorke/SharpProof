@@ -4144,6 +4144,43 @@ public class TestClass
             Assert.That(proof!.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
         }
 
+        [Test]
+        public void UnsupportedRuntimeHazard_MapsToExplicitPublicProofMetadata()
+        {
+            var hazard = new SymbolicRuntimeHazard(
+                "Hazards.cs",
+                SymbolicRuntimeHazardKind.DivideByZero,
+                SymbolicRuntimeHazardStatus.Unsupported,
+                "unsupported_formula_fallback",
+                "System.DivideByZeroException",
+                "definite_divide_by_zero",
+                "DivideExpression",
+                "10 / divisor",
+                10,
+                22,
+                5,
+                16,
+                5,
+                16,
+                5,
+                28,
+                "trigger#10_22",
+                triggerPrecondition: null,
+                mergedInvariantText: "divisor == 0",
+                pathConditions: Array.Empty<string>(),
+                symbolicFacts: Array.Empty<SymbolicFactInfo>(),
+                reachability: SymbolicReachability.Reachable,
+                reachabilityReason: "reachable",
+                proofInfo: null,
+                smtDiagnostics: SymbolicSmtDiagnostics.NotConfigured);
+
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unsupported));
+            Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+            Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.None));
+            Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+            Assert.That(hazard.Proof.Reason, Is.EqualTo("unsupported_formula_fallback"));
+        }
+
         private static SymbolicRuntimeHazardQueryResult QueryLine(
             string source,
             string marker,
