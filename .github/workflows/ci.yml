@@ -48,22 +48,31 @@ jobs:
           path: SharpProof.Vsix/bin/Release/*.vsix
           if-no-files-found: warn
 
-      - name: Package NuGet
-        run: dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --output nupkgs
+      - name: Package NuGet packages
+        run: |
+          dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs
+          dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs
 
       - name: Validate NuGet package contents
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem nupkgs -Filter SharpProof.*.nupkg -File |
+          $analyzerPackages = @(Get-ChildItem nupkgs -Filter SharpProof.*.nupkg -File |
             Where-Object { $_.Name -notlike "SharpProof.Attributes.*" } |
             Sort-Object Name)
+          $attributePackages = @(Get-ChildItem nupkgs -Filter SharpProof.Attributes.*.nupkg -File |
+            Sort-Object Name)
 
-          if ($packages.Count -ne 1) {
-            $found = if ($packages.Count -eq 0) { "<none>" } else { $packages.Name -join ", " }
-            throw "Expected exactly one SharpProof analyzer package, found $($packages.Count): $found"
+          if ($analyzerPackages.Count -ne 1) {
+            $found = if ($analyzerPackages.Count -eq 0) { "<none>" } else { $analyzerPackages.Name -join ", " }
+            throw "Expected exactly one SharpProof analyzer package, found $($analyzerPackages.Count): $found"
           }
 
-          $package = $packages[0]
+          if ($attributePackages.Count -ne 1) {
+            $found = if ($attributePackages.Count -eq 0) { "<none>" } else { $attributePackages.Name -join ", " }
+            throw "Expected exactly one SharpProof.Attributes package, found $($attributePackages.Count): $found"
+          }
+
+          $package = $analyzerPackages[0]
           $entries = tar -tf $package.FullName
           $requiredEntries = @(
             "README.md",
@@ -77,6 +86,19 @@ jobs:
           foreach ($entry in $requiredEntries) {
             if ($entries -notcontains $entry) {
               throw "Package $($package.Name) is missing required entry: $entry"
+            }
+          }
+
+          $attributesPackage = $attributePackages[0]
+          $attributesEntries = tar -tf $attributesPackage.FullName
+          $requiredAttributeEntries = @(
+            "README.md",
+            "lib/netstandard2.0/SharpProof.Attributes.dll"
+          )
+
+          foreach ($entry in $requiredAttributeEntries) {
+            if ($attributesEntries -notcontains $entry) {
+              throw "Package $($attributesPackage.Name) is missing required entry: $entry"
             }
           }
 

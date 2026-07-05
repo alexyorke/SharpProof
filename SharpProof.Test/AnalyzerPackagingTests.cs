@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -419,6 +421,87 @@ namespace TestNamespace {
         }
 
         [Test]
+        public async Task BuiltAnalyzerPackage_WhenConsumedByDisposableProject_ReportsAnalyzerDiagnostics_WhenPackageExists()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packageVersion = ReadPackageVersion(
+                Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
+                "PackageVersion");
+            var packageSource = Path.Combine(repositoryRoot, "nupkgs");
+            var packagePath = Path.Combine(packageSource, $"SharpProof.{packageVersion}.nupkg");
+            if (!File.Exists(packagePath))
+            {
+                Assert.Inconclusive("Build the package before verifying external package consumption.");
+            }
+
+            var probeRoot = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "analyzer-package-consumer-" + Guid.NewGuid().ToString("N"));
+            var packageCache = Path.Combine(probeRoot, ".nuget");
+
+            Directory.CreateDirectory(probeRoot);
+            try
+            {
+                var newResult = await RunDotnetAsync(
+                    probeRoot,
+                    packageCache,
+                    "new",
+                    "classlib",
+                    "--framework",
+                    "net8.0",
+                    "--name",
+                    "Probe").ConfigureAwait(false);
+                Assert.That(newResult.ExitCode, Is.EqualTo(0), newResult.Output);
+
+                var projectDirectory = Path.Combine(probeRoot, "Probe");
+                var addPackageResult = await RunDotnetAsync(
+                    projectDirectory,
+                    packageCache,
+                    "add",
+                    "package",
+                    "SharpProof",
+                    "--version",
+                    packageVersion,
+                    "--source",
+                    packageSource).ConfigureAwait(false);
+                Assert.That(addPackageResult.ExitCode, Is.EqualTo(0), addPackageResult.Output);
+
+                File.WriteAllText(
+                    Path.Combine(projectDirectory, "Class1.cs"),
+                    """
+using System;
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [EnforcePure]
+    public int ReadClock() => DateTime.Now.Second;
+}
+""");
+
+                var buildResult = await RunDotnetAsync(
+                    projectDirectory,
+                    packageCache,
+                    "build",
+                    "--no-restore",
+                    "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+
+                Assert.That(buildResult.ExitCode, Is.Not.EqualTo(0), buildResult.Output);
+                Assert.That(buildResult.Output, Does.Contain("SP0002"),
+                    "The packed SharpProof analyzer should report SP0002 when consumed from a disposable project.");
+            }
+            finally
+            {
+                if (Directory.Exists(probeRoot))
+                {
+                    Directory.Delete(probeRoot, recursive: true);
+                }
+            }
+        }
+
+        [Test]
         public void SymbolicCli_ShouldUseSymbolicLibrary_NotAnalyzerProject()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -762,6 +845,19 @@ public static class TestClass
             Assert.That(properties["Description"], Does.Contain("Impure"));
         }
 
+        [Test]
+        public void CiWorkflow_ShouldRun_AllTestLanes_AndPackBothNuGetPackages()
+        {
+            var workflowPath = Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml");
+            var source = File.ReadAllText(workflowPath);
+
+            Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Main"));
+            Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Tooling"));
+            Assert.That(source, Does.Contain("dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs"));
+            Assert.That(source, Does.Contain("dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs"));
+            Assert.That(source, Does.Contain("SharpProof.Attributes package"));
+        }
+
         private static string ReadPackageVersion(string projectPath, string elementName)
         {
             var document = XDocument.Load(projectPath);
@@ -788,6 +884,42 @@ public static class TestClass
             }
 
             throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
+        }
+
+        private static async Task<ProcessResult> RunDotnetAsync(
+            string workingDirectory,
+            string packageCacheDirectory,
+            params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            startInfo.Environment["NUGET_PACKAGES"] = packageCacheDirectory;
+
+            using var process = new Process { StartInfo = startInfo };
+            process.Start();
+
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120)).ConfigureAwait(false);
+            var output = new StringBuilder()
+                .AppendLine(await standardOutput.ConfigureAwait(false))
+                .AppendLine(await standardError.ConfigureAwait(false))
+                .ToString();
+            return new ProcessResult(process.ExitCode, output);
         }
 
         private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)
@@ -834,5 +966,7 @@ public static class TestClass
                 .Cast<MetadataReference>()
                 .ToImmutableArray();
         }
+
+        private readonly record struct ProcessResult(int ExitCode, string Output);
     }
 }

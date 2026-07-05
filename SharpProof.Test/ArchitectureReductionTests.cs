@@ -2272,6 +2272,9 @@ namespace SharpProof.Test
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("SharpProof"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("SharpProof bounded symbolic C# analysis"));
             Assert.That(readme, Does.Contain("SharpProof"));
+            Assert.That(readme, Does.Contain("alpha/beta quality"));
+            Assert.That(readme, Does.Contain("AI-assisted iteration"));
+            Assert.That(readme, Does.Contain("\"vibe-coded\""));
             Assert.That(readme, Does.Not.Contain("previously called"));
             Assert.That(readme, Does.Contain("packages, namespaces, diagnostics"));
             Assert.That(readme, Does.Contain("scripts, effect-summary file conventions, and the GitHub"));
@@ -2283,6 +2286,8 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
             Assert.That(readme, Does.Contain("--capabilities"));
             Assert.That(readme, Does.Contain("--complexity"));
+            Assert.That(readme, Does.Contain(@".\build-nuget.ps1"));
+            Assert.That(readme, Does.Contain(@"artifacts\nuget"));
             Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
             Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
             Assert.That(capabilityDoc, Does.Contain("SP0015"));

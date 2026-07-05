@@ -6,6 +6,24 @@ side-effect detection, symbolic invariants, runtime-hazard and exception-flow
 checks, build-time generated effect-summary data, Z3/SMT reasoning, code
 fixes, attributes, and a standalone symbolic query library/CLI.
 
+## Preview Status
+
+SharpProof is still preview software. Treat the current branch and packages as
+alpha/beta quality rather than production-hardened tooling.
+
+The project has also been developed through rapid AI-assisted iteration, or
+"vibe-coded" development in the informal sense: broad feature growth, fast
+refactoring, and heavy test coverage, but not the kind of long-lived
+stabilization, compatibility discipline, or external production mileage that a
+mature analyzer platform would normally have.
+
+That means you should expect rough edges:
+
+- analyzer false positives and false negatives
+- unsupported C# or library shapes that stay conservative or unknown
+- public API, CLI, configuration, and diagnostic-surface changes between preview releases
+- incomplete packaging/publication polish while the release process is still being finalized
+
 The analyzer does not execute user code and does not attempt an unbounded
 whole-program proof. When it cannot prove a fact within the implemented rules
 and budgets, it stays conservative: purity falls back to `SP0002` for methods
@@ -94,7 +112,23 @@ the entire test surface.
 
 ## Quick Start
 
-Install the analyzer package in projects that should be checked:
+The package IDs and versions below are the intended public install surface, but
+as of this preview branch neither `SharpProof` nor `SharpProof.Attributes` is
+published to NuGet.org yet.
+
+For local preview use, build a local feed from this repo and install from that
+feed:
+
+```powershell
+.\build-nuget.ps1 -Configuration Release
+dotnet add package SharpProof --version 0.1.0-preview.1 --source .\artifacts\nuget
+```
+
+The main analyzer package already includes the attributes assembly for normal
+package consumers.
+
+Once the packages are published, install the analyzer package in projects that
+should be checked with:
 
 ```powershell
 dotnet add package SharpProof --version 0.1.0-preview.1
@@ -116,7 +150,8 @@ public sealed class Calculator
 ```
 
 Add `SharpProof.Attributes` only when a project needs the attributes without
-installing the analyzer package:
+installing the analyzer package. For local preview builds, point `dotnet add`
+at the same `.\artifacts\nuget` feed:
 
 ```powershell
 dotnet add package SharpProof.Attributes --version 0.1.0-preview.1
