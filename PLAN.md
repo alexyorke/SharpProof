@@ -126,6 +126,10 @@ path-fact, hazard, and ownership flows.
   `SymbolicState` also detects contradictory exact ownership, disposal, and
   resource-lifetime states syntactically. The proof spine must keep growing
   into the only internal bridge from IR facts to solver formulas.
+  Query-side proof encoding now also rewrites transient terms, conditions,
+  and facts through the current `SymbolicState` symbol-version map before SMT
+  encoding, so versioned path state can answer ordinary unversioned proof
+  queries and safe-divisor checks without mutating the stored state facts.
   Reachability state-path encoding now delegates through a shared
   `SymbolicProofService.TryEncodeStatePathConditions` helper instead of
   constructing a null-scoped proof service ad hoc at the reachability call

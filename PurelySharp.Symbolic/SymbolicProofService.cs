@@ -105,6 +105,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            term = RewriteQueryTermToCurrentVersions(term, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
@@ -125,6 +126,21 @@ namespace PurelySharp.Symbolic
             SyntaxNode sourceNode,
             out SmtFormula formula)
         {
+            return TryEncodeConditionWithPathState(
+                condition,
+                state,
+                sourceNode,
+                rewriteQueryVersions: true,
+                out formula);
+        }
+
+        private static bool TryEncodeConditionWithPathState(
+            SymbolicCondition condition,
+            SymbolicState state,
+            SyntaxNode sourceNode,
+            bool rewriteQueryVersions,
+            out SmtFormula formula)
+        {
             if (condition == null)
             {
                 throw new ArgumentNullException(nameof(condition));
@@ -141,6 +157,11 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            if (rewriteQueryVersions)
+            {
+                condition = RewriteQueryConditionToCurrentVersions(condition, state);
+            }
+
             if (state.IsContradictory)
             {
                 return SymbolicIrFormulaEncoder.TryEncode(condition, out formula);
@@ -711,6 +732,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            fact = RewriteQueryFactToCurrentVersions(fact, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -771,6 +793,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            condition = RewriteQueryConditionToCurrentVersions(condition, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -847,6 +870,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            branchCondition = RewriteQueryConditionToCurrentVersions(branchCondition, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -896,6 +920,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            condition = RewriteQueryConditionToCurrentVersions(condition, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -977,6 +1002,7 @@ namespace PurelySharp.Symbolic
             }
 
             state = NormalizeState(state);
+            triggerPrecondition = RewriteQueryFactToCurrentVersions(triggerPrecondition, state);
             if (state.IsContradictory)
             {
                 return SymbolicIrProofResult.Syntactic(
@@ -1142,6 +1168,27 @@ namespace PurelySharp.Symbolic
         private static SymbolicState NormalizeState(SymbolicState state)
         {
             return state.Normalize();
+        }
+
+        private static SymbolicTerm RewriteQueryTermToCurrentVersions(SymbolicTerm term, SymbolicState state)
+        {
+            return state.SymbolVersions.Count == 0
+                ? term
+                : SymbolicIrVersionRewriter.RewriteToCurrentVersions(term, state.SymbolVersions);
+        }
+
+        private static SymbolicCondition RewriteQueryConditionToCurrentVersions(SymbolicCondition condition, SymbolicState state)
+        {
+            return state.SymbolVersions.Count == 0
+                ? condition
+                : SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, state.SymbolVersions);
+        }
+
+        private static SymbolicFact RewriteQueryFactToCurrentVersions(SymbolicFact fact, SymbolicState state)
+        {
+            return state.SymbolVersions.Count == 0
+                ? fact
+                : SymbolicIrVersionRewriter.RewriteToCurrentVersions(fact, state.SymbolVersions);
         }
 
         private static bool TryClassifySyntacticConditionTruth(
@@ -1368,7 +1415,12 @@ namespace PurelySharp.Symbolic
 
             foreach (var condition in state.PathConditions)
             {
-                if (!TryEncodeConditionWithPathState(condition, state, s_syntheticProofNode, out var formula))
+                if (!TryEncodeConditionWithPathState(
+                        condition,
+                        state,
+                        s_syntheticProofNode,
+                        rewriteQueryVersions: false,
+                        out var formula))
                 {
                     skippedUnsupported = true;
                     continue;

@@ -5571,6 +5571,93 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProofService_RewritesQueryFactsToCurrentSymbolVersions()
+        {
+            var currentX = new SymbolicVariableTerm("proof_version_x@v1", SmtValueKind.Int);
+            var stateFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    currentX,
+                    new SymbolicIntegerConstantTerm(5)),
+                SyntaxFactory.ParseExpression("proof_version_x = 5"),
+                "test.state");
+            var queriedFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    new SymbolicVariableTerm("proof_version_x", SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(5)),
+                SyntaxFactory.ParseExpression("proof_version_x == 5"),
+                "test.query");
+            var state = new SymbolicState(new[] { stateFact })
+                .WithSymbolVersion("proof_version_x", 1);
+
+            var result = SymbolicReachabilityService.ClassifyStateImplication(state, queriedFact, smtAnalysis: null);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(result.Info.Reason, Is.EqualTo("ir_state_contains_fact"));
+        }
+
+        [Test]
+        public void SymbolicProofService_RewritesQueryConditionsToCurrentSymbolVersions()
+        {
+            var currentX = new SymbolicVariableTerm("proof_version_condition_x@v2", SmtValueKind.Int);
+            var stateCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    currentX,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("proof_version_condition_x > 0"),
+                "test.state"));
+            var queriedCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThan,
+                    new SymbolicVariableTerm("proof_version_condition_x", SmtValueKind.Int),
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("proof_version_condition_x > 0"),
+                "test.query"));
+            var state = new SymbolicState(pathConditions: new[] { stateCondition })
+                .WithSymbolVersion("proof_version_condition_x", 2);
+
+            var result = SymbolicReachabilityService.ClassifyStateConditionTruth(state, queriedCondition, smtAnalysis: null);
+
+            Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            Assert.That(result.Info.Backend, Is.EqualTo(SymbolicProofBackend.Syntactic));
+            Assert.That(result.Info.Reason, Is.EqualTo("ir_state_contains_condition"));
+        }
+
+        [Test]
+        public void SymbolicProofService_RewritesQueryTermsToCurrentSymbolVersionsForSafeDivisors()
+        {
+            var currentDivisor = new SymbolicVariableTerm("proof_version_divisor@v1", SmtValueKind.Int);
+            var nonZeroFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    currentDivisor,
+                    new SymbolicIntegerConstantTerm(0)),
+                SyntaxFactory.ParseExpression("proof_version_divisor != 0"),
+                "test.state");
+            var state = new SymbolicState(new[] { nonZeroFact })
+                .WithSymbolVersion("proof_version_divisor", 1);
+            var term = new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Divide,
+                new SymbolicIntegerConstantTerm(10),
+                new SymbolicVariableTerm("proof_version_divisor", SmtValueKind.Int));
+
+            var success = SymbolicProofService.TryEncodeTermWithPathState(
+                term,
+                state,
+                SyntaxFactory.ParseExpression("10 / proof_version_divisor"),
+                out var formula);
+
+            Assert.That(success, Is.True);
+            Assert.That(formula, Is.EqualTo(new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                new SmtIntegerConstant(10),
+                new SmtVariable("proof_version_divisor@v1", SmtValueKind.Int))));
+        }
+
+        [Test]
         public void SymbolicProofService_TimeoutReasonMapsToPublicUnknownReason()
         {
             var value = new SymbolicVariableTerm("proof_timeout_value", SmtValueKind.String);
