@@ -251,6 +251,9 @@ path-fact, hazard, and ownership flows.
   through the IR indexing partial as conditional integer terms, restoring
   length proofs that depended on the legacy formula-side conditional length
   fallback.
+  `System.Array.Empty<T>()` invocation lengths now lower through the IR
+  indexing partial as integer constant 0, restoring empty-array length
+  proofs that depended on the legacy formula-side `Array.Empty` recognizer.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms. Unsupported
   `System.Range`/`System.Index` symbol flows at the reachability boundary now
