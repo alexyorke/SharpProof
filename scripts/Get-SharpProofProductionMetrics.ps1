@@ -65,7 +65,7 @@ try
             [pscustomobject]@{
                 path = $repoPath
                 module = Get-ModuleName $repoPath
-                lines = (Get-Content -LiteralPath $_.FullName | Measure-Object -Line).Lines
+                lines = [int](Get-Content -LiteralPath $_.FullName | Measure-Object -Line).Lines
             }
         } |
         Sort-Object path
@@ -75,8 +75,8 @@ try
         ForEach-Object {
             [pscustomobject]@{
                 module = $_.Name
-                files = $_.Count
-                lines = ($_.Group | Measure-Object lines -Sum).Sum
+                files = [int]$_.Count
+                lines = [int](($_.Group | Measure-Object lines -Sum).Sum)
             }
         } |
         Sort-Object lines -Descending
@@ -87,8 +87,8 @@ try
 
     $report = [ordered]@{
         schemaVersion = 1
-        totalFiles = $files.Count
-        totalLines = ($files | Measure-Object lines -Sum).Sum
+        totalFiles = [int]$files.Count
+        totalLines = [int](($files | Measure-Object lines -Sum).Sum)
         modules = @($modules)
         largestFiles = @($largestFiles)
     }
