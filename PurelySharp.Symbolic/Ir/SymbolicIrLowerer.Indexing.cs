@@ -790,6 +790,38 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryLowerBuiltInLengthTerm(coalesceExpression.Left, context, out var coalesceLeftLength) &&
+                TryLowerBuiltInLengthTerm(coalesceExpression.Right, context, out var coalesceRightLength) &&
+                coalesceLeftLength.Kind == SmtValueKind.Int &&
+                coalesceRightLength.Kind == SmtValueKind.Int &&
+                TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeftReceiver) &&
+                coalesceLeftReceiver.Kind == SmtValueKind.Reference)
+            {
+                term = new SymbolicConditionalTerm(
+                    CreateRelationCondition(
+                        SymbolicRelationOperator.NotEqual,
+                        coalesceLeftReceiver,
+                        new SymbolicNullTerm(),
+                        coalesceExpression.Left,
+                        "ir.coalesce.left-not-null"),
+                    coalesceLeftLength,
+                    coalesceRightLength);
+                return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalLengthExpression &&
+                TryLowerBuiltInLengthTerm(conditionalLengthExpression.WhenTrue, context, out var whenTrueLength) &&
+                TryLowerBuiltInLengthTerm(conditionalLengthExpression.WhenFalse, context, out var whenFalseLength) &&
+                whenTrueLength.Kind == SmtValueKind.Int &&
+                whenFalseLength.Kind == SmtValueKind.Int &&
+                TryLowerCondition(conditionalLengthExpression.Condition, context, out var lengthCondition))
+            {
+                term = new SymbolicConditionalTerm(lengthCondition, whenTrueLength, whenFalseLength);
+                return true;
+            }
+
             if (TryLowerTerm(expression, context, out var receiver) &&
                 TryCreateBuiltInLengthReferenceTerm(type, receiver, out term))
             {

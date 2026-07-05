@@ -246,6 +246,11 @@ path-fact, hazard, and ownership flows.
   integer constants, restoring array-creation length proofs that were lost
   when the legacy nullable assignment fact path stopped contributing to the
   shared length formula pipeline.
+  Coalesce-expression lengths such as `input ?? new int[1]` and conditional
+  expression lengths such as `flag ? new int[1] : new int[2]` now lower
+  through the IR indexing partial as conditional integer terms, restoring
+  length proofs that depended on the legacy formula-side conditional length
+  fallback.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms. Unsupported
   `System.Range`/`System.Index` symbol flows at the reachability boundary now
