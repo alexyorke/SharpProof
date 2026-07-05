@@ -422,8 +422,12 @@ path-fact, hazard, and ownership flows.
   null-reference families, and native assigned-value state now mirrors the
   legacy formula-side definitely-non-null reference projection so those
   coalesce branches can preserve or re-establish IR non-null facts directly.
-  The remaining work is to replace the other
-  lowered formula families, especially tuple, completion, and
+  Tuple literal assignments now also emit native tuple-element equality,
+  string-content, non-null, built-in-length, and multidimensional
+  dimension-length facts for bounded element shapes, and tuple source
+  snapshots plus tuple deconstruction targets now emit native element
+  equality facts into `SymbolicState`. The remaining work is to replace the
+  other lowered formula families, especially completion and
   self-referential assignment shapes, with native IR construction.
 - `for` initial-entry queries now merge ancestor, prior-statement, and
   initializer compatibility shadows into `SymbolicState`, so public node

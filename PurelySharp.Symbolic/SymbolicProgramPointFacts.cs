@@ -4209,6 +4209,16 @@ namespace PurelySharp.Symbolic
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                if (TryHandleTupleDeconstructionDeclarationState(ref state, assignment, semanticModel, cancellationToken))
+                {
+                    return;
+                }
+
+                if (TryHandleTupleAssignmentState(ref state, assignment, semanticModel, cancellationToken))
+                {
+                    return;
+                }
+
                 var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 if (assignedSymbol != null)
                 {
@@ -8241,6 +8251,20 @@ namespace PurelySharp.Symbolic
                 assignedType,
                 context,
                 provenanceRoot);
+            AddTupleElementAssignedValueStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
+            AddTupleElementSourceSymbolSnapshotStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
         }
 
         private static void AddAssignedNonNullStateFacts(
@@ -8319,6 +8343,345 @@ namespace PurelySharp.Symbolic
                 valueLength,
                 valueExpression,
                 provenanceRoot + ".assigned-length");
+        }
+
+        private static void AddTupleElementAssignedValueStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not TupleExpressionSyntax tupleExpression ||
+                !TryGetTupleElementStorageNames(assignedSymbol, tupleExpression.Arguments.Count, out var elementNames))
+            {
+                return;
+            }
+
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            for (var index = 0; index < tupleExpression.Arguments.Count; index++)
+            {
+                var argumentExpression = tupleExpression.Arguments[index].Expression;
+                if (ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddTupleElementAssignedValueStateFacts(
+                    ref state,
+                    assignedSymbol,
+                    elementNames[index],
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    context,
+                    provenanceRoot + ".tuple-element");
+            }
+        }
+
+        private static void AddTupleElementAssignedValueStateFacts(
+            ref SymbolicState state,
+            ISymbol tupleSymbol,
+            string elementName,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SymbolicLoweringContext context,
+            string provenanceRoot)
+        {
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+                !TryCreateTupleElementTerm(tupleSymbol, elementName, out var targetTerm))
+            {
+                return;
+            }
+
+            if (elementType.SpecialType == SpecialType.System_String &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetTerm, out var targetString) &&
+                SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetString,
+                    valueString,
+                    valueExpression,
+                    provenanceRoot + ".assigned-string");
+            }
+            else if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm) &&
+                     CanCompareIrTerms(targetTerm, valueTerm))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    valueTerm,
+                    valueExpression,
+                    provenanceRoot + ".assigned-value");
+            }
+
+            if (IsDefinitelyNonNullReferenceValue(valueExpression, semanticModel, cancellationToken) &&
+                targetTerm.Kind == SmtValueKind.Reference)
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.NotEqual,
+                    targetTerm,
+                    new SymbolicNullTerm(),
+                    valueExpression,
+                    provenanceRoot + ".assigned-non-null");
+            }
+
+            if (targetTerm.Kind == SmtValueKind.Reference &&
+                TryCreateBuiltInLengthTerm(targetTerm, elementType, out var targetLength) &&
+                SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength) &&
+                CanCompareIrTerms(targetLength, valueLength))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetLength,
+                    valueLength,
+                    valueExpression,
+                    provenanceRoot + ".assigned-length");
+            }
+
+            if (targetTerm.Kind != SmtValueKind.Reference ||
+                elementType is not IArrayTypeSymbol { Rank: > 1 } arrayType)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryCreateArrayDimensionLengthTerm(targetTerm, arrayType, dimension, out var targetDimensionLength) ||
+                    !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(valueExpression, dimension, context, out var valueDimensionLength) ||
+                    !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetDimensionLength,
+                    valueDimensionLength,
+                    valueExpression,
+                    provenanceRoot + ".assigned-dimension-length");
+            }
+        }
+
+        private static void AddTupleElementSourceSymbolSnapshotStateFacts(
+            ref SymbolicState state,
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
+            if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                    UnwrapExpression(valueExpression),
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceSymbol) ||
+                SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol) ||
+                !TryGetTupleElementStorageNames(assignedSymbol, expectedCount: 0, out var targetElementNames) ||
+                !TryGetTupleElementStorageNames(sourceSymbol, targetElementNames.Length, out var sourceElementNames))
+            {
+                return;
+            }
+
+            for (var index = 0; index < targetElementNames.Length; index++)
+            {
+                if (!TryCreateTupleElementTerm(assignedSymbol, targetElementNames[index], out var targetElement) ||
+                    !TryCreateTupleElementTerm(sourceSymbol, sourceElementNames[index], out var sourceElement) ||
+                    !CanCompareIrTerms(targetElement, sourceElement))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetElement,
+                    sourceElement,
+                    valueExpression,
+                    provenanceRoot + ".tuple-element.snapshot");
+            }
+        }
+
+        private static bool TryHandleTupleDeconstructionDeclarationState(
+            ref SymbolicState state,
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
+                declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation)
+            {
+                return false;
+            }
+
+            var targetSymbols = new List<ISymbol?>();
+            foreach (var variableDesignation in leftDesignation.Variables)
+            {
+                if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation)
+                {
+                    return true;
+                }
+
+                if (singleVariableDesignation.Identifier.ValueText == "_")
+                {
+                    targetSymbols.Add(null);
+                    continue;
+                }
+
+                if (semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
+                {
+                    return true;
+                }
+
+                targetSymbols.Add(localSymbol.OriginalDefinition);
+            }
+
+            var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
+            if (ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
+            {
+                return true;
+            }
+
+            AddTupleElementTargetStateFacts(
+                ref state,
+                targetSymbols,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                "ir.path.prior-statement.tuple-target");
+            return true;
+        }
+
+        private static bool TryHandleTupleAssignmentState(
+            ref SymbolicState state,
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not TupleExpressionSyntax leftTuple)
+            {
+                return false;
+            }
+
+            var targetSymbols = new List<ISymbol?>();
+            foreach (var argument in leftTuple.Arguments)
+            {
+                if (argument.Expression is IdentifierNameSyntax identifier &&
+                    identifier.Identifier.ValueText == "_")
+                {
+                    targetSymbols.Add(null);
+                    continue;
+                }
+
+                var targetSymbol = semanticModel.GetSymbolInfo(argument.Expression, cancellationToken).Symbol;
+                if (targetSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    targetSymbols.Add(targetSymbol.OriginalDefinition);
+                    continue;
+                }
+
+                return true;
+            }
+
+            foreach (var targetSymbol in targetSymbols)
+            {
+                if (targetSymbol != null)
+                {
+                    state = RemoveStateFactsReferencingSymbol(state, targetSymbol);
+                }
+            }
+
+            var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
+            if (targetSymbols.All(static symbol => symbol == null) ||
+                ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
+            {
+                return true;
+            }
+
+            AddTupleElementTargetStateFacts(
+                ref state,
+                targetSymbols,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                "ir.path.prior-statement.tuple-target");
+            return true;
+        }
+
+        private static void AddTupleElementTargetStateFacts(
+            ref SymbolicState state,
+            IReadOnlyList<ISymbol?> targetSymbols,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
+            rightExpression = UnwrapExpression(rightExpression);
+            if (rightExpression is TupleExpressionSyntax rightTuple)
+            {
+                if (rightTuple.Arguments.Count != targetSymbols.Count)
+                {
+                    return;
+                }
+
+                for (var index = 0; index < targetSymbols.Count; index++)
+                {
+                    if (targetSymbols[index] == null)
+                    {
+                        continue;
+                    }
+
+                    AddAssignedValueStateFacts(
+                        ref state,
+                        targetSymbols[index]!,
+                        rightTuple.Arguments[index].Expression,
+                        semanticModel,
+                        cancellationToken,
+                        provenanceRoot);
+                }
+
+                return;
+            }
+
+            if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                    rightExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceSymbol) ||
+                !TryGetTupleElementStorageNames(sourceSymbol, targetSymbols.Count, out var sourceElementNames))
+            {
+                return;
+            }
+
+            for (var index = 0; index < targetSymbols.Count; index++)
+            {
+                if (targetSymbols[index] == null ||
+                    !TryCreateSymbolTerm(targetSymbols[index]!, out var targetTerm) ||
+                    !TryCreateTupleElementTerm(sourceSymbol, sourceElementNames[index], out var sourceElementTerm) ||
+                    !CanCompareIrTerms(targetTerm, sourceElementTerm))
+                {
+                    continue;
+                }
+
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    sourceElementTerm,
+                    rightExpression,
+                    provenanceRoot + ".assigned-value");
+            }
         }
 
         private static void AddNotNullIfNotNullAssignedNullStateFacts(

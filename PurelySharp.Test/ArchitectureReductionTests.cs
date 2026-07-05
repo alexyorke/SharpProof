@@ -6940,6 +6940,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_ContainsNativeTupleStateBuilders()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("TryHandleTupleDeconstructionDeclarationState("));
+            Assert.That(source, Does.Contain("TryHandleTupleAssignmentState("));
+            Assert.That(source, Does.Contain("AddTupleElementAssignedValueStateFacts("));
+            Assert.That(source, Does.Contain("AddTupleElementSourceSymbolSnapshotStateFacts("));
+            Assert.That(source, Does.Contain("AddTupleElementTargetStateFacts("));
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_ContainsNativeDivideModuloCompoundAssignmentStateOperators()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -7037,28 +7053,133 @@ namespace PurelySharp.Test
                 SymbolicRelationAtom
                 {
                     Operator: SymbolicRelationOperator.Equal,
-                    Left: SymbolicVariableTerm { Name: var name, Kind: SmtValueKind.Int },
+                    Left: var left,
                     Right: SymbolicIntegerConstantTerm { Value: var value }
-                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                } when TryGetTermVariableName(left, out var name) &&
+                       string.Equals(name, variableName, StringComparison.Ordinal) &&
                        value == expectedValue => true,
                 SymbolicRelationAtom
                 {
                     Operator: SymbolicRelationOperator.Equal,
                     Left: SymbolicIntegerConstantTerm { Value: var value },
-                    Right: SymbolicVariableTerm { Name: var name, Kind: SmtValueKind.Int }
-                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                    Right: var right
+                } when TryGetTermVariableName(right, out var name) &&
+                       string.Equals(name, variableName, StringComparison.Ordinal) &&
                        value == expectedValue => true,
                 _ => false
             };
         }
 
-        private static SymbolicFact? FindIntegerEqualityFact(SymbolicState state, string variableName, long expectedValue)
+        private static bool IsLengthEqualityFact(SymbolicFact fact, string variableName, long expectedValue)
+        {
+            return fact.Atom switch
+            {
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicLengthTerm { Value: var leftValue },
+                    Right: SymbolicIntegerConstantTerm { Value: var value }
+                } when TryGetTermVariableName(leftValue, out var name) &&
+                       string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedValue => true,
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicIntegerConstantTerm { Value: var value },
+                    Right: SymbolicLengthTerm { Value: var rightValue }
+                } when TryGetTermVariableName(rightValue, out var name) &&
+                       string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedValue => true,
+                _ => false
+            };
+        }
+
+        private static bool IsVariableEqualityFact(SymbolicFact fact, string leftVariableName, string rightVariableName)
+        {
+            return fact.Atom switch
+            {
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: var left,
+                    Right: var right
+                } when TryGetTermVariableName(left, out var leftName) &&
+                       TryGetTermVariableName(right, out var rightName) &&
+                       string.Equals(leftName, leftVariableName, StringComparison.Ordinal) &&
+                       string.Equals(rightName, rightVariableName, StringComparison.Ordinal) => true,
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: var left,
+                    Right: var right
+                } when TryGetTermVariableName(left, out var leftName) &&
+                       TryGetTermVariableName(right, out var rightName) &&
+                       string.Equals(leftName, rightVariableName, StringComparison.Ordinal) &&
+                       string.Equals(rightName, leftVariableName, StringComparison.Ordinal) => true,
+                _ => false
+            };
+        }
+
+        private static bool TryGetTermVariableName(SymbolicTerm term, out string variableName)
+        {
+            switch (term)
+            {
+                case SymbolicVariableTerm { Name: var name }:
+                    variableName = name;
+                    return true;
+                case SymbolicMemberTerm
+                {
+                    Receiver: SymbolicVariableTerm { Name: var receiverName },
+                    MemberName: var memberName
+                }:
+                    variableName = receiverName + "." + memberName;
+                    return true;
+                default:
+                    variableName = string.Empty;
+                    return false;
+            }
+        }
+
+        private static SymbolicFact? FindIntegerEqualityFact(
+            SymbolicState state,
+            string variableName,
+            long expectedValue,
+            string? provenance = null)
         {
             return state.PathConditions
                 .OfType<SymbolicFactCondition>()
                 .Select(condition => condition.Fact)
                 .Concat(state.Facts)
-                .SingleOrDefault(candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue));
+                .Where(candidate => provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
+                .FirstOrDefault(candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue));
+        }
+
+        private static SymbolicFact? FindLengthEqualityFact(
+            SymbolicState state,
+            string variableName,
+            long expectedValue,
+            string? provenance = null)
+        {
+            return state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .Select(condition => condition.Fact)
+                .Concat(state.Facts)
+                .Where(candidate => provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
+                .FirstOrDefault(candidate => IsLengthEqualityFact(candidate, variableName, expectedValue));
+        }
+
+        private static SymbolicFact? FindVariableEqualityFact(
+            SymbolicState state,
+            string leftVariableName,
+            string rightVariableName,
+            string? provenance = null)
+        {
+            return state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .Select(condition => condition.Fact)
+                .Concat(state.Facts)
+                .Where(candidate => provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
+                .FirstOrDefault(candidate => IsVariableEqualityFact(candidate, leftVariableName, rightVariableName));
         }
 
         private static SymbolicFact? FindFactByProvenance(SymbolicState state, string provenance)
@@ -7140,6 +7261,190 @@ namespace PurelySharp.Test
             var condition = FindFactByProvenance(
                 analysis.PathState,
                 "ir.path.prior-statement.assigned-non-null");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrTupleElementLiteralState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { var pair = (1, 2); return pair.Item1; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicTupleElementLiteralState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var pairSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var tupleElementName = SymbolicFactFactory.GetSmtVariableName(pairSymbol.OriginalDefinition) + ".Item1";
+            var condition = FindIntegerEqualityFact(
+                analysis.PathState,
+                tupleElementName,
+                1,
+                "ir.path.prior-statement.tuple-element.assigned-value");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrTupleArrayLengthState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { var pair = (values: new int[2], other: 1); return pair.values.Length; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicTupleArrayLengthState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var pairSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var tupleElementName = SymbolicFactFactory.GetSmtVariableName(pairSymbol.OriginalDefinition) + ".Item1";
+            var condition = FindLengthEqualityFact(
+                analysis.PathState,
+                tupleElementName,
+                2,
+                "ir.path.prior-statement.tuple-element.assigned-length");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrTupleSnapshotState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { var pair = (1, 2); var copy = pair; return copy.Item1; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicTupleSnapshotState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var copySymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "copy", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var copyTupleElementName = SymbolicFactFactory.GetSmtVariableName(copySymbol.OriginalDefinition) + ".Item1";
+            var pairTupleElementName = SymbolicFactFactory.GetSmtVariableName(
+                tree.GetRoot()
+                    .DescendantNodesAndSelf()
+                    .OfType<VariableDeclaratorSyntax>()
+                    .Select(node => semanticModel.GetDeclaredSymbol(node))
+                    .OfType<ILocalSymbol>()
+                    .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal))
+                    .OriginalDefinition) + ".Item1";
+            var condition = FindVariableEqualityFact(
+                analysis.PathState,
+                copyTupleElementName,
+                pairTupleElementName,
+                "ir.path.prior-statement.tuple-element.snapshot");
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrTupleDeconstructionState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { var pair = (1, 2); var (divisor, other) = pair; return 10 / divisor; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicTupleDeconstructionState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var divisorSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<SingleVariableDesignationSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "divisor", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var variableName = SymbolicFactFactory.GetSmtVariableName(divisorSymbol.OriginalDefinition);
+            var pairTupleElementName = SymbolicFactFactory.GetSmtVariableName(
+                tree.GetRoot()
+                    .DescendantNodesAndSelf()
+                    .OfType<VariableDeclaratorSyntax>()
+                    .Select(node => semanticModel.GetDeclaredSymbol(node))
+                    .OfType<ILocalSymbol>()
+                    .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal))
+                    .OriginalDefinition) + ".Item1";
+            var condition = FindVariableEqualityFact(
+                analysis.PathState,
+                variableName,
+                pairTupleElementName,
+                "ir.path.prior-statement.tuple-target.assigned-value");
 
             Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
             var proof = SymbolicReachabilityService.ClassifyStateImplication(
