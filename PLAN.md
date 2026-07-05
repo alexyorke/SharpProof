@@ -143,6 +143,11 @@ path-fact, hazard, and ownership flows.
   `SymbolicState` before the legacy formula shadow is merged, so exact
   assigned-value and built-in-length facts for those shapes no longer depend
   entirely on lowered SMT replay.
+  Prior-assignment native state now also mirrors containing-block entry facts
+  for `if`/`else`, `while`, `do`, `for`, and `foreach` bodies before the
+  formula shadow merge, so branch-entry nullability, loop-entry invariants,
+  and foreach entry facts no longer depend entirely on lowered formula replay
+  when `CollectPriorAssignmentState` is queried directly.
   - Prior-assignment unary increment/decrement updates now also project into
   native `SymbolicState` when the previous integer value term is recoverable,
   and the legacy formula path now reuses the shared reachability helper
@@ -417,6 +422,10 @@ path-fact, hazard, and ownership flows.
   in `SymbolicState` through `CollectPriorAssignmentState`. Mutation-safe local
   declarations and simple local or parameter assignments now also emit native
   IR equality, string-content, string-non-null, and built-in-length facts.
+  Containing-block entry state for `if`/`else`, `while`, `do`, `for`, and
+  `foreach` bodies now also emits native path facts before the formula shadow,
+  including foreach entry non-null and length-positive facts plus loop-entry
+  invariants for direct `CollectPriorAssignmentState` queries.
   Recoverable unary increment/decrement updates now also emit native integer
   progression facts. Recoverable simple integer compound assignments now also
   emit native progression facts for bounded non-self-referential `+=`, `-=`,

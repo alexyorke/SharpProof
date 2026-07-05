@@ -6818,6 +6818,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_BuildsNativeContainingBlockEntryStateInPriorAssignmentPath()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("private static void RemoveStateFactsInvalidatedByContainingBlockEntry("));
+            Assert.That(source, Does.Contain("private static void AddContainingBlockEntryStateFacts("));
+            Assert.That(source, Does.Contain("RemoveStateFactsInvalidatedByContainingBlockEntry("));
+            Assert.That(source, Does.Contain("AddContainingBlockEntryStateFacts("));
+            Assert.That(source, Does.Contain("if (site is BlockSyntax siteBlock)"));
+        }
+
+        [Test]
         public void SymbolicProgramPointAnalysis_CarriesIrPriorAssignmentState()
         {
             var tree = CSharpSyntaxTree.ParseText("class C { int M() { int divisor = 5; return 10 / divisor; } }");
@@ -6851,6 +6867,38 @@ namespace PurelySharp.Test
                 condition!.Fact,
                 smtAnalysis);
             Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointFacts_CarriesIrContainingBlockEntryState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M(int[] values) { foreach (var value in values) { return value; } return 0; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicContainingBlockEntryState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var bodyBlock = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ForEachStatementSyntax>()
+                .Single()
+                .Statement as BlockSyntax;
+
+            Assert.That(bodyBlock, Is.Not.Null);
+
+            var state = SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                bodyBlock!,
+                semanticModel,
+                CancellationToken.None);
+            var condition = state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .SingleOrDefault(candidate => string.Equals(
+                    candidate.Fact.Provenance,
+                    "ir.path.foreach-entry.not-null",
+                    StringComparison.Ordinal));
+
+            Assert.That(condition, Is.Not.Null);
         }
 
         [Test]

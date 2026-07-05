@@ -118,6 +118,16 @@ namespace PurelySharp.Symbolic
                     containingBlock.Block,
                     semanticModel,
                     cancellationToken);
+                RemoveStateFactsInvalidatedByContainingBlockEntry(
+                    ref state,
+                    containingBlock.Block,
+                    semanticModel,
+                    cancellationToken);
+                AddContainingBlockEntryStateFacts(
+                    ref state,
+                    containingBlock.Block,
+                    semanticModel,
+                    cancellationToken);
                 foreach (var statement in containingBlock.Block.Statements)
                 {
                     if (ReferenceEquals(statement, containingBlock.ContainingStatement))
@@ -142,6 +152,25 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken);
                 }
+            }
+
+            if (site is BlockSyntax siteBlock)
+            {
+                RemoveStateFactsInvalidatedByForLoopEntry(
+                    ref state,
+                    siteBlock,
+                    semanticModel,
+                    cancellationToken);
+                RemoveStateFactsInvalidatedByContainingBlockEntry(
+                    ref state,
+                    siteBlock,
+                    semanticModel,
+                    cancellationToken);
+                AddContainingBlockEntryStateFacts(
+                    ref state,
+                    siteBlock,
+                    semanticModel,
+                    cancellationToken);
             }
 
             return state;
@@ -3875,6 +3904,18 @@ namespace PurelySharp.Symbolic
             }
         }
 
+        private static void RemoveStateFactsInvalidatedByContainingBlockEntry(
+            ref SymbolicState state,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var symbol in GetContainingBlockEntryAssignedSymbols(block, semanticModel, cancellationToken))
+            {
+                state = RemoveStateFactsReferencingSymbol(state, symbol);
+            }
+        }
+
         private static IEnumerable<ISymbol> GetContainingBlockEntryAssignedSymbols(
             BlockSyntax block,
             SemanticModel semanticModel,
@@ -3973,6 +4014,73 @@ namespace PurelySharp.Symbolic
             }
 
             return builder.ToImmutable();
+        }
+
+        private static void AddContainingBlockEntryStateFacts(
+            ref SymbolicState state,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            switch (block.Parent)
+            {
+                case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
+                    AddReachabilityCondition(ref state, ifStatement.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    break;
+                case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
+                    when ReferenceEquals(statement, block):
+                    AddReachabilityCondition(ref state, ifStatement.Condition, mustBeTrue: false, semanticModel, cancellationToken);
+                    break;
+                case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
+                    AddReachabilityCondition(ref state, whileStatement.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    AddPreLoopBodyInvariantStateFacts(
+                        ref state,
+                        whileStatement,
+                        whileStatement.Statement,
+                        "ir.path.while-loop-invariant",
+                        semanticModel,
+                        cancellationToken);
+                    break;
+                case DoStatementSyntax doStatement when ReferenceEquals(doStatement.Statement, block):
+                    AddPreLoopBodyInvariantStateFacts(
+                        ref state,
+                        doStatement,
+                        doStatement.Statement,
+                        "ir.path.do-loop-invariant",
+                        semanticModel,
+                        cancellationToken);
+                    break;
+                case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
+                    if (forStatement.Condition != null)
+                    {
+                        AddReachabilityCondition(ref state, forStatement.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+
+                    AddForLoopBodyInvariantStateFacts(
+                        ref state,
+                        forStatement,
+                        semanticModel,
+                        cancellationToken);
+                    break;
+                case ForEachStatementSyntax forEachStatement when ReferenceEquals(forEachStatement.Statement, block):
+                    AddForeachBodyEntryStateFacts(
+                        ref state,
+                        forEachStatement.Expression,
+                        forEachStatement,
+                        forEachStatement.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    break;
+                case ForEachVariableStatementSyntax forEachVariableStatement when ReferenceEquals(forEachVariableStatement.Statement, block):
+                    AddForeachBodyEntryStateFacts(
+                        ref state,
+                        forEachVariableStatement.Expression,
+                        forEachVariableStatement,
+                        forEachVariableStatement.Statement,
+                        semanticModel,
+                        cancellationToken);
+                    break;
+            }
         }
 
         private static void RemoveTemporaryFacts(
