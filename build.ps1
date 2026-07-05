@@ -30,11 +30,11 @@ Write-Section "Restoring packages"
 Invoke-DotnetInRepo @("restore")
 
 Write-Section "Building non-VSIX projects ($Configuration)"
-Invoke-DotnetInRepo @("build", ".\PurelySharp.Attributes\PurelySharp.Attributes.csproj", "-c", $Configuration)
-Invoke-DotnetInRepo @("build", ".\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj", "-c", $Configuration)
-Invoke-DotnetInRepo @("build", ".\PurelySharp.CodeFixes\PurelySharp.CodeFixes.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @("build", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @("build", ".\SharpProof.Analyzer\SharpProof.Analyzer.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @("build", ".\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj", "-c", $Configuration)
 
-$vsixDir = Join-Path $root "PurelySharp.Vsix\bin\$Configuration"
+$vsixDir = Join-Path $root "SharpProof.Vsix\bin\$Configuration"
 $nugetOutputDir = Join-Path $root "artifacts\nuget"
 New-Item -ItemType Directory -Force -Path $nugetOutputDir | Out-Null
 
@@ -73,7 +73,7 @@ if (-not $vsix) {
 
     if (-not $msbuildPath) { throw "Could not locate MSBuild.exe. Please install Visual Studio 2022 (any edition) or MSBuild Build Tools with the VS extension workload." }
 
-    & $msbuildPath ".\PurelySharp.Vsix\PurelySharp.Vsix.csproj" /t:Build /p:Configuration=$Configuration /p:EnableVsixPackaging=true
+    & $msbuildPath ".\SharpProof.Vsix\SharpProof.Vsix.csproj" /t:Build /p:Configuration=$Configuration /p:EnableVsixPackaging=true
     if ($LASTEXITCODE -ne 0) { throw "MSBuild VSIX build failed with exit code $LASTEXITCODE" }
 
     $vsix = Get-ChildItem -Path $vsixDir -Filter *.vsix -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -82,8 +82,8 @@ if (-not $vsix) {
 Write-Section "Packing NuGet packages"
 Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction SilentlyContinue | Remove-Item -Force
 
-Invoke-DotnetInRepo @("pack", ".\PurelySharp.Package\PurelySharp.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
-Invoke-DotnetInRepo @("pack", ".\PurelySharp.Attributes\PurelySharp.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Package\SharpProof.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
 
 $nupkgs = Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction Stop | Sort-Object Name
 

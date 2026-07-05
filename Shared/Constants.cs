@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace PurelySharp.Analyzer.Engine;
+namespace SharpProof.Analyzer.Engine;
 
 public static class Constants
 {

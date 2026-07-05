@@ -4,8 +4,8 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Initialize-PurelySharpJobObjectInterop {
-    if ('PurelySharp.JobObjectNative' -as [type]) {
+function Initialize-SharpProofJobObjectInterop {
+    if ('SharpProof.JobObjectNative' -as [type]) {
         return
     }
 
@@ -14,7 +14,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace PurelySharp
+namespace SharpProof
 {
     public static class JobObjectNative
     {
@@ -193,7 +193,7 @@ function Invoke-ProcessUnderJobObject {
         [string]$WorkingDirectory = (Get-Location).Path
     )
 
-    Initialize-PurelySharpJobObjectInterop
+    Initialize-SharpProofJobObjectInterop
     $resolvedFilePath = $FilePath
     $resolvedCommand = Get-Command -CommandType Application -Name $FilePath -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $resolvedCommand -and -not [string]::IsNullOrWhiteSpace($resolvedCommand.Source)) {
@@ -203,31 +203,31 @@ function Invoke-ProcessUnderJobObject {
         $resolvedFilePath = (Resolve-Path -LiteralPath $FilePath).Path
     }
 
-    $jobHandle = [PurelySharp.JobObjectNative]::CreateJobObject([IntPtr]::Zero, $null)
+    $jobHandle = [SharpProof.JobObjectNative]::CreateJobObject([IntPtr]::Zero, $null)
     if ($jobHandle -eq [IntPtr]::Zero) {
         $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
         throw "CreateJobObject failed with Win32 error $win32Error."
     }
 
-    $limitInfo = New-Object PurelySharp.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-    $limitInfo.BasicLimitInformation.LimitFlags = [PurelySharp.JobObjectNative+JobObjectLimitFlags]::KillOnJobClose
+    $limitInfo = New-Object SharpProof.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    $limitInfo.BasicLimitInformation.LimitFlags = [SharpProof.JobObjectNative+JobObjectLimitFlags]::KillOnJobClose
     if ($MemoryLimitMb -gt 0) {
-        $limitInfo.BasicLimitInformation.LimitFlags = $limitInfo.BasicLimitInformation.LimitFlags -bor [PurelySharp.JobObjectNative+JobObjectLimitFlags]::JobMemory
+        $limitInfo.BasicLimitInformation.LimitFlags = $limitInfo.BasicLimitInformation.LimitFlags -bor [SharpProof.JobObjectNative+JobObjectLimitFlags]::JobMemory
         $limitInfo.JobMemoryLimit = [UIntPtr]([uint64]$MemoryLimitMb * 1MB)
     }
 
-    $limitInfoSize = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][PurelySharp.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION])
+    $limitInfoSize = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][SharpProof.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION])
     $limitInfoBuffer = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$limitInfoSize)
 
     $process = $null
-    $processInformation = New-Object PurelySharp.JobObjectNative+PROCESS_INFORMATION
+    $processInformation = New-Object SharpProof.JobObjectNative+PROCESS_INFORMATION
     $processHandleOwned = $false
     $threadHandleOwned = $false
     try {
         [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
-        if (-not [PurelySharp.JobObjectNative]::SetInformationJobObject(
+        if (-not [SharpProof.JobObjectNative]::SetInformationJobObject(
                 $jobHandle,
-                [PurelySharp.JobObjectNative]::JobObjectExtendedLimitInformation,
+                [SharpProof.JobObjectNative]::JobObjectExtendedLimitInformation,
                 $limitInfoBuffer,
                 $limitInfoSize)) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
@@ -236,15 +236,15 @@ function Invoke-ProcessUnderJobObject {
 
         $commandLine = ((@($resolvedFilePath) + $ArgumentList | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
         $commandLineBuilder = [System.Text.StringBuilder]::new($commandLine)
-        $startupInfo = New-Object PurelySharp.JobObjectNative+STARTUPINFO
-        $startupInfo.cb = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][PurelySharp.JobObjectNative+STARTUPINFO])
-        if (-not [PurelySharp.JobObjectNative]::CreateProcess(
+        $startupInfo = New-Object SharpProof.JobObjectNative+STARTUPINFO
+        $startupInfo.cb = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][SharpProof.JobObjectNative+STARTUPINFO])
+        if (-not [SharpProof.JobObjectNative]::CreateProcess(
                 $resolvedFilePath,
                 $commandLineBuilder,
                 [IntPtr]::Zero,
                 [IntPtr]::Zero,
                 $true,
-                [PurelySharp.JobObjectNative]::CreateSuspended,
+                [SharpProof.JobObjectNative]::CreateSuspended,
                 [IntPtr]::Zero,
                 $WorkingDirectory,
                 [ref]$startupInfo,
@@ -255,24 +255,24 @@ function Invoke-ProcessUnderJobObject {
 
         $processHandleOwned = $true
         $threadHandleOwned = $true
-        if (-not [PurelySharp.JobObjectNative]::AssignProcessToJobObject($jobHandle, $processInformation.hProcess)) {
+        if (-not [SharpProof.JobObjectNative]::AssignProcessToJobObject($jobHandle, $processInformation.hProcess)) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
             throw "AssignProcessToJobObject failed with Win32 error $win32Error."
         }
 
         $process = [System.Diagnostics.Process]::GetProcessById([int]$processInformation.dwProcessId)
-        $resumeResult = [PurelySharp.JobObjectNative]::ResumeThread($processInformation.hThread)
+        $resumeResult = [SharpProof.JobObjectNative]::ResumeThread($processInformation.hThread)
         if ($resumeResult -eq [uint32]::MaxValue) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
             throw "ResumeThread failed with Win32 error $win32Error."
         }
 
         if ($TimeoutSeconds -gt 0) {
             $timeoutMilliseconds = $TimeoutSeconds * 1000
             if (-not $process.WaitForExit($timeoutMilliseconds)) {
-                [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+                [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
                 $process.WaitForExit()
                 $global:LASTEXITCODE = 124
                 return 124
@@ -283,7 +283,7 @@ function Invoke-ProcessUnderJobObject {
         }
 
         $nativeExitCode = [uint32]0
-        if (-not [PurelySharp.JobObjectNative]::GetExitCodeProcess($processInformation.hProcess, [ref]$nativeExitCode)) {
+        if (-not [SharpProof.JobObjectNative]::GetExitCodeProcess($processInformation.hProcess, [ref]$nativeExitCode)) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
             throw "GetExitCodeProcess failed with Win32 error $win32Error."
         }
@@ -294,18 +294,18 @@ function Invoke-ProcessUnderJobObject {
     }
     finally {
         if ($null -ne $process -and -not $process.HasExited) {
-            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
         }
 
         [Runtime.InteropServices.Marshal]::FreeHGlobal($limitInfoBuffer)
         if ($threadHandleOwned) {
-            [void][PurelySharp.JobObjectNative]::CloseHandle($processInformation.hThread)
+            [void][SharpProof.JobObjectNative]::CloseHandle($processInformation.hThread)
         }
 
         if ($processHandleOwned) {
-            [void][PurelySharp.JobObjectNative]::CloseHandle($processInformation.hProcess)
+            [void][SharpProof.JobObjectNative]::CloseHandle($processInformation.hProcess)
         }
 
-        [void][PurelySharp.JobObjectNative]::CloseHandle($jobHandle)
+        [void][SharpProof.JobObjectNative]::CloseHandle($jobHandle)
     }
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace PurelySharp.Analyzer.Engine;
+namespace SharpProof.Analyzer.Engine;
 
 internal static class BclPurityFallbackHeuristics
 {

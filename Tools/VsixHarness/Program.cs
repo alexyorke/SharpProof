@@ -23,7 +23,7 @@ internal static class Program
             var solutionRoot = FindRepoRoot();
             var vsixPath = args != null && args.Length > 0
                 ? args[0]
-                : Path.Combine(solutionRoot, "PurelySharp.Vsix", "bin", "Release", "PurelySharp.Vsix.vsix");
+                : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", "Release", "SharpProof.Vsix.vsix");
 
             // If a VSIX was not produced by the build, simulate one by zipping the analyzer DLL.
             if (!File.Exists(vsixPath))
@@ -35,23 +35,23 @@ internal static class Program
             string analyzerDllPath;
             using (var vsix = ZipFile.OpenRead(vsixPath))
             {
-                var analyzerEntry = vsix.Entries.FirstOrDefault(e => e.FullName.EndsWith("PurelySharp.Analyzer.dll", StringComparison.OrdinalIgnoreCase));
+                var analyzerEntry = vsix.Entries.FirstOrDefault(e => e.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase));
                 if (analyzerEntry == null)
                 {
                     throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
                 }
 
-                var tempDir = Directory.CreateTempSubdirectory("PurelySharpVsixHarness");
-                analyzerDllPath = Path.Combine(tempDir.FullName, "PurelySharp.Analyzer.dll");
+                var tempDir = Directory.CreateTempSubdirectory("SharpProofVsixHarness");
+                analyzerDllPath = Path.Combine(tempDir.FullName, "SharpProof.Analyzer.dll");
                 analyzerEntry.ExtractToFile(analyzerDllPath, overwrite: true);
             }
 
             // Prefer referencing the real Attributes assembly if available to simulate a real user project.
-            var attributesDll = Path.Combine(solutionRoot, "PurelySharp.Attributes", "bin", "Release", "netstandard2.0", "PurelySharp.Attributes.dll");
+            var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", "Release", "netstandard2.0", "SharpProof.Attributes.dll");
             bool useRealAttributes = File.Exists(attributesDll);
             var source = useRealAttributes
                 ? @"
-using PurelySharp.Attributes;
+using SharpProof.Attributes;
 namespace TestNamespace {
     public class C {
         [EnforcePure]
@@ -61,10 +61,10 @@ namespace TestNamespace {
 "
                 : @"
 using System;
-namespace PurelySharp.Attributes { public sealed class EnforcePureAttribute : Attribute {} public sealed class PureAttribute : Attribute {} public sealed class AllowSynchronizationAttribute : Attribute {} }
+namespace SharpProof.Attributes { public sealed class EnforcePureAttribute : Attribute {} public sealed class PureAttribute : Attribute {} public sealed class AllowSynchronizationAttribute : Attribute {} }
 namespace TestNamespace {
     public class C {
-        [PurelySharp.Attributes.EnforcePure]
+        [SharpProof.Attributes.EnforcePure]
         public void M() { }
     }
 }
@@ -115,7 +115,7 @@ namespace TestNamespace {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "PurelySharp.sln")))
+            if (File.Exists(Path.Combine(dir.FullName, "SharpProof.sln")))
             {
                 return dir.FullName;
             }
@@ -126,17 +126,17 @@ namespace TestNamespace {
 
     private static string CreateSimulatedVsix(string solutionRoot)
     {
-        var analyzerPath = Path.Combine(solutionRoot, "PurelySharp.Analyzer", "bin", "Release", "netstandard2.0", "PurelySharp.Analyzer.dll");
+        var analyzerPath = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", "Release", "netstandard2.0", "SharpProof.Analyzer.dll");
         if (!File.Exists(analyzerPath))
         {
             throw new FileNotFoundException($"Analyzer not found at {analyzerPath}. Build in Release first.");
         }
 
-        var tempDir = Directory.CreateTempSubdirectory("PurelySharpSimVsix");
-        var vsixPath = Path.Combine(tempDir.FullName, "PurelySharp.Simulated.vsix");
+        var tempDir = Directory.CreateTempSubdirectory("SharpProofSimVsix");
+        var vsixPath = Path.Combine(tempDir.FullName, "SharpProof.Simulated.vsix");
         using (var archive = ZipFile.Open(vsixPath, ZipArchiveMode.Create))
         {
-            archive.CreateEntryFromFile(analyzerPath, "PurelySharp.Analyzer.dll");
+            archive.CreateEntryFromFile(analyzerPath, "SharpProof.Analyzer.dll");
         }
         return vsixPath;
     }

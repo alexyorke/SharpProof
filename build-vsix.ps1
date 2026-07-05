@@ -29,7 +29,7 @@ function Find-MSBuild {
 }
 
 $repoRoot = Split-Path -Parent $PSCommandPath
-$vsixProj = Join-Path $repoRoot 'PurelySharp.Vsix\PurelySharp.Vsix.csproj'
+$vsixProj = Join-Path $repoRoot 'SharpProof.Vsix\SharpProof.Vsix.csproj'
 if (!(Test-Path $vsixProj)) {
     throw "VSIX project not found: $vsixProj"
 }
@@ -41,7 +41,7 @@ Write-Host "MSBuild: $msbuild" -ForegroundColor Green
 Write-Host "Building VSIX ($Configuration)..." -ForegroundColor Cyan
 & $msbuild $vsixProj /t:Restore,Build /p:Configuration=$Configuration /p:EnableVsixPackaging=true /v:m | Out-Host
 
-$vsixDir = Join-Path $repoRoot "PurelySharp.Vsix\bin\$Configuration"
+$vsixDir = Join-Path $repoRoot "SharpProof.Vsix\bin\$Configuration"
 $vsix = Get-ChildItem -Path $vsixDir -Recurse -Filter *.vsix | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName -First 1
 if (-not $vsix) {
     throw "No VSIX produced under: $vsixDir"

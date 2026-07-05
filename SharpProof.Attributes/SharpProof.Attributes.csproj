@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    
+    <IsPackable>true</IsPackable> 
+    
+    
+    
+    <PackageId>SharpProof.Attributes</PackageId>
+    <Version>0.0.4</Version> 
+    <Authors>Alex Yorke</Authors>
+    <Description>Contains compatibility attributes for SharpProof symbolic C# analysis, including EnforcePureAttribute, PureAttribute, PureExternalAttribute, ImpureAttribute, AllowSynchronizationAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, and SharpProofCapability.</Description>
+    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Title>SharpProof Attributes</Title>
+    <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/alexyorke/SharpProof</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Add ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, and SharpProofCapability alongside the existing analysis contract attributes.</PackageReleaseNotes>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 
+    
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project> 

@@ -1,13 +1,13 @@
 # Remaining SharpProof Symbolic Platform Backlog
 
 This is the single canonical backlog file for remaining symbolic platform and
-analyzer work. SharpProof is the product-facing name. PurelySharp remains the
-compatibility identity, but the product direction is a bounded symbolic C#
+analyzer work. SharpProof is the current product and codebase identity. The
+product direction is a bounded symbolic C#
 analysis platform where purity is one consumer of shared facts and proofs.
 
 Merged here and expected to stay deleted:
 
-- `REFACTORING_STATUS_PURELYSHARP.md`
+- `REFACTORING_STATUS_OLD_BRAND.md`
 - `IMPLEMENTATION_TODO.md`
 - `FUZZ_BACKLOG.md`
 - backlog-style "next steps" previously carried in `docs/effect-summary.md`
@@ -16,30 +16,30 @@ Not backlog files:
 
 - `README.md`
 - `docs/effect-summary.md`
-- `PurelySharp.Analyzer/AnalyzerReleases.Shipped.md`
-- `PurelySharp.Analyzer/AnalyzerReleases.Unshipped.md`
+- `SharpProof.Analyzer/AnalyzerReleases.Shipped.md`
+- `SharpProof.Analyzer/AnalyzerReleases.Unshipped.md`
 
 ## Current repo truth
 
 - Only top-level backlog/status markdown still present is this file.
 - The only markdown file that should carry remaining-work items is this file.
 - The analyzer already has:
-  - explainable `PS0002` evidence properties
-  - `PS0010` exception reporting and effect-summary tooling
+  - explainable `SP0002` evidence properties
+  - `SP0010` exception reporting and effect-summary tooling
   - report-only implementation-derived purity classification in
-    `Tools/PurelySharp.EffectSummary`
+    `Tools/SharpProof.EffectSummary`
   - manifest-backed Roslyn shape coverage tests
   - deterministic and random fuzz infrastructure
   - exact concrete dispatch narrowing for locals, aliases, casts, and
     same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
-- Last confirmed full `PurelySharp.Test` baseline: `2149/2149` green.
-- Staged rebrand direction:
-  - product-facing name is `SharpProof`
-  - current compatibility identity remains `PurelySharp`
-  - hard package/namespace/file-convention renames wait for formal availability
-    review and migration shims
+- Last confirmed full `SharpProof.Test` baseline: `2149/2149` green.
+- Rebrand direction:
+  - product, package, namespace, script, and diagnostic identity is `SharpProof`
+  - only repository-hosting/history surfaces should still mention the former
+    name
+  - future naming work is limited to repo/URL/trademark availability follow-up
   - package IDs, namespaces, diagnostics, config keys, attributes, and
     additional-file conventions are intentionally unchanged in the current
     tranche
@@ -72,8 +72,8 @@ Not backlog files:
       effect-summary-derived facts should share IR facts and proof services.
 - [ ] Keep analyzer raw-SMT migration hotspots at zero and burn down symbolic
       direct `CSharpConditionToFormula` usage reported by
-      `scripts/Get-PurelySharpRawSmtHotspots.ps1`.
-- [ ] Keep `scripts/Get-PurelySharpProductionMetrics.ps1` and the raw-SMT
+      `scripts/Get-SharpProofRawSmtHotspots.ps1`.
+- [ ] Keep `scripts/Get-SharpProofProductionMetrics.ps1` and the raw-SMT
       inventory aligned with the architecture debt list before major refactors.
 - [ ] Continue expanding trusted effect-summary coverage for metadata-only or
       hidden implementation methods.
@@ -88,18 +88,18 @@ Not backlog files:
 
 Evidence:
 
-- `PurelySharp.Symbolic/Ir`
-- `PurelySharp.Symbolic/SymbolicReachabilityService.cs`
-- `PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs`
-- `PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs`
-- `PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs`
-- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs`
-- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs`
-- `PurelySharp.Test/ArchitectureReductionTests.cs`
+- `SharpProof.Symbolic/Ir`
+- `SharpProof.Symbolic/SymbolicReachabilityService.cs`
+- `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs`
+- `SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs`
+- `SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs`
+- `SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs`
+- `SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs`
+- `SharpProof.Test/ArchitectureReductionTests.cs`
 
 Current state:
 
-- `PurelySharp.Symbolic.Ir` is the intended owner of C#/Roslyn semantic facts,
+- `SharpProof.Symbolic.Ir` is the intended owner of C#/Roslyn semantic facts,
   terms, atoms, exceptional preconditions, ownership/freshness/mutation facts,
   type tests, string/regex facts, and bounds.
 - `SearchLib` is backend SMT/Z3 infrastructure and should not absorb Roslyn or
@@ -110,7 +110,7 @@ Current state:
 - Architecture tests now prevent new analyzer files from becoming raw-SMT
   hotspots outside the approved migration list.
 - The current approved analyzer raw-SMT hotspot list is empty.
-- `scripts/Get-PurelySharpRawSmtHotspots.ps1` also tracks symbolic direct
+- `scripts/Get-SharpProofRawSmtHotspots.ps1` also tracks symbolic direct
   translator usage and IR known-API lowering descriptors so migration progress
   is measurable.
 
@@ -140,16 +140,16 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/BoundaryAttributeTests.cs`
-- `PurelySharp.Test/EffectSummaryToolTests.cs`
-- `PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs`
-- `PurelySharp.Analyzer/ExceptionFlowAnalyzer.cs`
-- `PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
+- `SharpProof.Test/BoundaryAttributeTests.cs`
+- `SharpProof.Test/EffectSummaryToolTests.cs`
+- `SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs`
+- `SharpProof.Analyzer/ExceptionFlowAnalyzer.cs`
+- `SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
 
 Current state:
 
 - Trusted summary boundary coverage already locks:
-  - exact filename and suffixed `*.PurelySharp.EffectSummary.json` discovery
+  - exact filename and suffixed `*.SharpProof.EffectSummary.json` discovery
   - direct plus transitive exception-type union
   - multi-file summary merge for the same trusted symbol
   - wrong-symbol rows being ignored
@@ -195,10 +195,10 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/CryptographyTests.cs`
-- `PurelySharp.Test/ConstantsTests.cs`
-- `PurelySharp.Analyzer/Engine/Constants.cs`
-- `PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
+- `SharpProof.Test/CryptographyTests.cs`
+- `SharpProof.Test/ConstantsTests.cs`
+- `SharpProof.Analyzer/Engine/Constants.cs`
+- `SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
 
 Current state:
 
@@ -238,16 +238,16 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/DynamicTypingTests.cs`
-- `PurelySharp.Test/ExactConcreteDispatchTests.cs`
-- `PurelySharp.Test/ExactConcreteDispatchFlowTests.cs`
-- `PurelySharp.Test/ExactConcretePropertyDispatchTests.cs`
-- `PurelySharp.Test/FrameworkCommonOperationsTests.cs`
-- `PurelySharp.Test/InheritanceInteractionTests.cs`
-- `PurelySharp.Test/StaticInterfaceMembersTests.cs`
-- `PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
-- `PurelySharp.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs`
-- `PurelySharp.Analyzer/Engine/Rules/DynamicOperationPurityRule.cs`
+- `SharpProof.Test/DynamicTypingTests.cs`
+- `SharpProof.Test/ExactConcreteDispatchTests.cs`
+- `SharpProof.Test/ExactConcreteDispatchFlowTests.cs`
+- `SharpProof.Test/ExactConcretePropertyDispatchTests.cs`
+- `SharpProof.Test/FrameworkCommonOperationsTests.cs`
+- `SharpProof.Test/InheritanceInteractionTests.cs`
+- `SharpProof.Test/StaticInterfaceMembersTests.cs`
+- `SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
+- `SharpProof.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs`
+- `SharpProof.Analyzer/Engine/Rules/DynamicOperationPurityRule.cs`
 
 Remaining:
 
@@ -271,8 +271,8 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs`
-- `PurelySharp.Analyzer/Engine/Rules/AssignmentPurityRule.cs`
+- `SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs`
+- `SharpProof.Analyzer/Engine/Rules/AssignmentPurityRule.cs`
 - ownership-sensitive tests across `BasicOperationsTests`,
   `BasicPureTests`, and `InlineArrayTests`
 
@@ -292,10 +292,10 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/LinqOperationsTests.cs`
-- `PurelySharp.Test/LinqSoundnessStressTests.cs`
-- `PurelySharp.Test/CollectionExpressionSpreadTests.cs`
-- `PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
+- `SharpProof.Test/LinqOperationsTests.cs`
+- `SharpProof.Test/LinqSoundnessStressTests.cs`
+- `SharpProof.Test/CollectionExpressionSpreadTests.cs`
+- `SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs`
 
 Remaining:
 
@@ -318,8 +318,8 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/FileScopedNamespacesTests.cs`
-- `PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs`
+- `SharpProof.Test/FileScopedNamespacesTests.cs`
+- `SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs`
 
 Current state:
 
@@ -342,7 +342,7 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/CryptographyTests.cs`
+- `SharpProof.Test/CryptographyTests.cs`
 
 Remaining:
 
@@ -357,19 +357,19 @@ Done when:
 - Any new crypto allowances are per-member, evidence-based, and regression
   tested.
 
-### 8. Exception and effect-summary depth beyond the current PS0010 baseline
+### 8. Exception and effect-summary depth beyond the current SP0010 baseline
 
 Evidence:
 
-- `PurelySharp.Test/ExceptionFlowAnalysisTests.cs`
-- `PurelySharp.Test/EffectSummaryToolTests.cs`
-- `PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs`
-- `Tools/PurelySharp.EffectSummary/Program.cs`
+- `SharpProof.Test/ExceptionFlowAnalysisTests.cs`
+- `SharpProof.Test/EffectSummaryToolTests.cs`
+- `SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs`
+- `Tools/SharpProof.EffectSummary/Program.cs`
 - `docs/effect-summary.md`
 
 Current state:
 
-- `PS0010` already covers source throws, simple rethrows, definite divide by
+- `SP0010` already covers source throws, simple rethrows, definite divide by
   zero, definite null dereference, basic catch suppression, same-compilation
   source propagation, and trusted consumed metadata summaries.
 - The effect-summary tool already emits low-level call/effect facts, root
@@ -386,7 +386,7 @@ Remaining:
       such as `IndexOutOfRangeException`, `InvalidCastException`,
       `ObjectDisposedException`, `FormatException`, and `OverflowException`.
 - [ ] Keep nullability, arithmetic, and path-feasibility growth bounded and
-      regression-tested instead of turning PS0010 into speculative symbolic
+      regression-tested instead of turning SP0010 into speculative symbolic
       execution.
 
 Done when:
@@ -400,10 +400,10 @@ Done when:
 
 Evidence:
 
-- `PurelySharp.Test/RoslynConstructCoverageTests.cs`
-- `PurelySharp.Test/FuzzToolTests.cs`
-- `Tools/PurelySharp.Fuzz/Program.cs`
-- `Tools/PurelySharp.Fuzz/RoslynShapeManifest.cs`
+- `SharpProof.Test/RoslynConstructCoverageTests.cs`
+- `SharpProof.Test/FuzzToolTests.cs`
+- `Tools/SharpProof.Fuzz/Program.cs`
+- `Tools/SharpProof.Fuzz/RoslynShapeManifest.cs`
 
 Still intentionally conservative:
 
@@ -469,7 +469,7 @@ Remaining:
 
 Evidence:
 
-- `PurelySharp.Test/CachingTests.cs` covers repeated-query and deep call-chain
+- `SharpProof.Test/CachingTests.cs` covers repeated-query and deep call-chain
   reuse, but larger dispatch-heavy, summary-heavy, and memory-behavior
   scenarios are still thinner than the main correctness suites.
 

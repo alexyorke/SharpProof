@@ -33,8 +33,8 @@ try {
 	Invoke-DotnetInRepo @('build', '-c', $Configuration)
 
 	Write-Host "Packing NuGet packages to $outFull" -ForegroundColor Cyan
-	Invoke-DotnetInRepo @('pack', '.\PurelySharp.Package\PurelySharp.Package.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
-	Invoke-DotnetInRepo @('pack', '.\PurelySharp.Attributes\PurelySharp.Attributes.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
+	Invoke-DotnetInRepo @('pack', '.\SharpProof.Package\SharpProof.Package.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
+	Invoke-DotnetInRepo @('pack', '.\SharpProof.Attributes\SharpProof.Attributes.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
 
 	$packages = Get-ChildItem -Path $outFull -Filter *.nupkg -File | Sort-Object Name
 	if (-not $packages -or $packages.Count -eq 0) {
@@ -46,13 +46,12 @@ try {
 
 	if ($InstallProject) {
 		$projPath = Resolve-Path $InstallProject
-		Write-Host "Installing SharpProof compatibility package from local source into project: $projPath" -ForegroundColor Cyan
+		Write-Host "Installing SharpProof package from local source into project: $projPath" -ForegroundColor Cyan
 		# Install the main analyzer package (includes Attributes for NuGet consumption)
-		Invoke-DotnetInRepo @('add', "$projPath", 'package', 'PurelySharp', '--source', "$outFull")
+		Invoke-DotnetInRepo @('add', "$projPath", 'package', 'SharpProof', '--source', "$outFull")
 	}
 }
 finally {
 	Pop-Location
 }
-
 

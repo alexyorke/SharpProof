@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>SharpProof.Smoke.Net472</RootNamespace>
+    <AssemblyName>SharpProof.Smoke.Net472</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,17 +1,17 @@
 # Effect summary tooling
 
-SharpProof's compatibility tool `Tools/PurelySharp.EffectSummary` is the first
+SharpProof's `Tools/SharpProof.EffectSummary` tool is the first
 step toward evidence-based BCL and framework purity summaries.
 
 The analyzer now regenerates its built-in effect-summary JSON into `obj` during
-build/test from `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
+build/test from `SharpProof.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
 and consumes those summaries only as embedded resources from the current build.
 Checked-in effect-summary JSON artifacts and the reviewed artifact spec are
 gone. Treat ad hoc outputs from this tool as disposable local calibration data.
 
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,
-implementation-derived purity classifications without changing live `PS0002`
+implementation-derived purity classifications without changing live `SP0002`
 behavior.
 
 ## Why assembly summaries first
@@ -81,39 +81,39 @@ Examples:
 For ad hoc local refreshes, run the tool through the repo's job-object .NET launcher:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-PurelySharpDotnet.ps1 run --project Tools\PurelySharp.EffectSummary\PurelySharp.EffectSummary.csproj -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --output artifacts\effect-summary\string-format.PurelySharp.EffectSummary.json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-SharpProofDotnet.ps1 run --project Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --output artifacts\effect-summary\string-format.SharpProof.EffectSummary.json
 ```
 
-Write ad hoc `*.PurelySharp.EffectSummary.json` files under ignored `artifacts\effect-summary\...` paths unless a test explicitly needs a temp path. Those outputs are for local inspection only; prefer symbol filters and limits for exploratory runs.
+Write ad hoc `*.SharpProof.EffectSummary.json` files under ignored `artifacts\effect-summary\...` paths unless a test explicitly needs a temp path. Those outputs are for local inspection only; prefer symbol filters and limits for exploratory runs.
 
 Smoke run against the latest installed .NET 8 `System.Private.CoreLib.dll`:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --limit 20
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --limit 20
 ```
 
 Inspect a specific API family such as `System.String.Format`:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --limit 20
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --limit 20
 ```
 
 Emit the low-confidence fallback inventory for a focused slice:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.GC --bcl-fallback-inventory --output artifacts\effect-summary\gc-fallback-inventory.json
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.GC --bcl-fallback-inventory --output artifacts\effect-summary\gc-fallback-inventory.json
 ```
 
 Audit all System runtime assemblies for the installed target framework. This can be large; write it under ignored `artifacts\` and prefer symbol filters while iterating:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --all-runtime-assemblies --bcl-fallback-inventory --output artifacts\effect-summary\net8-bcl-fallback-inventory.json
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --all-runtime-assemblies --bcl-fallback-inventory --output artifacts\effect-summary\net8-bcl-fallback-inventory.json
 ```
 
 Include same-assembly callees from the matched symbols:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 1 --limit 50
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 1 --limit 50
 ```
 
 Use `--max-depth -1` when a filtered slice must keep the full reachable same-assembly callee closure instead of a bounded prefix.
@@ -121,7 +121,7 @@ Use `--max-depth -1` when a filtered slice must keep the full reachable same-ass
 Propagate root candidate labels through same-assembly calls:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --limit 50
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --limit 50
 ```
 
 When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction. The tool also emits `TransitiveThrownExceptionEdges`, which preserve the recursive callee chain as structured records with `ExceptionType`, `SourcePath`, `CalleeExactSymbolKey`, and `Depth`.
@@ -129,24 +129,24 @@ When transitive roots are enabled, the JSON also includes `TransitiveThrownExcep
 Add report-only purity classification to the JSON:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --classify-purity --limit 50
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --classify-purity --limit 50
 ```
 
 Compare emitted methods against the current reviewed manual catalogs:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.BitConverter.GetBytes --include-callees --classify-purity --compare-manual-catalogs --limit 50
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.BitConverter.GetBytes --include-callees --classify-purity --compare-manual-catalogs --limit 50
 ```
 
 ## Analyzer consumption
 
 Built-in analyzer summaries are regenerated into `obj` during build/test and then embedded into the analyzer assembly for that build. The loader does not probe loose files beside the analyzer, `AppContext.BaseDirectory`, or repo artifact directories for built-ins.
 
-The analyzer can also consume generated exception summaries when the JSON is supplied explicitly as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
+The analyzer can also consume generated exception summaries when the JSON is supplied explicitly as an additional file named `SharpProof.EffectSummary.json` or `*.SharpProof.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
 
-With `purelysharp_report_exceptions = true`, `purelysharp_checked_exceptions = true`, or `purelysharp_runtime_hazard_mode = summaries/sites/all`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. Runtime-hazard mode is a clearer opt-in for ordinary-method failure checks: `sites` emits `PS0011`, `summaries` emits `PS0010`, and `all` emits both. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
+With `sharpproof_report_exceptions = true`, `sharpproof_checked_exceptions = true`, or `sharpproof_runtime_hazard_mode = summaries/sites/all`, `SP0010` and `SP0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. Runtime-hazard mode is a clearer opt-in for ordinary-method failure checks: `sites` emits `SP0011`, `summaries` emits `SP0010`, and `all` emits both. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
 
-The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation. That means `PS0010` can summarize what a method may let escape, while `PS0011` can still warn on the exact uncaught call or property-access site that propagates the exception.
+The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation. That means `SP0010` can summarize what a method may let escape, while `SP0011` can still warn on the exact uncaught call or property-access site that propagates the exception.
 
 Depth behavior is different for source and metadata on purpose:
 
@@ -156,13 +156,13 @@ Depth behavior is different for source and metadata on purpose:
 If you want effectively "unbounded" metadata propagation, generate the summary with the full reachable closure for the slice you care about:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix Your.Namespace.YourApi --include-callees --max-depth -1 --transitive-roots --output artifacts\effect-summary\your-api.json
+dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix Your.Namespace.YourApi --include-callees --max-depth -1 --transitive-roots --output artifacts\effect-summary\your-api.json
 ```
 
 Run against a specific assembly:
 
 ```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --assembly "C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.28\System.Private.CoreLib.dll" --output artifacts\effect-summary\corelib-net8.json
+dotnet run --project Tools\SharpProof.EffectSummary -- --assembly "C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.28\System.Private.CoreLib.dll" --output artifacts\effect-summary\corelib-net8.json
 ```
 
 The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build.

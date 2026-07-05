@@ -1,22 +1,22 @@
 {
     "schemaVersion":  1,
-    "generatedBy":  "scripts/Get-PurelySharpTestImpactInventory.ps1",
+    "generatedBy":  "scripts/Get-SharpProofTestImpactInventory.ps1",
     "modules":  [
                     {
                         "name":  "Analyzer",
                         "sourceRoots":  [
-                                            "PurelySharp.Analyzer/"
+                                            "SharpProof.Analyzer/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.Attributes",
-                                                         "PurelySharp.Symbolic",
+                                                         "SharpProof.Attributes",
+                                                         "SharpProof.Symbolic",
                                                          "SearchLib"
                                                      ]
                     },
                     {
                         "name":  "Symbolic",
                         "sourceRoots":  [
-                                            "PurelySharp.Symbolic/"
+                                            "SharpProof.Symbolic/"
                                         ],
                         "allowedProjectReferences":  [
                                                          "SearchLib"
@@ -34,17 +34,17 @@
                     {
                         "name":  "CodeFixes",
                         "sourceRoots":  [
-                                            "PurelySharp.CodeFixes/"
+                                            "SharpProof.CodeFixes/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.Analyzer",
-                                                         "PurelySharp.Attributes"
+                                                         "SharpProof.Analyzer",
+                                                         "SharpProof.Attributes"
                                                      ]
                     },
                     {
                         "name":  "Attributes",
                         "sourceRoots":  [
-                                            "PurelySharp.Attributes/"
+                                            "SharpProof.Attributes/"
                                         ],
                         "allowedProjectReferences":  [
 
@@ -62,188 +62,188 @@
                     {
                         "name":  "Packaging",
                         "sourceRoots":  [
-                                            "PurelySharp.Package/"
+                                            "SharpProof.Package/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.CodeFixes"
+                                                         "SharpProof.CodeFixes"
                                                      ]
                     },
                     {
                         "name":  "VSIX",
                         "sourceRoots":  [
-                                            "PurelySharp.Vsix/",
+                                            "SharpProof.Vsix/",
                                             "Tools/VsixHarness/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.CodeFixes",
-                                                         "PurelySharp.Analyzer",
-                                                         "PurelySharp.Symbolic"
+                                                         "SharpProof.CodeFixes",
+                                                         "SharpProof.Analyzer",
+                                                         "SharpProof.Symbolic"
                                                      ]
                     },
                     {
                         "name":  "Tools",
                         "sourceRoots":  [
-                                            "Tools/PurelySharp.CorpusReport.Core/",
-                                            "Tools/PurelySharp.CorpusReport/",
-                                            "Tools/PurelySharp.EffectSummary/",
-                                            "Tools/PurelySharp.Fuzz.Core/",
-                                            "Tools/PurelySharp.Fuzz/",
-                                            "Tools/PurelySharp.SymbolicCli/"
+                                            "Tools/SharpProof.CorpusReport.Core/",
+                                            "Tools/SharpProof.CorpusReport/",
+                                            "Tools/SharpProof.EffectSummary/",
+                                            "Tools/SharpProof.Fuzz.Core/",
+                                            "Tools/SharpProof.Fuzz/",
+                                            "Tools/SharpProof.SymbolicCli/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.Analyzer",
-                                                         "PurelySharp.Attributes",
-                                                         "PurelySharp.Symbolic",
-                                                         "PurelySharp.CorpusReport.Core",
-                                                         "PurelySharp.Fuzz.Core"
+                                                         "SharpProof.Analyzer",
+                                                         "SharpProof.Attributes",
+                                                         "SharpProof.Symbolic",
+                                                         "SharpProof.CorpusReport.Core",
+                                                         "SharpProof.Fuzz.Core"
                                                      ]
                     },
                     {
                         "name":  "TestInfrastructure",
                         "sourceRoots":  [
-                                            "PurelySharp.Test/",
-                                            "PurelySharp.ToolingTest/"
+                                            "SharpProof.Test/",
+                                            "SharpProof.ToolingTest/"
                                         ],
                         "allowedProjectReferences":  [
-                                                         "PurelySharp.CodeFixes",
-                                                         "PurelySharp.Attributes",
-                                                         "PurelySharp.Analyzer",
-                                                         "PurelySharp.Symbolic",
+                                                         "SharpProof.CodeFixes",
+                                                         "SharpProof.Attributes",
+                                                         "SharpProof.Analyzer",
+                                                         "SharpProof.Symbolic",
                                                          "SearchLib",
-                                                         "PurelySharp.CorpusReport.Core",
-                                                         "PurelySharp.Fuzz.Core",
-                                                         "PurelySharp.SymbolicCli"
+                                                         "SharpProof.CorpusReport.Core",
+                                                         "SharpProof.Fuzz.Core",
+                                                         "SharpProof.SymbolicCli"
                                                      ]
                     }
                 ],
     "maxInventoryFixtureDependencies":  40,
     "highFanoutFiles":  [
                             {
-                                "path":  "PurelySharp.Analyzer/Engine/CompilationPurityService.cs",
+                                "path":  "SharpProof.Analyzer/Engine/CompilationPurityService.cs",
                                 "reason":  "high-fanout analyzer core"
                             },
                             {
-                                "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
+                                "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
                                 "reason":  "high-fanout analyzer core"
                             },
                             {
-                                "path":  "PurelySharp.Analyzer/Engine/Rules/RuleRegistry.cs",
+                                "path":  "SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs",
                                 "reason":  "high-fanout analyzer core"
                             },
                             {
-                                "path":  "PurelySharp.Analyzer/PurelySharpAnalyzer.cs",
+                                "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
                                 "fixtureCount":  208,
                                 "tokens":  [
-                                               "PurelySharpAnalyzer"
+                                               "SharpProofAnalyzer"
                                            ]
                             },
                             {
-                                "path":  "PurelySharp.Analyzer/PurelySharpDiagnostics.cs",
+                                "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
                                 "fixtureCount":  99,
                                 "tokens":  [
-                                               "PurelySharpDiagnostics"
+                                               "SharpProofDiagnostics"
                                            ]
                             }
                         ],
     "projects":  [
                      {
-                         "name":  "PurelySharp.Analyzer",
-                         "path":  "PurelySharp.Analyzer/PurelySharp.Analyzer.csproj",
+                         "name":  "SharpProof.Analyzer",
+                         "path":  "SharpProof.Analyzer/SharpProof.Analyzer.csproj",
                          "module":  "Analyzer",
                          "projectReferences":  [
-                                                   "PurelySharp.Attributes",
-                                                   "PurelySharp.Symbolic",
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.Symbolic",
                                                    "SearchLib"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Attributes",
-                         "path":  "PurelySharp.Attributes/PurelySharp.Attributes.csproj",
+                         "name":  "SharpProof.Attributes",
+                         "path":  "SharpProof.Attributes/SharpProof.Attributes.csproj",
                          "module":  "Attributes",
                          "projectReferences":  [
 
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.CodeFixes",
-                         "path":  "PurelySharp.CodeFixes/PurelySharp.CodeFixes.csproj",
+                         "name":  "SharpProof.CodeFixes",
+                         "path":  "SharpProof.CodeFixes/SharpProof.CodeFixes.csproj",
                          "module":  "CodeFixes",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Demo",
-                         "path":  "PurelySharp.Demo/PurelySharp.Demo.csproj",
+                         "name":  "SharpProof.Demo",
+                         "path":  "SharpProof.Demo/SharpProof.Demo.csproj",
                          "module":  "Unknown",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes",
-                                                   "PurelySharp.CodeFixes"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.CodeFixes"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Package",
-                         "path":  "PurelySharp.Package/PurelySharp.Package.csproj",
+                         "name":  "SharpProof.Package",
+                         "path":  "SharpProof.Package/SharpProof.Package.csproj",
                          "module":  "Packaging",
                          "projectReferences":  [
-                                                   "PurelySharp.CodeFixes"
+                                                   "SharpProof.CodeFixes"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Smoke.Net472",
-                         "path":  "PurelySharp.Smoke.Net472/PurelySharp.Smoke.Net472.csproj",
+                         "name":  "SharpProof.Smoke.Net472",
+                         "path":  "SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj",
                          "module":  "Unknown",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Symbolic",
-                         "path":  "PurelySharp.Symbolic/PurelySharp.Symbolic.csproj",
+                         "name":  "SharpProof.Symbolic",
+                         "path":  "SharpProof.Symbolic/SharpProof.Symbolic.csproj",
                          "module":  "Symbolic",
                          "projectReferences":  [
                                                    "SearchLib"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Test",
-                         "path":  "PurelySharp.Test/PurelySharp.Test.csproj",
+                         "name":  "SharpProof.Test",
+                         "path":  "SharpProof.Test/SharpProof.Test.csproj",
                          "module":  "TestInfrastructure",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes",
-                                                   "PurelySharp.Symbolic",
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.Symbolic",
                                                    "SearchLib"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.ToolingTest",
-                         "path":  "PurelySharp.ToolingTest/PurelySharp.ToolingTest.csproj",
+                         "name":  "SharpProof.ToolingTest",
+                         "path":  "SharpProof.ToolingTest/SharpProof.ToolingTest.csproj",
                          "module":  "TestInfrastructure",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes",
-                                                   "PurelySharp.CodeFixes",
-                                                   "PurelySharp.CorpusReport.Core",
-                                                   "PurelySharp.Fuzz.Core",
-                                                   "PurelySharp.Symbolic"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes",
+                                                   "SharpProof.CodeFixes",
+                                                   "SharpProof.CorpusReport.Core",
+                                                   "SharpProof.Fuzz.Core",
+                                                   "SharpProof.Symbolic"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Vsix",
-                         "path":  "PurelySharp.Vsix/PurelySharp.Vsix.csproj",
+                         "name":  "SharpProof.Vsix",
+                         "path":  "SharpProof.Vsix/SharpProof.Vsix.csproj",
                          "module":  "VSIX",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.CodeFixes",
-                                                   "PurelySharp.Symbolic"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.CodeFixes",
+                                                   "SharpProof.Symbolic"
                                                ]
                      },
                      {
@@ -255,52 +255,52 @@
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.CorpusReport.Core",
-                         "path":  "Tools/PurelySharp.CorpusReport.Core/PurelySharp.CorpusReport.Core.csproj",
+                         "name":  "SharpProof.CorpusReport.Core",
+                         "path":  "Tools/SharpProof.CorpusReport.Core/SharpProof.CorpusReport.Core.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
 
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.CorpusReport",
-                         "path":  "Tools/PurelySharp.CorpusReport/PurelySharp.CorpusReport.csproj",
+                         "name":  "SharpProof.CorpusReport",
+                         "path":  "Tools/SharpProof.CorpusReport/SharpProof.CorpusReport.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "PurelySharp.CorpusReport.Core"
+                                                   "SharpProof.CorpusReport.Core"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.EffectSummary",
-                         "path":  "Tools/PurelySharp.EffectSummary/PurelySharp.EffectSummary.csproj",
+                         "name":  "SharpProof.EffectSummary",
+                         "path":  "Tools/SharpProof.EffectSummary/SharpProof.EffectSummary.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
 
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Fuzz.Core",
-                         "path":  "Tools/PurelySharp.Fuzz.Core/PurelySharp.Fuzz.Core.csproj",
+                         "name":  "SharpProof.Fuzz.Core",
+                         "path":  "Tools/SharpProof.Fuzz.Core/SharpProof.Fuzz.Core.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "PurelySharp.Analyzer",
-                                                   "PurelySharp.Attributes"
+                                                   "SharpProof.Analyzer",
+                                                   "SharpProof.Attributes"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.Fuzz",
-                         "path":  "Tools/PurelySharp.Fuzz/PurelySharp.Fuzz.csproj",
+                         "name":  "SharpProof.Fuzz",
+                         "path":  "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "PurelySharp.Fuzz.Core"
+                                                   "SharpProof.Fuzz.Core"
                                                ]
                      },
                      {
-                         "name":  "PurelySharp.SymbolicCli",
-                         "path":  "Tools/PurelySharp.SymbolicCli/PurelySharp.SymbolicCli.csproj",
+                         "name":  "SharpProof.SymbolicCli",
+                         "path":  "Tools/SharpProof.SymbolicCli/SharpProof.SymbolicCli.csproj",
                          "module":  "Tools",
                          "projectReferences":  [
-                                                   "PurelySharp.Symbolic"
+                                                   "SharpProof.Symbolic"
                                                ]
                      },
                      {
@@ -315,996 +315,996 @@
     "testFixtures":  [
                          {
                              "name":  "AmbientStateSoundnessStressTests",
-                             "path":  "PurelySharp.Test/AmbientStateSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/AmbientStateSoundnessStressTests.cs"
                          },
                          {
                              "name":  "AnalyzerPackagingTests",
-                             "path":  "PurelySharp.Test/AnalyzerPackagingTests.cs"
+                             "path":  "SharpProof.Test/AnalyzerPackagingTests.cs"
                          },
                          {
                              "name":  "ApplicationModelTests",
-                             "path":  "PurelySharp.Test/ApplicationModelTests.cs"
+                             "path":  "SharpProof.Test/ApplicationModelTests.cs"
                          },
                          {
                              "name":  "ArchitectureReductionTests",
-                             "path":  "PurelySharp.Test/ArchitectureReductionTests.cs"
+                             "path":  "SharpProof.Test/ArchitectureReductionTests.cs"
                          },
                          {
                              "name":  "ArrayFactoryTests",
-                             "path":  "PurelySharp.Test/ArrayFactoryTests.cs"
+                             "path":  "SharpProof.Test/ArrayFactoryTests.cs"
                          },
                          {
                              "name":  "ArrayMutationTests",
-                             "path":  "PurelySharp.Test/ArrayMutationTests.cs"
+                             "path":  "SharpProof.Test/ArrayMutationTests.cs"
                          },
                          {
                              "name":  "ArraySortTests",
-                             "path":  "PurelySharp.Test/ArraySortTests.cs"
+                             "path":  "SharpProof.Test/ArraySortTests.cs"
                          },
                          {
                              "name":  "AssemblyLoadingTests",
-                             "path":  "PurelySharp.Test/AssemblyLoadingTests.cs"
+                             "path":  "SharpProof.Test/AssemblyLoadingTests.cs"
                          },
                          {
                              "name":  "AsyncOperationsTests",
-                             "path":  "PurelySharp.Test/AsyncOperationsTests.cs"
+                             "path":  "SharpProof.Test/AsyncOperationsTests.cs"
                          },
                          {
                              "name":  "AsyncTaskAndValueTaskTests",
-                             "path":  "PurelySharp.Test/AsyncTaskAndValueTaskTests.cs"
+                             "path":  "SharpProof.Test/AsyncTaskAndValueTaskTests.cs"
                          },
                          {
                              "name":  "AsyncTests",
-                             "path":  "PurelySharp.Test/AsyncTests.cs"
+                             "path":  "SharpProof.Test/AsyncTests.cs"
                          },
                          {
                              "name":  "AttributePlacementPurityTests",
-                             "path":  "PurelySharp.Test/AttributePlacementPurityTests.cs"
+                             "path":  "SharpProof.Test/AttributePlacementPurityTests.cs"
                          },
                          {
                              "name":  "AttributeResolutionTests",
-                             "path":  "PurelySharp.Test/AttributeResolutionTests.cs"
+                             "path":  "SharpProof.Test/AttributeResolutionTests.cs"
                          },
                          {
                              "name":  "AuthoringRuntimeHazardDiagnosticTests",
-                             "path":  "PurelySharp.Test/AuthoringRuntimeHazardDiagnosticTests.cs"
+                             "path":  "SharpProof.Test/AuthoringRuntimeHazardDiagnosticTests.cs"
                          },
                          {
                              "name":  "AutoDefaultStructsTests",
-                             "path":  "PurelySharp.Test/AutoDefaultStructsTests.cs"
+                             "path":  "SharpProof.Test/AutoDefaultStructsTests.cs"
                          },
                          {
                              "name":  "BaselineSuppressionTests",
-                             "path":  "PurelySharp.Test/BaselineSuppressionTests.cs"
+                             "path":  "SharpProof.Test/BaselineSuppressionTests.cs"
                          },
                          {
                              "name":  "BasicImpurityInteractionTests",
-                             "path":  "PurelySharp.Test/BasicImpurityInteractionTests.cs"
+                             "path":  "SharpProof.Test/BasicImpurityInteractionTests.cs"
                          },
                          {
                              "name":  "BasicOperationsTests",
-                             "path":  "PurelySharp.Test/BasicOperationsTests.cs"
+                             "path":  "SharpProof.Test/BasicOperationsTests.cs"
                          },
                          {
                              "name":  "BasicPureTests",
-                             "path":  "PurelySharp.Test/BasicPureTests.cs"
+                             "path":  "SharpProof.Test/BasicPureTests.cs"
                          },
                          {
                              "name":  "BasicPurityTests",
-                             "path":  "PurelySharp.Test/BasicPurityTests.cs"
+                             "path":  "SharpProof.Test/BasicPurityTests.cs"
                          },
                          {
                              "name":  "BinaryPrimitivesTests",
-                             "path":  "PurelySharp.Test/BinaryPrimitivesTests.cs"
+                             "path":  "SharpProof.Test/BinaryPrimitivesTests.cs"
                          },
                          {
                              "name":  "BitConverterTests",
-                             "path":  "PurelySharp.Test/BitConverterTests.cs"
+                             "path":  "SharpProof.Test/BitConverterTests.cs"
                          },
                          {
                              "name":  "BitOperationsTests",
-                             "path":  "PurelySharp.Test/BitOperationsTests.cs"
+                             "path":  "SharpProof.Test/BitOperationsTests.cs"
                          },
                          {
                              "name":  "BoundaryAttributeTests",
-                             "path":  "PurelySharp.Test/BoundaryAttributeTests.cs"
+                             "path":  "SharpProof.Test/BoundaryAttributeTests.cs"
                          },
                          {
                              "name":  "CachingTests",
-                             "path":  "PurelySharp.Test/CachingTests.cs"
+                             "path":  "SharpProof.Test/CachingTests.cs"
                          },
                          {
                              "name":  "CalculatorTests",
-                             "path":  "PurelySharp.Test/Ps0004ConfigurationTests.cs"
+                             "path":  "SharpProof.Test/Sp0004ConfigurationTests.cs"
                          },
                          {
                              "name":  "CheckedUserDefinedOperatorsTests",
-                             "path":  "PurelySharp.Test/CheckedUserDefinedOperatorsTests.cs"
+                             "path":  "SharpProof.Test/CheckedUserDefinedOperatorsTests.cs"
                          },
                          {
                              "name":  "ClaimsPrincipalTests",
-                             "path":  "PurelySharp.Test/ClaimsPrincipalTests.cs"
+                             "path":  "SharpProof.Test/ClaimsPrincipalTests.cs"
                          },
                          {
                              "name":  "CodeDomProviderTests",
-                             "path":  "PurelySharp.Test/CodeDomProviderTests.cs"
+                             "path":  "SharpProof.Test/CodeDomProviderTests.cs"
                          },
                          {
                              "name":  "CollectionArrayTests",
-                             "path":  "PurelySharp.Test/CollectionArrayTests.cs"
+                             "path":  "SharpProof.Test/CollectionArrayTests.cs"
                          },
                          {
                              "name":  "CollectionConstructorTests",
-                             "path":  "PurelySharp.Test/CollectionConstructorTests.cs"
+                             "path":  "SharpProof.Test/CollectionConstructorTests.cs"
                          },
                          {
                              "name":  "CollectionExpressionSpreadTests",
-                             "path":  "PurelySharp.Test/CollectionExpressionSpreadTests.cs"
+                             "path":  "SharpProof.Test/CollectionExpressionSpreadTests.cs"
                          },
                          {
                              "name":  "CollectionExpressionTests",
-                             "path":  "PurelySharp.Test/CollectionExpressionTests.cs"
+                             "path":  "SharpProof.Test/CollectionExpressionTests.cs"
                          },
                          {
                              "name":  "CollectionMaterializationTests",
-                             "path":  "PurelySharp.Test/CollectionMaterializationTests.cs"
+                             "path":  "SharpProof.Test/CollectionMaterializationTests.cs"
                          },
                          {
                              "name":  "CollectionViewTests",
-                             "path":  "PurelySharp.Test/CollectionViewTests.cs"
+                             "path":  "SharpProof.Test/CollectionViewTests.cs"
                          },
                          {
                              "name":  "ComparerTests",
-                             "path":  "PurelySharp.Test/ComparerTests.cs"
+                             "path":  "SharpProof.Test/ComparerTests.cs"
                          },
                          {
                              "name":  "ComparisonDispatchTests",
-                             "path":  "PurelySharp.Test/ComparisonDispatchTests.cs"
+                             "path":  "SharpProof.Test/ComparisonDispatchTests.cs"
                          },
                          {
                              "name":  "ComplexPureOperationsTests",
-                             "path":  "PurelySharp.Test/ComplexPureOperationsTests.cs"
+                             "path":  "SharpProof.Test/ComplexPureOperationsTests.cs"
                          },
                          {
                              "name":  "ComplexSideEffectsTests",
-                             "path":  "PurelySharp.Test/ComplexSideEffectsTests.cs"
+                             "path":  "SharpProof.Test/ComplexSideEffectsTests.cs"
                          },
                          {
                              "name":  "ComponentModelTests",
-                             "path":  "PurelySharp.Test/ComponentModelTests.cs"
+                             "path":  "SharpProof.Test/ComponentModelTests.cs"
                          },
                          {
                              "name":  "CompositionInteractionTests",
-                             "path":  "PurelySharp.Test/CompositionInteractionTests.cs"
+                             "path":  "SharpProof.Test/CompositionInteractionTests.cs"
                          },
                          {
                              "name":  "ComprehensiveAsyncTests",
-                             "path":  "PurelySharp.Test/ComprehensiveAsyncTests.cs"
+                             "path":  "SharpProof.Test/ComprehensiveAsyncTests.cs"
                          },
                          {
                              "name":  "ConcurrencyOperationsTests",
-                             "path":  "PurelySharp.Test/ConcurrencyOperationsTests.cs"
+                             "path":  "SharpProof.Test/ConcurrencyOperationsTests.cs"
                          },
                          {
                              "name":  "ConsoleTests",
-                             "path":  "PurelySharp.Test/ConsoleTests.cs"
+                             "path":  "SharpProof.Test/ConsoleTests.cs"
                          },
                          {
                              "name":  "ConstantsTests",
-                             "path":  "PurelySharp.Test/ConstantsTests.cs"
+                             "path":  "SharpProof.Test/ConstantsTests.cs"
                          },
                          {
                              "name":  "ConstantsTests",
-                             "path":  "PurelySharp.Test/ConstantsTests.Helpers.cs"
+                             "path":  "SharpProof.Test/ConstantsTests.Helpers.cs"
                          },
                          {
                              "name":  "ConstructorTests",
-                             "path":  "PurelySharp.Test/ConstructorTests.cs"
+                             "path":  "SharpProof.Test/ConstructorTests.cs"
                          },
                          {
                              "name":  "ConvertTests",
-                             "path":  "PurelySharp.Test/ConvertTests.cs"
+                             "path":  "SharpProof.Test/ConvertTests.cs"
                          },
                          {
                              "name":  "CorpusReportTests",
-                             "path":  "PurelySharp.ToolingTest/CorpusReportTests.cs"
+                             "path":  "SharpProof.ToolingTest/CorpusReportTests.cs"
                          },
                          {
                              "name":  "CryptographyTests",
-                             "path":  "PurelySharp.Test/CryptographyTests.cs"
+                             "path":  "SharpProof.Test/CryptographyTests.cs"
                          },
                          {
                              "name":  "CultureInfoTests",
-                             "path":  "PurelySharp.Test/CultureInfoTests.cs"
+                             "path":  "SharpProof.Test/CultureInfoTests.cs"
                          },
                          {
                              "name":  "DataAnnotationsTests",
-                             "path":  "PurelySharp.Test/DataAnnotationsTests.cs"
+                             "path":  "SharpProof.Test/DataAnnotationsTests.cs"
                          },
                          {
                              "name":  "DataTests",
-                             "path":  "PurelySharp.Test/DataTests.cs"
+                             "path":  "SharpProof.Test/DataTests.cs"
                          },
                          {
                              "name":  "DateTimeTests",
-                             "path":  "PurelySharp.Test/DateTimeTests.cs"
+                             "path":  "SharpProof.Test/DateTimeTests.cs"
                          },
                          {
                              "name":  "DeconstructionSoundnessStressTests",
-                             "path":  "PurelySharp.Test/DeconstructionSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/DeconstructionSoundnessStressTests.cs"
                          },
                          {
                              "name":  "DeepRegressionTests",
-                             "path":  "PurelySharp.Test/DeepRegressionTests.cs"
+                             "path":  "SharpProof.Test/DeepRegressionTests.cs"
                          },
                          {
                              "name":  "DelegateArgumentDispatchTests",
-                             "path":  "PurelySharp.Test/DelegateArgumentDispatchTests.cs"
+                             "path":  "SharpProof.Test/DelegateArgumentDispatchTests.cs"
                          },
                          {
                              "name":  "DelegateTests",
-                             "path":  "PurelySharp.Test/DelegateTests.cs"
+                             "path":  "SharpProof.Test/DelegateTests.cs"
                          },
                          {
                              "name":  "DelegateTypeTests",
-                             "path":  "PurelySharp.Test/DelegateTypeTests.cs"
+                             "path":  "SharpProof.Test/DelegateTypeTests.cs"
                          },
                          {
                              "name":  "DiagnosticEvidenceTests",
-                             "path":  "PurelySharp.Test/DiagnosticEvidenceTests.cs"
+                             "path":  "SharpProof.Test/DiagnosticEvidenceTests.cs"
                          },
                          {
                              "name":  "DiagnosticEvidenceTests",
-                             "path":  "PurelySharp.Test/DiagnosticEvidenceTests.Helpers.cs"
+                             "path":  "SharpProof.Test/DiagnosticEvidenceTests.Helpers.cs"
                          },
                          {
                              "name":  "DiagnosticsTests",
-                             "path":  "PurelySharp.Test/DiagnosticsTests.cs"
+                             "path":  "SharpProof.Test/DiagnosticsTests.cs"
                          },
                          {
                              "name":  "DispatchSoundnessStressTests",
-                             "path":  "PurelySharp.Test/DispatchSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/DispatchSoundnessStressTests.cs"
                          },
                          {
                              "name":  "DynamicTests",
-                             "path":  "PurelySharp.Test/DynamicTests.cs"
+                             "path":  "SharpProof.Test/DynamicTests.cs"
                          },
                          {
                              "name":  "DynamicTypingTests",
-                             "path":  "PurelySharp.Test/DynamicTypingTests.cs"
+                             "path":  "SharpProof.Test/DynamicTypingTests.cs"
                          },
                          {
                              "name":  "EffectSummarySymbolKeyFactoryTests",
-                             "path":  "PurelySharp.Test/EffectSummarySymbolKeyFactoryTests.cs"
+                             "path":  "SharpProof.Test/EffectSummarySymbolKeyFactoryTests.cs"
                          },
                          {
                              "name":  "EffectSummaryToolTests",
-                             "path":  "PurelySharp.Test/EffectSummaryToolTests.cs"
+                             "path":  "SharpProof.Test/EffectSummaryToolTests.cs"
                          },
                          {
                              "name":  "EffectSummaryToolTests",
-                             "path":  "PurelySharp.Test/EffectSummaryToolTests.Helpers.cs"
+                             "path":  "SharpProof.Test/EffectSummaryToolTests.Helpers.cs"
                          },
                          {
                              "name":  "ElementAccessSmtTests",
-                             "path":  "PurelySharp.Test/ElementAccessSmtTests.cs"
+                             "path":  "SharpProof.Test/ElementAccessSmtTests.cs"
                          },
                          {
                              "name":  "EncodingLookupTests",
-                             "path":  "PurelySharp.Test/EncodingLookupTests.cs"
+                             "path":  "SharpProof.Test/EncodingLookupTests.cs"
                          },
                          {
                              "name":  "EnumOperationsTests",
-                             "path":  "PurelySharp.Test/EnumOperationsTests.cs"
+                             "path":  "SharpProof.Test/EnumOperationsTests.cs"
                          },
                          {
                              "name":  "EnvironmentTests",
-                             "path":  "PurelySharp.Test/EnvironmentTests.cs"
+                             "path":  "SharpProof.Test/EnvironmentTests.cs"
                          },
                          {
                              "name":  "EventAccessorRegressionTests",
-                             "path":  "PurelySharp.Test/EventAccessorRegressionTests.cs"
+                             "path":  "SharpProof.Test/EventAccessorRegressionTests.cs"
                          },
                          {
                              "name":  "EventSoundnessStressTests",
-                             "path":  "PurelySharp.Test/EventSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/EventSoundnessStressTests.cs"
                          },
                          {
                              "name":  "EventTests",
-                             "path":  "PurelySharp.Test/EventTests.cs"
+                             "path":  "SharpProof.Test/EventTests.cs"
                          },
                          {
                              "name":  "ExactConcreteDispatchFlowTests",
-                             "path":  "PurelySharp.Test/ExactConcreteDispatchFlowTests.cs"
+                             "path":  "SharpProof.Test/ExactConcreteDispatchFlowTests.cs"
                          },
                          {
                              "name":  "ExactConcreteDispatchLoopTests",
-                             "path":  "PurelySharp.Test/ExactConcreteDispatchLoopTests.cs"
+                             "path":  "SharpProof.Test/ExactConcreteDispatchLoopTests.cs"
                          },
                          {
                              "name":  "ExactConcreteDispatchSwitchStatementTests",
-                             "path":  "PurelySharp.Test/ExactConcreteDispatchSwitchStatementTests.cs"
+                             "path":  "SharpProof.Test/ExactConcreteDispatchSwitchStatementTests.cs"
                          },
                          {
                              "name":  "ExactConcreteDispatchTests",
-                             "path":  "PurelySharp.Test/ExactConcreteDispatchTests.cs"
+                             "path":  "SharpProof.Test/ExactConcreteDispatchTests.cs"
                          },
                          {
                              "name":  "ExactConcretePropertyDispatchTests",
-                             "path":  "PurelySharp.Test/ExactConcretePropertyDispatchTests.cs"
+                             "path":  "SharpProof.Test/ExactConcretePropertyDispatchTests.cs"
                          },
                          {
                              "name":  "ExceptionCatalogTests",
-                             "path":  "PurelySharp.Test/ExceptionCatalogTests.cs"
+                             "path":  "SharpProof.Test/ExceptionCatalogTests.cs"
                          },
                          {
                              "name":  "ExceptionFlowPathFactStressTests",
-                             "path":  "PurelySharp.Test/ExceptionFlowPathFactStressTests.cs"
+                             "path":  "SharpProof.Test/ExceptionFlowPathFactStressTests.cs"
                          },
                          {
                              "name":  "ExceptionFlowPropagationRegressionTests",
-                             "path":  "PurelySharp.Test/ExceptionFlowPropagationRegressionTests.cs"
+                             "path":  "SharpProof.Test/ExceptionFlowPropagationRegressionTests.cs"
                          },
                          {
                              "name":  "ExceptionHandlingTests",
-                             "path":  "PurelySharp.Test/ExceptionHandlingTests.cs"
+                             "path":  "SharpProof.Test/ExceptionHandlingTests.cs"
                          },
                          {
                              "name":  "ExceptionReachabilitySmtTests",
-                             "path":  "PurelySharp.Test/ExceptionReachabilitySmtTests.cs"
+                             "path":  "SharpProof.Test/ExceptionReachabilitySmtTests.cs"
                          },
                          {
                              "name":  "ExceptionRegionSoundnessStressTests",
-                             "path":  "PurelySharp.Test/ExceptionRegionSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/ExceptionRegionSoundnessStressTests.cs"
                          },
                          {
                              "name":  "ExceptionSummaryCatalogValidationTests",
-                             "path":  "PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs"
+                             "path":  "SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs"
                          },
                          {
                              "name":  "ExceptionSummaryCatalogValidationTests",
-                             "path":  "PurelySharp.Test/ExceptionSummaryCatalogValidationTests.Helpers.cs"
+                             "path":  "SharpProof.Test/ExceptionSummaryCatalogValidationTests.Helpers.cs"
                          },
                          {
                              "name":  "ExpressionAtomSmtTests",
-                             "path":  "PurelySharp.Test/ExpressionAtomSmtTests.cs"
+                             "path":  "SharpProof.Test/ExpressionAtomSmtTests.cs"
                          },
                          {
                              "name":  "ExpressionSmtTranslationTests",
-                             "path":  "PurelySharp.Test/ExpressionSmtTranslationTests.cs"
+                             "path":  "SharpProof.Test/ExpressionSmtTranslationTests.cs"
                          },
                          {
                              "name":  "ExpressionTreeTests",
-                             "path":  "PurelySharp.Test/ExpressionTreeTests.cs"
+                             "path":  "SharpProof.Test/ExpressionTreeTests.cs"
                          },
                          {
                              "name":  "ExtendedNameofScopeTests",
-                             "path":  "PurelySharp.Test/ExtendedNameofScopeTests.cs"
+                             "path":  "SharpProof.Test/ExtendedNameofScopeTests.cs"
                          },
                          {
                              "name":  "FieldReferenceValueTypeTests",
-                             "path":  "PurelySharp.Test/FieldReferenceValueTypeTests.cs"
+                             "path":  "SharpProof.Test/FieldReferenceValueTypeTests.cs"
                          },
                          {
                              "name":  "FileScopedNamespacesTests",
-                             "path":  "PurelySharp.Test/FileScopedNamespacesTests.cs"
+                             "path":  "SharpProof.Test/FileScopedNamespacesTests.cs"
                          },
                          {
                              "name":  "FixedCollectionExpressionTests",
-                             "path":  "PurelySharp.Test/FixedCollectionExpressionTests.cs"
+                             "path":  "SharpProof.Test/FixedCollectionExpressionTests.cs"
                          },
                          {
                              "name":  "ForeachLoopTests",
-                             "path":  "PurelySharp.Test/ForeachLoopTests.cs"
+                             "path":  "SharpProof.Test/ForeachLoopTests.cs"
                          },
                          {
                              "name":  "ForeachRuntimeMemberSoundnessTests",
-                             "path":  "PurelySharp.Test/ForeachRuntimeMemberSoundnessTests.cs"
+                             "path":  "SharpProof.Test/ForeachRuntimeMemberSoundnessTests.cs"
                          },
                          {
                              "name":  "ForeachSmtInvariantTests",
-                             "path":  "PurelySharp.Test/ForeachSmtInvariantTests.cs"
+                             "path":  "SharpProof.Test/ForeachSmtInvariantTests.cs"
                          },
                          {
                              "name":  "ForLoopTests",
-                             "path":  "PurelySharp.Test/ForLoopTests.cs"
+                             "path":  "SharpProof.Test/ForLoopTests.cs"
                          },
                          {
                              "name":  "FrameworkCommonOperationsTests",
-                             "path":  "PurelySharp.Test/FrameworkCommonOperationsTests.cs"
+                             "path":  "SharpProof.Test/FrameworkCommonOperationsTests.cs"
                          },
                          {
                              "name":  "FuzzToolTests",
-                             "path":  "PurelySharp.ToolingTest/FuzzToolTests.cs"
+                             "path":  "SharpProof.ToolingTest/FuzzToolTests.cs"
                          },
                          {
                              "name":  "GarbageCollectionTests",
-                             "path":  "PurelySharp.Test/GarbageCollectionTests.cs"
+                             "path":  "SharpProof.Test/GarbageCollectionTests.cs"
                          },
                          {
                              "name":  "GenericAttributesTests",
-                             "path":  "PurelySharp.Test/GenericAttributesTests.cs"
+                             "path":  "SharpProof.Test/GenericAttributesTests.cs"
                          },
                          {
                              "name":  "GenericComparisonDispatchTests",
-                             "path":  "PurelySharp.Test/GenericComparisonDispatchTests.cs"
+                             "path":  "SharpProof.Test/GenericComparisonDispatchTests.cs"
                          },
                          {
                              "name":  "GenericEqualityDispatchTests",
-                             "path":  "PurelySharp.Test/GenericEqualityDispatchTests.cs"
+                             "path":  "SharpProof.Test/GenericEqualityDispatchTests.cs"
                          },
                          {
                              "name":  "GenericIndexerDispatchTests",
-                             "path":  "PurelySharp.Test/GenericIndexerDispatchTests.cs"
+                             "path":  "SharpProof.Test/GenericIndexerDispatchTests.cs"
                          },
                          {
                              "name":  "GenericsInteractionTests",
-                             "path":  "PurelySharp.Test/GenericsInteractionTests.cs"
+                             "path":  "SharpProof.Test/GenericsInteractionTests.cs"
                          },
                          {
                              "name":  "GlobalizationTests",
-                             "path":  "PurelySharp.Test/GlobalizationTests.cs"
+                             "path":  "SharpProof.Test/GlobalizationTests.cs"
                          },
                          {
                              "name":  "GuardHelpersTests",
-                             "path":  "PurelySharp.Test/GuardHelpersTests.cs"
+                             "path":  "SharpProof.Test/GuardHelpersTests.cs"
                          },
                          {
                              "name":  "GuidTests",
-                             "path":  "PurelySharp.Test/GuidTests.cs"
+                             "path":  "SharpProof.Test/GuidTests.cs"
                          },
                          {
                              "name":  "IfStatementTests",
-                             "path":  "PurelySharp.Test/IfStatementTests.cs"
+                             "path":  "SharpProof.Test/IfStatementTests.cs"
                          },
                          {
                              "name":  "ImmutableBuilderTests",
-                             "path":  "PurelySharp.Test/ImmutableBuilderTests.cs"
+                             "path":  "SharpProof.Test/ImmutableBuilderTests.cs"
                          },
                          {
                              "name":  "ImmutableDictionaryTests",
-                             "path":  "PurelySharp.Test/ImmutableDictionaryTests.cs"
+                             "path":  "SharpProof.Test/ImmutableDictionaryTests.cs"
                          },
                          {
                              "name":  "ImmutableInterlockedTests",
-                             "path":  "PurelySharp.Test/ImmutableInterlockedTests.cs"
+                             "path":  "SharpProof.Test/ImmutableInterlockedTests.cs"
                          },
                          {
                              "name":  "ImmutableListTests",
-                             "path":  "PurelySharp.Test/ImmutableListTests.cs"
+                             "path":  "SharpProof.Test/ImmutableListTests.cs"
                          },
                          {
                              "name":  "ImmutableQueueTests",
-                             "path":  "PurelySharp.Test/ImmutableQueueTests.cs"
+                             "path":  "SharpProof.Test/ImmutableQueueTests.cs"
                          },
                          {
                              "name":  "ImmutableStackTests",
-                             "path":  "PurelySharp.Test/ImmutableStackTests.cs"
+                             "path":  "SharpProof.Test/ImmutableStackTests.cs"
                          },
                          {
                              "name":  "ImpactedTestSelectionScriptTests",
-                             "path":  "PurelySharp.Test/ImpactedTestSelectionScriptTests.cs"
+                             "path":  "SharpProof.Test/ImpactedTestSelectionScriptTests.cs"
                          },
                          {
                              "name":  "ImpureOperationTests",
-                             "path":  "PurelySharp.Test/ImpureOperationTests.cs"
+                             "path":  "SharpProof.Test/ImpureOperationTests.cs"
                          },
                          {
                              "name":  "IndexerTests",
-                             "path":  "PurelySharp.Test/IndexerTests.cs"
+                             "path":  "SharpProof.Test/IndexerTests.cs"
                          },
                          {
                              "name":  "InheritanceInteractionTests",
-                             "path":  "PurelySharp.Test/InheritanceInteractionTests.cs"
+                             "path":  "SharpProof.Test/InheritanceInteractionTests.cs"
                          },
                          {
                              "name":  "InitAccessorRegressionTests",
-                             "path":  "PurelySharp.Test/InitAccessorRegressionTests.cs"
+                             "path":  "SharpProof.Test/InitAccessorRegressionTests.cs"
                          },
                          {
                              "name":  "InlineArrayTests",
-                             "path":  "PurelySharp.Test/InlineArrayTests.cs"
+                             "path":  "SharpProof.Test/InlineArrayTests.cs"
                          },
                          {
                              "name":  "InParameterTests",
-                             "path":  "PurelySharp.Test/InParameterTests.cs"
+                             "path":  "SharpProof.Test/InParameterTests.cs"
                          },
                          {
                              "name":  "InstancePropertyGetterTests",
-                             "path":  "PurelySharp.Test/InstancePropertyGetterTests.cs"
+                             "path":  "SharpProof.Test/InstancePropertyGetterTests.cs"
                          },
                          {
                              "name":  "InterfaceInteractionTests",
-                             "path":  "PurelySharp.Test/InterfaceInteractionTests.cs"
+                             "path":  "SharpProof.Test/InterfaceInteractionTests.cs"
                          },
                          {
                              "name":  "InteropTests",
-                             "path":  "PurelySharp.Test/InteropTests.cs"
+                             "path":  "SharpProof.Test/InteropTests.cs"
                          },
                          {
                              "name":  "InterpolatedStringSoundnessStressTests",
-                             "path":  "PurelySharp.Test/InterpolatedStringSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/InterpolatedStringSoundnessStressTests.cs"
                          },
                          {
                              "name":  "IOOperationsTests",
-                             "path":  "PurelySharp.Test/IOOperationsTests.cs"
+                             "path":  "SharpProof.Test/IOOperationsTests.cs"
                          },
                          {
                              "name":  "JsonTests",
-                             "path":  "PurelySharp.Test/JsonTests.cs"
+                             "path":  "SharpProof.Test/JsonTests.cs"
                          },
                          {
                              "name":  "KeyedCollectionTests",
-                             "path":  "PurelySharp.Test/KeyedCollectionTests.cs"
+                             "path":  "SharpProof.Test/KeyedCollectionTests.cs"
                          },
                          {
                              "name":  "LambdaTests",
-                             "path":  "PurelySharp.Test/LambdaTests.cs"
+                             "path":  "SharpProof.Test/LambdaTests.cs"
                          },
                          {
                              "name":  "LinqMaterializationTests",
-                             "path":  "PurelySharp.Test/LinqMaterializationTests.cs"
+                             "path":  "SharpProof.Test/LinqMaterializationTests.cs"
                          },
                          {
                              "name":  "LinqOperationsTests",
-                             "path":  "PurelySharp.Test/LinqOperationsTests.cs"
+                             "path":  "SharpProof.Test/LinqOperationsTests.cs"
                          },
                          {
                              "name":  "LinqSoundnessStressTests",
-                             "path":  "PurelySharp.Test/LinqSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/LinqSoundnessStressTests.cs"
                          },
                          {
                              "name":  "ListPatternSoundnessTests",
-                             "path":  "PurelySharp.Test/ListPatternSoundnessTests.cs"
+                             "path":  "SharpProof.Test/ListPatternSoundnessTests.cs"
                          },
                          {
                              "name":  "ListSortTests",
-                             "path":  "PurelySharp.Test/ListSortTests.cs"
+                             "path":  "SharpProof.Test/ListSortTests.cs"
                          },
                          {
                              "name":  "LocalFunctionAndRecursionTests",
-                             "path":  "PurelySharp.Test/LocalFunctionAndRecursionTests.cs"
+                             "path":  "SharpProof.Test/LocalFunctionAndRecursionTests.cs"
                          },
                          {
                              "name":  "LocalFunctionTests",
-                             "path":  "PurelySharp.Test/LocalFunctionTests.cs"
+                             "path":  "SharpProof.Test/LocalFunctionTests.cs"
                          },
                          {
                              "name":  "LockStatementTests",
-                             "path":  "PurelySharp.Test/LockStatementTests.cs"
+                             "path":  "SharpProof.Test/LockStatementTests.cs"
                          },
                          {
                              "name":  "LoopExitSmtInvariantTests",
-                             "path":  "PurelySharp.Test/LoopExitSmtInvariantTests.cs"
+                             "path":  "SharpProof.Test/LoopExitSmtInvariantTests.cs"
                          },
                          {
                              "name":  "MathAndLinqTests",
-                             "path":  "PurelySharp.Test/MathAndLinqTests.cs"
+                             "path":  "SharpProof.Test/MathAndLinqTests.cs"
                          },
                          {
                              "name":  "MathOperationsTests",
-                             "path":  "PurelySharp.Test/MathOperationsTests.cs"
+                             "path":  "SharpProof.Test/MathOperationsTests.cs"
                          },
                          {
                              "name":  "MemoryInteropTests",
-                             "path":  "PurelySharp.Test/MemoryInteropTests.cs"
+                             "path":  "SharpProof.Test/MemoryInteropTests.cs"
                          },
                          {
                              "name":  "MethodCallTests",
-                             "path":  "PurelySharp.Test/MethodCallTests.cs"
+                             "path":  "SharpProof.Test/MethodCallTests.cs"
                          },
                          {
                              "name":  "MetricsTests",
-                             "path":  "PurelySharp.Test/MetricsTests.cs"
+                             "path":  "SharpProof.Test/MetricsTests.cs"
                          },
                          {
                              "name":  "NetworkingTests",
-                             "path":  "PurelySharp.Test/NetworkingTests.cs"
+                             "path":  "SharpProof.Test/NetworkingTests.cs"
                          },
                          {
                              "name":  "NonDeterministicOperationsTests",
-                             "path":  "PurelySharp.Test/NonDeterministicOperationsTests.cs"
+                             "path":  "SharpProof.Test/NonDeterministicOperationsTests.cs"
                          },
                          {
                              "name":  "NullCheckTests",
-                             "path":  "PurelySharp.Test/NullCheckTests.cs"
+                             "path":  "SharpProof.Test/NullCheckTests.cs"
                          },
                          {
                              "name":  "NullComparisonTests",
-                             "path":  "PurelySharp.Test/NullComparisonTests.cs"
+                             "path":  "SharpProof.Test/NullComparisonTests.cs"
                          },
                          {
                              "name":  "NullConditionalTests",
-                             "path":  "PurelySharp.Test/NullConditionalTests.cs"
+                             "path":  "SharpProof.Test/NullConditionalTests.cs"
                          },
                          {
                              "name":  "NullForgivingTests",
-                             "path":  "PurelySharp.Test/NullForgivingTests.cs"
+                             "path":  "SharpProof.Test/NullForgivingTests.cs"
                          },
                          {
                              "name":  "NullPropagationTests",
-                             "path":  "PurelySharp.Test/NullPropagationTests.cs"
+                             "path":  "SharpProof.Test/NullPropagationTests.cs"
                          },
                          {
                              "name":  "NullReferenceTests",
-                             "path":  "PurelySharp.Test/NullReferenceTests.cs"
+                             "path":  "SharpProof.Test/NullReferenceTests.cs"
                          },
                          {
                              "name":  "NumericIntPtrTests",
-                             "path":  "PurelySharp.Test/NumericIntPtrTests.cs"
+                             "path":  "SharpProof.Test/NumericIntPtrTests.cs"
                          },
                          {
                              "name":  "ObjectDispatchSoundnessStressTests",
-                             "path":  "PurelySharp.Test/ObjectDispatchSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/ObjectDispatchSoundnessStressTests.cs"
                          },
                          {
                              "name":  "ObjectEqualsDispatchTests",
-                             "path":  "PurelySharp.Test/ObjectEqualsDispatchTests.cs"
+                             "path":  "SharpProof.Test/ObjectEqualsDispatchTests.cs"
                          },
                          {
                              "name":  "ObjectInitializerTests",
-                             "path":  "PurelySharp.Test/ObjectInitializerTests.cs"
+                             "path":  "SharpProof.Test/ObjectInitializerTests.cs"
                          },
                          {
                              "name":  "ObjectRuntimeTests",
-                             "path":  "PurelySharp.Test/ObjectRuntimeTests.cs"
+                             "path":  "SharpProof.Test/ObjectRuntimeTests.cs"
                          },
                          {
                              "name":  "OperatingSystemTests",
-                             "path":  "PurelySharp.Test/OperatingSystemTests.cs"
+                             "path":  "SharpProof.Test/OperatingSystemTests.cs"
                          },
                          {
                              "name":  "OperatorOverloadTests",
-                             "path":  "PurelySharp.Test/OperatorOverloadTests.cs"
+                             "path":  "SharpProof.Test/OperatorOverloadTests.cs"
                          },
                          {
                              "name":  "OptionalParameterTests",
-                             "path":  "PurelySharp.Test/OptionalParameterTests.cs"
+                             "path":  "SharpProof.Test/OptionalParameterTests.cs"
                          },
                          {
                              "name":  "OutParameterTests",
-                             "path":  "PurelySharp.Test/OutParameterTests.cs"
+                             "path":  "SharpProof.Test/OutParameterTests.cs"
                          },
                          {
                              "name":  "ParamsArrayTests",
-                             "path":  "PurelySharp.Test/ParamsArrayTests.cs"
+                             "path":  "SharpProof.Test/ParamsArrayTests.cs"
                          },
                          {
                              "name":  "PartialFunctionsTests",
-                             "path":  "PurelySharp.Test/PartialFunctionsTests.cs"
+                             "path":  "SharpProof.Test/PartialFunctionsTests.cs"
                          },
                          {
                              "name":  "PathFactExpressionReachabilityTests",
-                             "path":  "PurelySharp.Test/PathFactExpressionReachabilityTests.cs"
+                             "path":  "SharpProof.Test/PathFactExpressionReachabilityTests.cs"
                          },
                          {
                              "name":  "PathSensitiveSmtInvariantTests",
-                             "path":  "PurelySharp.Test/PathSensitiveSmtInvariantTests.cs"
+                             "path":  "SharpProof.Test/PathSensitiveSmtInvariantTests.cs"
                          },
                          {
                              "name":  "PatternSmtInvariantTests",
-                             "path":  "PurelySharp.Test/PatternSmtInvariantTests.cs"
+                             "path":  "SharpProof.Test/PatternSmtInvariantTests.cs"
                          },
                          {
                              "name":  "PrimaryConstructorTests",
-                             "path":  "PurelySharp.Test/PrimaryConstructorTests.cs"
+                             "path":  "SharpProof.Test/PrimaryConstructorTests.cs"
                          },
                          {
                              "name":  "ProcessTests",
-                             "path":  "PurelySharp.Test/ProcessTests.cs"
+                             "path":  "SharpProof.Test/ProcessTests.cs"
                          },
                          {
                              "name":  "PropertyAccessInteractionTests",
-                             "path":  "PurelySharp.Test/PropertyAccessInteractionTests.cs"
+                             "path":  "SharpProof.Test/PropertyAccessInteractionTests.cs"
                          },
                          {
                              "name":  "PropertyGetterDispatchTests",
-                             "path":  "PurelySharp.Test/PropertyGetterDispatchTests.cs"
+                             "path":  "SharpProof.Test/PropertyGetterDispatchTests.cs"
                          },
                          {
                              "name":  "PropertyPatternTests",
-                             "path":  "PurelySharp.Test/PropertyPatternTests.cs"
+                             "path":  "SharpProof.Test/PropertyPatternTests.cs"
                          },
                          {
-                             "name":  "Ps0004ConfigurationTests",
-                             "path":  "PurelySharp.Test/Ps0004ConfigurationTests.cs"
+                             "name":  "Sp0004ConfigurationTests",
+                             "path":  "SharpProof.Test/Sp0004ConfigurationTests.cs"
                          },
                          {
                              "name":  "PureAsyncTests",
-                             "path":  "PurelySharp.Test/PureAsyncTests.cs"
+                             "path":  "SharpProof.Test/PureAsyncTests.cs"
                          },
                          {
-                             "name":  "PurelySharpCodeFixTests",
-                             "path":  "PurelySharp.Test/PurelySharpCodeFixTests.cs"
+                             "name":  "SharpProofCodeFixTests",
+                             "path":  "SharpProof.Test/SharpProofCodeFixTests.cs"
                          },
                          {
                              "name":  "PureStateInteractionTests",
-                             "path":  "PurelySharp.Test/PureStateInteractionTests.cs"
+                             "path":  "SharpProof.Test/PureStateInteractionTests.cs"
                          },
                          {
                              "name":  "PurityPostCfgRegressionTests",
-                             "path":  "PurelySharp.Test/PurityPostCfgRegressionTests.cs"
+                             "path":  "SharpProof.Test/PurityPostCfgRegressionTests.cs"
                          },
                          {
                              "name":  "PuritySoundnessStressTests",
-                             "path":  "PurelySharp.Test/PuritySoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/PuritySoundnessStressTests.cs"
                          },
                          {
                              "name":  "RandomOverloadTests",
-                             "path":  "PurelySharp.Test/RandomOverloadTests.cs"
+                             "path":  "SharpProof.Test/RandomOverloadTests.cs"
                          },
                          {
                              "name":  "RangeAndIndexTests",
-                             "path":  "PurelySharp.Test/RangeAndIndexTests.cs"
+                             "path":  "SharpProof.Test/RangeAndIndexTests.cs"
                          },
                          {
                              "name":  "RawStringLiteralsTests",
-                             "path":  "PurelySharp.Test/RawStringLiteralsTests.cs"
+                             "path":  "SharpProof.Test/RawStringLiteralsTests.cs"
                          },
                          {
                              "name":  "RecordStructTests",
-                             "path":  "PurelySharp.Test/RecordStructTests.cs"
+                             "path":  "SharpProof.Test/RecordStructTests.cs"
                          },
                          {
                              "name":  "RecordTests",
-                             "path":  "PurelySharp.Test/RecordTests.cs"
+                             "path":  "SharpProof.Test/RecordTests.cs"
                          },
                          {
                              "name":  "RecursiveExceptionFlowTests",
-                             "path":  "PurelySharp.Test/RecursiveExceptionFlowTests.cs"
+                             "path":  "SharpProof.Test/RecursiveExceptionFlowTests.cs"
                          },
                          {
                              "name":  "RefAliasSoundnessStressTests",
-                             "path":  "PurelySharp.Test/RefAliasSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/RefAliasSoundnessStressTests.cs"
                          },
                          {
                              "name":  "ReferenceReachabilitySmtTests",
-                             "path":  "PurelySharp.Test/ReferenceReachabilitySmtTests.cs"
+                             "path":  "SharpProof.Test/ReferenceReachabilitySmtTests.cs"
                          },
                          {
                              "name":  "RefFieldsAndScopedRefTests",
-                             "path":  "PurelySharp.Test/RefFieldsAndScopedRefTests.cs"
+                             "path":  "SharpProof.Test/RefFieldsAndScopedRefTests.cs"
                          },
                          {
                              "name":  "ReflectionTests",
-                             "path":  "PurelySharp.Test/ReflectionTests.cs"
+                             "path":  "SharpProof.Test/ReflectionTests.cs"
                          },
                          {
                              "name":  "RefParameterTests",
-                             "path":  "PurelySharp.Test/RefParameterTests.cs"
+                             "path":  "SharpProof.Test/RefParameterTests.cs"
                          },
                          {
                              "name":  "RefReadonlyParameterTests",
-                             "path":  "PurelySharp.Test/RefReadonlyParameterTests.cs"
+                             "path":  "SharpProof.Test/RefReadonlyParameterTests.cs"
                          },
                          {
                              "name":  "RegexTests",
-                             "path":  "PurelySharp.Test/RegexTests.cs"
+                             "path":  "SharpProof.Test/RegexTests.cs"
                          },
                          {
                              "name":  "RequiredMembersArchivedReferenceTests",
-                             "path":  "PurelySharp.Test/RequiredMembersArchivedReferenceTests.cs"
+                             "path":  "SharpProof.Test/RequiredMembersArchivedReferenceTests.cs"
                          },
                          {
                              "name":  "RequiredMembersSmokeTests",
-                             "path":  "PurelySharp.Test/RequiredMembersSmokeTests.cs"
+                             "path":  "SharpProof.Test/RequiredMembersSmokeTests.cs"
                          },
                          {
                              "name":  "RoslynConstructCoverageTests",
-                             "path":  "PurelySharp.ToolingTest/RoslynConstructCoverageTests.cs"
+                             "path":  "SharpProof.ToolingTest/RoslynConstructCoverageTests.cs"
                          },
                          {
                              "name":  "RoslynShapeManifestCoverageTests",
-                             "path":  "PurelySharp.ToolingTest/RoslynShapeManifestCoverageTests.cs"
+                             "path":  "SharpProof.ToolingTest/RoslynShapeManifestCoverageTests.cs"
                          },
                          {
                              "name":  "RuntimeVersioningTests",
-                             "path":  "PurelySharp.Test/RuntimeVersioningTests.cs"
+                             "path":  "SharpProof.Test/RuntimeVersioningTests.cs"
                          },
                          {
                              "name":  "SearchLibBackedPurityFlowTests",
-                             "path":  "PurelySharp.Test/SearchLibBackedPurityFlowTests.cs"
+                             "path":  "SharpProof.Test/SearchLibBackedPurityFlowTests.cs"
                          },
                          {
                              "name":  "SearchLibPurityProofTests",
-                             "path":  "PurelySharp.Test/SearchLibPurityProofTests.cs"
+                             "path":  "SharpProof.Test/SearchLibPurityProofTests.cs"
                          },
                          {
                              "name":  "SearchLibRoslynLoweringTests",
-                             "path":  "PurelySharp.Test/SearchLibRoslynLoweringTests.cs"
+                             "path":  "SharpProof.Test/SearchLibRoslynLoweringTests.cs"
                          },
                          {
                              "name":  "SearchLibZ3SmokeTests",
-                             "path":  "PurelySharp.Test/SearchLibZ3SmokeTests.cs"
+                             "path":  "SharpProof.Test/SearchLibZ3SmokeTests.cs"
                          },
                          {
                              "name":  "SemanticOracleMetamorphicTests",
-                             "path":  "PurelySharp.Test/SemanticOracleMetamorphicTests.cs"
+                             "path":  "SharpProof.Test/SemanticOracleMetamorphicTests.cs"
                          },
                          {
                              "name":  "SemanticOracleSmtTests",
-                             "path":  "PurelySharp.Test/SemanticOracleSmtTests.cs"
+                             "path":  "SharpProof.Test/SemanticOracleSmtTests.cs"
                          },
                          {
                              "name":  "SerializationTests",
-                             "path":  "PurelySharp.Test/SerializationTests.cs"
+                             "path":  "SharpProof.Test/SerializationTests.cs"
                          },
                          {
                              "name":  "SignalRTests",
-                             "path":  "PurelySharp.Test/SignalRTests.cs"
+                             "path":  "SharpProof.Test/SignalRTests.cs"
                          },
                          {
                              "name":  "SimpleCollectionExpressionTests",
-                             "path":  "PurelySharp.Test/SimpleCollectionExpressionTests.cs"
+                             "path":  "SharpProof.Test/SimpleCollectionExpressionTests.cs"
                          },
                          {
                              "name":  "SmtAnalysisServiceTests",
-                             "path":  "PurelySharp.Test/SmtAnalysisServiceTests.cs"
+                             "path":  "SharpProof.Test/SmtAnalysisServiceTests.cs"
                          },
                          {
                              "name":  "SpanMutationTests",
-                             "path":  "PurelySharp.Test/SpanMutationTests.cs"
+                             "path":  "SharpProof.Test/SpanMutationTests.cs"
                          },
                          {
                              "name":  "SpanPatternMatchingTests",
-                             "path":  "PurelySharp.Test/SpanPatternMatchingTests.cs"
+                             "path":  "SharpProof.Test/SpanPatternMatchingTests.cs"
                          },
                          {
                              "name":  "StackTraceTests",
-                             "path":  "PurelySharp.Test/StackTraceTests.cs"
+                             "path":  "SharpProof.Test/StackTraceTests.cs"
                          },
                          {
                              "name":  "StateModificationTests",
-                             "path":  "PurelySharp.Test/StateModificationTests.cs"
+                             "path":  "SharpProof.Test/StateModificationTests.cs"
                          },
                          {
                              "name":  "StaticInterfaceMembersTests",
-                             "path":  "PurelySharp.Test/StaticInterfaceMembersTests.cs"
+                             "path":  "SharpProof.Test/StaticInterfaceMembersTests.cs"
                          },
                          {
                              "name":  "StaticPropertyGetterTests",
-                             "path":  "PurelySharp.Test/StaticPropertyGetterTests.cs"
+                             "path":  "SharpProof.Test/StaticPropertyGetterTests.cs"
                          },
                          {
                              "name":  "StaticReadonlyFieldTests",
-                             "path":  "PurelySharp.Test/StaticReadonlyFieldTests.cs"
+                             "path":  "SharpProof.Test/StaticReadonlyFieldTests.cs"
                          },
                          {
                              "name":  "StaticStateInteractionTests",
-                             "path":  "PurelySharp.Test/StaticStateInteractionTests.cs"
+                             "path":  "SharpProof.Test/StaticStateInteractionTests.cs"
                          },
                          {
                              "name":  "StopwatchTests",
-                             "path":  "PurelySharp.Test/StopwatchTests.cs"
+                             "path":  "SharpProof.Test/StopwatchTests.cs"
                          },
                          {
                              "name":  "StringCultureAnalyzerTests",
-                             "path":  "PurelySharp.Test/StringCultureAnalyzerTests.cs"
+                             "path":  "SharpProof.Test/StringCultureAnalyzerTests.cs"
                          },
                          {
                              "name":  "StringCultureBehaviorTests",
-                             "path":  "PurelySharp.Test/StringCultureBehaviorTests.cs"
+                             "path":  "SharpProof.Test/StringCultureBehaviorTests.cs"
                          },
                          {
                              "name":  "StringLengthSmtTests",
-                             "path":  "PurelySharp.Test/StringLengthSmtTests.cs"
+                             "path":  "SharpProof.Test/StringLengthSmtTests.cs"
                          },
                          {
                              "name":  "StringOperationsTests",
-                             "path":  "PurelySharp.Test/StringOperationsTests.cs"
+                             "path":  "SharpProof.Test/StringOperationsTests.cs"
                          },
                          {
                              "name":  "SwitchTests",
-                             "path":  "PurelySharp.Test/SwitchTests.cs"
+                             "path":  "SharpProof.Test/SwitchTests.cs"
                          },
                          {
                              "name":  "SymbolicInvariantServiceTests",
-                             "path":  "PurelySharp.Test/SymbolicInvariantServiceTests.cs"
+                             "path":  "SharpProof.Test/SymbolicInvariantServiceTests.cs"
                          },
                          {
                              "name":  "SymbolicProgramPointFactTests",
-                             "path":  "PurelySharp.Test/SymbolicProgramPointFactTests.cs"
+                             "path":  "SharpProof.Test/SymbolicProgramPointFactTests.cs"
                          },
                          {
                              "name":  "SymbolicRuntimeHazardQueryTests",
-                             "path":  "PurelySharp.ToolingTest/SymbolicRuntimeHazardQueryTests.cs"
+                             "path":  "SharpProof.ToolingTest/SymbolicRuntimeHazardQueryTests.cs"
                          },
                          {
                              "name":  "SymbolicSourceQueryLineTests",
-                             "path":  "PurelySharp.ToolingTest/SymbolicSourceQueryLineTests.cs"
+                             "path":  "SharpProof.ToolingTest/SymbolicSourceQueryLineTests.cs"
                          },
                          {
                              "name":  "ThrowExpressionTests",
-                             "path":  "PurelySharp.Test/ThrowExpressionTests.cs"
+                             "path":  "SharpProof.Test/ThrowExpressionTests.cs"
                          },
                          {
                              "name":  "TimeProviderTests",
-                             "path":  "PurelySharp.Test/TimeProviderTests.cs"
+                             "path":  "SharpProof.Test/TimeProviderTests.cs"
                          },
                          {
                              "name":  "TimerTests",
-                             "path":  "PurelySharp.Test/TimerTests.cs"
+                             "path":  "SharpProof.Test/TimerTests.cs"
                          },
                          {
                              "name":  "TimeSpanTests",
-                             "path":  "PurelySharp.Test/TimeSpanTests.cs"
+                             "path":  "SharpProof.Test/TimeSpanTests.cs"
                          },
                          {
                              "name":  "TimeZoneInfoTests",
-                             "path":  "PurelySharp.Test/TimeZoneInfoTests.cs"
+                             "path":  "SharpProof.Test/TimeZoneInfoTests.cs"
                          },
                          {
                              "name":  "ToStringBehaviorTests",
-                             "path":  "PurelySharp.Test/ToStringBehaviorTests.cs"
+                             "path":  "SharpProof.Test/ToStringBehaviorTests.cs"
                          },
                          {
                              "name":  "TryCatchTests",
-                             "path":  "PurelySharp.Test/TryCatchTests.cs"
+                             "path":  "SharpProof.Test/TryCatchTests.cs"
                          },
                          {
                              "name":  "UnsafeCodeTests",
-                             "path":  "PurelySharp.Test/UnsafeCodeTests.cs"
+                             "path":  "SharpProof.Test/UnsafeCodeTests.cs"
                          },
                          {
                              "name":  "UnsafeTests",
-                             "path":  "PurelySharp.Test/UnsafeTests.cs"
+                             "path":  "SharpProof.Test/UnsafeTests.cs"
                          },
                          {
                              "name":  "UnsignedRightShiftTests",
-                             "path":  "PurelySharp.Test/UnsignedRightShiftTests.cs"
+                             "path":  "SharpProof.Test/UnsignedRightShiftTests.cs"
                          },
                          {
                              "name":  "UriTests",
-                             "path":  "PurelySharp.Test/UriTests.cs"
+                             "path":  "SharpProof.Test/UriTests.cs"
                          },
                          {
                              "name":  "UserDefinedConversionTests",
-                             "path":  "PurelySharp.Test/UserDefinedConversionTests.cs"
+                             "path":  "SharpProof.Test/UserDefinedConversionTests.cs"
                          },
                          {
                              "name":  "UsingDisposeSoundnessStressTests",
-                             "path":  "PurelySharp.Test/UsingDisposeSoundnessStressTests.cs"
+                             "path":  "SharpProof.Test/UsingDisposeSoundnessStressTests.cs"
                          },
                          {
                              "name":  "UsingStatementTests",
-                             "path":  "PurelySharp.Test/UsingStatementTests.cs"
+                             "path":  "SharpProof.Test/UsingStatementTests.cs"
                          },
                          {
                              "name":  "UsingTests",
-                             "path":  "PurelySharp.Test/UsingTests.cs"
+                             "path":  "SharpProof.Test/UsingTests.cs"
                          },
                          {
                              "name":  "VersionTests",
-                             "path":  "PurelySharp.Test/VersionTests.cs"
+                             "path":  "SharpProof.Test/VersionTests.cs"
                          },
                          {
                              "name":  "VolatileFieldTests",
-                             "path":  "PurelySharp.Test/VolatileFieldTests.cs"
+                             "path":  "SharpProof.Test/VolatileFieldTests.cs"
                          },
                          {
                              "name":  "WcfTests",
-                             "path":  "PurelySharp.Test/WcfTests.cs"
+                             "path":  "SharpProof.Test/WcfTests.cs"
                          },
                          {
                              "name":  "WebUtilityTests",
-                             "path":  "PurelySharp.Test/WebUtilityTests.cs"
+                             "path":  "SharpProof.Test/WebUtilityTests.cs"
                          },
                          {
                              "name":  "WhileLoopTests",
-                             "path":  "PurelySharp.Test/WhileLoopTests.cs"
+                             "path":  "SharpProof.Test/WhileLoopTests.cs"
                          },
                          {
                              "name":  "XmlTests",
-                             "path":  "PurelySharp.Test/XmlTests.cs"
+                             "path":  "SharpProof.Test/XmlTests.cs"
                          },
                          {
                              "name":  "YieldTests",
-                             "path":  "PurelySharp.Test/YieldTests.cs"
+                             "path":  "SharpProof.Test/YieldTests.cs"
                          }
                      ],
     "sourceFiles":  [
                         {
-                            "path":  "PurelySharp.Analyzer/AttributePlacementAnalyzer.cs",
+                            "path":  "SharpProof.Analyzer/AttributePlacementAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AttributePlacementAnalyzer"
@@ -1315,7 +1315,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/BuiltInEffectSummaryLoader.cs",
+                            "path":  "SharpProof.Analyzer/BuiltInEffectSummaryLoader.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BuiltInEffectSummaryLoader"
@@ -1326,7 +1326,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/CompatibilityHelpers.cs",
+                            "path":  "SharpProof.Analyzer/CompatibilityHelpers.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CompatibilityHelpers"
@@ -1337,7 +1337,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                            "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AnalyzerConfiguration",
@@ -1351,7 +1351,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Configuration/ConfigKeys.cs",
+                            "path":  "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConfigKeys"
@@ -1362,7 +1362,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Configuration/DiagnosticBaseline.cs",
+                            "path":  "SharpProof.Analyzer/Configuration/DiagnosticBaseline.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BaselineEntry",
@@ -1374,7 +1374,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/EffectSummaryMetadataSupport.cs",
+                            "path":  "SharpProof.Analyzer/EffectSummaryMetadataSupport.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ActualAssemblyIdentity",
@@ -1390,7 +1390,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/EffectSummarySymbolKeyFactory.cs",
+                            "path":  "SharpProof.Analyzer/EffectSummarySymbolKeyFactory.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "EffectSummarySymbolKeyFactory"
@@ -1401,7 +1401,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Analysis/CallGraph.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Analysis/CallGraph.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CallGraph"
@@ -1412,7 +1412,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Analysis/CallGraphBuilder.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Analysis/CallGraphBuilder.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CallGraphBuilder"
@@ -1423,7 +1423,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Analysis/WorklistPuritySolver.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Analysis/WorklistPuritySolver.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "WorklistPuritySolver"
@@ -1434,7 +1434,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs",
+                            "path":  "SharpProof.Analyzer/Engine/BclPurityFallbackClassifier.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BclPurityFallbackClassifier",
@@ -1446,7 +1446,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/CompilationPurityService.cs",
+                            "path":  "SharpProof.Analyzer/Engine/CompilationPurityService.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CompilationPurityService"
@@ -1457,7 +1457,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/ExecutionVisibility.cs",
+                            "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConditionTruthCache",
@@ -1470,7 +1470,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/ImpurityCatalog.cs",
+                            "path":  "SharpProof.Analyzer/Engine/ImpurityCatalog.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConfiguredOverrideScope",
@@ -1482,7 +1482,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/ImpurityCatalog.SemanticClassifiers.cs",
+                            "path":  "SharpProof.Analyzer/Engine/ImpurityCatalog.SemanticClassifiers.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ImpurityCatalog"
@@ -1493,7 +1493,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
+                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PotentialTargets",
@@ -1508,7 +1508,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
+                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine",
@@ -1520,7 +1520,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
+                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "MergeablePathFact",
@@ -1534,7 +1534,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/AnonymousObjectCreationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/AnonymousObjectCreationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AnonymousObjectCreationPurityRule"
@@ -1545,7 +1545,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ArrayCreationPurityRule"
@@ -1556,7 +1556,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ArrayElementReferencePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ArrayElementReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ArrayElementReferencePurityRule"
@@ -1567,7 +1567,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ArrayInitializerPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ArrayInitializerPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ArrayInitializerPurityRule"
@@ -1578,7 +1578,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/AssignmentPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/AssignmentPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AssignmentPurityRule",
@@ -1591,7 +1591,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/AwaitPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/AwaitPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "AwaitPurityRule"
@@ -1602,7 +1602,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BinaryOperationPurityRule"
@@ -1613,7 +1613,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/BinaryPatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/BinaryPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "BinaryPatternPurityRule"
@@ -1624,7 +1624,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/CoalesceOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/CoalesceOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CoalesceOperationPurityRule"
@@ -1635,7 +1635,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/CollectionExpressionPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/CollectionExpressionPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "CollectionExpressionPurityRule"
@@ -1646,7 +1646,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ComparerDispatchHelper.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ComparerDispatchHelper.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ComparerDispatchHelper"
@@ -1657,7 +1657,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ConditionalAccessPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ConditionalAccessPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConditionalAccessPurityRule"
@@ -1668,7 +1668,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ConditionalOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ConditionalOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConditionalOperationPurityRule"
@@ -1679,7 +1679,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ConstructorInitializerPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ConstructorInitializerPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConstructorInitializerPurityRule"
@@ -1690,7 +1690,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ConversionPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ConversionPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ConversionPurityRule"
@@ -1701,7 +1701,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DeclarativePureOperationRule"
@@ -1712,7 +1712,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DeconstructionAssignmentPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/DeconstructionAssignmentPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DeconstructionAssignmentPurityRule"
@@ -1723,7 +1723,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DelegateCreationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/DelegateCreationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DelegateCreationPurityRule"
@@ -1734,7 +1734,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/DynamicOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/DynamicOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DynamicOperationPurityRule"
@@ -1745,7 +1745,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/EventAssignmentPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/EventAssignmentPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "EventAssignmentPurityRule"
@@ -1756,7 +1756,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/EventReferencePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/EventReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "EventReferencePurityRule"
@@ -1767,7 +1767,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ExpressionStatementPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ExpressionStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExpressionStatementPurityRule"
@@ -1778,7 +1778,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/FieldOrPropertyInitializerOperationHelper.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "FieldOrPropertyInitializerOperationHelper"
@@ -1789,7 +1789,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/FieldReferencePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/FieldReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "FieldReferencePurityRule"
@@ -1800,7 +1800,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ImplicitIndexerReferencePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ImplicitIndexerReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ImplicitIndexerReferencePurityRule"
@@ -1811,7 +1811,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/InlineArrayAccessPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/InlineArrayAccessPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "InlineArrayAccessPurityRule"
@@ -1822,7 +1822,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/InterpolatedStringPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/InterpolatedStringPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "InterpolatedStringPurityRule"
@@ -1833,7 +1833,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/IPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/IPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "IPurityRule"
@@ -1844,7 +1844,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/IsNullPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/IsNullPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "IsNullPurityRule"
@@ -1855,7 +1855,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/IsPatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/IsPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "IsPatternPurityRule"
@@ -1866,7 +1866,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ListPatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ListPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ListPatternPurityRule"
@@ -1877,7 +1877,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/LockStatementPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/LockStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "LockStatementPurityRule"
@@ -1888,7 +1888,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/LoopPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/LoopPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "LoopPurityRule"
@@ -1899,7 +1899,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "MethodInvocationPurityRule"
@@ -1910,7 +1910,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/NegatedPatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/NegatedPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "NegatedPatternPurityRule"
@@ -1921,7 +1921,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ObjectCreationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ObjectCreationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ObjectCreationPurityRule"
@@ -1932,7 +1932,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/PatternPurityRuleHelpers.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PatternPurityRuleHelpers.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PatternPurityRuleHelpers"
@@ -1943,7 +1943,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PropertyReferencePurityRule"
@@ -1954,7 +1954,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/PropertySubpatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PropertySubpatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PropertySubpatternPurityRule"
@@ -1965,7 +1965,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/PureOperationRuleDescriptor.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PureOperationRuleDescriptor.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PureOperationRuleDescriptor"
@@ -1976,7 +1976,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/PurityAnalysisContext.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/PurityAnalysisContext.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PurityAnalysisContext"
@@ -1987,7 +1987,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/RangeOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/RangeOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "RangeOperationPurityRule"
@@ -1998,7 +1998,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/RecursivePatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/RecursivePatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "RecursivePatternPurityRule"
@@ -2009,7 +2009,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/RelationalPatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/RelationalPatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "RelationalPatternPurityRule"
@@ -2020,7 +2020,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ReturnStatementPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ReturnStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ArrayViewKind",
@@ -2032,7 +2032,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/RuleRegistry.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "RuleRegistry"
@@ -2043,7 +2043,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/SpreadOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/SpreadOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "SpreadOperationPurityRule"
@@ -2054,7 +2054,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/StructuralPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/StructuralPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "StructuralPurityRule"
@@ -2065,7 +2065,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/SwitchCasePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/SwitchCasePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "SwitchCasePurityRule"
@@ -2076,7 +2076,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/SwitchExpressionPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/SwitchExpressionPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "SwitchExpressionPurityRule"
@@ -2087,7 +2087,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/SwitchStatementPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/SwitchStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "SwitchStatementPurityRule"
@@ -2098,7 +2098,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ThrowOperationPurityRule"
@@ -2109,7 +2109,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/TuplePurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/TuplePurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "TuplePurityRule"
@@ -2120,7 +2120,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/TypePatternPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/TypePatternPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "TypePatternPurityRule"
@@ -2131,7 +2131,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/UnaryOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/UnaryOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "UnaryOperationPurityRule"
@@ -2142,7 +2142,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/UsingStatementPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/UsingStatementPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "UsingStatementPurityRule"
@@ -2153,7 +2153,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/WithOperationPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/WithOperationPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "WithOperationPurityRule"
@@ -2164,7 +2164,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Engine/Rules/YieldReturnPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Engine/Rules/YieldReturnPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "YieldReturnPurityRule"
@@ -2175,7 +2175,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer",
@@ -2189,7 +2189,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "DynamicNullBindingSite",
@@ -2201,7 +2201,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
@@ -2212,7 +2212,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.PropertyFlow.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PropertyFlow.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
@@ -2223,7 +2223,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ResourceCallSites.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ResourceCallSites.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer",
@@ -2235,7 +2235,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
@@ -2246,7 +2246,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionFlowQuery.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionFlowQuery.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ExceptionCandidate",
@@ -2263,7 +2263,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/ExceptionSummaryCatalog.cs",
+                            "path":  "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "EffectSummaryTypeNameProvider",
@@ -2284,7 +2284,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/GeneratedPurityCatalog.cs",
+                            "path":  "SharpProof.Analyzer/GeneratedPurityCatalog.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "EffectSummaryTypeNameProvider",
@@ -2301,7 +2301,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/MethodPurityAnalyzer.cs",
+                            "path":  "SharpProof.Analyzer/MethodPurityAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "MethodPurityAnalyzer"
@@ -2312,29 +2312,29 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/PurelySharpAnalyzer.cs",
+                            "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "PurelySharpAnalyzer"
+                                                  "SharpProofAnalyzer"
                                               ],
                             "referencingFixtureCount":  208,
                             "referencedTokens":  [
-                                                     "PurelySharpAnalyzer"
+                                                     "SharpProofAnalyzer"
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/PurelySharpDiagnostics.cs",
+                            "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
-                                                  "PurelySharpDiagnostics"
+                                                  "SharpProofDiagnostics"
                                               ],
                             "referencingFixtureCount":  99,
                             "referencedTokens":  [
-                                                     "PurelySharpDiagnostics"
+                                                     "SharpProofDiagnostics"
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Analyzer/Rules/ObjectOrCollectionInitializerPurityRule.cs",
+                            "path":  "SharpProof.Analyzer/Rules/ObjectOrCollectionInitializerPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "ObjectOrCollectionInitializerPurityRule"
@@ -2345,7 +2345,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Attributes/AllowSynchronizationAttribute.cs",
+                            "path":  "SharpProof.Attributes/AllowSynchronizationAttribute.cs",
                             "module":  "Attributes",
                             "declaredTypes":  [
                                                   "AllowSynchronizationAttribute"
@@ -2356,7 +2356,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Attributes/EnforcePureAttribute.cs",
+                            "path":  "SharpProof.Attributes/EnforcePureAttribute.cs",
                             "module":  "Attributes",
                             "declaredTypes":  [
                                                   "EnforcePureAttribute"
@@ -2367,7 +2367,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Attributes/ImpureAttribute.cs",
+                            "path":  "SharpProof.Attributes/ImpureAttribute.cs",
                             "module":  "Attributes",
                             "declaredTypes":  [
                                                   "ImpureAttribute"
@@ -2378,7 +2378,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Attributes/PureAttribute.cs",
+                            "path":  "SharpProof.Attributes/PureAttribute.cs",
                             "module":  "Attributes",
                             "declaredTypes":  [
                                                   "PureAttribute"
@@ -2389,7 +2389,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Attributes/PureExternalAttribute.cs",
+                            "path":  "SharpProof.Attributes/PureExternalAttribute.cs",
                             "module":  "Attributes",
                             "declaredTypes":  [
                                                   "PureExternalAttribute"
@@ -2400,7 +2400,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.CodeFixes/CodeFixResources.Designer.cs",
+                            "path":  "SharpProof.CodeFixes/CodeFixResources.Designer.cs",
                             "module":  "CodeFixes",
                             "declaredTypes":  [
                                                   "CodeFixResources"
@@ -2411,18 +2411,18 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs",
+                            "path":  "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
                             "module":  "CodeFixes",
                             "declaredTypes":  [
-                                                  "PurelySharpCodeFixProvider"
+                                                  "SharpProofCodeFixProvider"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "PurelySharpCodeFixProvider"
+                                                     "SharpProofCodeFixProvider"
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/CSharpSyntaxFacts.cs",
+                            "path":  "SharpProof.Symbolic/CSharpSyntaxFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpSyntaxFacts"
@@ -2433,7 +2433,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs",
+                            "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula",
@@ -2451,7 +2451,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
+                            "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
@@ -2462,7 +2462,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
+                            "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
@@ -2473,7 +2473,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
+                            "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
@@ -2484,7 +2484,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
+                            "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CSharpConditionToFormula"
@@ -2495,7 +2495,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisOptions.cs",
+                            "path":  "SharpProof.Symbolic/Smt/SmtAnalysisOptions.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SmtAnalysisMode",
@@ -2508,7 +2508,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
+                            "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SmtAnalysisService"
@@ -2519,7 +2519,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/SmtSyntacticClassifier.cs",
+                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "AffineIntegerTerm",
@@ -2534,7 +2534,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/Smt/SwitchPathConditionBuilder.cs",
+                            "path":  "SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SwitchPathConditionBuilder"
@@ -2545,7 +2545,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicDynamicNullBindingFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicDynamicNullBindingFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicDynamicNullBindingFacts"
@@ -2556,7 +2556,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicFactFactory.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicFactFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicFactFactory"
@@ -2567,7 +2567,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicInvariantService.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicInvariantService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicInvariantFactSummary",
@@ -2586,7 +2586,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicMutationFactFactory.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicMutationFactFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicMutationFactFactory"
@@ -2597,7 +2597,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "CompletedBranchFacts",
@@ -2611,7 +2611,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicProgramPointMetadata.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointMetadata.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicProgramPointMetadata"
@@ -2622,7 +2622,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicQueryApi.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicQueryApi.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicConditionProofRequest",
@@ -2647,7 +2647,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicReachabilityService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicReachabilityService"
@@ -2658,7 +2658,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeExceptionFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeExceptionFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "ExceptionCategories",
@@ -2675,7 +2675,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "RuntimeHazardCandidate",
@@ -2687,7 +2687,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicRuntimeHazard",
@@ -2708,7 +2708,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicRuntimeTypeFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeTypeFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicRuntimeTypeFacts"
@@ -2719,7 +2719,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicSourceCompilation.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicSourceCompilation.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicSourceCompilation"
@@ -2730,7 +2730,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicSourceLocation.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicSourceLocation.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "LineColumn",
@@ -2743,7 +2743,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "ProgramPointQueryContext",
@@ -2820,7 +2820,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicTypeFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicTypeFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicTypeFacts"
@@ -2831,7 +2831,7 @@
                                                  ]
                         },
                         {
-                            "path":  "PurelySharp.Symbolic/SymbolicValueFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicValueFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicValueFacts"
@@ -2993,7 +2993,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.CorpusReport.Core/CorpusReportModels.cs",
+                            "path":  "Tools/SharpProof.CorpusReport.Core/CorpusReportModels.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "CorpusReportSummary",
@@ -3007,7 +3007,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.CorpusReport.Core/SarifCorpusReport.cs",
+                            "path":  "Tools/SharpProof.CorpusReport.Core/SarifCorpusReport.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SarifCorpusInput",
@@ -3021,7 +3021,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.CorpusReport/Program.cs",
+                            "path":  "Tools/SharpProof.CorpusReport/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "CorpusReportOptions"
@@ -3032,7 +3032,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.EffectSummary/BclFallbackInventoryBuilder.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/BclFallbackInventoryBuilder.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "BclFallbackInventoryBuilder",
@@ -3046,7 +3046,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.EffectSummary/EffectSummaryExactSymbolKeyNormalizer.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryExactSymbolKeyNormalizer.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "EffectSummaryExactSymbolKeyNormalizer"
@@ -3057,7 +3057,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.EffectSummary/GeneratedPurityCatalogEntryRelations.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/GeneratedPurityCatalogEntryRelations.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "GeneratedPurityCatalogEntryRelations"
@@ -3068,7 +3068,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.EffectSummary/Program.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "ArtifactSpecDefaults",
@@ -3107,7 +3107,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.EffectSummary/PurityClassificationEngine.cs",
+                            "path":  "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "CatalogComparisonReport",
@@ -3125,7 +3125,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz.Core/Program.cs",
+                            "path":  "Tools/SharpProof.Fuzz.Core/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "AnalyzerRunResult",
@@ -3152,7 +3152,7 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz.Core/RoslynShapeManifest.cs",
+                            "path":  "Tools/SharpProof.Fuzz.Core/RoslynShapeManifest.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "AnalyzerActionSurfaceDecision",
@@ -3169,24 +3169,24 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.Fuzz.Core/ShapeRegistryEntry.cs",
+                            "path":  "Tools/SharpProof.Fuzz.Core/ShapeRegistryEntry.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "FuzzExpectation",
-                                                  "Ps0002ExpectationKind",
-                                                  "Ps0010ExpectationKind",
+                                                  "Sp0002ExpectationKind",
+                                                  "Sp0010ExpectationKind",
                                                   "ShapeRegistryEntry"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "FuzzExpectation",
-                                                     "Ps0002ExpectationKind",
-                                                     "Ps0010ExpectationKind",
+                                                     "Sp0002ExpectationKind",
+                                                     "Sp0010ExpectationKind",
                                                      "ShapeRegistryEntry"
                                                  ]
                         },
                         {
-                            "path":  "Tools/PurelySharp.SymbolicCli/Program.cs",
+                            "path":  "Tools/SharpProof.SymbolicCli/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "CompactRuntimeHazardItemTruncation",
@@ -3217,7 +3217,7 @@
                     ],
     "fixtureDependencies":  [
                                 {
-                                    "path":  "PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                                    "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "SemanticOracleSmtTests"
@@ -3228,7 +3228,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/EffectSummarySymbolKeyFactory.cs",
+                                    "path":  "SharpProof.Analyzer/EffectSummarySymbolKeyFactory.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "EffectSummarySymbolKeyFactoryTests"
@@ -3239,7 +3239,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/BclPurityFallbackClassifier.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3255,7 +3255,7 @@
                                     "fixtureCount":  6
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/CompilationPurityService.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/CompilationPurityService.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CachingTests"
@@ -3266,7 +3266,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/ExecutionVisibility.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/ExecutionVisibility.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3280,7 +3280,7 @@
                                     "fixtureCount":  4
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3291,7 +3291,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3302,7 +3302,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3313,7 +3313,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3324,7 +3324,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/AssignmentPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/AssignmentPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3335,7 +3335,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests",
@@ -3347,7 +3347,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/CollectionExpressionPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/CollectionExpressionPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3358,7 +3358,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/DeclarativePureOperationRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "RoslynConstructCoverageTests"
@@ -3369,7 +3369,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/EventAssignmentPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/EventAssignmentPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3380,7 +3380,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/FieldReferencePurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/FieldReferencePurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3391,7 +3391,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/InterpolatedStringPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/InterpolatedStringPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3402,7 +3402,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/IsNullPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/IsNullPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "RoslynConstructCoverageTests"
@@ -3413,7 +3413,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
@@ -3429,7 +3429,7 @@
                                     "fixtureCount":  6
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/ObjectCreationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/ObjectCreationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3440,7 +3440,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/PropertyReferencePurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3451,7 +3451,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/RuleRegistry.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/RuleRegistry.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "RoslynConstructCoverageTests"
@@ -3462,7 +3462,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/StructuralPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/StructuralPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "RoslynConstructCoverageTests"
@@ -3473,7 +3473,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/ThrowOperationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3484,7 +3484,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/Engine/Rules/UnaryOperationPurityRule.cs",
+                                    "path":  "SharpProof.Analyzer/Engine/Rules/UnaryOperationPurityRule.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "DiagnosticEvidenceTests"
@@ -3495,7 +3495,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/ExceptionSummaryCatalog.cs",
+                                    "path":  "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3508,7 +3508,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "PurelySharp.Analyzer/GeneratedPurityCatalog.cs",
+                                    "path":  "SharpProof.Analyzer/GeneratedPurityCatalog.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3525,7 +3525,7 @@
                                     "fixtureCount":  6
                                 },
                                 {
-                                    "path":  "PurelySharp.Attributes/AllowSynchronizationAttribute.cs",
+                                    "path":  "SharpProof.Attributes/AllowSynchronizationAttribute.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3539,7 +3539,7 @@
                                     "fixtureCount":  4
                                 },
                                 {
-                                    "path":  "PurelySharp.Attributes/EnforcePureAttribute.cs",
+                                    "path":  "SharpProof.Attributes/EnforcePureAttribute.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3555,7 +3555,7 @@
                                                                  "GuardHelpersTests",
                                                                  "NumericIntPtrTests",
                                                                  "PrimaryConstructorTests",
-                                                                 "Ps0004ConfigurationTests",
+                                                                 "Sp0004ConfigurationTests",
                                                                  "PureAsyncTests",
                                                                  "RecordStructTests",
                                                                  "RecordTests",
@@ -3572,7 +3572,7 @@
                                     "fixtureCount":  23
                                 },
                                 {
-                                    "path":  "PurelySharp.Attributes/PureAttribute.cs",
+                                    "path":  "SharpProof.Attributes/PureAttribute.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3588,18 +3588,18 @@
                                     "fixtureCount":  6
                                 },
                                 {
-                                    "path":  "PurelySharp.CodeFixes/PurelySharpCodeFixProvider.cs",
+                                    "path":  "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
                                     "module":  "CodeFixes",
                                     "selectedTestFixtures":  [
-                                                                 "PurelySharpCodeFixTests"
+                                                                 "SharpProofCodeFixTests"
                                                              ],
                                     "tokens":  [
-                                                   "PurelySharpCodeFixProvider"
+                                                   "SharpProofCodeFixProvider"
                                                ],
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3612,7 +3612,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3625,7 +3625,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3638,7 +3638,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3651,7 +3651,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3664,7 +3664,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisOptions.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/SmtAnalysisOptions.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3690,7 +3690,7 @@
                                     "fixtureCount":  15
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/Smt/SmtAnalysisService.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3715,7 +3715,7 @@
                                     "fixtureCount":  15
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicInvariantService.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicInvariantService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "PathFactExpressionReachabilityTests",
@@ -3732,7 +3732,7 @@
                                     "fixtureCount":  5
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "SemanticOracleSmtTests"
@@ -3743,7 +3743,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicQueryApi.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicQueryApi.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3761,7 +3761,7 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicReachabilityService.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicReachabilityService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
@@ -3772,7 +3772,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicRuntimeExceptionFacts.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeExceptionFacts.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -3787,7 +3787,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "SymbolicRuntimeHazardQueryTests",
@@ -3799,7 +3799,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "SymbolicRuntimeHazardQueryTests",
@@ -3816,7 +3816,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "PurelySharp.Symbolic/SymbolicSourceQueryService.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
@@ -3972,7 +3972,7 @@
                                     "fixtureCount":  8
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.CorpusReport.Core/CorpusReportModels.cs",
+                                    "path":  "Tools/SharpProof.CorpusReport.Core/CorpusReportModels.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
@@ -3985,7 +3985,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.CorpusReport.Core/SarifCorpusReport.cs",
+                                    "path":  "Tools/SharpProof.CorpusReport.Core/SarifCorpusReport.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "CorpusReportTests",
@@ -3998,7 +3998,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.EffectSummary/PurityClassificationEngine.cs",
+                                    "path":  "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "EffectSummaryToolTests"
@@ -4009,7 +4009,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz.Core/Program.cs",
+                                    "path":  "Tools/SharpProof.Fuzz.Core/Program.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
@@ -4026,7 +4026,7 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz.Core/RoslynShapeManifest.cs",
+                                    "path":  "Tools/SharpProof.Fuzz.Core/RoslynShapeManifest.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
@@ -4040,15 +4040,15 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "Tools/PurelySharp.Fuzz.Core/ShapeRegistryEntry.cs",
+                                    "path":  "Tools/SharpProof.Fuzz.Core/ShapeRegistryEntry.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests"
                                                              ],
                                     "tokens":  [
                                                    "FuzzExpectation",
-                                                   "Ps0002ExpectationKind",
-                                                   "Ps0010ExpectationKind",
+                                                   "Sp0002ExpectationKind",
+                                                   "Sp0010ExpectationKind",
                                                    "ShapeRegistryEntry"
                                                ],
                                     "fixtureCount":  1

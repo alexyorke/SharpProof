@@ -1,0 +1,459 @@
+using System;
+using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NUnit.Framework;
+using SharpProof.Symbolic;
+
+namespace SharpProof.Test
+{
+    [TestFixture]
+    public sealed class SymbolicComplexityTests
+    {
+        [Test]
+        public void StraightLineMethod_IsConstant()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var value = n + 1;
+        return value;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return value;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Constant));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(1)"));
+        }
+
+        [Test]
+        public void SingleForLoop_ProducesLinearComplexity()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+            Assert.That(result.Drivers.Any(driver => driver.Kind == "ForLoop"), Is.True);
+        }
+
+        [Test]
+        public void SequentialLinearLoops_UseAsymptoticMax()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        for (var j = 0; j < n; j++)
+        {
+            sum += j;
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+        }
+
+        [Test]
+        public void NestedForLoopsOverDistinctBounds_ProduceProduct()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n, int m)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < m; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Product));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n * m)"));
+        }
+
+        [Test]
+        public void NestedForLoopsOverSameBound_ProduceQuadratic()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < n; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Quadratic));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n^2)"));
+        }
+
+        [Test]
+        public void BranchesUseWorstCaseMaximum()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(bool flag, int n)
+    {
+        var sum = 0;
+        if (flag)
+        {
+            for (var i = 0; i < n; i++)
+            {
+                sum += i;
+            }
+        }
+        else
+        {
+            sum = 1;
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+        }
+
+        [Test]
+        public void ForeachOverString_IsLinearInLength()
+        {
+            const string source = """
+public static class C
+{
+    public static int CountLetters(string text)
+    {
+        var count = 0;
+        foreach (var ch in text)
+        {
+            count += ch;
+        }
+
+        return count;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return count;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(text.Length)"));
+        }
+
+        [Test]
+        public void MonotoneWhileLoop_IsLinear()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var i = 0;
+        while (i < n)
+        {
+            i++;
+        }
+
+        return i;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return i;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+        }
+
+        [Test]
+        public void UnsupportedWhileLoop_IsUnknown()
+        {
+            const string source = """
+public static class C
+{
+    public static int Step(int value) => value + 1;
+
+    public static int Work(int n)
+    {
+        var i = 0;
+        while (i < n)
+        {
+            i = Step(i);
+        }
+
+        return i;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return i;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Unknown));
+            Assert.That(result.UnknownReasons, Does.Contain(SymbolicComplexityUnknownReason.UnsupportedWhileLoop));
+        }
+
+        [Test]
+        public void KnownSourceCallee_ComposesIntoSurroundingLoop()
+        {
+            const string source = """
+public static class C
+{
+    public static void Helper(int m)
+    {
+        for (var j = 0; j < m; j++)
+        {
+        }
+    }
+
+    public static void Caller(int n, int m)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            Helper(m);
+        }
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "Helper(m);");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Product));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n * m)"));
+            Assert.That(result.CalleeSummaries.Any(summary => summary.MethodDisplayName.Contains("Helper", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void ExternalUnknownCallee_ProducesUnknown()
+        {
+            const string source = """
+using System;
+
+public static class C
+{
+    public static int Work(int n)
+    {
+        _ = Environment.GetEnvironmentVariable("PATH");
+        return n;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "Environment.GetEnvironmentVariable");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Unknown));
+            Assert.That(
+                result.UnknownReasons,
+                Has.Some.Matches<SymbolicComplexityUnknownReason>(
+                    reason => reason == SymbolicComplexityUnknownReason.ExternalCallee ||
+                        reason == SymbolicComplexityUnknownReason.UnknownCallee));
+        }
+
+        [Test]
+        public void SelfRecursiveMethod_IsRecursiveUnknown()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        if (n <= 0)
+        {
+            return 0;
+        }
+
+        return Work(n - 1);
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return Work");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.RecursiveUnknown));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(RecursiveUnknown)"));
+        }
+
+        [Test]
+        public void MutualRecursion_IsRecursiveUnknown()
+        {
+            const string source = """
+public static class C
+{
+    public static int First(int n)
+    {
+        return n <= 0 ? 0 : Second(n - 1);
+    }
+
+    public static int Second(int n)
+    {
+        return n <= 0 ? 0 : First(n - 1);
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "Second(n - 1)");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.RecursiveUnknown));
+        }
+
+        [Test]
+        public void LineTarget_ResolvesContainingMethod()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "sum += i;", useLineTarget: true);
+
+            Assert.That(result.MethodName, Is.EqualTo("Work"));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+        }
+
+        [Test]
+        public void NodeTarget_ResolvesContainingLocalFunction()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        int Local(int m)
+        {
+            for (var i = 0; i < m; i++)
+            {
+            }
+
+            return m;
+        }
+
+        return Local(n);
+    }
+}
+""";
+
+            var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+                source,
+                "SymbolicComplexityTests.cs",
+                "SymbolicComplexityTests.cs",
+                "SharpProof.Test.SymbolicComplexity",
+                references: null,
+                cancellationToken: default);
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot();
+            var localFunction = root.DescendantNodes()
+                .OfType<LocalFunctionStatementSyntax>()
+                .Single(node => node.Identifier.ValueText == "Local");
+
+            var result = new SymbolicQueryService().QueryComplexity(
+                new SymbolicComplexityRequest(
+                    SymbolicSourceInput.FromNode(localFunction, semanticModel),
+                    SymbolicQueryTarget.Node()));
+
+            Assert.That(result.MethodName, Is.EqualTo("Local"));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(m)"));
+        }
+
+        private static SymbolicComplexityResult QueryComplexityAtMarker(
+            string source,
+            string marker,
+            bool useLineTarget = false)
+        {
+            var position = source.IndexOf(marker, StringComparison.Ordinal);
+            if (position < 0)
+            {
+                throw new InvalidOperationException("Marker was not found in source.");
+            }
+
+            var target = useLineTarget
+                ? SymbolicQueryTarget.Line(GetLineNumber(source, position))
+                : SymbolicQueryTarget.Position(position);
+            return new SymbolicQueryService().QueryComplexity(
+                new SymbolicComplexityRequest(
+                    SymbolicSourceInput.FromText(source, "SymbolicComplexityTests.cs"),
+                    target));
+        }
+
+        private static int GetLineNumber(string source, int position)
+        {
+            var line = 1;
+            for (var index = 0; index < position; index++)
+            {
+                if (source[index] == '\n')
+                {
+                    line++;
+                }
+            }
+
+            return line;
+        }
+    }
+}

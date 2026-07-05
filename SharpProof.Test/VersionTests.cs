@@ -1,0 +1,61 @@
+using System.Threading.Tasks;
+using NUnit.Framework;
+using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
+    SharpProof.Analyzer.SharpProofAnalyzer>;
+
+namespace SharpProof.Test
+{
+    [TestFixture]
+    public class VersionTests
+    {
+        [Test]
+        public async Task VersionConstructor_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Version TestMethod()
+    {
+        return new Version(1, 2);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task VersionComparisonOperatorsAndGetters_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod()
+    {
+        var left = new Version(1, 2, 3, 4);
+        var right = new Version(1, 2, 3, 4);
+        return left.CompareTo(right) == 0 &&
+            left.Equals(right) &&
+            left == right &&
+            left >= right &&
+            left <= right &&
+            left.Major == 1 &&
+            left.Minor == 2 &&
+            left.Build == 3 &&
+            left.Revision == 4 &&
+            left.MajorRevision >= 0 &&
+            left.MinorRevision >= 0;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+    }
+}

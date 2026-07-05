@@ -2,7 +2,7 @@
 
 ## Summary
 
-SharpProof, formerly PurelySharp, should be a bounded symbolic C# analysis
+SharpProof, formerly SharpProof, should be a bounded symbolic C# analysis
 platform. Purity diagnostics are one consumer of the shared pipeline:
 
 ```text
@@ -17,12 +17,12 @@ path-fact, hazard, and ownership flows.
 
 - Product-facing name is SharpProof. Current package, namespace, diagnostic,
   analyzerconfig, additional-file, and summary-artifact identity remains
-  `PurelySharp` for compatibility.
+  `SharpProof` for compatibility.
 - Architecture inventory reports zero analyzer raw-SMT construction hotspots
   and zero public symbolic `SmtFormula` surfaces.
 - Production inventory currently reports 113,335 C# production lines across
-  181 files. The largest modules are `PurelySharp.Symbolic` at 54,351 lines,
-  `PurelySharp.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
+  181 files. The largest modules are `SharpProof.Symbolic` at 54,351 lines,
+  `SharpProof.Analyzer` at 37,289 lines, `Tools` at 14,989 lines, and
   `SearchLib` at 5,792 lines.
 - The largest remaining migration hotspot is `SymbolicProgramPointFacts.cs`,
   now at 8,864 lines. It routes legacy translation through
@@ -30,10 +30,10 @@ path-fact, hazard, and ownership flows.
   path-fact pipeline.
 - Direct `CSharpConditionToFormula` usage outside approved shims is gone.
   Symbolic-layer `CSharpSmtFormulaTranslator` wrapper usage is now gone.
-  `PurelySharp.Symbolic/SymbolicReachabilityService.cs` now routes the
+  `SharpProof.Symbolic/SymbolicReachabilityService.cs` now routes the
   remaining legacy condition, value, branch-fact, and pattern fallback entry
   points directly through the narrower
-  `PurelySharp.Symbolic/Smt/CSharpConditionToFormula.LegacyFormulaCompatibility.cs`
+  `SharpProof.Symbolic/Smt/CSharpConditionToFormula.LegacyFormulaCompatibility.cs`
   boundary. Public
   source-query condition proof still delegates formula fallback through
   reachability, but the legacy bridge is now smaller and easier to delete
@@ -223,7 +223,7 @@ path-fact, hazard, and ownership flows.
   shaping behind shared IR trigger helpers, reducing the fallback inventory to
   16 lines while Index/Range and other unsupported element-access or
   invocation shapes still keep the legacy path alive.
-- Analyzer PS0010/PS0011 site reporting now also recognizes definite
+- Analyzer SP0010/SP0011 site reporting now also recognizes definite
   `Array.GetValue` index hazards by reusing shared `Array.GetValue` in-range
   formula construction plus analyzer path facts, preserving the
   `definite_array_get_value_index_out_of_range` category/source.
@@ -376,7 +376,7 @@ path-fact, hazard, and ownership flows.
 
 ## Target Architecture
 
-- `PurelySharp.Symbolic.Ir` owns C#/Roslyn semantic facts: nullness, equality,
+- `SharpProof.Symbolic.Ir` owns C#/Roslyn semantic facts: nullness, equality,
   ranges, string/regex predicates, bounds, type tests, exception preconditions,
   freshness, ownership, aliases, borrows, mutation, disposal, and resource
   lifetime.
@@ -386,7 +386,7 @@ path-fact, hazard, and ownership flows.
   budgets, cancellation, timeout/native-load fallback, and unknown reasons.
 - `SearchLib` remains solver-only. It must not absorb Roslyn, analyzer, BCL, or
   C# API semantics.
-- `PurelySharp.Analyzer` consumes symbolic services. It should not grow new
+- `SharpProof.Analyzer` consumes symbolic services. It should not grow new
   path, reachability, hazard, ownership, or raw-SMT proof logic.
 - `CSharpConditionToFormula*` remains a migration shim and should shrink as
   declarative IR lowerings replace direct formula translation.
@@ -488,7 +488,7 @@ path-fact, hazard, and ownership flows.
 - Built-in one-dimensional and multidimensional element-access index hazards
   and rank-generic `Array.GetValue` hazards now use IR bounds preconditions
   before formula fallback.
-- Route analyzer `PS0010` and `PS0011` site checks through shared symbolic
+- Route analyzer `SP0010` and `SP0011` site checks through shared symbolic
   hazard results where equivalent.
 - Keep analyzer-only exception summary propagation separate until it is
   covered by equivalence tests.
@@ -547,23 +547,24 @@ path-fact, hazard, and ownership flows.
 git status --short
 git diff --check
 
-.\scripts\Get-PurelySharpRawSmtHotspots.ps1 -Json
-.\scripts\Get-PurelySharpProductionMetrics.ps1 -Json
+.\scripts\Get-SharpProofRawSmtHotspots.ps1 -Json
+.\scripts\Get-SharpProofProductionMetrics.ps1 -Json
 
-.\scripts\Invoke-PurelySharpDotnet.ps1 -MemoryLimitMb 6144 -TimeoutSeconds 420 build .\PurelySharp.Test\PurelySharp.Test.csproj --configuration Debug --no-restore /m:1 "/clp:ErrorsOnly;Summary"
+.\scripts\Invoke-SharpProofDotnet.ps1 -MemoryLimitMb 6144 -TimeoutSeconds 420 build .\SharpProof.Test\SharpProof.Test.csproj --configuration Debug --no-restore /m:1 "/clp:ErrorsOnly;Summary"
 
-.\scripts\Invoke-PurelySharpDotnet.ps1 -MemoryLimitMb 4096 -TimeoutSeconds 900 test .\PurelySharp.Test\PurelySharp.Test.csproj --configuration Debug --no-build --filter "FullyQualifiedName~ArchitectureReductionTests|FullyQualifiedName~SymbolicIrTests|FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~DiagnosticEvidenceTests" "/clp:ErrorsOnly;Summary"
+.\scripts\Invoke-SharpProofDotnet.ps1 -MemoryLimitMb 4096 -TimeoutSeconds 900 test .\SharpProof.Test\SharpProof.Test.csproj --configuration Debug --no-build --filter "FullyQualifiedName~ArchitectureReductionTests|FullyQualifiedName~SymbolicIrTests|FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~DiagnosticEvidenceTests" "/clp:ErrorsOnly;Summary"
 
-.\scripts\Invoke-PurelySharpDotnet.ps1 -MemoryLimitMb 6144 -TimeoutSeconds 900 build .\PurelySharp.sln --configuration Debug --no-restore /m:1 "/clp:ErrorsOnly;Summary"
+.\scripts\Invoke-SharpProofDotnet.ps1 -MemoryLimitMb 6144 -TimeoutSeconds 900 build .\SharpProof.sln --configuration Debug --no-restore /m:1 "/clp:ErrorsOnly;Summary"
 
 Get-Process dotnet,testhost,vstest.console,MSBuild,VBCSCompiler -ErrorAction SilentlyContinue
 ```
 
 ## Assumptions
 
-- Staged rebrand remains preferred over a hard rename.
-- SharpProof is product-facing; `PurelySharp` compatibility identity stays
-  until a separate migration project.
+- The SharpProof clean break is now the working identity across code,
+  packages, diagnostics, config keys, and scripts.
+- Remaining naming work is limited to repository-hosting and external
+  availability follow-up rather than internal compatibility shims.
 - Z3 is used aggressively for eligible proof obligations, but only through
   bounded proof services with caching and conservative fallback.
 - Code deletion is allowed only after tests prove shared IR/proof behavior

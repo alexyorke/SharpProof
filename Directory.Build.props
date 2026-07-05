@@ -1,4 +1,4 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
     
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
@@ -9,12 +9,12 @@
     <EnableVsixPackaging Condition="'$(EnableVsixPackaging)' != 'true' AND '$(BuildingInsideVisualStudio)' != 'true'">false</EnableVsixPackaging>
     
     
-    <IsPackable Condition="'$(MSBuildProjectName)' == 'PurelySharp.Vsix'">false</IsPackable>
+    <IsPackable Condition="'$(MSBuildProjectName)' == 'SharpProof.Vsix'">false</IsPackable>
     
     
-    <NoWarn Condition="'$(MSBuildProjectName)' == 'PurelySharp.Vsix'">$(NoWarn);NU5026</NoWarn>
+    <NoWarn Condition="'$(MSBuildProjectName)' == 'SharpProof.Vsix'">$(NoWarn);NU5026</NoWarn>
     
     
-    <DefaultItemExcludes Condition="'$(MSBuildProjectExtension)' == '.sln'">$(DefaultItemExcludes);PurelySharp.Vsix\**</DefaultItemExcludes>
+    <DefaultItemExcludes Condition="'$(MSBuildProjectExtension)' == '.sln'">$(DefaultItemExcludes);SharpProof.Vsix\**</DefaultItemExcludes>
   </PropertyGroup>
 </Project> 

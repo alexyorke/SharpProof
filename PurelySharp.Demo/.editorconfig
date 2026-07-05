@@ -1,8 +1,0 @@
-root = false
-
-[*.cs]
-dotnet_diagnostic.PS0002.severity = warning
-dotnet_diagnostic.PS0004.severity = suggestion
-dotnet_diagnostic.PS0003.severity = none
-
-

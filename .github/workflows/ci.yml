@@ -23,49 +23,49 @@ jobs:
         run: dotnet restore
 
       - name: Build solution
-        run: dotnet build PurelySharp.sln --configuration Release --no-restore
+        run: dotnet build SharpProof.sln --configuration Release --no-restore
 
       - name: Test main lane
         shell: pwsh
-        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Main
+        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Main
 
       - name: Test tooling lane
         shell: pwsh
-        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
+        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
 
       - name: Build VSIX project
         run: |
-          dotnet build PurelySharp.Vsix/PurelySharp.Vsix.csproj --configuration Release /p:EnableVsixPackaging=true
+          dotnet build SharpProof.Vsix/SharpProof.Vsix.csproj --configuration Release /p:EnableVsixPackaging=true
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: vsix-package
-          path: PurelySharp.Vsix/bin/Release/*.vsix
+          path: SharpProof.Vsix/bin/Release/*.vsix
           if-no-files-found: warn
 
       - name: Package NuGet
-        run: dotnet pack PurelySharp.Package/PurelySharp.Package.csproj --configuration Release --output nupkgs
+        run: dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --output nupkgs
 
       - name: Validate NuGet package contents
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem nupkgs -Filter PurelySharp.*.nupkg -File |
-            Where-Object { $_.Name -notlike "PurelySharp.Attributes.*" } |
+          $packages = @(Get-ChildItem nupkgs -Filter SharpProof.*.nupkg -File |
+            Where-Object { $_.Name -notlike "SharpProof.Attributes.*" } |
             Sort-Object Name)
 
           if ($packages.Count -ne 1) {
             $found = if ($packages.Count -eq 0) { "<none>" } else { $packages.Name -join ", " }
-            throw "Expected exactly one PurelySharp analyzer package, found $($packages.Count): $found"
+            throw "Expected exactly one SharpProof analyzer package, found $($packages.Count): $found"
           }
 
           $package = $packages[0]
           $entries = tar -tf $package.FullName
           $requiredEntries = @(
             "README.md",
-            "analyzers/dotnet/cs/PurelySharp.Analyzer.dll",
-            "analyzers/dotnet/cs/PurelySharp.CodeFixes.dll",
-            "lib/netstandard2.0/PurelySharp.Attributes.dll",
+            "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+            "analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
+            "lib/netstandard2.0/SharpProof.Attributes.dll",
             "tools/install.ps1",
             "tools/uninstall.ps1"
           )

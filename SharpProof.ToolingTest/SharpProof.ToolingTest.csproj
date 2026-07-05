@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="NUnit" Version="4.6.1" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.NUnit" Version="1.1.2" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
+    <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
+    <ProjectReference Include="..\Tools\SharpProof.CorpusReport.Core\SharpProof.CorpusReport.Core.csproj" />
+    <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SharpProof.Test\AnalyzerTestHost.cs" Link="Imported\AnalyzerTestHost.cs" />
+    <Compile Include="..\SharpProof.Test\AnalyzerPackagingTests.cs" Link="Imported\AnalyzerPackagingTests.cs" />
+    <Compile Include="..\SharpProof.Test\SharpProofCodeFixTests.cs" Link="Imported\SharpProofCodeFixTests.cs" />
+    <Compile Include="..\SharpProof.Test\EffectSummaryToolTests.cs" Link="Imported\EffectSummaryToolTests.cs" />
+    <Compile Include="..\SharpProof.Test\EffectSummaryToolTests.Helpers.cs" Link="Imported\EffectSummaryToolTests.Helpers.cs" />
+    <Compile Include="..\SharpProof.Test\ExceptionSummaryCatalogValidationTests.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.cs" />
+    <Compile Include="..\SharpProof.Test\ExceptionSummaryCatalogValidationTests.Helpers.cs" Link="Imported\ExceptionSummaryCatalogValidationTests.Helpers.cs" />
+    <Compile Include="..\SharpProof.Test\GeneratedPurityTestSupport.cs" Link="Imported\GeneratedPurityTestSupport.cs" />
+    <Compile Include="..\SharpProof.Test\ImpactedTestSelectionJsonSession.cs" Link="Imported\ImpactedTestSelectionJsonSession.cs" />
+    <Compile Include="..\SharpProof.Test\ImpactedTestSelectionScriptTests.cs" Link="Imported\ImpactedTestSelectionScriptTests.cs" />
+    <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2.cs" />
+    <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
+    <Compile Include="..\SharpProof.Test\Verifiers\SharpProofVerifierReferences.cs" Link="Imported\Verifiers\SharpProofVerifierReferences.cs" />
+    <Compile Include="..\SharpProof.Test\Verifiers\CSharpVerifierHelper.cs" Link="Imported\Verifiers\CSharpVerifierHelper.cs" />
+  </ItemGroup>
+
+</Project>

@@ -6,13 +6,9 @@ side-effect detection, symbolic invariants, runtime-hazard and exception-flow
 checks, build-time generated effect-summary data, Z3/SMT reasoning, code
 fixes, attributes, and a standalone symbolic query library/CLI.
 
-SharpProof was previously called PurelySharp. The repository and current NuGet
-package identifiers still use `PurelySharp` for compatibility while the
-product-facing name moves to SharpProof.
-
 The analyzer does not execute user code and does not attempt an unbounded
 whole-program proof. When it cannot prove a fact within the implemented rules
-and budgets, it stays conservative: purity falls back to `PS0002` for methods
+and budgets, it stays conservative: purity falls back to `SP0002` for methods
 marked pure, and SMT/exceptions fall back to unknown or no proof.
 
 ## Platform Direction
@@ -27,7 +23,7 @@ Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service -> Z3-bac
 
 Purity diagnostics, runtime-hazard detection, invariant queries, and SDK/BCL
 effect-summary consumption should all flow through that shared pipeline.
-`PurelySharp.Symbolic.Ir` owns C#/Roslyn semantic facts, terms, atoms,
+`SharpProof.Symbolic.Ir` owns C#/Roslyn semantic facts, terms, atoms,
 exceptional preconditions, ownership/freshness/mutation facts, type tests,
 string/regex facts, and bounds. `SearchLib` remains the backend SMT/Z3 layer.
 The analyzer should consume symbolic services instead of growing new local
@@ -41,13 +37,10 @@ and method budgets, native-load fallback, and conservative unknown results.
 
 ## Naming Direction
 
-The product-facing name is now SharpProof. The current package, namespace,
-diagnostic, configuration, additional-file, and summary-artifact identity
-remains `PurelySharp` for compatibility. Exact NuGet registration and the
-`SharpProof/SharpProof` GitHub repository were not found during the July 2026
-check, but a similarly named public web presence exists, so formal package,
-repository, and trademark clearance is still required before any hard rename of
-packages, namespaces, diagnostics, or file conventions.
+The codebase now uses SharpProof across packages, namespaces, diagnostics,
+configuration keys, scripts, and effect-summary file conventions. The remaining
+old-name surface is historical only: local clones or the current repository URL
+may still use the former name until hosting is renamed.
 
 Suggested GitHub repository metadata for the current staged rebrand:
 
@@ -56,19 +49,19 @@ Suggested GitHub repository metadata for the current staged rebrand:
 
 ## Current State
 
-- Current compatibility package metadata: `PurelySharp` `0.0.4` and
-  `PurelySharp.Attributes` `0.0.4`.
-- Product positioning is broader than the compatibility package name: the
-  analyzer is one delivery surface for the symbolic analysis platform.
+- Current package metadata: `SharpProof` `0.0.4` and
+  `SharpProof.Attributes` `0.0.4`.
+- Product positioning is broader than the analyzer package name: the analyzer
+  is one delivery surface for the symbolic analysis platform.
 - Analyzer and symbolic library target `netstandard2.0`; the symbolic CLI
   targets `net8.0`.
-- Public diagnostics in active use are `PS0002` through `PS0012`.
-- Z3 is packaged with the analyzer via `PurelySharp.Symbolic.dll`,
+- Public diagnostics in active use are `SP0002` through `SP0017`.
+- Z3 is packaged with the analyzer via `SharpProof.Symbolic.dll`,
   `SearchLib.dll`, `Microsoft.Z3.dll`, and native `libz3.dll`.
 - Built-in effect summaries are regenerated into `obj` during build/test and
   embedded as analyzer resources. The repo should not depend on checked-in or
-  preexisting `*.PurelySharp.EffectSummary.json` outputs.
-- Explicit user-supplied `PurelySharp.EffectSummary.json` additional files are
+  preexisting `*.SharpProof.EffectSummary.json` outputs.
+- Explicit user-supplied `SharpProof.EffectSummary.json` additional files are
   still supported for opt-in external summaries.
 
 ## Support Status Legend
@@ -101,13 +94,13 @@ the entire test surface.
 Install the analyzer package in projects that should be checked:
 
 ```powershell
-dotnet add package PurelySharp --version 0.0.4
+dotnet add package SharpProof --version 0.0.4
 ```
 
 Use the attributes in source:
 
 ```csharp
-using PurelySharp.Attributes;
+using SharpProof.Attributes;
 
 public sealed class Calculator
 {
@@ -115,43 +108,43 @@ public sealed class Calculator
     public int Add(int left, int right) => left + right;
 
     [EnforcePure]
-    public int ReadClock() => DateTime.Now.Second; // PS0002
+    public int ReadClock() => DateTime.Now.Second; // SP0002
 }
 ```
 
-Add `PurelySharp.Attributes` only when a project needs the attributes without
+Add `SharpProof.Attributes` only when a project needs the attributes without
 installing the analyzer package:
 
 ```powershell
-dotnet add package PurelySharp.Attributes --version 0.0.4
+dotnet add package SharpProof.Attributes --version 0.0.4
 ```
 
 ## Capability Matrix
 
 | Area | Status | What works today | Evidence |
 | --- | --- | --- | --- |
-| Attribute contracts | [x] | `[EnforcePure]` and `[Pure]` mark source methods for purity enforcement. `[PureExternal]` and `[Impure]` model trusted or rejected boundaries. `[AllowSynchronization]` can permit synchronization inside otherwise pure methods. | [BoundaryAttributeTests.cs](PurelySharp.Test/BoundaryAttributeTests.cs), [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs) |
-| Purity diagnostics | [x] | `PS0002` reports marked methods whose bodies cannot be proven pure. `PS0003` reports misplaced purity attributes. `PS0004` suggests missing purity attributes on methods that appear pure. `PS0005` through `PS0008` cover conflicting purity attributes and synchronization attribute misuse. | [PurelySharpDiagnostics.cs](PurelySharp.Analyzer/PurelySharpDiagnostics.cs), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
-| Optional explanation diagnostics | [x] | `PS0009` emits structured explanation data when `purelysharp_emit_explanations = true`. `PS0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence and either explanations or `purelysharp_report_bcl_fallback_guesses` are enabled. | [AnalyzerReleases.Unshipped.md](PurelySharp.Analyzer/AnalyzerReleases.Unshipped.md), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
-| Code fixes | [x] | Code fixes add `[EnforcePure]`, remove conflicting attributes, remove invalid purity attributes, and clean up synchronization attributes. | [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs) |
-| Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, runtime-hazard reporting, exception summaries, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](PurelySharp.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs) |
-| Baseline suppression | [x] | `PurelySharp.Baseline.json` additional files can suppress known diagnostics by ID, symbol documentation ID, and path for incremental adoption. | [BaselineSuppressionTests.cs](PurelySharp.Test/BaselineSuppressionTests.cs) |
-| NuGet/package layout | [x] | The analyzer package contains the analyzer, code fixes, attributes, symbolic library, SearchLib, and Z3 assets. It does not ship loose effect-summary JSON artifacts. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [PurelySharp.Package.csproj](PurelySharp.Package/PurelySharp.Package.csproj) |
-| Build-time built-in summaries | [x] | Built-in summaries are regenerated into analyzer intermediates, embedded for the current build, and loaded only from embedded resources. Loose analyzer-directory JSON files are ignored for built-ins. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [PurelySharp.Analyzer.csproj](PurelySharp.Analyzer/PurelySharp.Analyzer.csproj) |
-| External summary additional files | [x] | Explicit `*.PurelySharp.EffectSummary.json` additional files can be consumed when effect-summary JSON is enabled and identity validation passes. | [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [docs/effect-summary.md](docs/effect-summary.md) |
-| CFG purity analysis | [~] | Method bodies are analyzed through Roslyn operations and CFG-style flow. The analyzer handles many common expressions, calls, assignments, returns, object/array creation, delegates, LINQ, `using`, async, records, switch, try/catch, and common BCL APIs. Unknown or high-risk shapes remain conservative. | [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs), [BasicPurityTests.cs](PurelySharp.Test/BasicPurityTests.cs), [UsingStatementTests.cs](PurelySharp.Test/UsingStatementTests.cs) |
-| Z3/SMT service | [~] | One bounded `SmtAnalysisService` classifies reachability and implication, caches repeated queries, handles budgets/timeouts, and falls back conservatively when SMT is off, over budget, or unavailable. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SearchLibZ3SmokeTests.cs](PurelySharp.Test/SearchLibZ3SmokeTests.cs) |
-| Path-sensitive facts | [~] | Path facts include local/parameter versions, constants, null/non-null, numeric comparisons, affine arithmetic, multiplication by constant, boolean short-circuiting, conditionals, coalesce, switch arms, relational patterns, property/list patterns, assignments, tuple/array/list facts, and guarded exception hazards. | [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionFlowPathFactStressTests.cs](PurelySharp.Test/ExceptionFlowPathFactStressTests.cs) |
-| String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](PurelySharp.Test/RegexTests.cs) |
-| Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, syntax position, span, node, or all source lines through `SymbolicQueryService`, and can use SMT to check reachability or implication. Query results expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicQueryApi.cs](PurelySharp.Symbolic/SymbolicQueryApi.cs) |
-| Symbolic runtime-hazard API | [~] | `PurelySharp.Symbolic` can query proven runtime hazards at a line, span, syntax tree, or file, including direct throws, rethrows, divide-by-zero, null dereference, nullable value access, index/range hazards, casts, array covariance stores, checked overflow, negative array lengths, and dynamic null-binding hazards. Unknown candidates stay hidden by default unless explicitly requested. | [SymbolicRuntimeHazardQueryTests.cs](PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs), [SymbolicRuntimeHazardQueryService.cs](PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs) |
-| Symbolic CLI | [x] | `Tools/PurelySharp.SymbolicCli` exposes line, position, span, and all-lines invariant queries, runtime-hazard queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [SymbolicRuntimeHazardQueryTests.cs](PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs), [Program.cs](Tools/PurelySharp.SymbolicCli/Program.cs) |
-| Runtime hazards and exception flow | [~] | `purelysharp_runtime_hazard_mode = sites` reports `PS0011` operation-site hazards without requiring purity attributes. `all` also emits `PS0010` method summaries. Legacy `purelysharp_report_exceptions` and `purelysharp_checked_exceptions` remain supported. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, dynamic null binding, negative array lengths, index hazards, catch filters, and some resource disposal flows. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](PurelySharp.Test/RecursiveExceptionFlowTests.cs) |
-| Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](PurelySharp.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](PurelySharp.Test/DelegateTests.cs), [LinqOperationsTests.cs](PurelySharp.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](PurelySharp.Test/LinqSoundnessStressTests.cs) |
-| Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](PurelySharp.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](PurelySharp.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](PurelySharp.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
-| BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](PurelySharp.Test/ConstantsTests.cs), [CryptographyTests.cs](PurelySharp.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
-| BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL method, property, constructor, or field, `PS0002` carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `purelysharp_emit_explanations = true` or `purelysharp_report_bcl_fallback_guesses = true`, `PS0012` reports the same guess as an info diagnostic. The effect-summary tool can also emit a local `BclFallbackInventory` for SDK/runtime auditing. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [BclPurityFallbackClassifier.cs](PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
-| Full C# operation coverage | [~] | Every Roslyn operation kind should have an explicit coverage decision. Some shapes are intentionally conservative, including unsafe address capture, function pointer invocation, and custom interpolated-string-handler execution. | [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs) |
+| Attribute contracts | [x] | `[EnforcePure]` and `[Pure]` mark source methods for purity enforcement. `[PureExternal]` and `[Impure]` model trusted or rejected boundaries. `[AllowSynchronization]` can permit synchronization inside otherwise pure methods. | [BoundaryAttributeTests.cs](SharpProof.Test/BoundaryAttributeTests.cs), [SharpProofCodeFixTests.cs](SharpProof.Test/SharpProofCodeFixTests.cs) |
+| Purity diagnostics | [x] | `SP0002` reports marked methods whose bodies cannot be proven pure. `SP0003` reports misplaced purity attributes. `SP0004` suggests missing purity attributes on methods that appear pure. `SP0005` through `SP0008` cover conflicting purity attributes and synchronization attribute misuse. | [SharpProofDiagnostics.cs](SharpProof.Analyzer/SharpProofDiagnostics.cs), [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs) |
+| Optional explanation diagnostics | [x] | `SP0009` emits structured explanation data when `sharpproof_emit_explanations = true`. `SP0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence and either explanations or `sharpproof_report_bcl_fallback_guesses` are enabled. | [AnalyzerReleases.Unshipped.md](SharpProof.Analyzer/AnalyzerReleases.Unshipped.md), [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs) |
+| Code fixes | [x] | Code fixes add `[EnforcePure]`, remove conflicting attributes, remove invalid purity attributes, and clean up synchronization attributes. | [SharpProofCodeFixTests.cs](SharpProof.Test/SharpProofCodeFixTests.cs) |
+| Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, runtime-hazard reporting, exception summaries, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](SharpProof.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs) |
+| Baseline suppression | [x] | `SharpProof.Baseline.json` additional files can suppress known diagnostics by ID, symbol documentation ID, and path for incremental adoption. | [BaselineSuppressionTests.cs](SharpProof.Test/BaselineSuppressionTests.cs) |
+| NuGet/package layout | [x] | The analyzer package contains the analyzer, code fixes, attributes, symbolic library, SearchLib, and Z3 assets. It does not ship loose effect-summary JSON artifacts. | [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs), [SharpProof.Package.csproj](SharpProof.Package/SharpProof.Package.csproj) |
+| Build-time built-in summaries | [x] | Built-in summaries are regenerated into analyzer intermediates, embedded for the current build, and loaded only from embedded resources. Loose analyzer-directory JSON files are ignored for built-ins. | [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs), [SharpProof.Analyzer.csproj](SharpProof.Analyzer/SharpProof.Analyzer.csproj) |
+| External summary additional files | [x] | Explicit `*.SharpProof.EffectSummary.json` additional files can be consumed when effect-summary JSON is enabled and identity validation passes. | [ExceptionSummaryCatalogValidationTests.cs](SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs), [docs/effect-summary.md](docs/effect-summary.md) |
+| CFG purity analysis | [~] | Method bodies are analyzed through Roslyn operations and CFG-style flow. The analyzer handles many common expressions, calls, assignments, returns, object/array creation, delegates, LINQ, `using`, async, records, switch, try/catch, and common BCL APIs. Unknown or high-risk shapes remain conservative. | [RoslynConstructCoverageTests.cs](SharpProof.Test/RoslynConstructCoverageTests.cs), [BasicPurityTests.cs](SharpProof.Test/BasicPurityTests.cs), [UsingStatementTests.cs](SharpProof.Test/UsingStatementTests.cs) |
+| Z3/SMT service | [~] | One bounded `SmtAnalysisService` classifies reachability and implication, caches repeated queries, handles budgets/timeouts, and falls back conservatively when SMT is off, over budget, or unavailable. | [SmtAnalysisServiceTests.cs](SharpProof.Test/SmtAnalysisServiceTests.cs), [SearchLibZ3SmokeTests.cs](SharpProof.Test/SearchLibZ3SmokeTests.cs) |
+| Path-sensitive facts | [~] | Path facts include local/parameter versions, constants, null/non-null, numeric comparisons, affine arithmetic, multiplication by constant, boolean short-circuiting, conditionals, coalesce, switch arms, relational patterns, property/list patterns, assignments, tuple/array/list facts, and guarded exception hazards. | [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs), [ExceptionFlowPathFactStressTests.cs](SharpProof.Test/ExceptionFlowPathFactStressTests.cs) |
+| String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](SharpProof.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](SharpProof.Test/RegexTests.cs) |
+| Symbolic invariant API | [~] | `SharpProof.Symbolic` can query merged invariants at a line, column, syntax position, span, node, or all source lines through `SymbolicQueryService`, and can use SMT to check reachability or implication. Query results expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](SharpProof.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicQueryApi.cs](SharpProof.Symbolic/SymbolicQueryApi.cs) |
+| Symbolic runtime-hazard API | [~] | `SharpProof.Symbolic` can query proven runtime hazards at a line, span, syntax tree, or file, including direct throws, rethrows, divide-by-zero, null dereference, nullable value access, index/range hazards, casts, array covariance stores, checked overflow, negative array lengths, and dynamic null-binding hazards. Unknown candidates stay hidden by default unless explicitly requested. | [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs), [SymbolicRuntimeHazardQueryService.cs](SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs) |
+| Symbolic CLI | [x] | `Tools/SharpProof.SymbolicCli` exposes line, position, span, and all-lines invariant queries, runtime-hazard queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs), [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs), [Program.cs](Tools/SharpProof.SymbolicCli/Program.cs) |
+| Runtime hazards and exception flow | [~] | `sharpproof_runtime_hazard_mode = sites` reports `SP0011` operation-site hazards without requiring purity attributes. `all` also emits `SP0010` method summaries. Legacy `sharpproof_report_exceptions` and `sharpproof_checked_exceptions` remain supported. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, dynamic null binding, negative array lengths, index hazards, catch filters, and some resource disposal flows. | [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs), [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](SharpProof.Test/RecursiveExceptionFlowTests.cs) |
+| Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](SharpProof.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](SharpProof.Test/DelegateTests.cs), [LinqOperationsTests.cs](SharpProof.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](SharpProof.Test/LinqSoundnessStressTests.cs) |
+| Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](SharpProof.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](SharpProof.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](SharpProof.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
+| BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](SharpProof.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](SharpProof.Test/ConstantsTests.cs), [CryptographyTests.cs](SharpProof.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
+| BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL method, property, constructor, or field, `SP0002` carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `sharpproof_emit_explanations = true` or `sharpproof_report_bcl_fallback_guesses = true`, `SP0012` reports the same guess as an info diagnostic. The effect-summary tool can also emit a local `BclFallbackInventory` for SDK/runtime auditing. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](SharpProof.Test/DiagnosticEvidenceTests.cs), [EffectSummaryToolTests.cs](SharpProof.Test/EffectSummaryToolTests.cs), [BclPurityFallbackClassifier.cs](SharpProof.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
+| Full C# operation coverage | [~] | Every Roslyn operation kind should have an explicit coverage decision. Some shapes are intentionally conservative, including unsafe address capture, function pointer invocation, and custom interpolated-string-handler execution. | [RoslynConstructCoverageTests.cs](SharpProof.Test/RoslynConstructCoverageTests.cs) |
 | Whole-program execution prediction | [ ] | SharpProof does not run or fully simulate arbitrary C# programs. It derives bounded facts from syntax, semantics, CFG/path facts, catalogs, summaries, and SMT. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | Rust-style borrow checker | [ ] | A full borrow/resource ownership system is roadmap work. Current ownership handling is local, bounded, and purity-focused. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 
@@ -159,17 +152,17 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 
 | ID | Default severity | Meaning |
 | --- | --- | --- |
-| `PS0002` | Error | A method marked `[EnforcePure]` or `[Pure]` contains operations the analyzer cannot prove pure. |
-| `PS0003` | Error | `[EnforcePure]` or `[Pure]` is applied to a non-method declaration. |
-| `PS0004` | Warning | A method appears pure but is not marked `[EnforcePure]`. |
-| `PS0005` | Warning | Conflicting purity attributes are applied together. |
-| `PS0006` | Warning | `[AllowSynchronization]` is used without a purity attribute. |
-| `PS0007` | Error | `[AllowSynchronization]` is applied to a non-method declaration. |
-| `PS0008` | Info | `[AllowSynchronization]` is redundant because no synchronization was detected. |
-| `PS0009` | Info | Optional purity explanation emitted when `purelysharp_emit_explanations = true`. |
-| `PS0010` | Info | Optional escaping-exception summary emitted when `purelysharp_report_exceptions = true` or `purelysharp_runtime_hazard_mode = summaries/all`. |
-| `PS0011` | Warning | Optional uncaught operation-site exception/runtime-hazard warning emitted when `purelysharp_checked_exceptions = true` or `purelysharp_runtime_hazard_mode = sites/all`. |
-| `PS0012` | Info | Optional non-authoritative BCL purity fallback guess emitted when `purelysharp_emit_explanations = true` or `purelysharp_report_bcl_fallback_guesses = true`. |
+| `SP0002` | Error | A method marked `[EnforcePure]` or `[Pure]` contains operations the analyzer cannot prove pure. |
+| `SP0003` | Error | `[EnforcePure]` or `[Pure]` is applied to a non-method declaration. |
+| `SP0004` | Warning | A method appears pure but is not marked `[EnforcePure]`. |
+| `SP0005` | Warning | Conflicting purity attributes are applied together. |
+| `SP0006` | Warning | `[AllowSynchronization]` is used without a purity attribute. |
+| `SP0007` | Error | `[AllowSynchronization]` is applied to a non-method declaration. |
+| `SP0008` | Info | `[AllowSynchronization]` is redundant because no synchronization was detected. |
+| `SP0009` | Info | Optional purity explanation emitted when `sharpproof_emit_explanations = true`. |
+| `SP0010` | Info | Optional escaping-exception summary emitted when `sharpproof_report_exceptions = true` or `sharpproof_runtime_hazard_mode = summaries/all`. |
+| `SP0011` | Warning | Optional uncaught operation-site exception/runtime-hazard warning emitted when `sharpproof_checked_exceptions = true` or `sharpproof_runtime_hazard_mode = sites/all`. |
+| `SP0012` | Info | Optional non-authoritative BCL purity fallback guess emitted when `sharpproof_emit_explanations = true` or `sharpproof_report_bcl_fallback_guesses = true`. |
 
 ## Configuration
 
@@ -178,61 +171,61 @@ Example `.editorconfig`:
 ```ini
 is_global = true
 
-dotnet_diagnostic.PS0002.severity = error
-dotnet_diagnostic.PS0004.severity = suggestion
+dotnet_diagnostic.SP0002.severity = error
+dotnet_diagnostic.SP0004.severity = suggestion
 
-purelysharp_purity_profile = balanced
-purelysharp_suggest_missing_enforce_pure = true
-purelysharp_suggest_missing_enforce_pure_scope = all
-purelysharp_emit_explanations = false
-purelysharp_report_bcl_fallback_guesses = false
+sharpproof_purity_profile = balanced
+sharpproof_suggest_missing_enforce_pure = true
+sharpproof_suggest_missing_enforce_pure_scope = all
+sharpproof_emit_explanations = false
+sharpproof_report_bcl_fallback_guesses = false
 
-purelysharp_runtime_hazard_mode = off
-purelysharp_report_exceptions = false
-purelysharp_checked_exceptions = false
-purelysharp_enable_effect_summary_json = false
+sharpproof_runtime_hazard_mode = off
+sharpproof_report_exceptions = false
+sharpproof_checked_exceptions = false
+sharpproof_enable_effect_summary_json = false
 
-purelysharp_smt_mode = bounded
-purelysharp_smt_timeout_ms = 750
-purelysharp_smt_method_budget_ms = 5000
-purelysharp_smt_max_path_conditions = 192
-purelysharp_smt_max_expression_nodes = 2048
+sharpproof_smt_mode = bounded
+sharpproof_smt_timeout_ms = 750
+sharpproof_smt_method_budget_ms = 5000
+sharpproof_smt_max_path_conditions = 192
+sharpproof_smt_max_expression_nodes = 2048
 ```
 
 Supported analyzer keys:
 
-- `purelysharp_known_impure_methods`
-- `purelysharp_known_pure_methods`
-- `purelysharp_known_impure_namespaces`
-- `purelysharp_known_impure_types`
-- `purelysharp_purity_profile`
-- `purelysharp_enable_debug_logging`
-- `purelysharp_suggest_missing_enforce_pure`
-- `purelysharp_suggest_missing_enforce_pure_scope`
-- `purelysharp_suggest_missing_enforce_pure_exclude_generated`
-- `purelysharp_suggest_missing_enforce_pure_exclude_tests`
-- `purelysharp_suggest_missing_enforce_pure_min_complexity`
-- `purelysharp_suggest_missing_enforce_pure_namespace_filters`
-- `purelysharp_emit_explanations`
-- `purelysharp_report_bcl_fallback_guesses`
-- `purelysharp_runtime_hazard_mode`
-- `purelysharp_report_exceptions`
-- `purelysharp_checked_exceptions`
-- `purelysharp_enable_effect_summary_json`
-- `purelysharp_smt_mode`
-- `purelysharp_smt_timeout_ms`
-- `purelysharp_smt_method_budget_ms`
-- `purelysharp_smt_max_path_conditions`
-- `purelysharp_smt_max_expression_nodes`
+- `sharpproof_known_impure_methods`
+- `sharpproof_known_pure_methods`
+- `sharpproof_known_impure_namespaces`
+- `sharpproof_known_impure_types`
+- `sharpproof_purity_profile`
+- `sharpproof_enable_debug_logging`
+- `sharpproof_suggest_missing_enforce_pure`
+- `sharpproof_suggest_missing_enforce_pure_scope`
+- `sharpproof_suggest_missing_enforce_pure_exclude_generated`
+- `sharpproof_suggest_missing_enforce_pure_exclude_tests`
+- `sharpproof_suggest_missing_enforce_pure_min_complexity`
+- `sharpproof_suggest_missing_enforce_pure_namespace_filters`
+- `sharpproof_emit_explanations`
+- `sharpproof_report_bcl_fallback_guesses`
+- `sharpproof_runtime_hazard_mode`
+- `sharpproof_report_exceptions`
+- `sharpproof_checked_exceptions`
+- `sharpproof_enable_effect_summary_json`
+- `sharpproof_smt_mode`
+- `sharpproof_smt_timeout_ms`
+- `sharpproof_smt_method_budget_ms`
+- `sharpproof_smt_max_path_conditions`
+- `sharpproof_smt_max_expression_nodes`
 
 Runtime hazard modes:
 
 | Mode | Diagnostics | Use |
 | --- | --- | --- |
 | `off` | None | Default. Runtime-failure checks stay disabled unless legacy exception switches are enabled. |
-| `sites` | `PS0011` | Report analyzer-proven uncaught operation-site hazards such as throws, divide-by-zero, null dereference, and index hazards. |
-| `summaries` | `PS0010` | Report method-level escaping exception summaries without operation-site warnings. |
-| `all` | `PS0010`, `PS0011` | Emit both method summaries and operation-site runtime-hazard warnings. |
+| `sites` | `SP0011` | Report analyzer-proven uncaught operation-site hazards such as throws, divide-by-zero, null dereference, and index hazards. |
+| `summaries` | `SP0010` | Report method-level escaping exception summaries without operation-site warnings. |
+| `all` | `SP0010`, `SP0011` | Emit both method summaries and operation-site runtime-hazard warnings. |
 
 SMT modes:
 
@@ -251,8 +244,8 @@ patterns, null checks, numeric comparisons, string predicates, and regex
 predicates. Larger conclusions are derived by formula lowering and Z3 rather
 than by hard-coding one method's control flow.
 
-SharpProof exposes symbolic queries through the current
-`PurelySharp.Symbolic` compatibility assembly:
+SharpProof exposes symbolic queries through the
+`SharpProof.Symbolic` assembly:
 
 - `SymbolicQueryService.Query(SymbolicQueryRequest)` for point, position, line, span, line-span, all-lines, and node queries
 - `SymbolicSourceInput.FromFile`, `FromText`, `FromSyntaxTree`, and `FromNode`
@@ -265,7 +258,7 @@ SharpProof exposes symbolic queries through the current
 The CLI mirrors the library:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
 ```
 
 Use `--all-lines` to enumerate every source line with statement/expression
@@ -295,9 +288,9 @@ share the same path facts without hard-coded method or branch special cases.
 The same CLI can query runtime hazards instead of invariant program points:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards --json
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards --json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
 ```
 
 `SymbolicRuntimeHazardQueryService` is the library surface behind that CLI. It
@@ -315,7 +308,7 @@ is separate integration work.
 SharpProof still uses effect-summary JSON as data, but not as checked-in
 generated outputs.
 
-- The source manifest `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
+- The source manifest `SharpProof.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
   is checked in.
 - During analyzer build/test, built-in summaries are regenerated into
   analyzer intermediates under `obj`.
@@ -323,10 +316,10 @@ generated outputs.
 - The analyzer embeds only the current run's generated summaries.
 - Built-in loaders do not probe `Assembly.Location`, analyzer directories, repo
   artifacts, or `AppContext.BaseDirectory` for built-in summary files.
-- Explicit user additional files named `*.PurelySharp.EffectSummary.json` remain
+- Explicit user additional files named `*.SharpProof.EffectSummary.json` remain
   supported for external opt-in summaries.
 
-`Tools/PurelySharp.EffectSummary` remains ad hoc tooling for calibration,
+`Tools/SharpProof.EffectSummary` remains ad hoc tooling for calibration,
 summary generation, report-only SDK/runtime analysis, and disposable BCL
 fallback inventories. See
 [docs/effect-summary.md](docs/effect-summary.md).
@@ -343,7 +336,7 @@ fallback inventories. See
   surfaces are intentionally conservative unless explicitly modeled.
 - The compiler and IDE are not modified to display symbolic facts inline yet.
   Today those facts are available through the analyzer diagnostics and
-  `PurelySharp.Symbolic` library/CLI.
+  `SharpProof.Symbolic` library/CLI.
 - Regex SMT support is a subset. It can prove useful string/regex facts, but it
   does not enumerate every possible matching string or fully implement .NET
   regex semantics.
@@ -363,7 +356,7 @@ The detailed canonical backlog is
 keeps only the product-facing summary.
 
 - [x] Analyzer, attributes, code fixes, and NuGet/VSIX package layout.
-- [x] Core CFG purity rules and explainable `PS0002` evidence.
+- [x] Core CFG purity rules and explainable `SP0002` evidence.
 - [x] Build-time regenerated built-in summaries with embedded-resource loading.
 - [x] External additional-file summary support with identity validation.
 - [x] Bounded Z3/SMT service with cache, timeout, budget, and fallback behavior.
@@ -396,9 +389,9 @@ Use the repo wrapper for .NET commands so long-running tests run under the
 expected Windows Job Object:
 
 ```powershell
-.\scripts\Invoke-PurelySharpDotnet.ps1 build PurelySharp.sln --configuration Release
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane All
+.\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
 The default lane is `Main` so local loops skip the slower tooling and packaging
@@ -408,12 +401,12 @@ can also emit a TRX slow-test profile, override worker counts explicitly, and
 bound hung runs:
 
 ```powershell
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -FailFast
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Profile -Top 30
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Workers 8
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TimeoutSeconds 900
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
-.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -TestLane All
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -FailFast
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -Profile -Top 30
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -Workers 8
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TimeoutSeconds 900
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
 For local iteration, the impacted-test wrapper can derive a VSTest filter from
@@ -423,17 +416,17 @@ unless `-ForcePartial` is set. The wrapper combines curated path maps with the
 checked-in generated inventory in `scripts/test-impact-inventory.json`:
 
 ```powershell
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly -Json
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly -Explain
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild -ForcePartial
-.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -TimeoutSeconds 900
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -ListOnly
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -ListOnly -Json
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -ListOnly -Explain
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -BaseRef origin/main -NoBuild
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -BaseRef origin/main -NoBuild -ForcePartial
+.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -TimeoutSeconds 900
 ```
 
 Use `-ChangedFile <path>` with `-ListOnly` to preview the mapping for a
-specific edit before staging it. Use `scripts/Get-PurelySharpTestImpactInventory.ps1`
+specific edit before staging it. Use `scripts/Get-SharpProofTestImpactInventory.ps1`
 to regenerate the inventory after adding modules, fixtures, or production
 types. The helper is deliberately conservative and is not a CI replacement; run
 the full wrapper or GitHub CI before relying on broad behavioral changes.
@@ -441,22 +434,22 @@ the full wrapper or GitHub CI before relying on broad behavioral changes.
 Representative evidence suites:
 
 - Packaging and generated-summary policy:
-  [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs)
+  [AnalyzerPackagingTests.cs](SharpProof.Test/AnalyzerPackagingTests.cs)
 - Z3 solver, budgets, caching, string, and regex:
-  [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs),
-  [SearchLibZ3SmokeTests.cs](PurelySharp.Test/SearchLibZ3SmokeTests.cs)
+  [SmtAnalysisServiceTests.cs](SharpProof.Test/SmtAnalysisServiceTests.cs),
+  [SearchLibZ3SmokeTests.cs](SharpProof.Test/SearchLibZ3SmokeTests.cs)
 - CFG/path-sensitive symbolic facts:
-  [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs)
+  [SemanticOracleSmtTests.cs](SharpProof.Test/SemanticOracleSmtTests.cs)
 - Invariant query API:
-  [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs)
+  [SymbolicSourceQueryLineTests.cs](SharpProof.Test/SymbolicSourceQueryLineTests.cs)
 - Runtime-hazard query API:
-  [SymbolicRuntimeHazardQueryTests.cs](PurelySharp.Test/SymbolicRuntimeHazardQueryTests.cs)
+  [SymbolicRuntimeHazardQueryTests.cs](SharpProof.Test/SymbolicRuntimeHazardQueryTests.cs)
 - Exception summaries and additional-file summaries:
-  [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs),
-  [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs)
+  [ExceptionSummaryCatalogValidationTests.cs](SharpProof.Test/ExceptionSummaryCatalogValidationTests.cs),
+  [EffectSummaryToolTests.cs](SharpProof.Test/EffectSummaryToolTests.cs)
 - Roslyn operation coverage decisions:
-  [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs)
+  [RoslynConstructCoverageTests.cs](SharpProof.Test/RoslynConstructCoverageTests.cs)
 - Boundary attributes, baselines, and code fixes:
-  [BoundaryAttributeTests.cs](PurelySharp.Test/BoundaryAttributeTests.cs),
-  [BaselineSuppressionTests.cs](PurelySharp.Test/BaselineSuppressionTests.cs),
-  [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs)
+  [BoundaryAttributeTests.cs](SharpProof.Test/BoundaryAttributeTests.cs),
+  [BaselineSuppressionTests.cs](SharpProof.Test/BaselineSuppressionTests.cs),
+  [SharpProofCodeFixTests.cs](SharpProof.Test/SharpProofCodeFixTests.cs)

@@ -1,7 +1,7 @@
 # Symbolic Invariant Queries
 
 SharpProof exposes a Roslyn-based invariant query surface through the current
-`PurelySharp.Symbolic` compatibility assembly. It can be used without the
+`SharpProof.Symbolic` assembly. It can be used without the
 analyzer package.
 The API accepts a `SyntaxTree` plus `Compilation`, or raw source/file helpers that create a compilation from trusted platform references.
 
@@ -43,49 +43,49 @@ Runtime type tests are represented as Z3-backed reference predicates. That lets 
 The CLI mirrors the same API:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
 ```
 
 Use `--position` to query the statement or expression at a 0-based absolute source position:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --position 128 --check-reachability
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --position 128 --check-reachability
 ```
 
 Use `--all-lines` to enumerate every source line with statement/expression program points from one parse/compilation pass:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --json
 ```
 
 Use `--line-expressions` with `--line-invariants` or `--all-lines` when a caller needs expression-level points without computing absolute positions. This is useful for querying the invariant at a call, element access, member access, or arithmetic expression on a line:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --line-invariants --line-expressions --program-point-kind Expression --node-kind AddExpression --check-reachability --implies "index >= 0" --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --line-invariants --line-expressions --program-point-kind Expression --node-kind AddExpression --check-reachability --implies "index >= 0" --compact-json
 ```
 
 Use `--node-kind`, `--program-point-kind`, `--filter-line`, `--line-start`, `--line-end`, `--method`, `--method-contains`, `--with-facts`, `--with-conditions`, `--condition-target`, `--condition`, `--condition-contains`, or `--reachability` with `--line-invariants` or `--all-lines` to narrow aggregate output without changing symbolic inference:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --method TryParse --node-kind ReturnStatement --filter-line 42 --condition-target index --with-conditions --json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --method TryParse --node-kind ReturnStatement --filter-line 42 --condition-target index --with-conditions --json
 ```
 
 Use `--with-proofs`, `--proof-outcome`, `--proof-condition`, and `--proof-condition-contains` after `--implies` to keep only points with matching implication results:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --line-expressions --method-contains Parse --program-point-kind Expression --implies "index >= 0" --with-proofs --proof-outcome ProvenTrue --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --line-expressions --method-contains Parse --program-point-kind Expression --implies "index >= 0" --with-proofs --proof-outcome ProvenTrue --compact-json
 ```
 
 Use `--compact-json` when a tool needs a smaller stable shape instead of the full public object graph:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --compact-json --max-lines 25 --max-points 100 --max-facts 20 --max-conditions 20 --max-proofs 20
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --compact-json --max-lines 25 --max-points 100 --max-facts 20 --max-conditions 20 --max-proofs 20
 ```
 
 Use `--summary-only` to emit compact JSON with file or line aggregate metadata but no nested line or program-point arrays:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --summary-only
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --summary-only
 ```
 
 ## Runtime Hazard Queries
@@ -99,25 +99,25 @@ Known remaining runtime-hazard gaps: failed `as` conversions do not yet become r
 Query proven hazards on one line:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --line 42 --runtime-hazards
 ```
 
 Query all proven null-dereference hazards with compact JSON output:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
 ```
 
 Inspect unknown candidates as a bounded machine-readable summary:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json --max-hazards 50
 ```
 
 Fail the process when the final filtered hazard output is non-empty:
 
 ```powershell
-dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind DivideByZero --fail-on-hazard
+dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --runtime-hazards --hazard-kind DivideByZero --fail-on-hazard
 ```
 
 Hazard filters include `--hazard-kind`, `--hazard-status`, `--hazard-exception-type`, and `--hazard-category`. `--compact-json` hazard output includes `kind = runtimeHazards`, `hazardCount`, status/kind/exception/category counts, `analysisSummary`, bounded hazard entries, truncation flags, and SMT diagnostics.
