@@ -471,6 +471,31 @@ namespace PurelySharp.Symbolic.Ir
             out SymbolicTerm term)
         {
             term = null!;
+            if (dimension != 0 ||
+                arrayType.Rank != 1 ||
+                arrayExpression is not ImplicitArrayCreationExpressionSyntax implicitArrayCreation ||
+                implicitArrayCreation.Initializer == null)
+            {
+                return LowerExplicitArrayCreationDimensionLengthTerm(
+                    arrayExpression,
+                    arrayType,
+                    dimension,
+                    context,
+                    out term);
+            }
+
+            term = new SymbolicIntegerConstantTerm(implicitArrayCreation.Initializer.Expressions.Count);
+            return true;
+        }
+
+        private static bool LowerExplicitArrayCreationDimensionLengthTerm(
+            ExpressionSyntax arrayExpression,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            SymbolicLoweringContext context,
+            out SymbolicTerm term)
+        {
+            term = null!;
             if (arrayExpression is not ArrayCreationExpressionSyntax arrayCreation ||
                 arrayCreation.Type.RankSpecifiers.Count == 0)
             {
@@ -479,8 +504,21 @@ namespace PurelySharp.Symbolic.Ir
 
             var rankSpecifier = arrayCreation.Type.RankSpecifiers[0];
             if (rankSpecifier.Sizes.Count != arrayType.Rank ||
-                rankSpecifier.Sizes[dimension].IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.OmittedArraySizeExpression) ||
-                !TryLowerTerm(rankSpecifier.Sizes[dimension], context, out var sizeTerm) ||
+                rankSpecifier.Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression))
+            {
+                if (rankSpecifier.Sizes.Count == arrayType.Rank &&
+                    rankSpecifier.Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                    arrayCreation.Initializer != null &&
+                    dimension == 0)
+                {
+                    term = new SymbolicIntegerConstantTerm(arrayCreation.Initializer.Expressions.Count);
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (!TryLowerTerm(rankSpecifier.Sizes[dimension], context, out var sizeTerm) ||
                 sizeTerm.Kind != SmtValueKind.Int)
             {
                 return false;
@@ -743,6 +781,13 @@ namespace PurelySharp.Symbolic.Ir
                 {
                     return true;
                 }
+            }
+
+            if (expression is ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax &&
+                type is IArrayTypeSymbol arrayCreationType &&
+                TryLowerArrayTotalLengthTerm(expression, arrayCreationType, context, out term))
+            {
+                return true;
             }
 
             if (TryLowerTerm(expression, context, out var receiver) &&

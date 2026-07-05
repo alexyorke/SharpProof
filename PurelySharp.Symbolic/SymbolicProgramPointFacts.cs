@@ -2079,6 +2079,179 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool IsKnownNonNullReferenceSymbol(SymbolicState state, ISymbol symbol)
+        {
+            return TryGetKnownReferenceNullState(state, symbol, out var isNull) && !isNull;
+        }
+
+        private static bool IsKnownNullReferenceSymbol(SymbolicState state, ISymbol symbol)
+        {
+            return TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
+        }
+
+        private static bool TryGetKnownReferenceNullState(
+            SymbolicState state,
+            ISymbol symbol,
+            out bool isNull)
+        {
+            isNull = false;
+            var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+            for (var index = state.PathConditions.Length - 1; index >= 0; index--)
+            {
+                if (TryGetKnownReferenceNullState(state.PathConditions[index], symbolName, out isNull))
+                {
+                    return true;
+                }
+            }
+
+            for (var index = state.Facts.Length - 1; index >= 0; index--)
+            {
+                if (TryGetKnownReferenceNullState(state.Facts[index], symbolName, out isNull))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetKnownReferenceNullState(
+            SymbolicCondition condition,
+            string symbolName,
+            out bool isNull)
+        {
+            isNull = false;
+            return condition is SymbolicFactCondition factCondition &&
+                TryGetKnownReferenceNullState(factCondition.Fact, symbolName, out isNull);
+        }
+
+        private static bool TryGetKnownReferenceNullState(
+            SymbolicFact fact,
+            string symbolName,
+            out bool isNull)
+        {
+            isNull = false;
+            if (!fact.Polarity ||
+                fact.Atom is not SymbolicRelationAtom relation)
+            {
+                return false;
+            }
+
+            if (relation.Left is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } leftVariable &&
+                string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
+                relation.Right is SymbolicNullTerm)
+            {
+                if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
+                {
+                    isNull = relation.Operator == SymbolicRelationOperator.Equal;
+                    return true;
+                }
+            }
+
+            if (relation.Right is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } rightVariable &&
+                string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
+                relation.Left is SymbolicNullTerm)
+            {
+                if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
+                {
+                    isNull = relation.Operator == SymbolicRelationOperator.Equal;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsKnownNullableHasValueSymbol(SymbolicState state, ISymbol symbol)
+        {
+            return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
+        }
+
+        private static bool IsKnownNullableNoValueSymbol(SymbolicState state, ISymbol symbol)
+        {
+            return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && !hasValue;
+        }
+
+        private static bool TryGetKnownNullableHasValueState(
+            SymbolicState state,
+            ISymbol symbol,
+            out bool hasValue)
+        {
+            hasValue = false;
+            var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
+            for (var index = state.PathConditions.Length - 1; index >= 0; index--)
+            {
+                if (TryGetKnownNullableHasValueState(state.PathConditions[index], symbolName, out hasValue))
+                {
+                    return true;
+                }
+            }
+
+            for (var index = state.Facts.Length - 1; index >= 0; index--)
+            {
+                if (TryGetKnownNullableHasValueState(state.Facts[index], symbolName, out hasValue))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetKnownNullableHasValueState(
+            SymbolicCondition condition,
+            string symbolName,
+            out bool hasValue)
+        {
+            hasValue = false;
+            return condition is SymbolicFactCondition factCondition &&
+                TryGetKnownNullableHasValueState(factCondition.Fact, symbolName, out hasValue);
+        }
+
+        private static bool TryGetKnownNullableHasValueState(
+            SymbolicFact fact,
+            string symbolName,
+            out bool hasValue)
+        {
+            hasValue = false;
+            if (!fact.Polarity)
+            {
+                return false;
+            }
+
+            switch (fact.Atom)
+            {
+                case SymbolicTruthAtom { Condition: SymbolicNullableHasValueTerm nullableHasValue }:
+                    if (string.Equals(nullableHasValue.NullableName, symbolName, StringComparison.Ordinal))
+                    {
+                        hasValue = true;
+                        return true;
+                    }
+
+                    break;
+
+                case SymbolicRelationAtom
+                    {
+                        Operator: SymbolicRelationOperator.Equal,
+                        Left: SymbolicNullableHasValueTerm leftNullableHasValue,
+                        Right: SymbolicBooleanConstantTerm rightBoolean
+                    } when string.Equals(leftNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
+                    hasValue = rightBoolean.Value;
+                    return true;
+
+                case SymbolicRelationAtom
+                    {
+                        Operator: SymbolicRelationOperator.Equal,
+                        Left: SymbolicBooleanConstantTerm leftBoolean,
+                        Right: SymbolicNullableHasValueTerm rightNullableHasValue
+                    } when string.Equals(rightNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
+                    hasValue = leftBoolean.Value;
+                    return true;
+            }
+
+            return false;
+        }
+
         private static bool TryGetStateEqualityValueTerm(
             SymbolicCondition condition,
             string symbolName,
@@ -4021,6 +4194,22 @@ namespace PurelySharp.Symbolic
                     previousAssignedValueTerm = previousStateValueTerm;
                 }
 
+                var coalesceAssignmentIsKnownNoOp = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                    (IsKnownNonNullReferenceSymbol(state, assignedSymbol.OriginalDefinition) ||
+                     IsKnownNullableHasValueSymbol(state, assignedSymbol.OriginalDefinition));
+                var coalesceAssignmentIsKnownNullableNoValue = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                    IsKnownNullableNoValueSymbol(state, assignedSymbol.OriginalDefinition);
+                var coalesceAssignmentIsKnownNullReference = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                    IsKnownNullReferenceSymbol(state, assignedSymbol.OriginalDefinition);
+
+                if (coalesceAssignmentIsKnownNoOp)
+                {
+                    return;
+                }
+
                 RemoveStateFactsInvalidatedByNestedMutations(
                     ref state,
                     assignment.Left,
@@ -4044,6 +4233,18 @@ namespace PurelySharp.Symbolic
                             cancellationToken,
                             "ir.path.prior-statement");
                     }
+                }
+                else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                         assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                         (coalesceAssignmentIsKnownNullableNoValue || coalesceAssignmentIsKnownNullReference))
+                {
+                    AddAssignedValueStateFacts(
+                        ref state,
+                        assignedSymbol.OriginalDefinition,
+                        assignment.Right,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.prior-statement.coalesce-assignment");
                 }
                 else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
                          previousAssignedValueTerm != null &&

@@ -6924,6 +6924,141 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_ContainsNativeCoalesceAssignmentStateHelpers()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "PurelySharp.Symbolic",
+                "SymbolicProgramPointFacts.cs"));
+
+            Assert.That(source, Does.Contain("coalesceAssignmentIsKnownNoOp"));
+            Assert.That(source, Does.Contain("IsKnownNullReferenceSymbol(state, assignedSymbol.OriginalDefinition)"));
+            Assert.That(source, Does.Contain("IsKnownNullableNoValueSymbol(state, assignedSymbol.OriginalDefinition)"));
+            Assert.That(source, Does.Contain("\"ir.path.prior-statement.coalesce-assignment\""));
+        }
+
+        private static bool IsLengthEqualityFact(SymbolicFact fact, string variableName, long expectedLength)
+        {
+            return fact.Atom switch
+            {
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicLengthTerm { Value: SymbolicVariableTerm { Name: var name } },
+                    Right: SymbolicIntegerConstantTerm { Value: var value }
+                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedLength => true,
+                SymbolicRelationAtom
+                {
+                    Operator: SymbolicRelationOperator.Equal,
+                    Left: SymbolicIntegerConstantTerm { Value: var value },
+                    Right: SymbolicLengthTerm { Value: SymbolicVariableTerm { Name: var name } }
+                } when string.Equals(name, variableName, StringComparison.Ordinal) &&
+                       value == expectedLength => true,
+                _ => false
+            };
+        }
+
+        private static SymbolicFact? FindLengthEqualityFact(SymbolicState state, string variableName, long expectedLength)
+        {
+            return state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .Select(condition => condition.Fact)
+                .Concat(state.Facts)
+                .SingleOrDefault(candidate => IsLengthEqualityFact(candidate, variableName, expectedLength));
+        }
+
+        private static string DescribeState(SymbolicState state)
+        {
+            var pathConditions = state.PathConditions
+                .Select(static condition => condition is SymbolicFactCondition factCondition
+                    ? "PC:" + factCondition.Fact.Provenance + ":" + factCondition.Fact
+                    : "PC:" + condition)
+                .ToArray();
+            var facts = state.Facts
+                .Select(static fact => "F:" + fact.Provenance + ":" + fact)
+                .ToArray();
+            return string.Join(Environment.NewLine, pathConditions.Concat(facts));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_CarriesIrCoalesceAssignmentState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int[] values = null; values ??= new int[1]; return values.Length; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicCoalesceAssignmentState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var localSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "values", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
+            var condition = FindLengthEqualityFact(analysis.PathState, variableName, 1);
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicProgramPointAnalysis_PreservesIrCoalesceAssignmentNoOpState()
+        {
+            var tree = CSharpSyntaxTree.ParseText("class C { int M() { int[] values = new int[2]; values ??= new int[1]; return values.Length; } }");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicCoalesceAssignmentNoOpState",
+                new[] { tree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var returnStatement = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+            var localSymbol = tree.GetRoot()
+                .DescendantNodesAndSelf()
+                .OfType<VariableDeclaratorSyntax>()
+                .Select(node => semanticModel.GetDeclaredSymbol(node))
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, "values", StringComparison.Ordinal));
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(
+                returnStatement,
+                semanticModel,
+                smtAnalysis,
+                CancellationToken.None);
+            var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
+            var condition = FindLengthEqualityFact(analysis.PathState, variableName, 2);
+
+            Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
+            var proof = SymbolicReachabilityService.ClassifyStateImplication(
+                analysis.PathState,
+                condition!,
+                smtAnalysis);
+            Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
