@@ -790,6 +790,18 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax arrayEmptyInvocation &&
+                context.SemanticModel.GetSymbolInfo(arrayEmptyInvocation, context.CancellationToken).Symbol is IMethodSymbol
+                {
+                    Name: "Empty",
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_Array
+                })
+            {
+                term = new SymbolicIntegerConstantTerm(0);
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryLowerBuiltInLengthTerm(coalesceExpression.Left, context, out var coalesceLeftLength) &&
