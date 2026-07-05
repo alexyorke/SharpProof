@@ -1896,6 +1896,8 @@ namespace PurelySharp.Test
             Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
             Assert.That(source, Does.Contain("\"ir.runtime-hazard.invalid-cast.formula-fallback\""));
             Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateExactRuntimeInvalidCastTrigger"));
+            Assert.That(irTriggerSource, Does.Contain("private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
             Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateReferenceNullCondition"));
         }
@@ -2148,7 +2150,7 @@ namespace PurelySharp.Test
                 .GroupBy(static provenance => provenance, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-            Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(17));
+            Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(16));
             Assert.That(
                 runtimeHazardFormulaFallbackLocations.All(static location =>
                     location.Path.StartsWith("PurelySharp.Symbolic/", StringComparison.Ordinal)),
@@ -2157,7 +2159,7 @@ namespace PurelySharp.Test
                 runtimeHazardFormulaFallbackCountsByPath,
                 Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs"] = 9,
+                    ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs"] = 8,
                     ["PurelySharp.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"] = 8,
                 }));
             Assert.That(
@@ -2176,7 +2178,7 @@ namespace PurelySharp.Test
                     ["ir.runtime-hazard.divide-by-zero.formula-fallback"] = 1,
                     ["ir.runtime-hazard.dynamic-null-binding.formula-fallback"] = 1,
                     ["ir.runtime-hazard.index.out-of-range.formula-fallback"] = 1,
-                    ["ir.runtime-hazard.invalid-cast.formula-fallback"] = 2,
+                    ["ir.runtime-hazard.invalid-cast.formula-fallback"] = 1,
                     ["ir.runtime-hazard.nullable-value.without-value.formula-fallback"] = 1,
                     ["ir.runtime-hazard.null-dereference.formula-fallback"] = 1,
                     ["ir.runtime-hazard.unbox-null.formula-fallback"] = 1,

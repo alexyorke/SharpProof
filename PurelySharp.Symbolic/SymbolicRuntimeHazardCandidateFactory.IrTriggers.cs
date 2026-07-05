@@ -13,6 +13,8 @@ namespace PurelySharp.Symbolic
 {
     internal sealed partial class SymbolicRuntimeHazardQueryService
     {
+        private const string InvalidCastFormulaFallbackProvenance = "ir.runtime-hazard.invalid-cast.formula-fallback";
+
         private static bool TryCreateDirectThrowTrigger(
             SyntaxNode throwNode,
             out RuntimeHazardTrigger trigger)
@@ -745,17 +747,73 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            trigger = CreateInvalidCastFormulaBackedTrigger(
+                expression,
+                semanticModel,
+                cancellationToken,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest),
+                "ir.runtime-hazard.invalid-cast.translated");
+            return true;
+        }
+
+        private static bool TryCreateExactRuntimeInvalidCastTrigger(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardTrigger trigger)
+        {
+            SymbolicTerm? subject = null;
+            _ = TryCreateOptionalReferenceSubject(expression, semanticModel, cancellationToken, out subject);
+            if (TryCreateReferenceNullCondition(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.runtime-hazard.reference.non-null.guard",
+                    out var nullCondition) &&
+                TryEncodeIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.InvalidCast,
+                    subject,
+                    new SymbolicNotCondition(nullCondition),
+                    expression,
+                    "ir.runtime-hazard.invalid-cast.exact-mismatch",
+                    out trigger))
+            {
+                return true;
+            }
+
+            trigger = CreateInvalidCastFormulaBackedTrigger(
+                expression,
+                semanticModel,
+                cancellationToken,
+                new SmtBooleanConstant(true),
+                translatedProvenance: null);
+            return true;
+        }
+
+        private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtFormula mismatchTrigger,
+            string? translatedProvenance)
+        {
             var triggerFormula = Conjoin(
                 CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
-                new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest));
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                expression,
-                SymbolicExceptionPreconditionKind.InvalidCast,
-                subject: null,
-                triggerFormula,
-                "ir.runtime-hazard.invalid-cast.translated",
-                "ir.runtime-hazard.invalid-cast.formula-fallback");
-            return true;
+                mismatchTrigger);
+            return translatedProvenance != null
+                ? CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                    expression,
+                    SymbolicExceptionPreconditionKind.InvalidCast,
+                    subject: null,
+                    triggerFormula,
+                    translatedProvenance,
+                    InvalidCastFormulaFallbackProvenance)
+                : CreateFormulaBackedExceptionPreconditionTrigger(
+                    expression,
+                    SymbolicExceptionPreconditionKind.InvalidCast,
+                    subject: null,
+                    triggerFormula,
+                    InvalidCastFormulaFallbackProvenance);
         }
 
         private static bool TryCreateDynamicNullBindingTrigger(

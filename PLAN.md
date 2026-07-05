@@ -209,8 +209,10 @@ path-fact, hazard, and ownership flows.
   state pipeline without dropping unsupported switch/pattern shapes.
 - Multidimensional array element-access and rank-generic `Array.GetValue`
   runtime hazards now emit IR `SymbolicExceptionPreconditionAtom` bounds
-  triggers before formula-backed compatibility. The fallback inventory count
-  is unchanged because Index/Range and other unsupported element-access or
+  triggers before formula-backed compatibility. Invalid-cast runtime hazards
+  now also centralize exact-runtime-mismatch and runtime-type-test fallback
+  shaping behind shared IR trigger helpers, reducing the fallback inventory to
+  16 lines while Index/Range and other unsupported element-access or
   invocation shapes still keep the legacy path alive.
 - Analyzer PS0010/PS0011 site reporting now also recognizes definite
   `Array.GetValue` index hazards by reusing shared `Array.GetValue` in-range

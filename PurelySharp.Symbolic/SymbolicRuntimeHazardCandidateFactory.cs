@@ -837,14 +837,35 @@ namespace PurelySharp.Symbolic
                     return false;
                 }
 
-                mismatchTrigger = SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                    castExpression.Expression,
-                    castExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var exactRuntimeType)
-                    ? new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
-                    : CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
+                if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                        castExpression.Expression,
+                        castExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var exactRuntimeType))
+                {
+                    if (SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
+                    {
+                        return false;
+                    }
+
+                    if (TryCreateExactRuntimeInvalidCastTrigger(
+                            castExpression.Expression,
+                            semanticModel,
+                            cancellationToken,
+                            out var exactInvalidCastTrigger))
+                    {
+                        candidate = new RuntimeHazardCandidate(
+                            castExpression,
+                            SymbolicRuntimeHazardKind.InvalidCast,
+                            exactInvalidCastTrigger,
+                            ExceptionTypes.InvalidCastException,
+                            ExceptionCategories.DefiniteInvalidCast);
+                        return true;
+                    }
+                }
+
+                mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
             }
             else
             {
@@ -883,12 +904,33 @@ namespace PurelySharp.Symbolic
                     return true;
                 }
 
-                mismatchTrigger = exactRuntimeType != null
-                    ? new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
-                        exactRuntimeType,
-                        targetType,
-                        semanticModel.Compilation))
-                    : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
+                if (exactRuntimeType != null)
+                {
+                    if (SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
+                            exactRuntimeType,
+                            targetType,
+                            semanticModel.Compilation))
+                    {
+                        return false;
+                    }
+
+                    if (TryCreateExactRuntimeInvalidCastTrigger(
+                            castExpression.Expression,
+                            semanticModel,
+                            cancellationToken,
+                            out var exactInvalidCastTrigger))
+                    {
+                        candidate = new RuntimeHazardCandidate(
+                            castExpression,
+                            SymbolicRuntimeHazardKind.InvalidCast,
+                            exactInvalidCastTrigger,
+                            ExceptionTypes.InvalidCastException,
+                            ExceptionCategories.DefiniteInvalidCast);
+                        return true;
+                    }
+                }
+
+                mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_reference_cast");
             }
 
             if (mismatchTrigger is SmtBooleanConstant { Value: false })
@@ -896,10 +938,13 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var trigger = Conjoin(
-                CreateNonNullTrigger(castExpression.Expression, castExpression, semanticModel, cancellationToken),
-                mismatchTrigger);
-            if (trigger is SmtBooleanConstant { Value: false })
+            var formulaTrigger = CreateInvalidCastFormulaBackedTrigger(
+                castExpression.Expression,
+                semanticModel,
+                cancellationToken,
+                mismatchTrigger,
+                translatedProvenance: null);
+            if (formulaTrigger.Condition is SmtBooleanConstant { Value: false })
             {
                 return false;
             }
@@ -907,12 +952,7 @@ namespace PurelySharp.Symbolic
             candidate = new RuntimeHazardCandidate(
                 castExpression,
                 SymbolicRuntimeHazardKind.InvalidCast,
-                CreateFormulaBackedExceptionPreconditionTrigger(
-                    castExpression,
-                    SymbolicExceptionPreconditionKind.InvalidCast,
-                    subject: null,
-                    trigger,
-                    "ir.runtime-hazard.invalid-cast.formula-fallback"),
+                formulaTrigger,
                 ExceptionTypes.InvalidCastException,
                 ExceptionCategories.DefiniteInvalidCast);
             return true;
