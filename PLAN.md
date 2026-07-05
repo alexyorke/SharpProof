@@ -254,6 +254,10 @@ path-fact, hazard, and ownership flows.
   `System.Array.Empty<T>()` invocation lengths now lower through the IR
   indexing partial as integer constant 0, restoring empty-array length
   proofs that depended on the legacy formula-side `Array.Empty` recognizer.
+  `string.Empty` member access now lowers through the IR string lowerer as
+  a string constant, so `string.Empty.Length` proofs surface natively
+  through `TryLowerStringTerm` instead of depending on the legacy
+  `TryGetKnownStringLength` formula-side recognizer.
 - String `Substring(start).Length` and `Substring(start, length).Length` now
   lower through the IR indexing partial as integer terms. Unsupported
   `System.Range`/`System.Index` symbol flows at the reachability boundary now

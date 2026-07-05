@@ -481,6 +481,19 @@ namespace PurelySharp.Symbolic.Ir
                 return true;
             }
 
+            if (expression is MemberAccessExpressionSyntax stringEmptyMemberAccess &&
+                context.SemanticModel.GetSymbolInfo(stringEmptyMemberAccess, context.CancellationToken).Symbol is IFieldSymbol
+                {
+                    IsStatic: true,
+                    Name: nameof(string.Empty),
+                    Type.SpecialType: SpecialType.System_String
+                } stringEmptyField &&
+                IsSystemStringType(stringEmptyField.ContainingType))
+            {
+                term = new SymbolicStringConstantTerm(string.Empty);
+                return true;
+            }
+
             if (TryLowerStringExpressionTerm(expression, context, out term))
             {
                 return true;
