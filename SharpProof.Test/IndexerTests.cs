@@ -12,7 +12,7 @@ namespace SharpProof.Test
     public class IndexerTests
     {
         [Test]
-        public async Task ReadingFromIndexer_IsPure()
+        public async Task ReadingFromGenericDictionaryBackedIndexer_WithUnresolvedKeyComparer_IsImpure()
         {
             var test = @"
 using System;
@@ -34,13 +34,12 @@ public class TestClass
     private readonly CustomDictionary<string, int> _dictionary = new CustomDictionary<string, int>();
 
     [EnforcePure]
-    public int GetValue(string key)
+    public int {|SP0002:GetValue|}(string key)
     {
-        // Reading from an indexer should be pure
+        // The wrapped generic dictionary indexer may dispatch through an unresolved key comparer.
         return _dictionary[key];
     }
 }";
-
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }

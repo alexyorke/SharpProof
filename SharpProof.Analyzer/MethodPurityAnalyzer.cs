@@ -25,9 +25,15 @@ namespace SharpProof.Analyzer
         {
 
             ISymbol? declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
+            IMethodSymbol? methodSymbol = declaredSymbol as IMethodSymbol;
+            if (methodSymbol == null &&
+                declaredSymbol is IPropertySymbol propertySymbol &&
+                context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or IndexerDeclarationSyntax { ExpressionBody: not null })
+            {
+                methodSymbol = propertySymbol.GetMethod;
+            }
 
-
-            if (!(declaredSymbol is IMethodSymbol methodSymbol))
+            if (methodSymbol == null)
             {
                 return;
             }
@@ -207,7 +213,7 @@ namespace SharpProof.Analyzer
 
             else if (effectiveMissingPuritySuggestions.IsEnabled && isPure && !hasPurityEnforcementAttribute && !hasAllowSynchronization && !hasImpureAttribute)
             {
-                if (context.Node is LocalFunctionStatementSyntax)
+                if (context.Node is LocalFunctionStatementSyntax or PropertyDeclarationSyntax or IndexerDeclarationSyntax)
                 {
                     return;
                 }
@@ -666,6 +672,8 @@ namespace SharpProof.Analyzer
             return node switch
             {
                 MethodDeclarationSyntax m => m.Identifier.GetLocation(),
+                PropertyDeclarationSyntax p => p.Identifier.GetLocation(),
+                IndexerDeclarationSyntax i => i.ThisKeyword.GetLocation(),
 
                 AccessorDeclarationSyntax a =>
                     a.Parent?.Parent switch
@@ -675,6 +683,7 @@ namespace SharpProof.Analyzer
                         _ => a.Keyword.GetLocation()
                     } ?? a.Keyword.GetLocation(),
                 ConstructorDeclarationSyntax c => c.Identifier.GetLocation(),
+                ConversionOperatorDeclarationSyntax c => c.Type.GetLocation(),
                 OperatorDeclarationSyntax o => o.OperatorToken.GetLocation(),
                 LocalFunctionStatementSyntax l => l.Identifier.GetLocation(),
 

@@ -65,6 +65,11 @@ namespace SharpProof
                 case SharpProofDiagnostics.MissingEnforcePureAttributeId:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declMissing))
                     {
+                        if (declMissing is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
+                        {
+                            break;
+                        }
+
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Add [EnforcePure] attribute",
@@ -140,6 +145,9 @@ namespace SharpProof
                     case MethodDeclarationSyntax:
                     case ConstructorDeclarationSyntax:
                     case OperatorDeclarationSyntax:
+                    case ConversionOperatorDeclarationSyntax:
+                    case IndexerDeclarationSyntax:
+                    case PropertyDeclarationSyntax:
                     case AccessorDeclarationSyntax:
                     case LocalFunctionStatementSyntax:
                         declaration = node;
@@ -186,20 +194,8 @@ namespace SharpProof
         {
             return host switch
             {
-                MethodDeclarationSyntax m => m.WithAttributeLists(lists),
-                ConstructorDeclarationSyntax c => c.WithAttributeLists(lists),
-                OperatorDeclarationSyntax o => o.WithAttributeLists(lists),
-                AccessorDeclarationSyntax a => a.WithAttributeLists(lists),
+                MemberDeclarationSyntax m => m.WithAttributeLists(lists),
                 LocalFunctionStatementSyntax l => l.WithAttributeLists(lists),
-                ClassDeclarationSyntax c => c.WithAttributeLists(lists),
-                StructDeclarationSyntax s => s.WithAttributeLists(lists),
-                InterfaceDeclarationSyntax i => i.WithAttributeLists(lists),
-                RecordDeclarationSyntax r => r.WithAttributeLists(lists),
-                EnumDeclarationSyntax e => e.WithAttributeLists(lists),
-                DelegateDeclarationSyntax d => d.WithAttributeLists(lists),
-                PropertyDeclarationSyntax p => p.WithAttributeLists(lists),
-                EventDeclarationSyntax ev => ev.WithAttributeLists(lists),
-                FieldDeclarationSyntax f => f.WithAttributeLists(lists),
                 ParameterSyntax p => p.WithAttributeLists(lists),
                 CompilationUnitSyntax u => u.WithAttributeLists(lists),
                 _ => host
@@ -254,8 +250,7 @@ namespace SharpProof
         private static bool IsEnforcePureOrPureAttribute(INamedTypeSymbol? t)
         {
             if (t == null) return false;
-            return t.Name is "EnforcePureAttribute" or "PureAttribute"
-                   && t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+            return t.Name is "EnforcePureAttribute" or "PureAttribute";
         }
 
         private static bool IsConflictingPurityBoundaryAttribute(INamedTypeSymbol? t) =>

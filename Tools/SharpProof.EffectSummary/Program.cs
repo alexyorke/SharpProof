@@ -1027,6 +1027,11 @@ internal static class RuntimeAssemblyResolver
         }
 
         var digits = new string(framework.Skip(3).TakeWhile(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            throw new ArgumentException($"Unsupported framework moniker '{framework}'. Expected netX.Y.");
+        }
+
         return int.Parse(digits);
     }
 
@@ -1125,21 +1130,30 @@ internal static class RuntimeAssemblyResolver
 
     private static IEnumerable<string> EnumerateSharedRuntimeRoots()
     {
-        var roots = new[]
+        var sharedDirectories = new[]
         {
-            Environment.GetEnvironmentVariable("DOTNET_ROOT"),
-            Environment.GetEnvironmentVariable("DOTNET_ROOT(x86)"),
-            CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared", "Microsoft.NETCore.App"),
-            CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet", "shared", "Microsoft.NETCore.App"),
-            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "share", "dotnet", "shared", "Microsoft.NETCore.App"),
-            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "local", "share", "dotnet", "shared", "Microsoft.NETCore.App"),
+            CombineIfRooted(Environment.GetEnvironmentVariable("DOTNET_ROOT"), "shared"),
+            CombineIfRooted(Environment.GetEnvironmentVariable("DOTNET_ROOT(x86)"), "shared"),
+            CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared"),
+            CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet", "shared"),
+            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "share", "dotnet", "shared"),
+            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "local", "share", "dotnet", "shared"),
         };
 
-        foreach (var root in roots)
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sharedDirectory in sharedDirectories)
         {
-            if (!string.IsNullOrWhiteSpace(root))
+            if (string.IsNullOrWhiteSpace(sharedDirectory) || !Directory.Exists(sharedDirectory))
             {
-                yield return root;
+                continue;
+            }
+
+            foreach (var runtimeRoot in Directory.EnumerateDirectories(sharedDirectory))
+            {
+                if (seen.Add(runtimeRoot))
+                {
+                    yield return runtimeRoot;
+                }
             }
         }
     }
@@ -1742,14 +1756,14 @@ internal static class AssemblyEffectSummarizer
                     summary.ExactSymbolKey,
                     bySymbol,
                     exceptionMemo,
-                    exceptionVisiting);
+                    exceptionVisiting).Result;
                 var transitiveExceptionSources = OrderExceptionSourcePaths(
                     transitiveExceptionEdges
                         .Select(edge => new ExceptionSourcePath(edge.ExceptionType, edge.SourcePath))
                         .DistinctBy(CreateExceptionSourcePathKey));
                 return summary with
                 {
-                    TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting),
+                    TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting).Result,
                     TransitiveThrownExceptionTypes = transitiveExceptionSources
                         .Select(source => source.ExceptionType)
                         .Distinct(StringComparer.Ordinal)
@@ -1762,7 +1776,7 @@ internal static class AssemblyEffectSummarizer
             .ToList();
     }
 
-    private static string[] VisitRootCandidates(
+    private static (string[] Result, bool DependsOnCycle) VisitRootCandidates(
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         Dictionary<string, string[]> memo,
@@ -1770,35 +1784,42 @@ internal static class AssemblyEffectSummarizer
     {
         if (memo.TryGetValue(symbol, out var cached))
         {
-            return cached;
+            return (cached, false);
         }
 
         if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
         {
-            return Array.Empty<string>();
+            return (Array.Empty<string>(), false);
         }
 
         var roots = new SortedSet<string>(summary.RootCandidates, StringComparer.Ordinal);
         if (!visiting.Add(symbol))
         {
-            return roots.ToArray();
+            return (roots.ToArray(), true);
         }
 
+        var dependsOnCycle = false;
         foreach (var call in summary.Calls)
         {
             if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _))
             {
-                roots.UnionWith(VisitRootCandidates(resolvedCallKey, bySymbol, memo, visiting));
+                var nestedResult = VisitRootCandidates(resolvedCallKey, bySymbol, memo, visiting);
+                roots.UnionWith(nestedResult.Result);
+                dependsOnCycle |= nestedResult.DependsOnCycle;
             }
         }
 
         visiting.Remove(symbol);
         var result = roots.ToArray();
-        memo[symbol] = result;
-        return result;
+        if (!dependsOnCycle)
+        {
+            memo[symbol] = result;
+        }
+
+        return (result, dependsOnCycle);
     }
 
-    private static ThrownExceptionEdgeSummary[] VisitThrownExceptionEdges(
+    private static (ThrownExceptionEdgeSummary[] Result, bool DependsOnCycle) VisitThrownExceptionEdges(
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         Dictionary<string, ThrownExceptionEdgeSummary[]> memo,
@@ -1806,12 +1827,12 @@ internal static class AssemblyEffectSummarizer
     {
         if (memo.TryGetValue(symbol, out var cached))
         {
-            return cached;
+            return (cached, false);
         }
 
         if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
         {
-            return Array.Empty<ThrownExceptionEdgeSummary>();
+            return (Array.Empty<ThrownExceptionEdgeSummary>(), false);
         }
 
         var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
@@ -1827,14 +1848,17 @@ internal static class AssemblyEffectSummarizer
 
         if (!visiting.Add(symbol))
         {
-            return OrderThrownExceptionEdges(thrownSources.Values);
+            return (OrderThrownExceptionEdges(thrownSources.Values), true);
         }
 
+        var dependsOnCycle = false;
         foreach (var propagationSite in summary.ExceptionPropagationSites)
         {
             if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol, out var resolvedPropagationKey, out _))
             {
-                foreach (var nestedSource in VisitThrownExceptionEdges(resolvedPropagationKey, bySymbol, memo, visiting))
+                var nestedResult = VisitThrownExceptionEdges(resolvedPropagationKey, bySymbol, memo, visiting);
+                dependsOnCycle |= nestedResult.DependsOnCycle;
+                foreach (var nestedSource in nestedResult.Result)
                 {
                     if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType))
                     {
@@ -1866,8 +1890,12 @@ internal static class AssemblyEffectSummarizer
 
         visiting.Remove(symbol);
         var result = OrderThrownExceptionEdges(thrownSources.Values);
-        memo[symbol] = result;
-        return result;
+        if (!dependsOnCycle)
+        {
+            memo[symbol] = result;
+        }
+
+        return (result, dependsOnCycle);
     }
 
     private static string CreateExceptionSourcePathKey(ExceptionSourcePath sourcePath)

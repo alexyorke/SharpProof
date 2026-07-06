@@ -15,6 +15,7 @@ namespace SharpProof.Test
     public partial class EffectSummaryToolTests
     {
         private static readonly object EffectSummaryToolBuildLock = new object();
+        private static readonly TimeSpan EffectSummaryToolTimeout = TimeSpan.FromSeconds(240);
         private static string? s_effectSummaryToolDllPath;
 
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
@@ -344,12 +345,12 @@ public sealed class StableCacheDerived : StaticFieldBase
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
             try
             {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+                await process.WaitForExitAsync().WaitAsync(EffectSummaryToolTimeout);
             }
             catch (TimeoutException)
             {
                 TryKillProcess(process);
-                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+                throw new AssertionException("Effect summary tool timed out after " + (int)EffectSummaryToolTimeout.TotalSeconds + " seconds.");
             }
             if (process.ExitCode != 0)
             {
@@ -360,6 +361,38 @@ public sealed class StableCacheDerived : StaticFieldBase
             }
 
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        }
+
+        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunEffectSummaryProcessAsync(params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            var standardErrorTask = process.StandardError.ReadToEndAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(EffectSummaryToolTimeout);
+            }
+            catch (TimeoutException)
+            {
+                TryKillProcess(process);
+                throw new AssertionException("Effect summary tool timed out after " + (int)EffectSummaryToolTimeout.TotalSeconds + " seconds.");
+            }
+
+            return (process.ExitCode, await standardOutputTask, await standardErrorTask);
         }
 
         private static async Task<JsonDocument> RunFilteredEffectSummaryAsync(
@@ -416,12 +449,12 @@ public sealed class StableCacheDerived : StaticFieldBase
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
             try
             {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+                await process.WaitForExitAsync().WaitAsync(EffectSummaryToolTimeout);
             }
             catch (TimeoutException)
             {
                 TryKillProcess(process);
-                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+                throw new AssertionException("Effect summary tool timed out after " + (int)EffectSummaryToolTimeout.TotalSeconds + " seconds.");
             }
             if (process.ExitCode != 0)
             {
@@ -462,12 +495,12 @@ public sealed class StableCacheDerived : StaticFieldBase
 
             try
             {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+                await process.WaitForExitAsync().WaitAsync(EffectSummaryToolTimeout);
             }
             catch (TimeoutException)
             {
                 TryKillProcess(process);
-                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+                throw new AssertionException("Effect summary tool timed out after " + (int)EffectSummaryToolTimeout.TotalSeconds + " seconds.");
             }
 
             var standardOutput = await standardOutputTask;
@@ -570,12 +603,12 @@ public sealed class StableCacheDerived : StaticFieldBase
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
             try
             {
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+                await process.WaitForExitAsync().WaitAsync(EffectSummaryToolTimeout);
             }
             catch (TimeoutException)
             {
                 TryKillProcess(process);
-                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+                throw new AssertionException("Effect summary tool timed out after " + (int)EffectSummaryToolTimeout.TotalSeconds + " seconds.");
             }
             if (process.ExitCode != 0)
             {

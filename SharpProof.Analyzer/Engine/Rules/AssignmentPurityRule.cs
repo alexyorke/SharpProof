@@ -37,7 +37,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             else if (operation is IIncrementOrDecrementOperation incrementDecrementOperation)
             {
                 targetOperation = incrementDecrementOperation.Target;
-
+                compoundOperatorMethod = incrementDecrementOperation.OperatorMethod?.OriginalDefinition;
 
             }
             else

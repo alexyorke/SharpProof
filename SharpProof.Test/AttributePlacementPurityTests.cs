@@ -12,6 +12,7 @@ namespace SharpProof.Test
         public async Task PureAttributeOnProperty_NoPlacementDiagnostic()
         {
             var test = @"
+#pragma warning disable SP0004
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -60,6 +61,32 @@ public sealed class TestClass
 {
     [{|SP0003:EnforcePure|}]
     public int Value => 42;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task EnforcePureAttributeOnConversionOperator_NoPlacementDiagnostic()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public readonly struct Temperature
+{
+    private readonly int _celsius;
+
+    public Temperature(int celsius)
+    {
+        _celsius = celsius;
+    }
+
+    [EnforcePure]
+    public static explicit operator int(Temperature value)
+    {
+        return value._celsius;
+    }
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);

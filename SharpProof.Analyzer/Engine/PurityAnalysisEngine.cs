@@ -5086,6 +5086,14 @@ namespace SharpProof.Analyzer.Engine
                 LogDebug($"  [GetBody]   SyntaxRef {syntaxRef.Span} yielded SyntaxNode of Kind: {syntaxNode?.Kind()}");
 
 
+                if (syntaxNode is ArrowExpressionClauseSyntax arrowExpressionClauseSyntax &&
+                    (arrowExpressionClauseSyntax.Parent is PropertyDeclarationSyntax ||
+                     arrowExpressionClauseSyntax.Parent is IndexerDeclarationSyntax))
+                {
+                    LogDebug($"  [GetBody]   Found property/indexer arrow body node of Kind: {syntaxNode.Kind()}");
+                    return syntaxNode;
+                }
+
                 if (syntaxNode is MethodDeclarationSyntax ||
                     syntaxNode is LocalFunctionStatementSyntax ||
                     syntaxNode is AnonymousFunctionExpressionSyntax ||

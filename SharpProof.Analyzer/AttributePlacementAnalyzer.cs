@@ -173,6 +173,7 @@ namespace SharpProof.Analyzer
             return node is MethodDeclarationSyntax ||
                    node is AccessorDeclarationSyntax ||
                    node is ConstructorDeclarationSyntax ||
+                   node is ConversionOperatorDeclarationSyntax ||
                    node is OperatorDeclarationSyntax ||
                    node is LocalFunctionStatementSyntax;
         }

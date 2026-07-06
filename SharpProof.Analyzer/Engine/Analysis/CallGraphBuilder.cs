@@ -77,6 +77,15 @@ namespace SharpProof.Analyzer.Engine.Analysis
 						}
 					}
 
+					foreach (var incrementOrDecrement in body.Descendants().OfType<IIncrementOrDecrementOperation>())
+					{
+						if (incrementOrDecrement.OperatorMethod != null &&
+							PurityAnalysisEngine.ShouldAnalyzeCompoundAssignmentOperator(incrementOrDecrement.OperatorMethod.OriginalDefinition))
+						{
+							callees.Add(incrementOrDecrement.OperatorMethod.OriginalDefinition);
+						}
+					}
+
 					foreach (var conv in body.Descendants().OfType<IConversionOperation>())
 					{
 						var method = conv.Conversion.MethodSymbol;

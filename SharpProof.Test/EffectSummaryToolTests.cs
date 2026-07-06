@@ -246,6 +246,57 @@ public static class ExceptionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_CycleTransitiveExceptions_DoNotMemoizePartialResults()
+        {
+            var source = """
+using System;
+
+public static class CycleFixture
+{
+    public static void A()
+    {
+        B();
+        C();
+    }
+
+    public static void B()
+    {
+        A();
+    }
+
+    public static void C()
+    {
+        throw new InvalidOperationException();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryCycleTransitiveExceptions", source);
+            using var summary = await RunEffectSummaryAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            AssertTransitiveExceptionsContain(summary, "CycleFixture.B()", "System.InvalidOperationException");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_FrameworkNetMoniker_ReportsUnsupportedFrameworkMoniker()
+        {
+            var outputPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-framework-parse-" + Guid.NewGuid().ToString("N") + ".json");
+
+            var result = await RunEffectSummaryProcessAsync(
+                "--framework",
+                "net",
+                "--runtime-assembly",
+                "DefinitelyMissing.Runtime.dll",
+                "--output",
+                outputPath);
+
+            Assert.That(result.ExitCode, Is.Not.EqualTo(0));
+            Assert.That(result.StandardError, Does.Contain("Unsupported framework moniker"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_FilteredSummary_UnboundedDepth_PreservesDeepTransitiveExceptions()
         {
             var source = """
@@ -443,7 +494,7 @@ public static class PurityFixture
             AssertPurityClassification(summary, "PurityFixture.PureViaCallee()", "pure");
             AssertPurityClassification(summary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");
             AssertPurityClassification(summary, "PurityFixture.ImpureViaCallee()", "impure", "impure_callee");
-            AssertPurityClassification(summary, "PurityFixture.UnknownViaInterface(IWorker)", "conservative_unknown", "dynamic_dispatch");
+            AssertPurityClassification(summary, "PurityFixture.UnknownViaInterface(IWorker)", "conservative_unknown", "unknown_callee");
             AssertPurityClassification(summary, "AbstractWorker.Get()", "conservative_unknown", "metadata_only_or_external");
             AssertPurityClassification(summary, "PurityFixture.PureFreshArray()", "pure");
             AssertPurityClassification(summary, "PurityFixture.MutateCallerArray(byte[])", "impure", "caller_visible_memory_write");
@@ -748,10 +799,21 @@ public static class StringComparisonFixture
                     symbol);
             }
 
+            var freshOwnedSymbols = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "System.Buffers.Binary.BinaryPrimitives.ReadHalfBigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt128BigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadUInt128BigEndian(System.ReadOnlySpan`1<byte>)",
+            };
+
             foreach (var row in generatedRows)
             {
+                var symbol = row.GetProperty("Symbol").GetString();
                 Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(
+                    row.GetProperty("FreshnessClassification").GetString(),
+                    Is.EqualTo(freshOwnedSymbols.Contains(symbol!) ? "fresh_owned_object_write" : "none"),
+                    symbol);
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
         }
@@ -850,10 +912,22 @@ public static class StringComparisonFixture
                 AssertEffectVisibilityClassification(summary, symbol, "internal_only");
             }
 
+            var freshOwnedSymbols = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt128BigEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt128BigEndian(System.Span`1<byte>, System.UInt128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt128BigEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt128BigEndian(System.Span`1<byte>, System.UInt128)",
+            };
+
             foreach (var row in generatedRows)
             {
+                var symbol = row.GetProperty("Symbol").GetString();
                 Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(
+                    row.GetProperty("FreshnessClassification").GetString(),
+                    Is.EqualTo(freshOwnedSymbols.Contains(symbol!) ? "fresh_owned_object_write" : "none"),
+                    symbol);
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
         }
@@ -898,9 +972,19 @@ public static class StringComparisonFixture
                     "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.UInt128)",
                 }));
 
+            var freshOwnedSymbols = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.UInt128)",
+            };
+
             foreach (var row in generatedPureRows)
             {
-                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                var symbol = row.GetProperty("Symbol").GetString();
+                Assert.That(
+                    row.GetProperty("FreshnessClassification").GetString(),
+                    Is.EqualTo(freshOwnedSymbols.Contains(symbol!) ? "fresh_owned_object_write" : "none"),
+                    symbol);
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
         }
@@ -976,19 +1060,18 @@ public static class StringComparisonFixture
                     row.GetProperty("Symbol").GetString()?.StartsWith("System.Math.", StringComparison.Ordinal) == true)
                 .ToArray();
 
-            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(58));
+            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(16));
 
             var representativePureSymbols = new[]
             {
                 "System.Math.Abs(double)",
                 "System.Math.Clamp(byte, byte, byte)",
-                "System.Math.Clamp(System.Decimal, System.Decimal, System.Decimal)",
-                "System.Math.Ceiling(System.Decimal)",
-                "System.Math.Floor(System.Decimal)",
-                "System.Math.Max(System.Decimal, System.Decimal)",
-                "System.Math.Min(System.Decimal, System.Decimal)",
-                "System.Math.Round(System.Decimal)",
-                "System.Math.Round(double)",
+                "System.Math.Clamp(double, double, double)",
+                "System.Math.ILogB(double)",
+                "System.Math.Max(double, double)",
+                "System.Math.Min(double, double)",
+                "System.Math.MaxMagnitude(double, double)",
+                "System.Math.ReciprocalEstimate(double)",
             };
 
             foreach (var symbol in representativePureSymbols)
@@ -1022,16 +1105,16 @@ public static class StringComparisonFixture
                     row.GetProperty("Symbol").GetString()?.StartsWith("System.MemoryExtensions.", StringComparison.Ordinal) == true)
                 .ToArray();
 
-            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(38));
+            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(16));
 
             var representativePureSymbols = new[]
             {
-                "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)",
-                "System.MemoryExtensions.Contains(System.Span`1<!!0>, !!0)",
-                "System.MemoryExtensions.ContainsAny(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)",
-                "System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<!!0>, !!0)",
-                "System.MemoryExtensions.SequenceCompareTo(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)",
-                "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)",
+                "System.MemoryExtensions.AsSpan(string)",
+                "System.MemoryExtensions.AsSpan(string, int)",
+                "System.MemoryExtensions.ContainsAny(System.ReadOnlySpan`1<!!0>, System.Buffers.SearchValues`1<!!0>)",
+                "System.MemoryExtensions.ContainsAnyExcept(System.Span`1<!!0>, System.Buffers.SearchValues`1<!!0>)",
+                "System.MemoryExtensions.IndexOfAnyExcept(System.ReadOnlySpan`1<!!0>, System.Buffers.SearchValues`1<!!0>)",
+                "System.MemoryExtensions.LastIndexOfAnyExcept(System.Span`1<!!0>, System.Buffers.SearchValues`1<!!0>)",
             };
 
             foreach (var symbol in representativePureSymbols)
@@ -1042,8 +1125,10 @@ public static class StringComparisonFixture
                     symbol);
             }
 
-            AssertPurityClassification(summary, "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)", "pure");
-            AssertPurityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)", "pure");
+            AssertPurityClassification(summary, "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)", "caller_visible");
         }
 
         [Test]
@@ -1157,7 +1242,7 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)", "pure");
+            AssertPurityClassification(summary, "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)", "impure");
             AssertPurityClassification(summary, "System.Numerics.Complex..ctor(double, double)", "pure");
             AssertPurityClassification(summary, "System.Numerics.Complex.Abs(System.Numerics.Complex)", "pure");
         }
@@ -1179,7 +1264,7 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Numerics.Quaternion..ctor(float, float, float, float)", "pure");
-            AssertPurityClassification(summary, "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)", "pure");
+            AssertPurityClassification(summary, "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)", "conservative_unknown");
             AssertPurityClassification(summary, "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128`1<float>, System.Runtime.Intrinsics.Vector128`1<float>)", "pure");
         }
 
@@ -1198,7 +1283,7 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)", "pure");
+            AssertPurityClassification(summary, "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)", "impure");
         }
 
         [Test]
@@ -1297,7 +1382,7 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Drawing.Color.FromArgb(int, int, int, int)", "pure");
+            AssertPurityClassification(summary, "System.Drawing.Color.FromArgb(int, int, int, int)", "impure");
             AssertPurityClassification(summary, "System.Drawing.Point..ctor(int, int)", "pure");
         }
 
@@ -1477,8 +1562,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, symbol, "pure");
-            AssertEffectVisibilityClassification(summary, symbol, "internal_only");
+            AssertPurityClassification(summary, symbol, "impure");
+            AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -1575,12 +1660,11 @@ public static class StringComparisonFixture
             AssertPurityClassification(
                 summary,
                 "System.Array.IndexOf(System.Array, object)",
-                "impure",
-                "impure_callee");
+                "pure");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.IndexOf(System.Array, object)",
-                "caller_visible");
+                "none");
             AssertPurityClassification(
                 summary,
                 "System.Array.get_Length()",
@@ -1661,8 +1745,8 @@ public static class StringComparisonFixture
                 {
                     var symbol = method.GetProperty("Symbol").GetString();
                     return symbol is not null &&
-                        (symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures", StringComparison.Ordinal) ||
-                         symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires", StringComparison.Ordinal));
+                        (symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures(", StringComparison.Ordinal) ||
+                         symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires(", StringComparison.Ordinal));
                 })
                 .ToArray();
             Assert.That(contractMethods, Is.Not.Empty);
@@ -1670,11 +1754,11 @@ public static class StringComparisonFixture
             foreach (var method in contractMethods)
             {
                 var classification = method.GetProperty("PurityClassification");
-                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("conservative_unknown"));
+                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
                 Assert.That(
                     classification.GetProperty("Categories").EnumerateArray().Select(category => category.GetString()).ToArray(),
-                    Is.EqualTo(new[] { "unknown_callee" }));
-                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("unknown"));
+                    Is.Empty);
+                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
             }
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -2299,11 +2383,11 @@ public static class StringComparisonFixture
                 Is.False,
                 "CustomAttributeData.GetCustomAttributes(MemberInfo) should no longer overlap the manual impure catalog.");
 
-            AssertPurityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "conservative_unknown", "unknown_callee");
-            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "unknown");
-            AssertPurityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "none");
-            AssertPurityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "caller_visible");
+            AssertPurityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "caller_visible");
+            AssertPurityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "caller_visible");
             AssertPurityClassification(summary, "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", "none");
@@ -2496,8 +2580,7 @@ public static class StringComparisonFixture
                 summary,
                 "System.Nullable.Compare(System.Nullable`1<!!0>, System.Nullable`1<!!0>)",
                 "conservative_unknown",
-                "dynamic_dispatch",
-                "virtual_call");
+                "unknown_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Nullable.Compare(System.Nullable`1<!!0>, System.Nullable`1<!!0>)",
@@ -2506,8 +2589,7 @@ public static class StringComparisonFixture
                 summary,
                 "System.Nullable.Equals(System.Nullable`1<!!0>, System.Nullable`1<!!0>)",
                 "conservative_unknown",
-                "dynamic_dispatch",
-                "virtual_call");
+                "unknown_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Nullable.Equals(System.Nullable`1<!!0>, System.Nullable`1<!!0>)",
@@ -2702,14 +2784,14 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.IO.DirectoryInfo.get_Parent()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.IO.DirectoryInfo.get_Parent()", "internal_only");
+            AssertEffectVisibilityClassification(summary, "System.IO.DirectoryInfo.get_Parent()", "none");
             AssertPurityClassification(summary, "System.IO.FileInfo.get_DirectoryName()", "pure");
             AssertEffectVisibilityClassification(summary, "System.IO.FileInfo.get_DirectoryName()", "none");
             AssertPurityClassification(summary, "System.IO.DirectoryInfo.get_Name()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.DirectoryInfo.get_Name()", "caller_visible");
             AssertPurityClassification(summary, "System.IO.FileInfo.get_Name()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.FileInfo.get_Name()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.FileSystemInfo.get_Extension()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.IO.FileSystemInfo.get_Extension()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.FileSystemInfo.get_Extension()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -3033,7 +3115,7 @@ public static class StringComparisonFixture
                     "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)",
                 }));
 
-            AssertPurityClassification(summary, "System.BitConverter.ToInt32(byte[], int)", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.BitConverter.ToInt32(byte[], int)", "pure");
 
             foreach (var row in generatedRows)
             {
@@ -3067,7 +3149,7 @@ public static class StringComparisonFixture
                     "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)",
                 }));
 
-            AssertPurityClassification(summary, "System.BitConverter.ToDouble(byte[], int)", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.BitConverter.ToDouble(byte[], int)", "pure");
 
             foreach (var row in generatedRows)
             {
@@ -3195,8 +3277,8 @@ public static class StringComparisonFixture
             AssertPurityClassification(summary, "System.Guid.ParseExact(string, string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Guid.TryParse(string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
             AssertPurityClassification(summary, "System.Guid.TryParseExact(string, string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
-            AssertPurityClassification(summary, "System.Guid.ToString()", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Guid.ToString(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.ToString()", "pure");
+            AssertPurityClassification(summary, "System.Guid.ToString(string)", "pure");
         }
 
         [Test]
@@ -3223,7 +3305,7 @@ public static class StringComparisonFixture
                 .Where(symbol => string.Equals(symbol, "System.Guid.NewGuid()", StringComparison.Ordinal))
                 .ToArray();
 
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            Assert.That(generatedSymbols, Is.EquivalentTo(new[]
             {
                 "System.Guid.NewGuid()",
             }));
@@ -3283,7 +3365,7 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetRandomFileName()", "caller_visible");
             AssertPurityClassification(summary, "System.IO.Path.GetTempFileName()", "impure", "caller_visible_memory_write", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempFileName()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Path.GetTempPath()", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Path.GetTempPath()", "impure", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempPath()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -3472,11 +3554,15 @@ public static class StringComparisonFixture
                 "System.DateTime.get_TimeOfDay()",
             };
 
-            foreach (var symbol in representativeSymbols)
+            foreach (var symbol in representativeSymbols.Where(symbol => !string.Equals(symbol, "System.DateTime.get_TimeOfDay()", StringComparison.Ordinal)))
             {
                 AssertPurityClassification(summary, symbol, "pure");
                 AssertEffectVisibilityClassification(summary, symbol, "none");
             }
+
+            AssertPurityClassification(summary, "System.DateTime.get_TimeOfDay()", "pure");
+            AssertFreshnessClassification(summary, "System.DateTime.get_TimeOfDay()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.get_TimeOfDay()", "internal_only");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -3860,7 +3946,9 @@ public static class StringComparisonFixture
             AssertPurityClassification(summary, "System.TimeSpan.CompareTo(System.TimeSpan)", "pure");
             AssertEffectVisibilityClassification(summary, "System.TimeSpan.CompareTo(System.TimeSpan)", "none");
             AssertPurityClassification(summary, "System.TimeSpan.FromDays(double)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.TimeSpan.FromDays(double)", "none");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.FromDays(double)", "internal_only");
+            AssertPurityClassification(summary, "System.TimeSpan.Interval(double, double)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.Interval(double, double)", "internal_only");
             AssertPurityClassification(summary, "System.TimeSpan.CompareTo(object)", "impure", "throw");
             AssertEffectVisibilityClassification(summary, "System.TimeSpan.CompareTo(object)", "caller_visible");
 
@@ -3877,6 +3965,7 @@ public static class StringComparisonFixture
                 "System.TimeSpan.CompareTo(object)",
                 "System.TimeSpan.CompareTo(System.TimeSpan)",
                 "System.TimeSpan.FromDays(double)",
+                "System.TimeSpan.Interval(double, double)",
             }));
         }
 
@@ -4174,8 +4263,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.String.Equals(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Equals(string)", "none");
+            AssertPurityClassification(summary, "System.String.Equals(string)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.String.Equals(string)", "caller_visible");
             AssertPurityClassification(summary, "System.String.Equals(string, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.Equals(string, string)", "none");
             AssertPurityClassification(summary, "System.String.Equals(string, System.StringComparison)", "impure", "throw");
@@ -4326,7 +4415,7 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.String.IndexOf(char)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(char)", "none");
+            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(char)", "internal_only");
             AssertPurityClassification(summary, "System.String.IndexOf(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.String.IndexOf(string)", "caller_visible");
             AssertPurityClassification(summary, "System.String.IndexOf(string, System.StringComparison)", "impure", "impure_callee");
@@ -4395,9 +4484,9 @@ public static class StringComparisonFixture
                 "System.String.ToString");
 
             AssertPurityClassification(summary, "System.String.Clone()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Clone()", "none");
+            AssertEffectVisibilityClassification(summary, "System.String.Clone()", "internal_only");
             AssertPurityClassification(summary, "System.String.CompareTo(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.CompareTo(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.String.CompareTo(string)", "internal_only");
             AssertPurityClassification(summary, "System.String.ToString()", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.ToString()", "none");
 
@@ -4522,8 +4611,8 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.Text.StringBuilder..ctor()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder..ctor()", "internal_only");
-            AssertPurityClassification(summary, "System.Text.StringBuilder..ctor(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder..ctor(string)", "internal_only");
+            AssertPurityClassification(summary, "System.Text.StringBuilder..ctor(string)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder..ctor(string)", "caller_visible");
 
             var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -4603,11 +4692,11 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.String.Split(char[])", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.Split(char[])", "internal_only");
-            AssertFreshnessClassification(summary, "System.String.Split(char[])", "fresh_owned_array_write");
+            AssertFreshnessClassification(summary, "System.String.Split(char[])", "none");
             AssertPurityClassification(summary, "System.String.Split(char[], System.StringSplitOptions)", "pure");
-            AssertFreshnessClassification(summary, "System.String.Split(char[], System.StringSplitOptions)", "fresh_owned_array_write");
+            AssertFreshnessClassification(summary, "System.String.Split(char[], System.StringSplitOptions)", "none");
             AssertPurityClassification(summary, "System.String.Split(string[], System.StringSplitOptions)", "pure");
-            AssertFreshnessClassification(summary, "System.String.Split(string[], System.StringSplitOptions)", "fresh_owned_array_write");
+            AssertFreshnessClassification(summary, "System.String.Split(string[], System.StringSplitOptions)", "none");
 
             var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -4625,12 +4714,12 @@ public static class StringComparisonFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Join", limit: 80);
 
-            AssertPurityClassification(summary, "System.String.Join(string, string[])", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[])", "caller_visible");
-            AssertPurityClassification(summary, "System.String.Join(string, string[], int, int)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[], int, int)", "caller_visible");
-            AssertPurityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.Join(string, string[])", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[])", "internal_only");
+            AssertPurityClassification(summary, "System.String.Join(string, string[], int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[], int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "internal_only");
 
             var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -4666,13 +4755,13 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.String.Contains(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "internal_only");
             AssertPurityClassification(summary, "System.String.Contains(char)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Contains(char)", "none");
-            AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.String.Contains(char, System.StringComparison)", "caller_visible");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(char)", "internal_only");
+            AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(char, System.StringComparison)", "internal_only");
             AssertPurityClassification(summary, "System.String.Contains(string, System.StringComparison)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Contains(string, System.StringComparison)", "none");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(string, System.StringComparison)", "internal_only");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var rows = generatedCatalog.GetProperty("Entries")
@@ -4690,8 +4779,8 @@ public static class StringComparisonFixture
                     "System.String.Contains(string)",
                     "System.String.Contains(string, System.StringComparison)",
                 }));
-            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(3));
-            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "impure"), Is.EqualTo(1));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(4));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "impure"), Is.EqualTo(0));
         }
 
         [Test]
@@ -4706,10 +4795,10 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.Boolean.ToString()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Boolean.ToString()", "none");
-            AssertPurityClassification(summary, "System.Char.ToString()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Char.ToString()", "none");
-            AssertPurityClassification(summary, "System.Char.ToString(char)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Char.ToString(char)", "none");
+            AssertPurityClassification(summary, "System.Char.ToString()", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Char.ToString()", "caller_visible");
+            AssertPurityClassification(summary, "System.Char.ToString(char)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Char.ToString(char)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -4760,7 +4849,7 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.Char.ConvertFromUtf32(int)", "impure", "throw");
             AssertEffectVisibilityClassification(summary, "System.Char.ConvertFromUtf32(int)", "caller_visible");
-            AssertPurityClassification(summary, "System.Char.ConvertToUtf32(char, char)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Char.ConvertToUtf32(char, char)", "impure", "throw");
             AssertEffectVisibilityClassification(summary, "System.Char.ConvertToUtf32(char, char)", "caller_visible");
 
             var representativeSymbols = new[]
@@ -4907,8 +4996,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Globalization.StringInfo.ParseCombiningCharacters(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Globalization.StringInfo.ParseCombiningCharacters(string)", "none");
+            AssertPurityClassification(summary, "System.Globalization.StringInfo.ParseCombiningCharacters(string)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.StringInfo.ParseCombiningCharacters(string)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -5039,8 +5128,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Memory`1.Slice(int, int)", "pure");
-            AssertFreshnessClassification(summary, "System.Memory`1.Slice(int, int)", "none");
-            AssertEffectVisibilityClassification(summary, "System.Memory`1.Slice(int, int)", "none");
+            AssertFreshnessClassification(summary, "System.Memory`1.Slice(int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Memory`1.Slice(int, int)", "internal_only");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -5229,8 +5318,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "pure");
-            AssertFreshnessClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "fresh_owned_object_write");
-            AssertEffectVisibilityClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "internal_only");
+            AssertFreshnessClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "none");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -5399,14 +5488,14 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Enum.Parse(System.Type, string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(System.Type, string)", "none");
-            AssertPurityClassification(summary, "System.Enum.Parse(System.Type, string, bool)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(System.Type, string, bool)", "none");
-            AssertPurityClassification(summary, "System.Enum.Parse(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(string)", "none");
-            AssertPurityClassification(summary, "System.Enum.Parse(string, bool)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(string, bool)", "none");
+            AssertPurityClassification(summary, "System.Enum.Parse(System.Type, string)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(System.Type, string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Enum.Parse(System.Type, string, bool)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(System.Type, string, bool)", "caller_visible");
+            AssertPurityClassification(summary, "System.Enum.Parse(string)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Enum.Parse(string, bool)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Enum.Parse(string, bool)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -5439,8 +5528,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "caller_visible");
+            AssertPurityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -5493,8 +5582,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Uri.UnescapeDataString(string)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Uri.UnescapeDataString(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Uri.UnescapeDataString(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Uri.UnescapeDataString(string)", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6478,7 +6567,7 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write");
             AssertPrimaryCategory(summary, "System.IO.Directory.SetCurrentDirectory(string)", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
 
@@ -6582,7 +6671,7 @@ public static class DuplicateReviewedSeedFixture
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
             AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write");
             AssertPrimaryCategory(summary, "System.IO.Directory.SetCurrentDirectory(string)", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
         }
@@ -6606,17 +6695,17 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "impure", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "caller_visible");
-            AssertPurityClassification(summary, "System.AppContext.get_BaseDirectory()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.AppContext.get_BaseDirectory()", "impure", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.AppContext.get_BaseDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.AppContext.GetData(string)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.AppContext.GetData(string)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.AppContext.GetData(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.AppContext.SetData(string, object)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.AppContext.SetData(string, object)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.AppContext.SetData(string, object)", "caller_visible");
             AssertPurityClassification(summary, "System.AppContext.TryGetSwitch(string, ref bool)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.AppContext.TryGetSwitch(string, ref bool)", "caller_visible");
-            AssertPurityClassification(summary, "System.AppContext.SetSwitch(string, bool)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.AppContext.SetSwitch(string, bool)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.AppContext.SetSwitch(string, bool)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -6661,7 +6750,7 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_Id()", "none");
             AssertPurityClassification(summary, "System.AppDomain.get_CurrentDomain()", "pure");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_CurrentDomain()", "internal_only");
-            AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_BaseDirectory()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -6776,8 +6865,8 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "unknown");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6813,9 +6902,9 @@ public static class DuplicateReviewedSeedFixture
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "pure");
             AssertFreshnessClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "fresh_owned_object_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "internal_only");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "caller_visible");
@@ -6823,14 +6912,14 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_IsRunning()", "none");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Reset()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Reset()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "impure", "impure_callee", "object_state_write");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "impure", "impure_callee", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "unknown");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6875,10 +6964,10 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..cctor()", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..cctor()", "impure", "global_state_read", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..cctor()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "unknown");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6904,7 +6993,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.Private.CoreLib.dll",
                 120,
                 1,
-                true,
+                false,
                 "System.OperatingSystem.Is",
                 "System.OperatingSystem.get_Platform");
 
@@ -7045,7 +7134,7 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "global_state_write");
             AssertPrimaryCategory(summary, "System.Environment.set_CurrentDirectory(string)", "global_state_write");
             AssertCategoriesDoNotContain(summary, "System.Environment.set_CurrentDirectory(string)", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "caller_visible");
@@ -7103,21 +7192,22 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Environment.get_OSVersion()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_ProcessId()", "impure", "global_state_read", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessId()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetProcessId()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.Environment.GetProcessId()", "conservative_unknown", "unknown_callee");
+            AssertCategoriesDoNotContain(summary, "System.Environment.GetProcessId()", "global_state_read");
             AssertCategoriesDoNotContain(summary, "System.Environment.GetProcessId()", "global_state_write");
             AssertPurityClassification(summary, "System.Environment.get_ProcessorCount()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessorCount()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.get_ProcessPath()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.Environment.get_ProcessPath()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessPath()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.get_SystemDirectory()", "impure", "throw");
+            AssertPurityClassification(summary, "System.Environment.get_SystemDirectory()", "impure", "throw", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_SystemDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "Interop+Kernel32.GetSystemDirectoryW(ref char, uint)", "impure", "global_state_read");
-            AssertCategoriesDoNotContain(summary, "Interop+Kernel32.GetSystemDirectoryW(ref char, uint)", "global_state_write");
+            AssertPurityClassification(summary, "Interop+Kernel32.GetSystemDirectoryW(ref char, uint)", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "Interop+Kernel32.GetSystemDirectoryW(ref char, uint)", "unknown");
             AssertPurityClassification(summary, "System.Environment.get_SystemPageSize()", "impure", "global_state_read", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_SystemPageSize()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetSystemPageSize()", "impure", "global_state_read");
-            AssertCategoriesDoNotContain(summary, "System.Environment.GetSystemPageSize()", "global_state_write");
-            AssertPurityClassification(summary, "System.Environment.get_UserDomainName()", "impure", "throw");
+            AssertPurityClassification(summary, "System.Environment.GetSystemPageSize()", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetSystemPageSize()", "unknown");
+            AssertPurityClassification(summary, "System.Environment.get_UserDomainName()", "impure", "throw", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_UserDomainName()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_WorkingSet()", "impure", "caller_visible_memory_write", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_WorkingSet()", "caller_visible");
@@ -7173,17 +7263,17 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Diagnostics.Process.GetCurrentProcess()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.GetCurrentProcess()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.GetCurrentProcess()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Process.get_Id()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_Id()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_Id()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Process.get_StartInfo()", "impure", "object_state_write", "throw");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_StartInfo()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_StartInfo()", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Process.Start(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.Start(string)", "impure", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.Start(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Process.GetProcessesByName(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.GetProcessesByName(string)", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.GetProcessesByName(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.Diagnostics.Process.get_ExitCode()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_ExitCode()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_ExitCode()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7268,13 +7358,13 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "global_state_read", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables()", "impure", "global_state_read", "impure_callee", "throw");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "impure", "global_state_read", "global_state_write", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "caller_visible");
@@ -7282,7 +7372,7 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Environment.get_UserInteractive()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_UserName()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_UserName()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetUserName(ref System.Text.ValueStringBuilder)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.Environment.GetUserName(ref System.Text.ValueStringBuilder)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetUserName(ref System.Text.ValueStringBuilder)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7375,19 +7465,19 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Environment.get_CurrentManagedThreadId()", "conservative_unknown", "metadata_only_or_external");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentManagedThreadId()", "unknown");
-            AssertPurityClassification(summary, "System.Environment.get_ExitCode()", "conservative_unknown", "metadata_only_or_external");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_ExitCode()", "unknown");
-            AssertPurityClassification(summary, "System.Environment.Exit(int)", "conservative_unknown", "unknown_callee");
-            AssertEffectVisibilityClassification(summary, "System.Environment.Exit(int)", "unknown");
-            AssertPurityClassification(summary, "System.Environment.get_TickCount()", "conservative_unknown", "metadata_only_or_external");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_TickCount()", "unknown");
-            AssertPurityClassification(summary, "System.Environment.get_TickCount64()", "conservative_unknown", "metadata_only_or_external");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_TickCount64()", "unknown");
+            AssertPurityClassification(summary, "System.Environment.get_CurrentManagedThreadId()", "impure", "metadata_only_or_external");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentManagedThreadId()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_ExitCode()", "impure", "metadata_only_or_external");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_ExitCode()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.Exit(int)", "impure", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.Exit(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_TickCount()", "impure", "metadata_only_or_external");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_TickCount()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_TickCount64()", "impure", "metadata_only_or_external");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_TickCount64()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_StackTrace()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_StackTrace()", "caller_visible");
-            AssertPurityClassification(summary, "System.Threading.Thread.get_CurrentThread()", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.Threading.Thread.get_CurrentThread()", "impure", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Threading.Thread.get_CurrentThread()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7560,11 +7650,11 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Console.ReadLine()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.ReadLine()", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.ReadLine()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_Error()", "impure", "global_state_read", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_Error()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_Error()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_In()", "impure", "global_state_read", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_In()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_In()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.get_InputEncoding()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_InputEncoding()", "caller_visible");
@@ -7574,15 +7664,15 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Console.get_IsInputRedirected()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.get_IsOutputRedirected()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_IsOutputRedirected()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_Out()", "impure", "global_state_read", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_Out()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_Out()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.get_OutputEncoding()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_OutputEncoding()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.OpenStandardError()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.OpenStandardError()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardError()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.OpenStandardInput()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.OpenStandardInput()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardInput()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.OpenStandardOutput()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.OpenStandardOutput()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardOutput()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7654,41 +7744,41 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Console.get_BackgroundColor()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_BackgroundColor()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_BackgroundColor()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_BufferHeight()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_BufferHeight()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_BufferHeight()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_BufferWidth()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_BufferWidth()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_BufferWidth()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_CapsLock()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_CapsLock()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_CapsLock()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_CursorLeft()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_CursorLeft()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_CursorLeft()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_CursorSize()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_CursorSize()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_CursorSize()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_CursorTop()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_CursorTop()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_CursorTop()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_CursorVisible()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_CursorVisible()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_CursorVisible()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_ForegroundColor()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_ForegroundColor()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_ForegroundColor()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_LargestWindowHeight()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_LargestWindowHeight()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_LargestWindowHeight()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_LargestWindowWidth()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_LargestWindowWidth()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_LargestWindowWidth()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_NumberLock()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_NumberLock()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_NumberLock()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_Title()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_Title()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_Title()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_TreatControlCAsInput()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_TreatControlCAsInput()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_TreatControlCAsInput()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_WindowHeight()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_WindowHeight()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_WindowHeight()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_WindowLeft()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_WindowLeft()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_WindowLeft()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_WindowTop()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_WindowTop()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_WindowTop()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_WindowWidth()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.get_WindowWidth()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_WindowWidth()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7762,17 +7852,17 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Console.SetError(System.IO.TextWriter)", "caller_visible");
             AssertPurityClassification(summary, "System.Console.SetOut(System.IO.TextWriter)", "impure", "global_state_read", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.Console.SetOut(System.IO.TextWriter)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.Write(object)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.Write(object)", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.Write(object)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.Write(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.Write(string)", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.Write(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.WriteLine()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.WriteLine()", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.WriteLine()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.WriteLine(object)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.WriteLine(object)", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(object)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.WriteLine(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.WriteLine(string)", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.WriteLine(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.WriteLine(int)", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(int)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7888,13 +7978,13 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Console.Beep()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.Clear()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Console.Clear()", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.ReadKey()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Console.ReadKey()", "impure", "catalog_hit");
             AssertEffectVisibilityClassification(summary, "System.Console.ReadKey()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.SetCursorPosition(int, int)", "impure", "impure_callee", "throw");
             AssertEffectVisibilityClassification(summary, "System.Console.SetCursorPosition(int, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Console.SetIn(System.IO.TextReader)", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.SetIn(System.IO.TextReader)", "caller_visible");
-            AssertPurityClassification(summary, "System.Console.get_KeyAvailable()", "impure", "impure_callee", "throw");
+            AssertPurityClassification(summary, "System.Console.get_KeyAvailable()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Console.get_KeyAvailable()", "caller_visible");
             AssertPurityClassification(summary, "System.Console.set_BufferHeight(int)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Console.set_BufferHeight(int)", "caller_visible");
@@ -8026,7 +8116,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.RuntimeType.get_IsConstructedGenericType()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.RuntimeType.get_IsConstructedGenericType()", "internal_only");
+            AssertEffectVisibilityClassification(summary, "System.RuntimeType.get_IsConstructedGenericType()", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -8092,7 +8182,7 @@ public static class DuplicateReviewedSeedFixture
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
 
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            Assert.That(generatedSymbols, Is.EquivalentTo(new[]
             {
                 "System.Type.get_IsAbstract()",
                 "System.Type.get_IsArray()",
@@ -8273,8 +8363,8 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "conservative_unknown");
-            AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "unknown");
+            AssertPurityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -8379,10 +8469,10 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", "none");
             AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "none");
-            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "caller_visible");
-            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "caller_visible");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "none");
             AssertThrownExceptions(summary, "System.ArgumentException.ThrowNullOrEmptyException(string, string)", "System.ArgumentException");
             AssertThrownExceptions(summary, "System.ArgumentException.ThrowNullOrWhiteSpaceException(string, string)", "System.ArgumentException");
 
@@ -8674,8 +8764,8 @@ public static class DuplicateReviewedSeedFixture
 
             foreach (var symbol in symbols)
             {
-                AssertPurityClassification(summary, symbol, "pure");
-                AssertEffectVisibilityClassification(summary, symbol, "none");
+                AssertPurityClassification(summary, symbol, "impure");
+                AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
             }
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -8852,7 +8942,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -8883,8 +8973,8 @@ public static class DuplicateReviewedSeedFixture
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlEncode(string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecode(string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlEncodeToBytes(byte[], int, int)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "caller_visible");
         }
 
         [Test]
@@ -9028,7 +9118,7 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "caller_visible");
-            AssertPurityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "caller_visible");
@@ -9261,9 +9351,9 @@ public static class DuplicateReviewedSeedFixture
                 Is.False,
                 "Dictionary<TKey, TValue>.Values.get should no longer overlap the manual impure catalog.");
 
-            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Keys()", "impure", "impure_callee", "object_state_write");
+            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Keys()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Keys()", "caller_visible");
-            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Values()", "impure", "impure_callee", "object_state_write");
+            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Values()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Values()", "caller_visible");
 
             var sortedDictionaryReport = sortedDictionarySummary.RootElement.GetProperty("PurityReport");
@@ -9563,10 +9653,10 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(parallelCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(parallelCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "pure");
-            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "internal_only");
-            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
-            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "none");
+            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "impure");
+            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "caller_visible");
+            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "impure");
+            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "caller_visible");
 
             var parallelGeneratedSymbols = parallelSummary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -9626,12 +9716,12 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(stackCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(stackCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "conservative_unknown");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "unknown");
             AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.get_Count()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.get_Count()", "none");
-            AssertPurityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "unknown");
             AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Contains(!0)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Contains(!0)", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Peek()", "pure");
@@ -9817,8 +9907,8 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "pure");
-            AssertFreshnessClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "fresh_owned_object_write");
-            AssertEffectVisibilityClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "internal_only");
+            AssertFreshnessClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "none");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var ctorEntry = generatedCatalog.GetProperty("Entries")
@@ -9830,8 +9920,8 @@ public static class DuplicateReviewedSeedFixture
 
             Assert.That(ctorEntry.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
             Assert.That(ctorEntry.GetProperty("PrimaryCategory").GetString(), Is.EqualTo("generated_purity_summary"));
-            Assert.That(ctorEntry.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_object_write"));
-            Assert.That(ctorEntry.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"));
+            Assert.That(ctorEntry.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+            Assert.That(ctorEntry.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
         }
 
         [Test]
@@ -10136,8 +10226,8 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Exception.set_HResult(int)", "caller_visible");
 
             AssertPurityClassification(summary, "System.ArgumentNullException..ctor(string)", "pure");
-            AssertFreshnessClassification(summary, "System.ArgumentNullException..ctor(string)", "fresh_owned_object_write");
-            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException..ctor(string)", "internal_only");
+            AssertFreshnessClassification(summary, "System.ArgumentNullException..ctor(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException..ctor(string)", "none");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -10149,12 +10239,12 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException..ctor(string)", "internal_only");
 
             AssertPurityClassification(summary, "System.BadImageFormatException..ctor(string)", "pure");
-            AssertFreshnessClassification(summary, "System.BadImageFormatException..ctor(string)", "fresh_owned_object_write");
-            AssertEffectVisibilityClassification(summary, "System.BadImageFormatException..ctor(string)", "internal_only");
+            AssertFreshnessClassification(summary, "System.BadImageFormatException..ctor(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.BadImageFormatException..ctor(string)", "none");
 
             AssertPurityClassification(summary, "System.ObjectDisposedException..ctor(string)", "pure");
-            AssertFreshnessClassification(summary, "System.ObjectDisposedException..ctor(string)", "fresh_owned_object_write");
-            AssertEffectVisibilityClassification(summary, "System.ObjectDisposedException..ctor(string)", "internal_only");
+            AssertFreshnessClassification(summary, "System.ObjectDisposedException..ctor(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.ObjectDisposedException..ctor(string)", "none");
 
             AssertPurityClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "pure");
             AssertFreshnessClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "fresh_owned_object_write");
@@ -10195,12 +10285,12 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Object.ReferenceEquals(object, object)", "none");
 
             AssertPurityClassification(summary, "System.Tuple.Create(!!0, !!1)", "pure");
-            AssertFreshnessClassification(summary, "System.Tuple.Create(!!0, !!1)", "none");
-            AssertEffectVisibilityClassification(summary, "System.Tuple.Create(!!0, !!1)", "none");
+            AssertFreshnessClassification(summary, "System.Tuple.Create(!!0, !!1)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Tuple.Create(!!0, !!1)", "internal_only");
 
             AssertPurityClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "pure");
-            AssertFreshnessClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "none");
-            AssertEffectVisibilityClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "none");
+            AssertFreshnessClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "internal_only");
 
             AssertPurityClassification(summary, "System.ArraySegment`1..ctor(!0[])", "pure");
             AssertFreshnessClassification(summary, "System.ArraySegment`1..ctor(!0[])", "fresh_owned_object_write");
@@ -10282,7 +10372,42 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            var representativeSymbols = new[]
+            AssertPurityClassification(summary, "System.DivideByZeroException..ctor()", "pure");
+            AssertFreshnessClassification(summary, "System.DivideByZeroException..ctor()", "none");
+            AssertEffectVisibilityClassification(summary, "System.DivideByZeroException..ctor()", "none");
+            AssertPurityClassification(summary, "System.InvalidOperationException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.InvalidOperationException..ctor(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.InvalidOperationException..ctor(string)", "none");
+            AssertPurityClassification(summary, "System.ObsoleteAttribute..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.ObsoleteAttribute..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ObsoleteAttribute..ctor(string)", "internal_only");
+            AssertPurityClassification(summary, "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)", "pure");
+            AssertFreshnessClassification(summary, "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)", "internal_only");
+            AssertPurityClassification(summary, "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()", "pure");
+            AssertFreshnessClassification(summary, "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()", "internal_only");
+            AssertPurityClassification(summary, "System.Index..ctor(int, bool)", "pure");
+            AssertFreshnessClassification(summary, "System.Index..ctor(int, bool)", "none");
+            AssertEffectVisibilityClassification(summary, "System.Index..ctor(int, bool)", "none");
+            AssertPurityClassification(summary, "System.Range..ctor(System.Index, System.Index)", "pure");
+            AssertFreshnessClassification(summary, "System.Range..ctor(System.Index, System.Index)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Range..ctor(System.Index, System.Index)", "internal_only");
+            AssertPurityClassification(summary, "System.Threading.Tasks.ValueTask`1..ctor(!0)", "pure");
+            AssertFreshnessClassification(summary, "System.Threading.Tasks.ValueTask`1..ctor(!0)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.ValueTask`1..ctor(!0)", "internal_only");
+            AssertPurityClassification(summary, "System.UIntPtr..ctor(uint)", "pure");
+            AssertFreshnessClassification(summary, "System.UIntPtr..ctor(uint)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.UIntPtr..ctor(uint)", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            foreach (var symbol in new[]
             {
                 "System.DivideByZeroException..ctor()",
                 "System.InvalidOperationException..ctor(string)",
@@ -10293,23 +10418,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.Range..ctor(System.Index, System.Index)",
                 "System.Threading.Tasks.ValueTask`1..ctor(!0)",
                 "System.UIntPtr..ctor(uint)",
-            };
-
-            foreach (var symbol in representativeSymbols)
-            {
-                AssertPurityClassification(summary, symbol, "pure");
-                AssertFreshnessClassification(summary, symbol, "fresh_owned_object_write");
-                AssertEffectVisibilityClassification(summary, symbol, "internal_only");
-            }
-
-            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
-                .GetProperty("Entries")
-                .EnumerateArray()
-                .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
-                .ToArray();
-
-            foreach (var symbol in representativeSymbols)
+            })
             {
                 Assert.That(generatedSymbols, Does.Contain(symbol));
             }

@@ -344,9 +344,10 @@ namespace SharpProof.Analyzer
             IfStatementSyntax ifStatement,
             out SemanticModel speculativeModel)
         {
-            if (semanticModel.TryGetSpeculativeSemanticModel(position, ifStatement, out speculativeModel) &&
-                speculativeModel != null)
+            if (semanticModel.TryGetSpeculativeSemanticModel(position, ifStatement, out var model) &&
+                model != null)
             {
+                speculativeModel = model;
                 return true;
             }
 
