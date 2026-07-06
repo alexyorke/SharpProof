@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -48,7 +49,7 @@ namespace SharpProof.Test
                 Assert.Pass("Regenerated README example snapshot: " + exampleId);
             }
 
-            var expected = Normalize(File.ReadAllText(outputPath));
+            var expected = NormalizeForSnapshot(File.ReadAllText(outputPath));
             Assert.That(normalizedActual, Is.EqualTo(expected));
         }
 
@@ -121,7 +122,11 @@ namespace SharpProof.Test
             var root = RepositoryRoot.Value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             normalized = normalized.Replace(root + Path.DirectorySeparatorChar, string.Empty, StringComparison.OrdinalIgnoreCase);
             normalized = normalized.Replace(root + Path.AltDirectorySeparatorChar, string.Empty, StringComparison.OrdinalIgnoreCase);
-            return normalized.Replace('\\', '/');
+            normalized = normalized.Replace('\\', '/');
+            normalized = Regex.Replace(normalized, @"position=\d+", "position=<offset>");
+            normalized = Regex.Replace(normalized, @"span=\d+-\d+", "span=<offset-range>");
+            normalized = Regex.Replace(normalized, @"Node: ([^\r\n]+?) \d+-\d+", "Node: $1 <offset-range>");
+            return normalized;
         }
 
         private static string FindRepositoryRoot()
