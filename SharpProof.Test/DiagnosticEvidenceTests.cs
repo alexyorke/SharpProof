@@ -11328,7 +11328,8 @@ public class TestClass
     {
         return NativeMethods.ReadValue();
     }
-}");
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_emit_explanations", "true"));
 
             var diagnostic = diagnostics
                 .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -11337,6 +11338,11 @@ public class TestClass
             Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
             Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("NativeMethods.ReadValue"));
             Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("extern"));
+
+            var explanationDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityExplanationId);
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("unverified external call at"));
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("NativeMethods.ReadValue"));
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("unknown_external_call"));
         }
 
         [Test]
@@ -11370,6 +11376,10 @@ public class TestClass
 
             var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
             Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
+
+            var explanationDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityExplanationId);
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("non-authoritative BCL fallback guess probably_pure"));
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("with BCL fallback "));
         }
 
         [Test]

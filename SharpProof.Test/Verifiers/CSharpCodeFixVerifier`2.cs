@@ -58,8 +58,8 @@ namespace SharpProof.Test
         {
             var test = new Test
             {
-                TestCode = source,
-                FixedCode = fixedSource,
+                TestCode = NormalizeLineEndings(source),
+                FixedCode = NormalizeLineEndings(fixedSource),
             };
 
             if (codeActionIndex.HasValue)
@@ -72,6 +72,9 @@ namespace SharpProof.Test
             await test.RunAsync(CancellationToken.None);
         }
 
+        private static string NormalizeLineEndings(string text)
+            => text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", System.Environment.NewLine);
+
         private static void AddSharpProofReferences(Test test)
         {
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.AnalyzerReference);
@@ -80,4 +83,3 @@ namespace SharpProof.Test
         }
     }
 }
-

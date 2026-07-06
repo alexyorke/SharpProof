@@ -287,18 +287,32 @@ namespace SharpProof.Analyzer.Engine
 
             public string ToSummary()
             {
-                var category = string.IsNullOrEmpty(Category) ? "unknown" : Category;
+                var category = GetSummaryCategoryText(Category);
                 if (!string.IsNullOrEmpty(Symbol))
                 {
                     var summary = category + " at " + Symbol;
                     return string.IsNullOrEmpty(BclFallbackGuess)
                         ? summary
-                        : summary + " with BCL fallback " + BclFallbackGuess;
+                        : summary + " with non-authoritative BCL fallback guess " + BclFallbackGuess;
                 }
 
                 return string.IsNullOrEmpty(BclFallbackGuess)
                     ? category
-                    : category + " with BCL fallback " + BclFallbackGuess;
+                    : category + " with non-authoritative BCL fallback guess " + BclFallbackGuess;
+            }
+
+            private static string GetSummaryCategoryText(string category)
+            {
+                if (string.IsNullOrEmpty(category))
+                {
+                    return "unknown";
+                }
+
+                return category switch
+                {
+                    "unknown_external_call" => "unverified external call",
+                    _ => category,
+                };
             }
 
             private static void AddIfPresent(ImmutableDictionary<string, string?>.Builder builder, string key, string value)

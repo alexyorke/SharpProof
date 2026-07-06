@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
 
 namespace SharpProof
@@ -336,14 +337,29 @@ namespace SharpProof
             var attributeName = useShortName
                 ? "EnforcePure"
                 : "global::SharpProof.Attributes.EnforcePure";
+            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var lineEnding = sourceText.ToString().IndexOf("\r\n", System.StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
             var newAttrList = SyntaxFactory.AttributeList(
                     SyntaxFactory.SingletonSeparatedList(
                         SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))))
-                .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
+                .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding));
 
             var newDecl = WithAttributeLists(declaration, lists.Insert(0, newAttrList));
             var newRoot = root.ReplaceNode(declaration, newDecl);
-            return document.WithSyntaxRoot(newRoot);
+            var updatedDocument = document.WithSyntaxRoot(newRoot);
+            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
+            if (string.Equals(normalizedText, updatedText.ToString(), System.StringComparison.Ordinal))
+            {
+                return updatedDocument;
+            }
+
+            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
+        }
+
+        private static string NormalizeLineEndings(string text, string lineEnding)
+        {
+            return text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", lineEnding);
         }
     }
 }

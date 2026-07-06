@@ -421,53 +421,26 @@ namespace TestNamespace {
         }
 
         [Test]
-        public async Task BuiltAnalyzerPackage_WhenConsumedByDisposableProject_ReportsAnalyzerDiagnostics_WhenPackageExists()
+        public async Task BuiltAnalyzerPackage_WhenConsumedByDisposableProject_ReportsCurrentBetaDiagnostics_WhenPackageExists()
         {
             var repositoryRoot = FindRepositoryRoot();
             var packageVersion = ReadPackageVersion(
                 Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
                 "PackageVersion");
-            var packageSource = Path.Combine(repositoryRoot, "nupkgs");
-            var packagePath = Path.Combine(packageSource, $"SharpProof.{packageVersion}.nupkg");
-            if (!File.Exists(packagePath))
+            var packagePath = ResolveExistingPackageArtifact(
+                repositoryRoot,
+                "SharpProof.Package",
+                $"SharpProof.{packageVersion}.nupkg");
+            if (packagePath == null)
             {
                 Assert.Inconclusive("Build the package before verifying external package consumption.");
             }
+            var packageSource = Path.GetDirectoryName(packagePath)!;
 
-            var probeRoot = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "analyzer-package-consumer-" + Guid.NewGuid().ToString("N"));
-            var packageCache = Path.Combine(probeRoot, ".nuget");
-
-            Directory.CreateDirectory(probeRoot);
-            try
+            var scenarios = new[]
             {
-                var newResult = await RunDotnetAsync(
-                    probeRoot,
-                    packageCache,
-                    "new",
-                    "classlib",
-                    "--framework",
-                    "net8.0",
-                    "--name",
-                    "Probe").ConfigureAwait(false);
-                Assert.That(newResult.ExitCode, Is.EqualTo(0), newResult.Output);
-
-                var projectDirectory = Path.Combine(probeRoot, "Probe");
-                var addPackageResult = await RunDotnetAsync(
-                    projectDirectory,
-                    packageCache,
-                    "add",
-                    "package",
-                    "SharpProof",
-                    "--version",
-                    packageVersion,
-                    "--source",
-                    packageSource).ConfigureAwait(false);
-                Assert.That(addPackageResult.ExitCode, Is.EqualTo(0), addPackageResult.Output);
-
-                File.WriteAllText(
-                    Path.Combine(projectDirectory, "Class1.cs"),
+                new ConsumerPackageScenario(
+                    "sp0002-purity-not-verified",
                     """
 using System;
 using SharpProof.Attributes;
@@ -479,26 +452,130 @@ public sealed class Demo
     [EnforcePure]
     public int ReadClock() => DateTime.Now.Second;
 }
-""");
+""",
+                    ExpectedDiagnosticIds: new[] { "SP0002" }),
+                new ConsumerPackageScenario(
+                    "sp0004-missing-enforce-pure",
+                    """
+using SharpProof.Attributes;
 
-                var buildResult = await RunDotnetAsync(
-                    projectDirectory,
-                    packageCache,
-                    "build",
-                    "--no-restore",
-                    "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+namespace Probe;
 
-                Assert.That(buildResult.ExitCode, Is.Not.EqualTo(0), buildResult.Output);
-                Assert.That(buildResult.Output, Does.Contain("SP0002"),
-                    "The packed SharpProof analyzer should report SP0002 when consumed from a disposable project.");
-            }
-            finally
+public sealed class Demo
+{
+    public int AddOne(int value) => value + 1;
+}
+""",
+                    ExpectedDiagnosticIds: new[] { "SP0004" }),
+                new ConsumerPackageScenario(
+                    "sp0013-zero-allocations",
+                    """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [Impure]
+    [ZeroAllocations]
+    public object Allocate() => new object();
+}
+""",
+                    ExpectedDiagnosticIds: new[] { "SP0013" }),
+                new ConsumerPackageScenario(
+                    "sp0015-capability-violation",
+                    """
+using System;
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void WriteConsole() => Console.WriteLine("hello");
+}
+""",
+                    ExpectedDiagnosticIds: new[] { "SP0015" }),
+                new ConsumerPackageScenario(
+                    "sp0016-capability-unknown",
+                    """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public string Describe(dynamic value) => value.ToString();
+}
+""",
+                    ExpectedDiagnosticIds: new[] { "SP0016" }),
+            };
+
+            foreach (var scenario in scenarios)
             {
-                if (Directory.Exists(probeRoot))
+                var buildResult = await BuildDisposablePackageConsumerAsync(
+                    packageId: "SharpProof",
+                    packageVersion,
+                    packageSource,
+                    source: scenario.Source,
+                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
+
+                Assert.That(
+                    buildResult.ExitCode,
+                    Is.Not.EqualTo(0),
+                    $"The packaged analyzer scenario '{scenario.Name}' should fail when promoted diagnostics are emitted.{Environment.NewLine}{buildResult.Output}");
+
+                foreach (var diagnosticId in scenario.ExpectedDiagnosticIds)
                 {
-                    Directory.Delete(probeRoot, recursive: true);
+                    Assert.That(
+                        buildResult.Output,
+                        Does.Contain(diagnosticId),
+                        $"The packaged SharpProof analyzer scenario '{scenario.Name}' should emit {diagnosticId}.{Environment.NewLine}{buildResult.Output}");
                 }
             }
+        }
+
+        [Test]
+        public async Task BuiltAttributesPackage_WhenConsumedByDisposableProject_AllowsAttributeCompileWithoutAnalyzerAssets_WhenPackageExists()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packageVersion = ReadPackageVersion(
+                Path.Combine(repositoryRoot, "SharpProof.Attributes", "SharpProof.Attributes.csproj"),
+                "Version");
+            var packagePath = ResolveExistingPackageArtifact(
+                repositoryRoot,
+                "SharpProof.Attributes",
+                $"SharpProof.Attributes.{packageVersion}.nupkg");
+            if (packagePath == null)
+            {
+                Assert.Inconclusive("Build the attributes package before verifying external package consumption.");
+            }
+            var packageSource = Path.GetDirectoryName(packagePath)!;
+
+            var buildResult = await BuildDisposablePackageConsumerAsync(
+                packageId: "SharpProof.Attributes",
+                packageVersion,
+                packageSource,
+                source:
+                """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [EnforcePure]
+    [ZeroAllocations]
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public int Identity(int value) => value;
+}
+""").ConfigureAwait(false);
+
+            Assert.That(buildResult.ExitCode, Is.EqualTo(0), buildResult.Output);
+            Assert.That(buildResult.Output, Does.Not.Contain("SP000"),
+                "Installing SharpProof.Attributes alone should not require analyzer assets or emit analyzer diagnostics.");
         }
 
         [Test]
@@ -886,6 +963,25 @@ public static class TestClass
             throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
         }
 
+        private static string? ResolveExistingPackageArtifact(string repositoryRoot, string projectDirectoryName, string packageFileName)
+        {
+            var preferredPackagePath = Path.Combine(repositoryRoot, "nupkgs", packageFileName);
+            if (File.Exists(preferredPackagePath))
+            {
+                return preferredPackagePath;
+            }
+
+            var projectBinDirectory = Path.Combine(repositoryRoot, projectDirectoryName, "bin");
+            if (!Directory.Exists(projectBinDirectory))
+            {
+                return null;
+            }
+
+            return Directory.EnumerateFiles(projectBinDirectory, packageFileName, SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+
         private static async Task<ProcessResult> RunDotnetAsync(
             string workingDirectory,
             string packageCacheDirectory,
@@ -920,6 +1016,84 @@ public static class TestClass
                 .AppendLine(await standardError.ConfigureAwait(false))
                 .ToString();
             return new ProcessResult(process.ExitCode, output);
+        }
+
+        private static async Task<ProcessResult> BuildDisposablePackageConsumerAsync(
+            string packageId,
+            string packageVersion,
+            string packageSource,
+            string source,
+            string? editorConfigText = null)
+        {
+            var probeRoot = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "analyzer-package-consumer-" + Guid.NewGuid().ToString("N"));
+            var packageCache = Path.Combine(probeRoot, ".nuget");
+
+            Directory.CreateDirectory(probeRoot);
+            try
+            {
+                var newResult = await RunDotnetAsync(
+                    probeRoot,
+                    packageCache,
+                    "new",
+                    "classlib",
+                    "--framework",
+                    "net8.0",
+                    "--name",
+                    "Probe").ConfigureAwait(false);
+                Assert.That(newResult.ExitCode, Is.EqualTo(0), newResult.Output);
+
+                var projectDirectory = Path.Combine(probeRoot, "Probe");
+                var addPackageResult = await RunDotnetAsync(
+                    projectDirectory,
+                    packageCache,
+                    "add",
+                    "package",
+                    packageId,
+                    "--version",
+                    packageVersion,
+                    "--source",
+                    packageSource).ConfigureAwait(false);
+                Assert.That(addPackageResult.ExitCode, Is.EqualTo(0), addPackageResult.Output);
+
+                File.WriteAllText(Path.Combine(projectDirectory, "Class1.cs"), source);
+                if (!string.IsNullOrWhiteSpace(editorConfigText))
+                {
+                    File.WriteAllText(Path.Combine(projectDirectory, ".editorconfig"), editorConfigText);
+                }
+
+                return await RunDotnetAsync(
+                    projectDirectory,
+                    packageCache,
+                    "build",
+                    "--no-restore",
+                    "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+            }
+            finally
+            {
+                if (Directory.Exists(probeRoot))
+                {
+                    Directory.Delete(probeRoot, recursive: true);
+                }
+            }
+        }
+
+        private static string CreateAnalyzerSeverityEditorConfig(string[] diagnosticIds)
+        {
+            var builder = new StringBuilder()
+                .AppendLine("root = true")
+                .AppendLine()
+                .AppendLine("[*.cs]");
+
+            foreach (var diagnosticId in diagnosticIds.Distinct(StringComparer.Ordinal))
+            {
+                builder.Append("dotnet_diagnostic.")
+                    .Append(diagnosticId)
+                    .AppendLine(".severity = error");
+            }
+
+            return builder.ToString();
         }
 
         private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)
@@ -968,5 +1142,6 @@ public static class TestClass
         }
 
         private readonly record struct ProcessResult(int ExitCode, string Output);
+        private readonly record struct ConsumerPackageScenario(string Name, string Source, string[] ExpectedDiagnosticIds);
     }
 }
