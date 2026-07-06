@@ -191,7 +191,7 @@ namespace SharpProof.Analyzer
                             {
                                 methodSymbol.Name,
                                 purityResult.Evidence.BclFallbackGuess,
-                                purityResult.Evidence.BclFallbackReason
+                                BclPurityFallbackHeuristics.GetDisplayReason(purityResult.Evidence.BclFallbackReason)
                             });
                         context.ReportDiagnostic(fallbackDiagnostic);
                     }

@@ -311,6 +311,9 @@ namespace SharpProof.Analyzer.Engine
                 return category switch
                 {
                     "unknown_external_call" => "unverified external call",
+                    "bcl_fallback_probably_pure" => "unverified framework metadata member",
+                    "bcl_fallback_probably_impure" => "unverified framework metadata member",
+                    "bcl_fallback_unknown" => "unverified framework metadata member",
                     _ => category,
                 };
             }

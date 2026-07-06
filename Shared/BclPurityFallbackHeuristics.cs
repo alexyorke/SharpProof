@@ -181,6 +181,30 @@ internal static class BclPurityFallbackHeuristics
         return typeName.Trim().TrimEnd('&');
     }
 
+    public static string GetDisplayReason(string reason)
+    {
+        return reason switch
+        {
+            "ref_or_out_parameter" => "member has ref or out parameters",
+            "byref_return" => "member returns by-reference data",
+            "ambient_namespace_or_type" => "member belongs to an ambient framework namespace or type",
+            "value_type_constructor_value_like_parameters" => "value-type constructor only uses value-like parameters",
+            "metadata_constructor_without_body" => "metadata constructor has no body available",
+            "void_returning_metadata_method" => "metadata method returns void",
+            "mutating_method_name" => "member name suggests mutation",
+            "reference_returning_instance_metadata_method" => "instance metadata method returns a reference-like value",
+            "value_return_no_ref_or_out" => "member returns a value-like result without ref or out parameters",
+            "metadata_method_shape_ambiguous" => "metadata method shape is ambiguous",
+            "metadata_property_setter" => "metadata property only exposes a setter",
+            "reference_returning_instance_metadata_property" => "instance metadata property returns a reference-like value",
+            "metadata_getter_value_like_return" => "metadata getter returns a value-like result",
+            "mutable_metadata_field" => "metadata field is mutable",
+            "readonly_reference_metadata_field" => "readonly metadata field returns a reference-like value",
+            "readonly_metadata_field_value_like" => "readonly metadata field returns a value-like result",
+            _ => reason.Replace('_', ' '),
+        };
+    }
+
     private static Classification ClassifyMethod(Shape shape)
     {
         if (shape.IsConstructor)

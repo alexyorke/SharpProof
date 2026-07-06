@@ -11376,10 +11376,14 @@ public class TestClass
 
             var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
             Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("value-like result without ref or out parameters"));
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Not.Contain("value_return_no_ref_or_out"));
 
             var explanationDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityExplanationId);
             Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("non-authoritative BCL fallback guess probably_pure"));
             Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("with BCL fallback "));
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Contain("unverified framework metadata member"));
+            Assert.That(explanationDiagnostic.GetMessage(), Does.Not.Contain("bcl_fallback_probably_pure"));
         }
 
         [Test]
