@@ -3,6 +3,10 @@
 SharpProof exposes a conservative symbolic complexity surface for asking:
 "What is the best proven asymptotic cost of this method-like body?"
 
+It also exposes an opt-in analyzer contract:
+`[ExpectedComplexity(ComplexityKind...)]`
+for enforcing simple upper bounds such as `O(1)`, `O(n)`, and `O(n^2)`.
+
 The current result model is intentionally bounded. It does not attempt to infer
 real wall-clock performance, allocation cost, cache effects, or JIT behavior.
 
@@ -63,6 +67,30 @@ Supported target shapes:
 Complexity queries resolve the containing method-like body. Invalid
 source/target combinations are API misuse and currently throw
 `NotSupportedException`.
+
+## Analyzer Contract
+
+The first contract surface is intentionally narrow:
+
+- `[ExpectedComplexity(ComplexityKind.Constant)]`
+- `[ExpectedComplexity(ComplexityKind.Linear)]`
+- `[ExpectedComplexity(ComplexityKind.Quadratic)]`
+
+Current diagnostics:
+
+- `SP0021` when the inferred complexity definitely exceeds the declared bound
+- `SP0022` when the declared bound could not be verified conservatively
+- `SP0023` when `[ExpectedComplexity]` is applied to a non-method-like target
+
+The comparison is deliberately partial. SharpProof will only accept bounds it
+can justify conservatively. For example:
+
+- `O(1)` satisfies `Constant`, `Linear`, and `Quadratic`
+- `O(n)` satisfies `Linear` and `Quadratic`
+- `O(n^2)` satisfies `Quadratic`
+- `O(n * m)`, `O(max(...))`, `O(Unknown)`, and `O(RecursiveUnknown)` do not get
+  coerced into a simpler contract; they remain conservative and report
+  `SP0022` when used with `[ExpectedComplexity]`
 
 ## CLI
 

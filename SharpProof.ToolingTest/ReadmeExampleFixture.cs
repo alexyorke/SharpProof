@@ -39,8 +39,17 @@ namespace SharpProof.Test
 
         public static void AssertOutputMatchesSnapshot(string exampleId, string actual)
         {
-            var expected = Normalize(File.ReadAllText(GetAbsoluteExamplePath(exampleId, "output.txt")));
-            Assert.That(NormalizeForSnapshot(actual), Is.EqualTo(expected));
+            var normalizedActual = NormalizeForSnapshot(actual);
+            var outputPath = GetAbsoluteExamplePath(exampleId, "output.txt");
+            if (ShouldRegenerateSnapshots())
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                File.WriteAllText(outputPath, normalizedActual);
+                Assert.Pass("Regenerated README example snapshot: " + exampleId);
+            }
+
+            var expected = Normalize(File.ReadAllText(outputPath));
+            Assert.That(normalizedActual, Is.EqualTo(expected));
         }
 
         public static string FormatDiagnostics(ImmutableArray<Diagnostic> diagnostics)
@@ -164,6 +173,13 @@ namespace SharpProof.Test
             }
 
             throw new FileNotFoundException("Could not locate PowerShell.");
+        }
+
+        private static bool ShouldRegenerateSnapshots()
+        {
+            var value = Environment.GetEnvironmentVariable("SHARPPROOF_REGENERATE_EXAMPLE_OUTPUTS");
+            return string.Equals(value, "1", StringComparison.Ordinal) ||
+                   string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

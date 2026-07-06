@@ -1,0 +1,2 @@
+SP0002 Error docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Method 'Log' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
+SP0009 Info docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Purity analysis for 'Log': catalog_hit at static System.Console.WriteLine(string?)

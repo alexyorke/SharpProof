@@ -7,10 +7,32 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$sourcePath = Join-Path $repositoryRoot "README.source.md"
-$readmePath = Join-Path $repositoryRoot "README.md"
-$manifestPath = Join-Path $repositoryRoot "docs/readme-examples/examples.json"
-$marker = "<!-- README_EXAMPLES -->"
+$pages = @(
+    @{
+        Name = "README"
+        TemplatePath = "README.source.md"
+        OutputPath = "README.md"
+        ManifestPath = "docs/readme-examples/readme-examples.json"
+        Marker = "<!-- README_EXAMPLES -->"
+        Header = "<!-- Generated from README.source.md by scripts/Generate-Readme.ps1. -->"
+    },
+    @{
+        Name = "diagnostic examples"
+        TemplatePath = "docs/diagnostic-examples.source.md"
+        OutputPath = "docs/diagnostic-examples.md"
+        ManifestPath = "docs/readme-examples/diagnostic-examples.json"
+        Marker = "<!-- DIAGNOSTIC_EXAMPLES -->"
+        Header = "<!-- Generated from docs/diagnostic-examples.source.md by scripts/Generate-Readme.ps1. -->"
+    },
+    @{
+        Name = "symbolic query examples"
+        TemplatePath = "docs/symbolic-query-examples.source.md"
+        OutputPath = "docs/symbolic-query-examples.md"
+        ManifestPath = "docs/readme-examples/symbolic-examples.json"
+        Marker = "<!-- SYMBOLIC_QUERY_EXAMPLES -->"
+        Header = "<!-- Generated from docs/symbolic-query-examples.source.md by scripts/Generate-Readme.ps1. -->"
+    }
+)
 
 function Normalize-Text {
     param([string]$Text)
@@ -52,17 +74,17 @@ function Convert-ToGeneratedExamplesMarkdown {
     $builder = New-Object System.Text.StringBuilder
     foreach ($example in $Examples) {
         if (-not $Tests.ContainsKey($example.Id)) {
-            throw "README example '$($example.Id)' is missing a [ReadmeExample] test."
+            throw "Generated example '$($example.Id)' is missing a [ReadmeExample] test."
         }
 
         $sourceFile = Join-Path $Root $example.SourcePath
         $outputFile = Join-Path $Root $example.OutputPath
         if (-not (Test-Path -LiteralPath $sourceFile)) {
-            throw "Missing README example source file: $($example.SourcePath)"
+            throw "Missing generated example source file: $($example.SourcePath)"
         }
 
         if (-not (Test-Path -LiteralPath $outputFile)) {
-            throw "Missing README example output file: $($example.OutputPath)"
+            throw "Missing generated example output file: $($example.OutputPath)"
         }
 
         $sourceText = Normalize-Text (Get-Content -LiteralPath $sourceFile -Raw)
@@ -99,47 +121,88 @@ function Convert-ToGeneratedExamplesMarkdown {
     return $builder.ToString().TrimEnd("`r`n".ToCharArray())
 }
 
-if (-not (Test-Path -LiteralPath $sourcePath)) {
-    throw "Missing README source file: $sourcePath"
+function Get-ManifestExamples {
+    param([string]$ManifestFile)
+
+    if (-not (Test-Path -LiteralPath $ManifestFile)) {
+        throw "Missing generated example manifest: $ManifestFile"
+    }
+
+    $examples = Get-Content -LiteralPath $ManifestFile -Raw | ConvertFrom-Json
+    if ($null -eq $examples) {
+        throw "Manifest '$ManifestFile' is empty."
+    }
+
+    return @($examples)
 }
 
-if (-not (Test-Path -LiteralPath $manifestPath)) {
-    throw "Missing README example manifest: $manifestPath"
+function Get-GeneratedPage {
+    param(
+        [hashtable]$Page,
+        [hashtable]$Tests,
+        [string]$Root
+    )
+
+    $templateFile = Join-Path $Root $Page.TemplatePath
+    if (-not (Test-Path -LiteralPath $templateFile)) {
+        throw "Missing template file: $($Page.TemplatePath)"
+    }
+
+    $template = Normalize-Text (Get-Content -LiteralPath $templateFile -Raw)
+    if (-not $template.Contains($Page.Marker)) {
+        throw "Template '$($Page.TemplatePath)' is missing marker '$($Page.Marker)'."
+    }
+
+    $examples = Get-ManifestExamples -ManifestFile (Join-Path $Root $Page.ManifestPath)
+    $generatedExamples = Convert-ToGeneratedExamplesMarkdown -Examples $examples -Tests $Tests -Root $Root
+    $content = $Page.Header + "`n`n" + $template.Replace($Page.Marker, $generatedExamples)
+    return @{
+        Examples = $examples
+        Content = Normalize-Text $content
+    }
 }
 
-$template = Normalize-Text (Get-Content -LiteralPath $sourcePath -Raw)
-if (-not $template.Contains($marker)) {
-    throw "README source is missing marker '$marker'."
-}
-
-$examples = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $tests = Get-ReadmeExampleTests -Root $repositoryRoot
-$testIds = @($tests.Keys | Sort-Object)
-$exampleIds = @($examples.Id | Sort-Object)
-$missingExamples = @($testIds | Where-Object { $_ -notin $exampleIds })
+$generatedPages = @()
+$allExampleIds = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::Ordinal)
+
+foreach ($page in $pages) {
+    $generated = Get-GeneratedPage -Page $page -Tests $tests -Root $repositoryRoot
+    foreach ($example in $generated.Examples) {
+        [void]$allExampleIds.Add($example.Id)
+    }
+
+    $generatedPages += @{
+        Page = $page
+        Content = $generated.Content
+    }
+}
+
+$missingExamples = @($tests.Keys | Where-Object { -not $allExampleIds.Contains($_) } | Sort-Object)
 if ($missingExamples.Count -ne 0) {
     throw "One or more [ReadmeExample] ids do not have manifest entries: $($missingExamples -join ', ')"
 }
 
-$generatedExamples = Convert-ToGeneratedExamplesMarkdown -Examples $examples -Tests $tests -Root $repositoryRoot
-$generatedReadme = "<!-- Generated from README.source.md by scripts/Generate-Readme.ps1. -->`n`n" +
-    $template.Replace($marker, $generatedExamples)
-$generatedReadme = Normalize-Text $generatedReadme
-
 if ($Verify) {
-    if (-not (Test-Path -LiteralPath $readmePath)) {
-        throw "README.md is missing. Run .\scripts\Generate-Readme.ps1."
+    foreach ($generatedPage in $generatedPages) {
+        $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
+        if (-not (Test-Path -LiteralPath $outputFile)) {
+            throw "$($generatedPage.Page.OutputPath) is missing. Run .\scripts\Generate-Readme.ps1."
+        }
+
+        $existing = Normalize-Text (Get-Content -LiteralPath $outputFile -Raw)
+        if (-not [string]::Equals($existing, $generatedPage.Content, [System.StringComparison]::Ordinal)) {
+            throw "$($generatedPage.Page.OutputPath) is stale. Run .\scripts\Generate-Readme.ps1."
+        }
     }
 
-    $existing = Normalize-Text (Get-Content -LiteralPath $readmePath -Raw)
-    if (-not [string]::Equals($existing, $generatedReadme, [System.StringComparison]::Ordinal)) {
-        throw "README.md is stale. Run .\scripts\Generate-Readme.ps1."
-    }
-
-    Write-Host "README.md is up to date."
+    Write-Host "Generated example pages are up to date."
     return
 }
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($readmePath, $generatedReadme, $utf8NoBom)
-Write-Host "Regenerated README.md from README.source.md."
+foreach ($generatedPage in $generatedPages) {
+    $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
+    [System.IO.File]::WriteAllText($outputFile, $generatedPage.Content, $utf8NoBom)
+    Write-Host ("Regenerated {0}." -f $generatedPage.Page.OutputPath)
+}

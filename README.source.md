@@ -6,24 +6,24 @@ usage, line-level invariants, runtime hazards, and conservative complexity.
 
 ## Preview Status
 
-SharpProof is still preview software. Treat the current branch and packages as
-alpha/beta quality rather than production-hardened tooling.
-
-The project has also been developed through rapid AI-assisted iteration, or
-"vibe-coded" development in the informal sense: broad feature growth, fast
-refactoring, and heavy test coverage, but not the kind of long-lived
-stabilization and compatibility discipline you would expect from a mature
-analysis platform.
-
-Expect rough edges:
-
-- analyzer false positives and false negatives
-- unsupported C# or library shapes that stay conservative or unknown
-- public API, CLI, configuration, and diagnostic-surface changes between preview releases
-
-The analyzer does not execute user code and does not attempt unbounded
-whole-program proof. When it cannot prove a fact within the implemented rules
-and budgets, it stays conservative.
+> [!WARNING]
+> SharpProof is still preview software. Treat the current branch and packages
+> as alpha/beta quality rather than production-hardened tooling.
+>
+> The project has also been developed through rapid AI-assisted iteration, or
+> "vibe-coded" development in the informal sense: broad feature growth, fast
+> refactoring, and heavy test coverage, but not the kind of long-lived
+> stabilization and compatibility discipline you would expect from a mature
+> analysis platform.
+>
+> Expect rough edges:
+> - analyzer false positives and false negatives
+> - unsupported C# or library shapes that stay conservative or unknown
+> - public API, CLI, configuration, and diagnostic-surface changes between preview releases
+>
+> The analyzer does not execute user code and does not attempt unbounded
+> whole-program proof. When it cannot prove a fact within the implemented rules
+> and budgets, it stays conservative.
 
 ## What SharpProof Does
 
@@ -101,12 +101,18 @@ fail fast when the public behavior or documentation drifts.
 
 <!-- README_EXAMPLES -->
 
+For the full generated galleries:
+
+- [Diagnostic example gallery](docs/diagnostic-examples.md)
+- [Symbolic query examples](docs/symbolic-query-examples.md)
+
 ## What It Can Prove Today
 
 - Analyzer contracts:
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
-  `[AllowedCapabilities(...)]`, and related diagnostics from `SP0002` through
-  `SP0017`.
+  `[AllowedCapabilities(...)]`, `[Ensures(...)]`,
+  `[ExpectedComplexity(...)]`, and related diagnostics from `SP0002` through
+  `SP0023`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
@@ -124,6 +130,8 @@ fail fast when the public behavior or documentation drifts.
 
 ## Deeper Docs
 
+- [Diagnostic example gallery](docs/diagnostic-examples.md)
+- [Symbolic query examples](docs/symbolic-query-examples.md)
 - [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)
 - [Capability analysis and `[AllowedCapabilities]`](docs/capability-analysis.md)
 - [Complexity query behavior](docs/complexity-queries.md)

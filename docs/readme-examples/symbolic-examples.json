@@ -1,18 +1,8 @@
 [
   {
-    "Id": "purity-clock",
-    "Title": "Purity contract catches ambient clock access",
-    "Summary": "`[EnforcePure]` does not treat ambient time reads as pure. A direct read of `DateTime.Now` still produces `SP0002`.",
-    "SourcePath": "docs/readme-examples/purity-clock/input.cs",
-    "OutputPath": "docs/readme-examples/purity-clock/output.txt",
-    "OutputLabel": "Expected analyzer diagnostics",
-    "Language": "csharp",
-    "OutputLanguage": "text"
-  },
-  {
     "Id": "invariants-positive",
-    "Title": "Invariant query proves a branch-local fact",
-    "Summary": "At a specific program point, the symbolic CLI can report the merged invariant, prove reachability, and check whether the current facts imply another condition.",
+    "Title": "Invariant, reachability, and implication at one point",
+    "Summary": "One query can show the merged invariant at a program point, whether the point is reachable, and whether the current facts imply another condition.",
     "SourcePath": "docs/readme-examples/invariants-positive/input.cs",
     "OutputPath": "docs/readme-examples/invariants-positive/output.txt",
     "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies \"value > 0\"",
@@ -22,8 +12,8 @@
   },
   {
     "Id": "runtime-hazard-divide-by-zero",
-    "Title": "Runtime hazard query proves guarded divide-by-zero",
-    "Summary": "The runtime-hazard query surface can prove a concrete exception path from source guards without executing the method.",
+    "Title": "Runtime hazard proof for divide-by-zero",
+    "Summary": "The symbolic CLI can report a concrete hazard at a specific operation without executing the method.",
     "SourcePath": "docs/readme-examples/runtime-hazard-divide-by-zero/input.cs",
     "OutputPath": "docs/readme-examples/runtime-hazard-divide-by-zero/output.txt",
     "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --line 7 --runtime-hazards",
@@ -32,19 +22,9 @@
     "OutputLanguage": "text"
   },
   {
-    "Id": "zero-allocations",
-    "Title": "Direct allocation sites under [ZeroAllocations]",
-    "Summary": "`[ZeroAllocations]` reports each direct heap allocation site inside the annotated method-like body instead of collapsing everything into one method-level warning.",
-    "SourcePath": "docs/readme-examples/zero-allocations/input.cs",
-    "OutputPath": "docs/readme-examples/zero-allocations/output.txt",
-    "OutputLabel": "Expected analyzer diagnostics",
-    "Language": "csharp",
-    "OutputLanguage": "text"
-  },
-  {
     "Id": "capabilities-console",
-    "Title": "Capability query for console I/O",
-    "Summary": "The symbolic CLI can classify proven side-effect capability categories at a point inside a method, including derived umbrella categories such as `IO`.",
+    "Title": "Capability summary at a program point",
+    "Summary": "Capability queries classify proven side-effect categories such as `Console` and the derived umbrella category `IO`.",
     "SourcePath": "docs/readme-examples/capabilities-console/input.cs",
     "OutputPath": "docs/readme-examples/capabilities-console/output.txt",
     "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/capabilities-console/input.cs --line 7 --capabilities",
@@ -54,11 +34,22 @@
   },
   {
     "Id": "complexity-linear",
-    "Title": "Conservative method complexity query",
-    "Summary": "The complexity query surface reports the best proven asymptotic cost for the containing method-like body and explains the structural drivers that established it.",
+    "Title": "Conservative complexity classification",
+    "Summary": "Complexity queries report the best proven Big-O plus the structural drivers that justify it.",
     "SourcePath": "docs/readme-examples/complexity-linear/input.cs",
     "OutputPath": "docs/readme-examples/complexity-linear/output.txt",
     "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/complexity-linear/input.cs --line 10 --complexity",
+    "OutputLabel": "CLI output",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "symbolic-unknown-dynamic",
+    "Title": "Conservative unknown for dynamic dispatch",
+    "Summary": "When the engine cannot prove a capability set because of dynamic dispatch, the CLI reports an explicit unknown instead of inventing a stronger answer.",
+    "SourcePath": "docs/readme-examples/symbolic-unknown-dynamic/input.cs",
+    "OutputPath": "docs/readme-examples/symbolic-unknown-dynamic/output.txt",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/symbolic-unknown-dynamic/input.cs --line 5 --capabilities",
     "OutputLabel": "CLI output",
     "Language": "csharp",
     "OutputLanguage": "text"

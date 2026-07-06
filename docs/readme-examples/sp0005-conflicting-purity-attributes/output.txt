@@ -1,0 +1,2 @@
+SP0002 Error docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:8:16 Method 'Value' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
+SP0005 Warning docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:8:16 Method 'Value' has conflicting purity attributes applied

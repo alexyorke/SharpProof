@@ -16,12 +16,16 @@ namespace SharpProof.Analyzer
             var allowSynchronizationAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute");
             var zeroAllocationsAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute");
             var allowedCapabilitiesAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowedCapabilitiesAttribute", "AllowedCapabilitiesAttribute");
+            var ensuresAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute");
+            var expectedComplexityAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ExpectedComplexityAttribute", "ExpectedComplexityAttribute");
 
             if (enforcePureAttributeSymbol == null &&
                 pureAttributeSymbol == null &&
                 allowSynchronizationAttributeSymbol == null &&
                 zeroAllocationsAttributeSymbol == null &&
-                allowedCapabilitiesAttributeSymbol == null)
+                allowedCapabilitiesAttributeSymbol == null &&
+                ensuresAttributeSymbol == null &&
+                expectedComplexityAttributeSymbol == null)
             {
                 return;
             }
@@ -95,6 +99,32 @@ namespace SharpProof.Analyzer
                     var diag = Diagnostic.Create(
                         SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
                         allowedCapabilitiesAttributeLocation);
+                    context.ReportDiagnostic(diag);
+                    return;
+                }
+            }
+
+            if (ensuresAttributeSymbol != null)
+            {
+                var ensuresAttributeLocation = FindAttributeLocation(attributeList, ensuresAttributeSymbol, context.SemanticModel);
+                if (ensuresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+                {
+                    var diag = Diagnostic.Create(
+                        SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
+                        ensuresAttributeLocation);
+                    context.ReportDiagnostic(diag);
+                    return;
+                }
+            }
+
+            if (expectedComplexityAttributeSymbol != null)
+            {
+                var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, expectedComplexityAttributeSymbol, context.SemanticModel);
+                if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+                {
+                    var diag = Diagnostic.Create(
+                        SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
+                        expectedComplexityAttributeLocation);
                     context.ReportDiagnostic(diag);
                     return;
                 }

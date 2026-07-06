@@ -1,0 +1,106 @@
+[
+  {
+    "Id": "purity-clock",
+    "Title": "Purity contract catches ambient clock access",
+    "Summary": "`[EnforcePure]` does not treat ambient time reads as pure. A direct read of `DateTime.Now` still produces `SP0002`.",
+    "SourcePath": "docs/readme-examples/purity-clock/input.cs",
+    "OutputPath": "docs/readme-examples/purity-clock/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0004-missing-enforce-pure",
+    "Title": "Pure-looking code without a contract gets a suggestion",
+    "Summary": "When a method looks pure but is not explicitly marked, SharpProof suggests adding `[EnforcePure]` with `SP0004`.",
+    "SourcePath": "docs/readme-examples/sp0004-missing-enforce-pure/input.cs",
+    "OutputPath": "docs/readme-examples/sp0004-missing-enforce-pure/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0010-exception-summary",
+    "Title": "Method-level exception summaries",
+    "Summary": "With runtime-hazard summaries enabled, SharpProof can report the exception types that may escape a method body.",
+    "SourcePath": "docs/readme-examples/sp0010-exception-summary/input.cs",
+    "OutputPath": "docs/readme-examples/sp0010-exception-summary/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "runtime-hazard-divide-by-zero",
+    "Title": "Runtime hazard query proves guarded divide-by-zero",
+    "Summary": "The runtime-hazard query surface can prove a concrete exception path from source guards without executing the method.",
+    "SourcePath": "docs/readme-examples/runtime-hazard-divide-by-zero/input.cs",
+    "OutputPath": "docs/readme-examples/runtime-hazard-divide-by-zero/output.txt",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --line 7 --runtime-hazards",
+    "OutputLabel": "CLI output",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "zero-allocations",
+    "Title": "Direct allocation sites under [ZeroAllocations]",
+    "Summary": "`[ZeroAllocations]` reports each direct heap allocation site inside the annotated method-like body instead of collapsing everything into one method-level warning.",
+    "SourcePath": "docs/readme-examples/zero-allocations/input.cs",
+    "OutputPath": "docs/readme-examples/zero-allocations/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0015-capability-violation",
+    "Title": "Capability contracts catch disallowed side effects",
+    "Summary": "`[AllowedCapabilities]` is separate from purity. Here it rejects console I/O directly at the violating call site.",
+    "SourcePath": "docs/readme-examples/sp0015-capability-violation/input.cs",
+    "OutputPath": "docs/readme-examples/sp0015-capability-violation/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "invariants-positive",
+    "Title": "Invariant query proves a branch-local fact",
+    "Summary": "At a specific program point, the symbolic CLI can report the merged invariant, prove reachability, and check whether the current facts imply another condition.",
+    "SourcePath": "docs/readme-examples/invariants-positive/input.cs",
+    "OutputPath": "docs/readme-examples/invariants-positive/output.txt",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies \"value > 0\"",
+    "OutputLabel": "CLI output",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "capabilities-console",
+    "Title": "Capability query for console I/O",
+    "Summary": "The symbolic CLI can classify proven side-effect capability categories at a point inside a method, including derived umbrella categories such as `IO`.",
+    "SourcePath": "docs/readme-examples/capabilities-console/input.cs",
+    "OutputPath": "docs/readme-examples/capabilities-console/output.txt",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/capabilities-console/input.cs --line 7 --capabilities",
+    "OutputLabel": "CLI output",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "complexity-linear",
+    "Title": "Conservative method complexity query",
+    "Summary": "The complexity query surface reports the best proven asymptotic cost for the containing method-like body and explains the structural drivers that established it.",
+    "SourcePath": "docs/readme-examples/complexity-linear/input.cs",
+    "OutputPath": "docs/readme-examples/complexity-linear/output.txt",
+    "Command": "dotnet run --project .\\Tools\\SharpProof.SymbolicCli\\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/complexity-linear/input.cs --line 10 --complexity",
+    "OutputLabel": "CLI output",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0018-ensures-failing-return",
+    "Title": "Symbolic postconditions at method exits",
+    "Summary": "`[Ensures]` uses the bounded proof pipeline at each reachable return site and reports the exact exit that failed the declared postcondition.",
+    "SourcePath": "docs/readme-examples/sp0018-ensures-failing-return/input.cs",
+    "OutputPath": "docs/readme-examples/sp0018-ensures-failing-return/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  }
+]

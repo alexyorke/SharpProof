@@ -2292,8 +2292,8 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("## Help And Feedback"));
             Assert.That(readme, Does.Contain("0.1.0-preview.1"));
             Assert.That(readme, Does.Contain("SP0013"));
-            Assert.That(readme, Does.Contain("SP0017"));
             Assert.That(readme, Does.Contain("SP0002"));
+            Assert.That(readme, Does.Contain("SP0023"));
             Assert.That(readme, Does.Contain("[ZeroAllocations]"));
             Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
             Assert.That(readme, Does.Contain("--capabilities"));
@@ -2319,6 +2319,7 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("docs/readme-examples/invariants-positive/input.cs"));
             Assert.That(readme, Does.Contain("docs/readme-examples/runtime-hazard-divide-by-zero/input.cs"));
             Assert.That(readme, Does.Contain("docs/readme-examples/complexity-linear/input.cs"));
+            Assert.That(readme, Does.Contain("docs/diagnostic-examples.md"));
             Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
             Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
             Assert.That(readme, Does.Contain("docs/symbolic-invariants.md"));

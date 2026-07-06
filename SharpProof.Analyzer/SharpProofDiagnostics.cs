@@ -185,6 +185,97 @@ namespace SharpProof.Analyzer
             isEnabledByDefault: true,
             description: MisplacedAllowedCapabilitiesAttributeDescription);
 
+        public const string EnsuresNotProvenId = "SP0018";
+        public const string EnsuresConditionProperty = "sharpproof.ensures.condition";
+        public const string EnsuresProofStatusProperty = "sharpproof.ensures.proof_status";
+        public const string EnsuresUnknownReasonProperty = "sharpproof.ensures.unknown_reason";
+        public const string EnsuresFailureReasonProperty = "sharpproof.ensures.failure_reason";
+        private static readonly LocalizableString EnsuresNotProvenTitle = "Postcondition Not Proven";
+        private static readonly LocalizableString EnsuresNotProvenMessageFormat = "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'";
+        private static readonly LocalizableString EnsuresNotProvenDescription = "Reports return sites that contradict a declared [Ensures] postcondition.";
+
+        public static readonly DiagnosticDescriptor EnsuresNotProvenRule = new DiagnosticDescriptor(
+            id: EnsuresNotProvenId,
+            title: EnsuresNotProvenTitle,
+            messageFormat: EnsuresNotProvenMessageFormat,
+            category: "Contracts",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: EnsuresNotProvenDescription);
+
+        public const string EnsuresUnsupportedId = "SP0019";
+        private static readonly LocalizableString EnsuresUnsupportedTitle = "Postcondition Could Not Be Verified";
+        private static readonly LocalizableString EnsuresUnsupportedMessageFormat = "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}";
+        private static readonly LocalizableString EnsuresUnsupportedDescription = "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface.";
+
+        public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = new DiagnosticDescriptor(
+            id: EnsuresUnsupportedId,
+            title: EnsuresUnsupportedTitle,
+            messageFormat: EnsuresUnsupportedMessageFormat,
+            category: "Contracts",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: EnsuresUnsupportedDescription);
+
+        public const string MisplacedEnsuresAttributeId = "SP0020";
+        private static readonly LocalizableString MisplacedEnsuresAttributeTitle = "Misplaced [Ensures] Attribute";
+        private static readonly LocalizableString MisplacedEnsuresAttributeMessageFormat = "The [Ensures] attribute can only be applied to method-like declarations";
+        private static readonly LocalizableString MisplacedEnsuresAttributeDescription = "[Ensures] configures symbolic postcondition analysis for a method-like declaration and should not be used on non-method declarations.";
+
+        public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule = new DiagnosticDescriptor(
+            id: MisplacedEnsuresAttributeId,
+            title: MisplacedEnsuresAttributeTitle,
+            messageFormat: MisplacedEnsuresAttributeMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: MisplacedEnsuresAttributeDescription);
+
+        public const string ComplexityExceededId = "SP0021";
+        public const string ExpectedComplexityProperty = "sharpproof.complexity.expected";
+        public const string ActualComplexityProperty = "sharpproof.complexity.actual";
+        public const string ComplexityUnknownReasonProperty = "sharpproof.complexity.unknown_reason";
+        private static readonly LocalizableString ComplexityExceededTitle = "Declared Complexity Exceeded";
+        private static readonly LocalizableString ComplexityExceededMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound";
+        private static readonly LocalizableString ComplexityExceededDescription = "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows.";
+
+        public static readonly DiagnosticDescriptor ComplexityExceededRule = new DiagnosticDescriptor(
+            id: ComplexityExceededId,
+            title: ComplexityExceededTitle,
+            messageFormat: ComplexityExceededMessageFormat,
+            category: "Complexity",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: ComplexityExceededDescription);
+
+        public const string ComplexityCouldNotBeVerifiedId = "SP0022";
+        private static readonly LocalizableString ComplexityCouldNotBeVerifiedTitle = "Declared Complexity Could Not Be Verified";
+        private static readonly LocalizableString ComplexityCouldNotBeVerifiedMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}";
+        private static readonly LocalizableString ComplexityCouldNotBeVerifiedDescription = "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound.";
+
+        public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = new DiagnosticDescriptor(
+            id: ComplexityCouldNotBeVerifiedId,
+            title: ComplexityCouldNotBeVerifiedTitle,
+            messageFormat: ComplexityCouldNotBeVerifiedMessageFormat,
+            category: "Complexity",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: ComplexityCouldNotBeVerifiedDescription);
+
+        public const string MisplacedExpectedComplexityAttributeId = "SP0023";
+        private static readonly LocalizableString MisplacedExpectedComplexityAttributeTitle = "Misplaced [ExpectedComplexity] Attribute";
+        private static readonly LocalizableString MisplacedExpectedComplexityAttributeMessageFormat = "The [ExpectedComplexity] attribute can only be applied to method-like declarations";
+        private static readonly LocalizableString MisplacedExpectedComplexityAttributeDescription = "[ExpectedComplexity] configures complexity-contract analysis for a method-like declaration and should not be used on non-method declarations.";
+
+        public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule = new DiagnosticDescriptor(
+            id: MisplacedExpectedComplexityAttributeId,
+            title: MisplacedExpectedComplexityAttributeTitle,
+            messageFormat: MisplacedExpectedComplexityAttributeMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: MisplacedExpectedComplexityAttributeDescription);
+
 
         public const string MisplacedAttributeId = "SP0003";
         private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";

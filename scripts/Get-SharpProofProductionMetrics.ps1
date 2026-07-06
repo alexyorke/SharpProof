@@ -56,6 +56,7 @@ try
             $repoPath = Convert-ToRepoPath $_.FullName
              $repoPath -notmatch '(^|/)(bin|obj)/' -and
              $repoPath -notmatch '^artifacts/' -and
+             $repoPath -notmatch '^docs/readme-examples/' -and
              $repoPath -notmatch '(^|/)\.[^/]+/' -and
              $repoPath -notmatch '^SharpProof\.(Test|ToolingTest)/' -and
              $repoPath -notmatch '^SharpProof\.(Demo|Smoke\.Net472)/'

@@ -33,7 +33,13 @@ namespace SharpProof.Analyzer
                                   SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
                                   SharpProofDiagnostics.CapabilityViolationRule,
                                   SharpProofDiagnostics.CapabilityUnknownRule,
-                                  SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule);
+                                  SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
+                                  SharpProofDiagnostics.EnsuresNotProvenRule,
+                                  SharpProofDiagnostics.EnsuresUnsupportedRule,
+                                  SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
+                                  SharpProofDiagnostics.ComplexityExceededRule,
+                                  SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
+                                  SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -65,6 +71,8 @@ namespace SharpProof.Analyzer
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, reportBclFallbackGuesses, baseline);
                         MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(c, baseline);
                         MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(c, baseline);
+                        MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(c, purityService, baseline);
+                        MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(c, baseline);
                         ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService);
                     }
                 },

@@ -8,24 +8,24 @@ usage, line-level invariants, runtime hazards, and conservative complexity.
 
 ## Preview Status
 
-SharpProof is still preview software. Treat the current branch and packages as
-alpha/beta quality rather than production-hardened tooling.
-
-The project has also been developed through rapid AI-assisted iteration, or
-"vibe-coded" development in the informal sense: broad feature growth, fast
-refactoring, and heavy test coverage, but not the kind of long-lived
-stabilization and compatibility discipline you would expect from a mature
-analysis platform.
-
-Expect rough edges:
-
-- analyzer false positives and false negatives
-- unsupported C# or library shapes that stay conservative or unknown
-- public API, CLI, configuration, and diagnostic-surface changes between preview releases
-
-The analyzer does not execute user code and does not attempt unbounded
-whole-program proof. When it cannot prove a fact within the implemented rules
-and budgets, it stays conservative.
+> [!WARNING]
+> SharpProof is still preview software. Treat the current branch and packages
+> as alpha/beta quality rather than production-hardened tooling.
+>
+> The project has also been developed through rapid AI-assisted iteration, or
+> "vibe-coded" development in the informal sense: broad feature growth, fast
+> refactoring, and heavy test coverage, but not the kind of long-lived
+> stabilization and compatibility discipline you would expect from a mature
+> analysis platform.
+>
+> Expect rough edges:
+> - analyzer false positives and false negatives
+> - unsupported C# or library shapes that stay conservative or unknown
+> - public API, CLI, configuration, and diagnostic-surface changes between preview releases
+>
+> The analyzer does not execute user code and does not attempt unbounded
+> whole-program proof. When it cannot prove a fact within the implemented rules
+> and budgets, it stays conservative.
 
 ## What SharpProof Does
 
@@ -129,79 +129,53 @@ Expected analyzer diagnostics:
 SP0002 Error docs/readme-examples/purity-clock/input.cs:7:16 Method 'ReadClock' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
 ```
 
-### Invariant query proves a branch-local fact
+### Pure-looking code without a contract gets a suggestion
 
-At a specific program point, the symbolic CLI can report the merged invariant, prove reachability, and check whether the current facts imply another condition.
+When a method looks pure but is not explicitly marked, SharpProof suggests adding `[EnforcePure]` with `SP0004`.
 
-Backed by test: `ReadmeGeneratedExamplesTests.InvariantsCliExample_MatchesSnapshot`.
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0004_MissingEnforcePureExample_MatchesSnapshot`.
 
-Command:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies "value > 0"
-```
-
-Source (`docs/readme-examples/invariants-positive/input.cs`):
+Source (`docs/readme-examples/sp0004-missing-enforce-pure/input.cs`):
 
 ```csharp
-public static class Example
+public sealed class TestClass
 {
-    public static int UseValue(int value)
+    public int Add(int left, int right)
     {
-        if (value > 0)
-        {
-            return value;
-        }
-
-        return 0;
+        return left + right;
     }
 }
 ```
 
-CLI output:
+Expected analyzer diagnostics:
 
 ```text
-docs/readme-examples/invariants-positive/input.cs:7:13
-Node: ReturnStatement
-Program point kind: Statement
-Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
-Method: UseValue
-Merged invariant: value > 0
-Invariant merge: Conjunction
-Path conditions: 1
-Conservative unknown conditions: 0
-Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoints=0
-Invariant query text: value > 0
-Invariant query status: Exact
-Invariant query status reason: all_candidate_program_points_exact
-Invariant query summary: Invariant query is exact for the selected reachable program points.
-Invariant query must facts: value > 0
-Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
-Invariant query target summary: All selected reachable program points agree on the facts for this target.
-Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
-Invariant query target path summary: This target has source-location path conditions available for invariant queries.
-Invariant query target path conditions: value > 0
-Invariant conditions:
-  [0] value > 0 target=value kind=SmtBinary
-Reachability: Reachable
-Reachability reason: branch_reachable
-Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
-Implication formula: value > 0
-Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 node=ReturnStatement programPointKind=Statement span=123-136
-Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
-Implication reason: branch_unreachable
-Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-Facts:
-  value > 0
+SP0004 Warning docs/readme-examples/sp0004-missing-enforce-pure/input.cs:3:16 Method 'Add' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.
+```
+
+### Method-level exception summaries
+
+With runtime-hazard summaries enabled, SharpProof can report the exception types that may escape a method body.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0010_ExceptionSummaryExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0010-exception-summary/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+public sealed class TestClass
+{
+    public int Divide(int value)
+    {
+        return value / 0;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0010 Info docs/readme-examples/sp0010-exception-summary/input.cs:4:16 Method 'Divide' can throw: System.DivideByZeroException
 ```
 
 ### Runtime hazard query proves guarded divide-by-zero
@@ -290,6 +264,110 @@ Expected analyzer diagnostics:
 SP0013 Warning docs/readme-examples/zero-allocations/input.cs:9:16 Method 'Create' is marked [ZeroAllocations], but operation 'new object()' allocates
 ```
 
+### Capability contracts catch disallowed side effects
+
+`[AllowedCapabilities]` is separate from purity. Here it rejects console I/O directly at the violating call site.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0015_CapabilityViolationExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0015-capability-violation/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod()
+    {
+        Console.WriteLine("hello");
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0015 Warning docs/readme-examples/sp0015-capability-violation/input.cs:10:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'Console.WriteLine("hello")' requires capabilities: IO, Console
+```
+
+### Invariant query proves a branch-local fact
+
+At a specific program point, the symbolic CLI can report the merged invariant, prove reachability, and check whether the current facts imply another condition.
+
+Backed by test: `ReadmeGeneratedExamplesTests.InvariantsCliExample_MatchesSnapshot`.
+
+Command:
+
+```powershell
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies "value > 0"
+```
+
+Source (`docs/readme-examples/invariants-positive/input.cs`):
+
+```csharp
+public static class Example
+{
+    public static int UseValue(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}
+```
+
+CLI output:
+
+```text
+docs/readme-examples/invariants-positive/input.cs:7:13
+Node: ReturnStatement
+Program point kind: Statement
+Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
+Method: UseValue
+Merged invariant: value > 0
+Invariant merge: Conjunction
+Path conditions: 1
+Conservative unknown conditions: 0
+Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoints=0
+Invariant query text: value > 0
+Invariant query status: Exact
+Invariant query status reason: all_candidate_program_points_exact
+Invariant query summary: Invariant query is exact for the selected reachable program points.
+Invariant query must facts: value > 0
+Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
+Invariant query target summary: All selected reachable program points agree on the facts for this target.
+Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
+Invariant query target path summary: This target has source-location path conditions available for invariant queries.
+Invariant query target path conditions: value > 0
+Invariant conditions:
+  [0] value > 0 target=value kind=SmtBinary
+Reachability: Reachable
+Reachability reason: branch_reachable
+Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
+Implication formula: value > 0
+Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 node=ReturnStatement programPointKind=Statement span=123-136
+Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
+Implication reason: branch_unreachable
+Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
+SMT:
+  Mode: Bounded
+  Enabled: True
+  Query timeout ms: 750
+  Method budget ms: 5000
+  Max path conditions: 192
+  Max expression nodes: 2048
+  Executed queries: 1
+  Cache entries: 1
+Facts:
+  value > 0
+```
+
 ### Capability query for console I/O
 
 The symbolic CLI can classify proven side-effect capability categories at a point inside a method, including derived umbrella categories such as `IO`.
@@ -373,12 +451,46 @@ Drivers:
   - [ForLoop] for-loop bound O(n) from n @ 6:9
 ```
 
+### Symbolic postconditions at method exits
+
+`[Ensures]` uses the bounded proof pipeline at each reachable return site and reports the exact exit that failed the declared postcondition.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0018_EnsuresNotProvenExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0018-ensures-failing-return/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures("result > 0")]
+    public int Identity()
+    {
+        return 0;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0018 Warning docs/readme-examples/sp0018-ensures-failing-return/input.cs:9:16 Method 'Identity' is marked [Ensures], but return site '0' does not prove postcondition 'result > 0'
+```
+
+For the full generated galleries:
+
+- [Diagnostic example gallery](docs/diagnostic-examples.md)
+- [Symbolic query examples](docs/symbolic-query-examples.md)
+
 ## What It Can Prove Today
 
 - Analyzer contracts:
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
-  `[AllowedCapabilities(...)]`, and related diagnostics from `SP0002` through
-  `SP0017`.
+  `[AllowedCapabilities(...)]`, `[Ensures(...)]`,
+  `[ExpectedComplexity(...)]`, and related diagnostics from `SP0002` through
+  `SP0023`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
@@ -396,6 +508,8 @@ Drivers:
 
 ## Deeper Docs
 
+- [Diagnostic example gallery](docs/diagnostic-examples.md)
+- [Symbolic query examples](docs/symbolic-query-examples.md)
 - [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)
 - [Capability analysis and `[AllowedCapabilities]`](docs/capability-analysis.md)
 - [Complexity query behavior](docs/complexity-queries.md)
