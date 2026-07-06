@@ -1,0 +1,24 @@
+docs/readme-examples/runtime-hazard-divide-by-zero/input.cs
+Line: 7
+Runtime hazards: 1
+Hazard status summary: Proven=1
+Hazard exception summary: System.DivideByZeroException=1
+Hazard category summary: definite_divide_by_zero=1
+
+docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Proven
+Exception: System.DivideByZeroException
+Category: definite_divide_by_zero
+Reason: ir_state_contains_condition
+Node: DivideExpression 133-145
+Operation: 10 / divisor
+Trigger: SmtBinaryFormula { Kind = Bool, Operator = Equal, Left = SmtVariable { Kind = Int, Name = divisor#63 }, Right = SmtIntegerConstant { Kind = Int, Value = 0 } }
+Invariant: divisor == 0
+SMT:
+  Mode: Bounded
+  Enabled: True
+  Query timeout ms: 750
+  Method budget ms: 5000
+  Max path conditions: 192
+  Max expression nodes: 2048
+  Executed queries: 1
+  Cache entries: 1

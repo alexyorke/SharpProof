@@ -189,7 +189,8 @@ Consumers can use those fields to reject summaries generated from a different ru
 
 ## Remaining work tracking
 
-Public roadmap items now live in `README.md`.
+The root `README.md` is intentionally the landing page. Use this document for
+the detailed effect-summary behavior and workflow.
 
 This document stays descriptive: how the tool works, what evidence it emits,
 and how the analyzer consumes that evidence. It should not carry a parallel

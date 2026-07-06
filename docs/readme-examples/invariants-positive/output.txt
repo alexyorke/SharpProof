@@ -1,0 +1,41 @@
+docs/readme-examples/invariants-positive/input.cs:7:13
+Node: ReturnStatement
+Program point kind: Statement
+Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
+Method: UseValue
+Merged invariant: value > 0
+Invariant merge: Conjunction
+Path conditions: 1
+Conservative unknown conditions: 0
+Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoints=0
+Invariant query text: value > 0
+Invariant query status: Exact
+Invariant query status reason: all_candidate_program_points_exact
+Invariant query summary: Invariant query is exact for the selected reachable program points.
+Invariant query must facts: value > 0
+Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
+Invariant query target summary: All selected reachable program points agree on the facts for this target.
+Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
+Invariant query target path summary: This target has source-location path conditions available for invariant queries.
+Invariant query target path conditions: value > 0
+Invariant conditions:
+  [0] value > 0 target=value kind=SmtBinary
+Reachability: Reachable
+Reachability reason: branch_reachable
+Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
+Implication formula: value > 0
+Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 node=ReturnStatement programPointKind=Statement span=123-136
+Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
+Implication reason: branch_unreachable
+Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
+SMT:
+  Mode: Bounded
+  Enabled: True
+  Query timeout ms: 750
+  Method budget ms: 5000
+  Max path conditions: 192
+  Max expression nodes: 2048
+  Executed queries: 1
+  Cache entries: 1
+Facts:
+  value > 0
