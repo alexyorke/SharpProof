@@ -126,6 +126,7 @@ namespace SharpProof.Test
             normalized = Regex.Replace(normalized, @"position=\d+", "position=<offset>");
             normalized = Regex.Replace(normalized, @"span=\d+-\d+", "span=<offset-range>");
             normalized = Regex.Replace(normalized, @"Node: ([^\r\n]+?) \d+-\d+", "Node: $1 <offset-range>");
+            normalized = Regex.Replace(normalized, @"\b([A-Za-z_][A-Za-z0-9_]*)#\d+\b", "$1#<version>");
             return normalized;
         }
 
