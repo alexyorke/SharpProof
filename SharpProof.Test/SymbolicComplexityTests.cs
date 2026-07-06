@@ -455,5 +455,16 @@ public static class C
 
             return line;
         }
+
+        [Test]
+        public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException()
+        {
+            var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryComplexity(
+                new SymbolicComplexityRequest(
+                    SymbolicSourceInput.FromText("class C { }", "SymbolicComplexityTests.cs"),
+                    SymbolicQueryTarget.AllLines())));
+
+            Assert.That(ex!.Message, Is.EqualTo("Complexity queries support point, position, line, or node targets only."));
+        }
     }
 }

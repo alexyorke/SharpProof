@@ -233,5 +233,16 @@ public static class C
                     SymbolicSourceInput.FromText(source, "CapabilityTests.cs"),
                     SymbolicQueryTarget.Position(position)));
         }
+
+        [Test]
+        public void QueryCapabilities_AllLinesTarget_ThrowsNotSupportedException()
+        {
+            var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryCapabilities(
+                new SymbolicCapabilityRequest(
+                    SymbolicSourceInput.FromText("class C { }", "CapabilityTests.cs"),
+                    SymbolicQueryTarget.AllLines())));
+
+            Assert.That(ex!.Message, Is.EqualTo("Capability queries support point, position, line, or node targets only."));
+        }
     }
 }

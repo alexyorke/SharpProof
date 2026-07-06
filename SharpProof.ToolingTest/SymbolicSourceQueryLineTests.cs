@@ -588,6 +588,34 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicQueryService_QueryRuntimeHazards_RequiresSmtAnalysis()
+        {
+            var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().QueryRuntimeHazards(
+                new SymbolicRuntimeHazardRequest(
+                    SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "HazardInput.cs"),
+                    SymbolicQueryTarget.AllLines(),
+                    SymbolicQueryOptions.Default)));
+
+            Assert.That(ex!.Message, Does.Contain("Runtime hazard queries require SMT analysis."));
+        }
+
+        [Test]
+        public void SymbolicQueryService_Prove_RequiresPointTarget()
+        {
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().Prove(
+                new SymbolicConditionProofRequest(
+                    SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "ProofInput.cs"),
+                    SymbolicQueryTarget.Line(1),
+                    "value > 0",
+                    new SymbolicQueryOptions(
+                        references: AnalyzerTestHost.GetTrustedPlatformReferences(),
+                        smtAnalysis: smtAnalysis))));
+
+            Assert.That(ex!.Message, Does.Contain("Condition proof requests require a point target."));
+        }
+
+        [Test]
         public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
         {
             var assembly = typeof(SymbolicQueryService).Assembly;
