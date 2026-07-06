@@ -805,6 +805,23 @@ namespace SharpProof.Symbolic
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
+        public string GetDisplayStatusReason()
+        {
+            if (string.IsNullOrWhiteSpace(StatusReason))
+            {
+                return StatusReason;
+            }
+
+            return StatusReason switch
+            {
+                "unsupported_formula_fallback" => "unsupported formula fallback; legacy translated trigger was not trusted as proof",
+                "smt_disabled" => "SMT disabled",
+                "trigger_always_true" => "trigger condition is always true",
+                "trigger_always_false" => "trigger condition is always false",
+                _ => StatusReason,
+            };
+        }
+
         private static SymbolicProofStatus MapProofStatus(SymbolicRuntimeHazardStatus status)
         {
             return status switch

@@ -265,7 +265,7 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
         Console.WriteLine($"{hazard.FilePath}:{hazard.Line}:{hazard.Column} {hazard.Kind} {hazard.Status}");
         Console.WriteLine($"Exception: {hazard.ExceptionType}");
         Console.WriteLine($"Category: {hazard.Category}");
-        Console.WriteLine($"Reason: {hazard.StatusReason}");
+        Console.WriteLine($"Reason: {hazard.GetDisplayStatusReason()}");
         Console.WriteLine($"Node: {hazard.NodeKind} {hazard.SpanStart}-{hazard.SpanEnd}");
         Console.WriteLine($"Operation: {hazard.OperationText}");
         Console.WriteLine($"Trigger: {hazard.TriggerCondition}");

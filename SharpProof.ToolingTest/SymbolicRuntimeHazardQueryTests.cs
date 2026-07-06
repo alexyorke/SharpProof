@@ -4179,6 +4179,9 @@ public class TestClass
             Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.None));
             Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
             Assert.That(hazard.Proof.Reason, Is.EqualTo("unsupported_formula_fallback"));
+            Assert.That(
+                hazard.GetDisplayStatusReason(),
+                Is.EqualTo("unsupported formula fallback; legacy translated trigger was not trusted as proof"));
         }
 
         private static SymbolicRuntimeHazardQueryResult QueryLine(
