@@ -490,7 +490,7 @@ function Get-SharpProofDefaultWorkerCount
         'MainSmtOracle' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
         'MainSmtAnalyzer' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
         'MainSmtFlow' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
-        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 11)) }
+        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
         'Tooling'
         {
             $defaultWorkerCount = 20
