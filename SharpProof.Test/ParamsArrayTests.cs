@@ -36,7 +36,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -65,7 +65,7 @@ public class TestClass
         return Sum(1, 2, 3, 4, 5);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -95,7 +95,7 @@ public class TestClass
         return Sum(myArray);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -125,7 +125,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -151,7 +151,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -288,6 +288,11 @@ public class TestClass
             var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(22, 24, 22, 34).WithArguments("TestMethod");
             await VerifyCS.VerifyAnalyzerAsync(testCode, expectedImpureAction, expectedProcessNumbers, expectedTestMethod);
         }
+
+        private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            Assert.That(diagnostics, Is.Empty);
+        }
     }
 }
-
