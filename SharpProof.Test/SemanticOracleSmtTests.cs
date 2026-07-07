@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,6 +15,7 @@ using SearchLib.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public class SemanticOracleSmtTests
     {
         private const string GeneratedRegexFactorySource = @"
@@ -780,14 +782,12 @@ public class TestClass
             string source,
             string assemblyName)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 assemblyName,
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
 
-            return (compilation.GetSemanticModel(syntaxTree), syntaxTree.GetRoot());
+            return (context.SemanticModel, context.Root);
         }
 
         [Test]
@@ -2249,19 +2249,16 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "SymbolicProgramPointAnalysisHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var statement = syntaxTree.GetRoot()
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
+            var statement = context.Root
                 .DescendantNodes()
                 .OfType<ReturnStatementSyntax>()
                 .Single(node => node.Expression?.ToString() == "value");
 
-            var analysis = new SymbolicInvariantService().AnalyzeAt(statement, semanticModel, cancellationToken: CancellationToken.None);
+            var analysis = new SymbolicInvariantService().AnalyzeAt(statement, context.SemanticModel, cancellationToken: CancellationToken.None);
 
             Assert.That(analysis.PathConditions, Is.Not.Empty);
             Assert.That(analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
@@ -14746,6 +14743,18 @@ public class TestClass
             Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
         }
 
+        private static readonly Type ExecutionVisibilityType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
+            .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!;
+
+        private static readonly MethodInfo IsConditionAlwaysFalseMethod = ExecutionVisibilityType
+            .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        private static readonly MethodInfo IsConditionAlwaysTrueMethod = ExecutionVisibilityType
+            .GetMethod("IsConditionAlwaysTrue", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        private static readonly MethodInfo IsInStaticallyUnreachableBranchMethod = ExecutionVisibilityType
+            .GetMethod("IsInStaticallyUnreachableBranch", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+
         private static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
         {
             return AnalyzerTestHost.GetDiagnosticsAsync(
@@ -14756,117 +14765,89 @@ public class TestClass
         private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")
         {
             var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            var method = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod("IsConditionAlwaysFalse", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-
-            return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+            return (bool)IsConditionAlwaysFalseMethod.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
 
         private static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression, string extraSource = "")
         {
             var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            var method = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod("IsConditionAlwaysTrue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-
-            return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+            return (bool)IsConditionAlwaysTrueMethod.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
 
         private static bool IsStatementUnreachable(string source, string statementText)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "StatementReachabilityHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var statement = syntaxTree.GetRoot()
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
+            var statement = context.Root
                 .DescendantNodes()
                 .OfType<StatementSyntax>()
                 .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
-            var method = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
-            return (bool)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
+            return (bool)IsInStaticallyUnreachableBranchMethod.Invoke(null, new object?[] { statement, context.SemanticModel, CancellationToken.None })!;
         }
 
         private static bool IsExpressionUnreachable(string source, string expressionText)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "ExpressionReachabilityHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var expression = syntaxTree.GetRoot()
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
+            var expression = context.Root
                 .DescendantNodes()
                 .OfType<ExpressionSyntax>()
                 .Where(node => string.Equals(node.ToString(), expressionText, StringComparison.Ordinal))
                 .OrderBy(static node => node.Span.Length)
                 .First();
-            var method = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
-            return (bool)method.Invoke(null, new object?[] { expression, semanticModel, CancellationToken.None })!;
+            return (bool)IsInStaticallyUnreachableBranchMethod.Invoke(null, new object?[] { expression, context.SemanticModel, CancellationToken.None })!;
         }
 
         private static string[] CollectProgramPointFacts(string source, string statementPrefix)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "ProgramPointFactHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var statement = syntaxTree.GetRoot()
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
+            var statement = context.Root
                 .DescendantNodes()
                 .OfType<StatementSyntax>()
                 .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
-            var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel, CancellationToken.None);
+            var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
         }
 
         private static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "CompletedLoopFactHost",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var loopStatement = syntaxTree.GetRoot()
+                AnalyzerTestHost.GetMinimalFrameworkReferences());
+            var loopStatement = context.Root
                 .DescendantNodes()
                 .OfType<StatementSyntax>()
                 .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
             return SymbolicProgramPointFacts
-                .CollectCompletedLoopExitInvariantFacts(loopStatement, semanticModel, CancellationToken.None)
+                .CollectCompletedLoopExitInvariantFacts(loopStatement, context.SemanticModel, CancellationToken.None)
                 .Select(static fact => SymbolicFormulaDisplay.Format(fact))
                 .ToArray();
         }
 
         private static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source);
-            var compilation = CSharpCompilation.Create(
+            var context = AnalyzerTestHost.CreateSourceContext(
+                source,
                 "SymbolicFactsTest",
-                new[] { syntaxTree },
-                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var expression = syntaxTree.GetRoot()
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(typeof(object).Assembly.Location)),
+                parseOptions: null);
+            var expression = context.Root
                 .DescendantNodes()
                 .OfType<ExpressionSyntax>()
                 .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
-            var snapshot = new SymbolicInvariantService().GetInvariantsAt(expression, semanticModel, CancellationToken.None);
+            var snapshot = new SymbolicInvariantService().GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
         }

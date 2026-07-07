@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,9 @@ namespace SharpProof.Test
     [TestFixture]
     public class AnalyzerPackagingTests
     {
+        private static readonly ConcurrentDictionary<string, Lazy<Task<PreparedConsumerTemplate>>> PreparedConsumerTemplates =
+            new(StringComparer.Ordinal);
+
         private sealed class SimpleAnalyzerAssemblyLoader : IAnalyzerAssemblyLoader
         {
             public void AddDependencyLocation(string fullPath)
@@ -515,12 +519,20 @@ public sealed class Demo
 
             foreach (var scenario in scenarios)
             {
-                var buildResult = await BuildDisposablePackageConsumerAsync(
-                    packageId: "SharpProof",
-                    packageVersion,
-                    packageSource,
-                    source: scenario.Source,
-                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
+                var buildResult = scenario == scenarios[0]
+                    ? await BuildDisposablePackageConsumerAsync(
+                        packageId: "SharpProof",
+                        packageVersion,
+                        packageSource,
+                        source: scenario.Source,
+                        editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false)
+                    : await BuildPreparedPackageConsumerAsync(
+                        await GetPreparedConsumerTemplateAsync(
+                            packageId: "SharpProof",
+                            packageVersion,
+                            packageSource).ConfigureAwait(false),
+                        source: scenario.Source,
+                        editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
 
                 Assert.That(
                     buildResult.ExitCode,
@@ -936,6 +948,25 @@ public static class TestClass
             Assert.That(source, Does.Contain("SharpProof.Attributes package"));
         }
 
+        [OneTimeTearDown]
+        public void CleanupPreparedConsumerTemplates()
+        {
+            foreach (var templateFactory in PreparedConsumerTemplates.Values)
+            {
+                if (!templateFactory.IsValueCreated ||
+                    !templateFactory.Value.IsCompletedSuccessfully)
+                {
+                    continue;
+                }
+
+                var template = templateFactory.Value.GetAwaiter().GetResult();
+                if (Directory.Exists(template.RootDirectory))
+                {
+                    Directory.Delete(template.RootDirectory, recursive: true);
+                }
+            }
+        }
+
         private static string ReadPackageVersion(string projectPath, string elementName)
         {
             var document = XDocument.Load(projectPath);
@@ -1080,6 +1111,126 @@ public static class TestClass
             }
         }
 
+        private static Task<PreparedConsumerTemplate> GetPreparedConsumerTemplateAsync(
+            string packageId,
+            string packageVersion,
+            string packageSource)
+        {
+            var templateKey = string.Join("|", packageId, packageVersion, packageSource);
+            var templateFactory = PreparedConsumerTemplates.GetOrAdd(
+                templateKey,
+                _ => new Lazy<Task<PreparedConsumerTemplate>>(
+                    () => CreatePreparedConsumerTemplateAsync(
+                        packageId,
+                        packageVersion,
+                        packageSource)));
+
+            return templateFactory.Value;
+        }
+
+        private static async Task<PreparedConsumerTemplate> CreatePreparedConsumerTemplateAsync(
+            string packageId,
+            string packageVersion,
+            string packageSource)
+        {
+            var probeRoot = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "analyzer-package-template-" + packageId + "-" + Guid.NewGuid().ToString("N"));
+            var packageCache = Path.Combine(probeRoot, ".nuget");
+
+            Directory.CreateDirectory(probeRoot);
+
+            var newResult = await RunDotnetAsync(
+                probeRoot,
+                packageCache,
+                "new",
+                "classlib",
+                "--framework",
+                "net8.0",
+                "--name",
+                "Probe").ConfigureAwait(false);
+            Assert.That(newResult.ExitCode, Is.EqualTo(0), newResult.Output);
+
+            var projectDirectory = Path.Combine(probeRoot, "Probe");
+            var addPackageResult = await RunDotnetAsync(
+                projectDirectory,
+                packageCache,
+                "add",
+                "package",
+                packageId,
+                "--version",
+                packageVersion,
+                "--source",
+                packageSource).ConfigureAwait(false);
+            Assert.That(addPackageResult.ExitCode, Is.EqualTo(0), addPackageResult.Output);
+
+            return new PreparedConsumerTemplate(probeRoot, projectDirectory, packageCache);
+        }
+
+        private static async Task<ProcessResult> BuildPreparedPackageConsumerAsync(
+            PreparedConsumerTemplate template,
+            string source,
+            string? editorConfigText = null)
+        {
+            var probeRoot = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "analyzer-package-scenario-" + Guid.NewGuid().ToString("N"));
+
+            Directory.CreateDirectory(probeRoot);
+            try
+            {
+                var projectDirectory = Path.Combine(probeRoot, "Probe");
+                CopyDirectory(template.ProjectDirectory, projectDirectory);
+
+                File.WriteAllText(Path.Combine(projectDirectory, "Class1.cs"), source);
+                var editorConfigPath = Path.Combine(projectDirectory, ".editorconfig");
+                if (string.IsNullOrWhiteSpace(editorConfigText))
+                {
+                    if (File.Exists(editorConfigPath))
+                    {
+                        File.Delete(editorConfigPath);
+                    }
+                }
+                else
+                {
+                    File.WriteAllText(editorConfigPath, editorConfigText);
+                }
+
+                return await RunDotnetAsync(
+                    projectDirectory,
+                    template.PackageCacheDirectory,
+                    "build",
+                    "--no-restore",
+                    "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+            }
+            finally
+            {
+                if (Directory.Exists(probeRoot))
+                {
+                    Directory.Delete(probeRoot, recursive: true);
+                }
+            }
+        }
+
+        private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
+        {
+            Directory.CreateDirectory(destinationDirectory);
+
+            foreach (var directory in Directory.EnumerateDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+            {
+                var relativePath = Path.GetRelativePath(sourceDirectory, directory);
+                Directory.CreateDirectory(Path.Combine(destinationDirectory, relativePath));
+            }
+
+            foreach (var filePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+            {
+                var relativePath = Path.GetRelativePath(sourceDirectory, filePath);
+                var destinationPath = Path.Combine(destinationDirectory, relativePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                File.Copy(filePath, destinationPath, overwrite: true);
+            }
+        }
+
         private static string CreateAnalyzerSeverityEditorConfig(string[] diagnosticIds)
         {
             var builder = new StringBuilder()
@@ -1144,5 +1295,6 @@ public static class TestClass
 
         private readonly record struct ProcessResult(int ExitCode, string Output);
         private readonly record struct ConsumerPackageScenario(string Name, string Source, string[] ExpectedDiagnosticIds);
+        private readonly record struct PreparedConsumerTemplate(string RootDirectory, string ProjectDirectory, string PackageCacheDirectory);
     }
 }

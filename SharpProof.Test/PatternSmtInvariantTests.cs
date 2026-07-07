@@ -7,6 +7,7 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public sealed class PatternSmtInvariantTests
     {
         [Test]

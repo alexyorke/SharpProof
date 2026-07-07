@@ -98,15 +98,13 @@ namespace System.Experimental
         public async Task RuntimeHazardCliExample_MatchesSnapshot()
         {
             const string exampleId = "runtime-hazard-divide-by-zero";
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            await VerifyCliExampleAsync(
+                exampleId,
                 "--file",
                 ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 "--line",
                 "7",
                 "--runtime-hazards");
-
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         [ReadmeExample("sp0012-bcl-fallback-guess")]
@@ -202,15 +200,13 @@ namespace System.Experimental
         public async Task CapabilitiesCliExample_MatchesSnapshot()
         {
             const string exampleId = "capabilities-console";
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            await VerifyCliExampleAsync(
+                exampleId,
                 "--file",
                 ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 "--line",
                 "7",
                 "--capabilities");
-
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         [ReadmeExample("symbolic-unknown-dynamic")]
@@ -218,15 +214,13 @@ namespace System.Experimental
         public async Task SymbolicUnknownCapabilitiesCliExample_MatchesSnapshot()
         {
             const string exampleId = "symbolic-unknown-dynamic";
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            await VerifyCliExampleAsync(
+                exampleId,
                 "--file",
                 ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 "--line",
                 "5",
                 "--capabilities");
-
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         [ReadmeExample("invariants-positive")]
@@ -234,7 +228,8 @@ namespace System.Experimental
         public async Task InvariantsCliExample_MatchesSnapshot()
         {
             const string exampleId = "invariants-positive";
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            await VerifyCliExampleAsync(
+                exampleId,
                 "--file",
                 ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 "--line",
@@ -244,9 +239,6 @@ namespace System.Experimental
                 "--check-reachability",
                 "--implies",
                 "value > 0");
-
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         [ReadmeExample("complexity-linear")]
@@ -254,15 +246,13 @@ namespace System.Experimental
         public async Task ComplexityCliExample_MatchesSnapshot()
         {
             const string exampleId = "complexity-linear";
-            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            await VerifyCliExampleAsync(
+                exampleId,
                 "--file",
                 ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 "--line",
                 "10",
                 "--complexity");
-
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         [Test]
@@ -321,6 +311,14 @@ namespace System.Experimental
 
             var formatted = ReadmeExampleFixture.FormatDiagnostics(diagnostics);
             ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, formatted);
+        }
+
+        private static async Task VerifyCliExampleAsync(string exampleId, params string[] arguments)
+        {
+            var result = await SymbolicCliTestHost.RunAsync(arguments);
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);
         }
 
         private static MetadataOnlyAssemblyFixture CreateMetadataOnlyAssemblyFixture(

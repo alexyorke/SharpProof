@@ -23,7 +23,7 @@ public sealed class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--complexity",

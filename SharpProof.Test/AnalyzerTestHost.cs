@@ -55,6 +55,12 @@ namespace SharpProof.Test
             ExpressionSyntax PathCondition,
             ExpressionSyntax Conclusion);
 
+        internal readonly record struct SourceContext(
+            CSharpCompilation Compilation,
+            SemanticModel SemanticModel,
+            SyntaxTree SyntaxTree,
+            SyntaxNode Root);
+
         public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
             string source,
             ImmutableDictionary<string, string>? globalOptions = null,
@@ -63,6 +69,7 @@ namespace SharpProof.Test
             string? sourcePath = null,
             bool autoEnableEffectSummaryJsonForAdditionalFiles = true,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool concurrentAnalysis = false,
             string compilationName = "AnalyzerTestHost")
         {
             return await GetDiagnosticsAsync(
@@ -73,6 +80,7 @@ namespace SharpProof.Test
                 sourcePath,
                 autoEnableEffectSummaryJsonForAdditionalFiles,
                 frameworkReferences,
+                concurrentAnalysis,
                 additionalMetadataReferences: null,
                 compilationName: compilationName);
         }
@@ -85,6 +93,7 @@ namespace SharpProof.Test
             string? sourcePath,
             bool autoEnableEffectSummaryJsonForAdditionalFiles,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool concurrentAnalysis = false,
             ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
             string compilationName = "AnalyzerTestHost")
         {
@@ -116,7 +125,7 @@ namespace SharpProof.Test
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
-                    concurrentAnalysis: true,
+                    concurrentAnalysis: concurrentAnalysis,
                     logAnalyzerExecutionTime: false,
                     reportSuppressedDiagnostics: false));
 
@@ -204,6 +213,41 @@ public static class ConditionHost
                 .Expression!;
 
             return new ConditionContext(semanticModel, returnExpression);
+        }
+
+        public static SourceContext CreateSourceContext(
+            string source,
+            string compilationName,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool allowUnsafe = false,
+            string? sourcePath = null,
+            CSharpParseOptions? parseOptions = null,
+            CSharpCompilationOptions? compilationOptions = null,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                parseOptions ?? PreviewParseOptions,
+                path: sourcePath ?? string.Empty);
+
+            var references = frameworkReferences ?? GetMinimalFrameworkReferences();
+            if (additionalMetadataReferences.HasValue)
+            {
+                references = references.AddRange(additionalMetadataReferences.Value);
+            }
+
+            var options = compilationOptions ?? (allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions);
+            var compilation = CSharpCompilation.Create(
+                compilationName,
+                new[] { syntaxTree },
+                references,
+                options);
+
+            return new SourceContext(
+                compilation,
+                compilation.GetSemanticModel(syntaxTree),
+                syntaxTree,
+                syntaxTree.GetRoot());
         }
 
         public static ConditionImplicationContext CreateConditionImplicationContext(

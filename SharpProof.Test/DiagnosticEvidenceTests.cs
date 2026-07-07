@@ -23,6 +23,7 @@ using InMemoryAdditionalText = SharpProof.Test.AnalyzerTestHost.InMemoryAddition
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public partial class DiagnosticEvidenceTests
     {
         private const string BclFallbackFixtureSource = @"

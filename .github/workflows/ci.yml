@@ -33,7 +33,7 @@ jobs:
       - name: Build solution
         run: dotnet build SharpProof.sln --configuration Release --no-restore
 
-      - name: Test main and tooling lanes concurrently
+      - name: Test lanes
         shell: pwsh
         run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
 

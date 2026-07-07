@@ -18,7 +18,7 @@ param(
     [string]$Filter = '',
 
     [Parameter()]
-    [ValidateSet('All', 'Main', 'Tooling')]
+    [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
     [string]$TestLane = 'Main',
 
     [Parameter()]
@@ -220,7 +220,7 @@ function Resolve-SharpProofTestProjects
 {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('All', 'Main', 'Tooling')]
+        [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
         [string]$RequestedLane,
 
         [Parameter(Mandatory = $true)]
@@ -231,21 +231,35 @@ function Resolve-SharpProofTestProjects
     $mainProject = [ordered]@{
         Name = 'Main'
         ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = ''
+    }
+    $mainSmtProject = [ordered]@{
+        Name = 'MainSmt'
+        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = 'TestCategory=SmtHeavy'
+    }
+    $mainGeneralProject = [ordered]@{
+        Name = 'MainGeneral'
+        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = 'TestCategory!=SmtHeavy'
     }
     $toolingProject = [ordered]@{
         Name = 'Tooling'
         ProjectPath = 'SharpProof.ToolingTest\SharpProof.ToolingTest.csproj'
+        LaneFilter = ''
     }
 
     switch ($RequestedLane)
     {
         'Main' { return @($mainProject) }
+        'MainSmt' { return @($mainSmtProject) }
+        'MainGeneral' { return @($mainGeneralProject) }
         'Tooling' { return @($toolingProject) }
     }
 
     if ([string]::IsNullOrWhiteSpace($Filter))
     {
-        return @($mainProject, $toolingProject)
+        return @($mainSmtProject, $mainGeneralProject, $toolingProject)
     }
 
     $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
@@ -301,36 +315,79 @@ function Resolve-SharpProofTestProjects
     return @($mainProject, $toolingProject)
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$testRunStartedAt = Get-Date
-$initialTestWorkerIds = @(Get-SharpProofTestWorkerProcesses -RepoRoot $repoRoot | ForEach-Object { [int]$_.ProcessId })
-$settingsPath = ''
-$effectiveWorkers = if ($PSBoundParameters.ContainsKey('Workers'))
+function Get-SharpProofDefaultWorkerCount
 {
-    $Workers
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Main', 'MainSmt', 'MainGeneral', 'Tooling')]
+        [string]$LaneName
+    )
+
+    $processorCount = [Environment]::ProcessorCount
+    switch ($LaneName)
+    {
+        'Main' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
+        'MainSmt' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
+        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 20)) }
+        'Tooling' { return [Math]::Max(1, [Math]::Min($processorCount, 20)) }
+    }
 }
-else
+
+function Join-SharpProofTestFilter
 {
-    [Math]::Max(1, [Math]::Min([Environment]::ProcessorCount, 20))
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$UserFilter,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$LaneFilter
+    )
+
+    if ([string]::IsNullOrWhiteSpace($UserFilter))
+    {
+        return $LaneFilter
+    }
+
+    if ([string]::IsNullOrWhiteSpace($LaneFilter))
+    {
+        return $UserFilter
+    }
+
+    return "($UserFilter)&($LaneFilter)"
 }
-$useGeneratedRunSettings = $effectiveWorkers -gt 0 -or $FailFast
-if ($useGeneratedRunSettings)
+
+function New-SharpProofRunSettings
 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$WorkerCount,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$EnableFailFast
+    )
+
+    if ($WorkerCount -le 0 -and -not $EnableFailFast)
+    {
+        return ''
+    }
+
     $settingsPath = Join-Path ([System.IO.Path]::GetTempPath()) ('sharpproof-test-' + [guid]::NewGuid().ToString('N') + '.runsettings')
 
     $runConfigurationLines = New-Object System.Collections.Generic.List[string]
-    if ($effectiveWorkers -gt 0)
+    if ($WorkerCount -gt 0)
     {
-        $runConfigurationLines.Add("    <MaxCpuCount>$effectiveWorkers</MaxCpuCount>")
+        $runConfigurationLines.Add("    <MaxCpuCount>$WorkerCount</MaxCpuCount>")
     }
 
     $nunitLines = New-Object System.Collections.Generic.List[string]
-    if ($effectiveWorkers -gt 0)
+    if ($WorkerCount -gt 0)
     {
-        $nunitLines.Add("    <NumberOfTestWorkers>$effectiveWorkers</NumberOfTestWorkers>")
+        $nunitLines.Add("    <NumberOfTestWorkers>$WorkerCount</NumberOfTestWorkers>")
     }
 
-    if ($FailFast)
+    if ($EnableFailFast)
     {
         $nunitLines.Add('    <StopOnError>true</StopOnError>')
     }
@@ -362,7 +419,13 @@ if ($useGeneratedRunSettings)
 "@
 
     Set-Content -LiteralPath $settingsPath -Value $settingsXml -Encoding utf8
+    return $settingsPath
 }
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$testRunStartedAt = Get-Date
+$initialTestWorkerIds = @(Get-SharpProofTestWorkerProcesses -RepoRoot $repoRoot | ForEach-Object { [int]$_.ProcessId })
+$laneSettingsPaths = New-Object System.Collections.Generic.List[string]
 
 $effectiveResultsDirectory = $ResultsDirectory
 if ($Profile -and [string]::IsNullOrWhiteSpace($effectiveResultsDirectory))
@@ -398,6 +461,21 @@ try
     $projectCount = $selectedProjects.Count
     $laneSpecs = @(foreach ($project in $selectedProjects)
     {
+        $effectiveFilter = Join-SharpProofTestFilter -UserFilter $Filter -LaneFilter $project.LaneFilter
+        $projectWorkers = if ($PSBoundParameters.ContainsKey('Workers'))
+        {
+            $Workers
+        }
+        else
+        {
+            Get-SharpProofDefaultWorkerCount -LaneName $project.Name
+        }
+        $projectSettingsPath = New-SharpProofRunSettings -WorkerCount $projectWorkers -EnableFailFast $FailFast.IsPresent
+        if (-not [string]::IsNullOrWhiteSpace($projectSettingsPath))
+        {
+            $laneSettingsPaths.Add($projectSettingsPath)
+        }
+
         $projectResultsDirectory = $effectiveResultsDirectory
         if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory) -and $projectCount -gt 1)
         {
@@ -415,10 +493,10 @@ try
         $testArgs.Add('/nodeReuse:false')
         $testArgs.Add('-p:UseSharedCompilation=false')
 
-        if ($useGeneratedRunSettings)
+        if (-not [string]::IsNullOrWhiteSpace($projectSettingsPath))
         {
             $testArgs.Add('--settings')
-            $testArgs.Add($settingsPath)
+            $testArgs.Add($projectSettingsPath)
         }
 
         if ($NoBuild)
@@ -426,10 +504,10 @@ try
             $testArgs.Add('--no-build')
         }
 
-        if (-not [string]::IsNullOrWhiteSpace($Filter))
+        if (-not [string]::IsNullOrWhiteSpace($effectiveFilter))
         {
             $testArgs.Add('--filter')
-            $testArgs.Add($Filter)
+            $testArgs.Add($effectiveFilter)
         }
 
         if (-not [string]::IsNullOrWhiteSpace($projectResultsDirectory))
@@ -452,8 +530,10 @@ try
         [pscustomobject]@{
             Name = [string]$project.Name
             ProjectPath = [string]$project.ProjectPath
+            WorkerCount = $projectWorkers
             TestArgs = $testArgs
             ResultsDirectory = $projectResultsDirectory
+            SettingsPath = $projectSettingsPath
         }
     })
 
@@ -463,14 +543,22 @@ try
     {
         # Concurrent lanes must not build concurrently: they share most of the project
         # graph and MSBuild does not coordinate simultaneous writes to the same outputs.
+        $builtProjects = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
         foreach ($spec in $laneSpecs)
         {
+            if ($builtProjects.Contains($spec.ProjectPath))
+            {
+                continue
+            }
+
             & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds build $spec.ProjectPath --configuration $Configuration --verbosity minimal
             if ($LASTEXITCODE -ne 0)
             {
                 $exitCode = $LASTEXITCODE
                 break
             }
+
+            $builtProjects.Add($spec.ProjectPath) | Out-Null
         }
 
         if ($exitCode -eq 0)
@@ -527,7 +615,8 @@ try
         })
 
         $foregroundSpec = $laneSpecs[0]
-        Write-Host "Running the $($foregroundSpec.Name) lane with $($backgroundLanes.Count) lane(s) in the background: $(($backgroundLanes | ForEach-Object { $_.Spec.Name }) -join ', ')"
+        $backgroundLaneSummary = ($backgroundLanes | ForEach-Object { "$($_.Spec.Name) [$($_.Spec.WorkerCount)]" }) -join ', '
+        Write-Host "Running the $($foregroundSpec.Name) lane ($($foregroundSpec.WorkerCount) workers) with $($backgroundLanes.Count) lane(s) in the background: $backgroundLaneSummary"
         $foregroundArgs = $foregroundSpec.TestArgs
         & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @foregroundArgs
         $laneExitCodes = @{ ($foregroundSpec.Name) = $LASTEXITCODE }
@@ -583,6 +672,7 @@ try
         foreach ($spec in $laneSpecs)
         {
             $laneArgs = $spec.TestArgs
+            Write-Host "Running the $($spec.Name) lane with $($spec.WorkerCount) workers"
             & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @laneArgs
             $projectExitCode = $LASTEXITCODE
             if ($projectExitCode -ne 0)
@@ -616,9 +706,12 @@ finally
         -RepoRoot $repoRoot
 
     Pop-Location
-    if (-not [string]::IsNullOrWhiteSpace($settingsPath))
+    foreach ($laneSettingsPath in $laneSettingsPaths)
     {
-        Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
+        if (-not [string]::IsNullOrWhiteSpace($laneSettingsPath))
+        {
+            Remove-Item -LiteralPath $laneSettingsPath -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

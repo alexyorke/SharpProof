@@ -10,6 +10,7 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public class ExceptionFlowPathFactStressTests
     {
         private const string SourcePredicateSource = @"
