@@ -493,7 +493,7 @@ function Get-SharpProofDefaultWorkerCount
         'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 11)) }
         'Tooling'
         {
-            $defaultWorkerCount = if ($TestLane -eq 'All') { 20 } else { 8 }
+            $defaultWorkerCount = 20
             return [Math]::Max(1, [Math]::Min($processorCount, $defaultWorkerCount))
         }
     }
