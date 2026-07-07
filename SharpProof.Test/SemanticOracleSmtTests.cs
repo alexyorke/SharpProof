@@ -9495,6 +9495,17 @@ public class TestClass
             Assert.That(options.IsEnabled, Is.False);
         }
 
+        [TestCase("0")]
+        [TestCase("no")]
+        public void SmtConfiguration_DisableAliases_DisableService(string mode)
+        {
+            var options = ReadSmtOptions(
+                ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", mode));
+
+            Assert.That(options.Mode, Is.EqualTo("Off"));
+            Assert.That(options.IsEnabled, Is.False);
+        }
+
         private static readonly Type ExecutionVisibilityType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!;
 

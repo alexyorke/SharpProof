@@ -478,10 +478,15 @@ namespace SharpProof.Analyzer.Configuration
                         case "off":
                         case "false":
                         case "disabled":
+                        case "no":
+                        case "0":
                             return SmtAnalysisMode.Off;
                         case "bounded":
                         case "default":
                         case "true":
+                        case "yes":
+                        case "on":
+                        case "1":
                             return SmtAnalysisMode.Bounded;
                         case "deep":
                         case "aggressive":
