@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO.Compression;
 using System.IO;
 using System.Linq;
@@ -20,6 +21,7 @@ using System.Xml.Linq;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class AnalyzerPackagingTests
     {
         private static readonly ConcurrentDictionary<string, Lazy<Task<PreparedConsumerTemplate>>> PreparedConsumerTemplates =
@@ -424,8 +426,90 @@ namespace TestNamespace {
                 "The public SharpProof analyzer package should not ship developmentDependency metadata.");
         }
 
-        [Test]
-        public async Task BuiltAnalyzerPackage_WhenConsumedByDisposableProject_ReportsCurrentBetaDiagnostics_WhenPackageExists()
+        public static IEnumerable<ConsumerPackageScenario> BuiltAnalyzerPackageScenarios()
+        {
+            yield return new ConsumerPackageScenario(
+                "sp0002-purity-not-verified",
+                """
+using System;
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [EnforcePure]
+    public int ReadClock() => DateTime.Now.Second;
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0002" },
+                UsePreparedTemplate: false);
+            yield return new ConsumerPackageScenario(
+                "sp0004-missing-enforce-pure",
+                """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    public int AddOne(int value) => value + 1;
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0004" },
+                UsePreparedTemplate: true);
+            yield return new ConsumerPackageScenario(
+                "sp0013-zero-allocations",
+                """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [Impure]
+    [ZeroAllocations]
+    public object Allocate() => new object();
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0013" },
+                UsePreparedTemplate: true);
+            yield return new ConsumerPackageScenario(
+                "sp0015-capability-violation",
+                """
+using System;
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void WriteConsole() => Console.WriteLine("hello");
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0015" },
+                UsePreparedTemplate: true);
+            yield return new ConsumerPackageScenario(
+                "sp0016-capability-unknown",
+                """
+using SharpProof.Attributes;
+
+namespace Probe;
+
+public sealed class Demo
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public string Describe(dynamic value) => value.ToString();
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0016" },
+                UsePreparedTemplate: true);
+        }
+
+        [TestCaseSource(nameof(BuiltAnalyzerPackageScenarios))]
+        public async Task BuiltAnalyzerPackage_WhenConsumedByDisposableProject_ReportsCurrentBetaDiagnostics_WhenPackageExists(
+            ConsumerPackageScenario scenario)
         {
             var repositoryRoot = FindRepositoryRoot();
             var packageVersion = ReadPackageVersion(
@@ -440,112 +524,32 @@ namespace TestNamespace {
                 Assert.Inconclusive("Build the package before verifying external package consumption.");
             }
             var packageSource = Path.GetDirectoryName(packagePath)!;
-
-            var scenarios = new[]
-            {
-                new ConsumerPackageScenario(
-                    "sp0002-purity-not-verified",
-                    """
-using System;
-using SharpProof.Attributes;
-
-namespace Probe;
-
-public sealed class Demo
-{
-    [EnforcePure]
-    public int ReadClock() => DateTime.Now.Second;
-}
-""",
-                    ExpectedDiagnosticIds: new[] { "SP0002" }),
-                new ConsumerPackageScenario(
-                    "sp0004-missing-enforce-pure",
-                    """
-using SharpProof.Attributes;
-
-namespace Probe;
-
-public sealed class Demo
-{
-    public int AddOne(int value) => value + 1;
-}
-""",
-                    ExpectedDiagnosticIds: new[] { "SP0004" }),
-                new ConsumerPackageScenario(
-                    "sp0013-zero-allocations",
-                    """
-using SharpProof.Attributes;
-
-namespace Probe;
-
-public sealed class Demo
-{
-    [Impure]
-    [ZeroAllocations]
-    public object Allocate() => new object();
-}
-""",
-                    ExpectedDiagnosticIds: new[] { "SP0013" }),
-                new ConsumerPackageScenario(
-                    "sp0015-capability-violation",
-                    """
-using System;
-using SharpProof.Attributes;
-
-namespace Probe;
-
-public sealed class Demo
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public void WriteConsole() => Console.WriteLine("hello");
-}
-""",
-                    ExpectedDiagnosticIds: new[] { "SP0015" }),
-                new ConsumerPackageScenario(
-                    "sp0016-capability-unknown",
-                    """
-using SharpProof.Attributes;
-
-namespace Probe;
-
-public sealed class Demo
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public string Describe(dynamic value) => value.ToString();
-}
-""",
-                    ExpectedDiagnosticIds: new[] { "SP0016" }),
-            };
-
-            foreach (var scenario in scenarios)
-            {
-                var buildResult = scenario == scenarios[0]
-                    ? await BuildDisposablePackageConsumerAsync(
+            var buildResult = scenario.UsePreparedTemplate
+                ? await BuildPreparedPackageConsumerAsync(
+                    await GetPreparedConsumerTemplateAsync(
                         packageId: "SharpProof",
                         packageVersion,
-                        packageSource,
-                        source: scenario.Source,
-                        editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false)
-                    : await BuildPreparedPackageConsumerAsync(
-                        await GetPreparedConsumerTemplateAsync(
-                            packageId: "SharpProof",
-                            packageVersion,
-                            packageSource).ConfigureAwait(false),
-                        source: scenario.Source,
-                        editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
+                        packageSource).ConfigureAwait(false),
+                    source: scenario.Source,
+                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false)
+                : await BuildDisposablePackageConsumerAsync(
+                    packageId: "SharpProof",
+                    packageVersion,
+                    packageSource,
+                    source: scenario.Source,
+                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
 
+            Assert.That(
+                buildResult.ExitCode,
+                Is.Not.EqualTo(0),
+                $"The packaged analyzer scenario '{scenario.Name}' should fail when promoted diagnostics are emitted.{Environment.NewLine}{buildResult.Output}");
+
+            foreach (var diagnosticId in scenario.ExpectedDiagnosticIds)
+            {
                 Assert.That(
-                    buildResult.ExitCode,
-                    Is.Not.EqualTo(0),
-                    $"The packaged analyzer scenario '{scenario.Name}' should fail when promoted diagnostics are emitted.{Environment.NewLine}{buildResult.Output}");
-
-                foreach (var diagnosticId in scenario.ExpectedDiagnosticIds)
-                {
-                    Assert.That(
-                        buildResult.Output,
-                        Does.Contain(diagnosticId),
-                        $"The packaged SharpProof analyzer scenario '{scenario.Name}' should emit {diagnosticId}.{Environment.NewLine}{buildResult.Output}");
-                }
+                    buildResult.Output,
+                    Does.Contain(diagnosticId),
+                    $"The packaged SharpProof analyzer scenario '{scenario.Name}' should emit {diagnosticId}.{Environment.NewLine}{buildResult.Output}");
             }
         }
 
@@ -1294,7 +1298,17 @@ public static class TestClass
         }
 
         private readonly record struct ProcessResult(int ExitCode, string Output);
-        private readonly record struct ConsumerPackageScenario(string Name, string Source, string[] ExpectedDiagnosticIds);
+        public readonly record struct ConsumerPackageScenario(
+            string Name,
+            string Source,
+            string[] ExpectedDiagnosticIds,
+            bool UsePreparedTemplate)
+        {
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
         private readonly record struct PreparedConsumerTemplate(string RootDirectory, string ProjectDirectory, string PackageCacheDirectory);
     }
 }

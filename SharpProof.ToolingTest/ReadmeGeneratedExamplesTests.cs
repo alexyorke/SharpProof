@@ -11,6 +11,7 @@ using NUnit.Framework;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public sealed class ReadmeGeneratedExamplesTests
     {
         private const string BclFallbackFixtureSource = @"
