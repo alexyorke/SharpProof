@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Tools.CorpusReport;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace SharpProof.Test
@@ -437,6 +438,64 @@ namespace SharpProof.Test
             Assert.That(report.TopImpureApis[0].Count, Is.EqualTo(1));
             Assert.That(report.CatalogMisses[0].Count, Is.EqualTo(1));
             Assert.That(report.FalsePositiveCandidates[0].Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task CorpusReportCli_HelpWithoutInputs_ReturnsSuccess()
+        {
+            var result = await RunCorpusReportCliAsync("--help");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            Assert.That(result.StandardError, Does.Contain("Usage: SharpProof.CorpusReport"));
+        }
+
+        [Test]
+        public async Task CorpusReportCli_MissingOutputValue_ReturnsUsageError()
+        {
+            var result = await RunCorpusReportCliAsync("--output");
+
+            Assert.That(result.ExitCode, Is.EqualTo(64), result.StandardError);
+            Assert.That(result.StandardError, Does.Contain("--output requires a path."));
+            Assert.That(result.StandardError, Does.Contain("Usage: SharpProof.CorpusReport"));
+        }
+
+        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunCorpusReportCliAsync(params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = ReadmeExampleFixture.GetRepositoryRoot(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--no-restore");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add(Path.Combine("Tools", "SharpProof.CorpusReport", "SharpProof.CorpusReport.csproj"));
+            startInfo.ArgumentList.Add("--");
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start corpus report CLI.");
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(90)).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                process.Kill(entireProcessTree: true);
+                throw;
+            }
+
+            return (
+                process.ExitCode,
+                await outputTask.ConfigureAwait(false),
+                await errorTask.ConfigureAwait(false));
         }
     }
 }

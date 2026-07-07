@@ -2,11 +2,22 @@ using System.Diagnostics;
 using System.Text.Json;
 using SharpProof.Tools.CorpusReport;
 
-var options = CorpusReportOptions.Parse(args);
+CorpusReportOptions options;
+try
+{
+    options = CorpusReportOptions.Parse(args);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine(ex.Message);
+    WriteUsage();
+    return 64;
+}
+
 if (options.ShowHelp || options.Inputs.Count == 0)
 {
-    Console.Error.WriteLine("Usage: SharpProof.CorpusReport [--output report.json] <project-or-sarif> [more inputs...]");
-    return options.Inputs.Count == 0 ? 1 : 0;
+    WriteUsage();
+    return options.ShowHelp ? 0 : 1;
 }
 
 var sarifInputs = new List<SarifCorpusInput>();
@@ -87,6 +98,11 @@ static void TryDelete(string path)
     catch
     {
     }
+}
+
+static void WriteUsage()
+{
+    Console.Error.WriteLine("Usage: SharpProof.CorpusReport [--output report.json] <project-or-sarif> [more inputs...]");
 }
 
 internal sealed class CorpusReportOptions
