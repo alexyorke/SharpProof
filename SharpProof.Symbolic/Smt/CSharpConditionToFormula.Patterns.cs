@@ -13,7 +13,8 @@ using SearchLib.Smt;
 namespace SharpProof.Symbolic.Smt
 {
     internal static partial class CSharpConditionToFormula
-    {        public static bool TryCollectBranchAssumptions(
+    {
+        public static bool TryCollectBranchAssumptions(
             ExpressionSyntax expression,
             bool branchWhenTrue,
             SemanticModel semanticModel,

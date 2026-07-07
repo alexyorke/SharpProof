@@ -13,7 +13,8 @@ using SearchLib.Smt;
 namespace SharpProof.Symbolic.Smt
 {
     internal static partial class CSharpConditionToFormula
-    {        public static bool TryTranslateValue(
+    {
+        public static bool TryTranslateValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
