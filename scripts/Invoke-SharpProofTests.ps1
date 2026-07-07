@@ -251,7 +251,7 @@ function Resolve-SharpProofTestProjects
 
     switch ($RequestedLane)
     {
-        'Main' { return @($mainProject) }
+        'Main' { return @($mainSmtProject, $mainGeneralProject) }
         'MainSmt' { return @($mainSmtProject) }
         'MainGeneral' { return @($mainGeneralProject) }
         'Tooling' { return @($toolingProject) }
