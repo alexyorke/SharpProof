@@ -41,6 +41,15 @@ namespace SharpProof.Test
         private static readonly ConcurrentDictionary<string, AnalyzerOptions> AnalyzerOptionsWithoutAdditionalFilesCache =
             new ConcurrentDictionary<string, AnalyzerOptions>(StringComparer.Ordinal);
 
+        private static readonly ConcurrentDictionary<string, ConditionContext> ConditionContextCache =
+            new ConcurrentDictionary<string, ConditionContext>(StringComparer.Ordinal);
+
+        private static readonly ConcurrentDictionary<string, ConditionImplicationContext> ConditionImplicationContextCache =
+            new ConcurrentDictionary<string, ConditionImplicationContext>(StringComparer.Ordinal);
+
+        private static readonly ConcurrentDictionary<SourceContextCacheKey, SourceContext> SourceContextCache =
+            new ConcurrentDictionary<SourceContextCacheKey, SourceContext>();
+
         private static readonly AnalyzerOptions EmptyAnalyzerOptions =
             new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
@@ -60,6 +69,11 @@ namespace SharpProof.Test
             SemanticModel SemanticModel,
             SyntaxTree SyntaxTree,
             SyntaxNode Root);
+
+        private readonly record struct SourceContextCacheKey(
+            string Source,
+            string CompilationName,
+            string SourcePath);
 
         public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
             string source,
@@ -194,6 +208,13 @@ public static class ConditionHost
 }
 """;
 
+            return ConditionContextCache.GetOrAdd(
+                source,
+                static conditionSource => CreateConditionContextCore(conditionSource));
+        }
+
+        private static ConditionContext CreateConditionContextCore(string source)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
@@ -216,6 +237,48 @@ public static class ConditionHost
         }
 
         public static SourceContext CreateSourceContext(
+            string source,
+            string compilationName,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool allowUnsafe = false,
+            string? sourcePath = null,
+            CSharpParseOptions? parseOptions = null,
+            CSharpCompilationOptions? compilationOptions = null,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
+        {
+            if (CanUseSourceContextCache(
+                frameworkReferences,
+                allowUnsafe,
+                sourcePath,
+                parseOptions,
+                compilationOptions,
+                additionalMetadataReferences))
+            {
+                return SourceContextCache.GetOrAdd(
+                    new SourceContextCacheKey(source, compilationName, string.Empty),
+                    static key => CreateSourceContextCore(
+                        key.Source,
+                        key.CompilationName,
+                        sourcePath: key.SourcePath,
+                        frameworkReferences: null,
+                        allowUnsafe: false,
+                        parseOptions: null,
+                        compilationOptions: null,
+                        additionalMetadataReferences: null));
+            }
+
+            return CreateSourceContextCore(
+                source,
+                compilationName,
+                frameworkReferences,
+                allowUnsafe,
+                sourcePath,
+                parseOptions,
+                compilationOptions,
+                additionalMetadataReferences);
+        }
+
+        private static SourceContext CreateSourceContextCore(
             string source,
             string compilationName,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
@@ -267,6 +330,13 @@ public static class ConditionHost
 }
 """;
 
+            return ConditionImplicationContextCache.GetOrAdd(
+                source,
+                static implicationSource => CreateConditionImplicationContextCore(implicationSource));
+        }
+
+        private static ConditionImplicationContext CreateConditionImplicationContextCore(string source)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
             var compilation = CSharpCompilation.Create(
                 "ConditionHost",
@@ -282,6 +352,34 @@ public static class ConditionHost
                 .ToArray();
 
             return new ConditionImplicationContext(semanticModel, variables[0], variables[1]);
+        }
+
+        private static bool CanUseSourceContextCache(
+            ImmutableArray<MetadataReference>? frameworkReferences,
+            bool allowUnsafe,
+            string? sourcePath,
+            CSharpParseOptions? parseOptions,
+            CSharpCompilationOptions? compilationOptions,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences)
+        {
+            if (allowUnsafe ||
+                !string.IsNullOrEmpty(sourcePath) ||
+                parseOptions is not null ||
+                compilationOptions is not null ||
+                additionalMetadataReferences.HasValue)
+            {
+                return false;
+            }
+
+            if (!frameworkReferences.HasValue)
+            {
+                return true;
+            }
+
+            var references = frameworkReferences.Value;
+            var minimalReferences = GetMinimalFrameworkReferences();
+            return references.Length == minimalReferences.Length &&
+                references.SequenceEqual(minimalReferences);
         }
 
         internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
