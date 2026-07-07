@@ -37,6 +37,25 @@ namespace SharpProof.Test
                 FormatDiagnostics(diagnostics));
         }
 
+        [Test]
+        public async Task Sp0011_RuntimeHazardModeNo_SuppressesAuthoringRuntimeHazards()
+        {
+            var diagnostics = await GetAuthoringHazardDiagnosticsAsync(@"
+public class TestClass
+{
+    public int NullDereference()
+    {
+        string value = null!;
+        return value.Length;
+    }
+}", "no");
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+                Is.False,
+                FormatDiagnostics(diagnostics));
+        }
+
         private static IEnumerable<TestCaseData> ProvableRuntimeHazardCases()
         {
             yield return new TestCaseData(
@@ -483,11 +502,13 @@ public class TestClass
                 .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedSwitchExpressionNoMatch");
         }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAuthoringHazardDiagnosticsAsync(string source)
+        private static async Task<ImmutableArray<Diagnostic>> GetAuthoringHazardDiagnosticsAsync(
+            string source,
+            string runtimeHazardMode = "sites")
         {
             return await AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", "sites"),
+                ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", runtimeHazardMode),
                 allowUnsafe: false,
                 additionalFiles: ImmutableArray<AdditionalText>.Empty,
                 concurrentAnalysis: true);

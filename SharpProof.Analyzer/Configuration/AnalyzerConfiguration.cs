@@ -414,11 +414,8 @@ namespace SharpProof.Analyzer.Configuration
         {
             switch (value.Trim().ToLowerInvariant())
             {
-                case "off":
                 case "none":
-                case "false":
                 case "disabled":
-                case "0":
                     return RuntimeHazardMode.Off;
                 case "sites":
                 case "site":
@@ -426,10 +423,6 @@ namespace SharpProof.Analyzer.Configuration
                 case "checked-exceptions":
                 case "warnings":
                 case "warning":
-                case "true":
-                case "on":
-                case "yes":
-                case "1":
                     return RuntimeHazardMode.Sites;
                 case "summaries":
                 case "summary":
@@ -440,6 +433,11 @@ namespace SharpProof.Analyzer.Configuration
                 case "all":
                 case "both":
                     return RuntimeHazardMode.All;
+            }
+
+            if (TryParseBool(value, out var parsed))
+            {
+                return parsed ? RuntimeHazardMode.Sites : RuntimeHazardMode.Off;
             }
 
             return fallback;
