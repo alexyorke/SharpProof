@@ -634,7 +634,14 @@ try
         }
         else
         {
-            Get-SharpProofDefaultWorkerCount -LaneName $project.Name
+            if ($requestedLane -eq 'All' -and $project.Name -eq 'Tooling')
+            {
+                8
+            }
+            else
+            {
+                Get-SharpProofDefaultWorkerCount -LaneName $project.Name
+            }
         }
         $projectSettingsPath = New-SharpProofRunSettings -WorkerCount $projectWorkers -EnableFailFast $FailFast.IsPresent
         if (-not [string]::IsNullOrWhiteSpace($projectSettingsPath))
