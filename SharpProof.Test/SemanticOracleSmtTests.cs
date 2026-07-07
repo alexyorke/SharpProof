@@ -15,6 +15,7 @@ using SearchLib.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     [Category("SmtHeavy")]
     public class SemanticOracleSmtTests
     {
