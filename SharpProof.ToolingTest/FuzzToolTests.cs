@@ -139,6 +139,30 @@ public class KnownImpureConsoleCase
         }
 
         [Test]
+        public async Task FuzzRunner_RunAsync_ClampsOutOfRangeDeadline()
+        {
+            var outputDirectory = CreateOutputDirectory();
+            try
+            {
+                var summary = await FuzzRunner.RunAsync(new FuzzOptions
+                {
+                    Iterations = 1,
+                    Duration = TimeSpan.MaxValue,
+                    OutputDirectory = outputDirectory,
+                    CheckpointEvery = 0,
+                    Parallelism = 1,
+                    Quiet = true
+                });
+
+                Assert.That(summary.CasesAnalyzed, Is.EqualTo(1));
+            }
+            finally
+            {
+                DeleteOutputDirectory(outputDirectory);
+            }
+        }
+
+        [Test]
         public async Task FuzzRunner_RunCasesAsync_DedupesRepeatedInterestingCases_AndCapsSavedCasesPerFamily()
         {
             var outputDirectory = CreateOutputDirectory();

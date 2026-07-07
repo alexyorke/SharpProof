@@ -279,7 +279,7 @@ public static class FuzzRunner
         var startedUtc = DateTimeOffset.UtcNow;
         var generator = new FuzzCaseGenerator(options.Seed);
         var maxIterations = options.Iterations is > 0 ? options.Iterations.Value : (int?)null;
-        var deadline = options.Duration is { } duration ? startedUtc + duration : (DateTimeOffset?)null;
+        var deadline = options.Duration is { } duration ? CreateDeadline(startedUtc, duration) : (DateTimeOffset?)null;
 
         return await RunCoreAsync(
             options,
@@ -289,6 +289,14 @@ public static class FuzzRunner
             maxIterations,
             deadline,
             cancellationToken);
+    }
+
+    private static DateTimeOffset CreateDeadline(DateTimeOffset startedUtc, TimeSpan duration)
+    {
+        var maxDuration = DateTimeOffset.MaxValue - startedUtc;
+        return duration >= maxDuration
+            ? DateTimeOffset.MaxValue
+            : startedUtc + duration;
     }
 
     public static async Task<FuzzRunSummary> RunCasesAsync(
