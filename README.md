@@ -1,10 +1,11 @@
 <!-- Generated from README.source.md by scripts/Generate-Readme.ps1. -->
 
-# SharpProof - Bounded Symbolic C# Analysis with Z3 SMT
+# SharpProof - Symbolic C# Contracts Backed By Bounded Proof
 
-SharpProof is a Roslyn analyzer and symbolic query toolkit for proving bounded
-facts about C# code: purity violations, direct allocation sites, capability
-usage, line-level invariants, runtime hazards, and conservative complexity.
+SharpProof is a beta Roslyn analyzer for enforceable C# contracts. You add
+attributes such as `[EnforcePure]`, `[Ensures]`, `[ZeroAllocations]`,
+`[AllowedCapabilities]`, or `[ExpectedComplexity]`; the analyzer reports build
+diagnostics; the CLI and .NET API let you inspect the bounded proof evidence.
 
 ## Preview Status
 
@@ -29,12 +30,23 @@ usage, line-level invariants, runtime hazards, and conservative complexity.
 
 ## What SharpProof Does
 
-SharpProof is more than just a purity checker. It uses Roslyn plus bounded
-symbolic reasoning to answer questions like:
+SharpProof is more than just a purity checker. Its intended developer workflow
+is:
+
+```text
+Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API
+```
+
+The analyzer answers contract questions during normal builds:
 
 - can this method be proven pure?
 - which direct allocation sites violate `[ZeroAllocations]`?
 - which capability categories does this method use?
+- does every return satisfy `[Ensures("...")]`?
+- is the method within the declared `[ExpectedComplexity(...)]` bound?
+
+The CLI and library API answer proof-inspection questions:
+
 - what facts hold at this line?
 - is this branch reachable?
 - can this operation provably throw at runtime?
@@ -484,6 +496,21 @@ For the full generated galleries:
 - [Diagnostic example gallery](docs/diagnostic-examples.md)
 - [Symbolic query examples](docs/symbolic-query-examples.md)
 
+## How To Inspect Proof Results
+
+Use analyzer diagnostics for build enforcement, then use the symbolic CLI when
+you need the reason behind a result:
+
+```powershell
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain --file Example.cs --line 42
+```
+
+The `explain` mode summarizes nearby invariants, reachability, runtime hazards,
+capabilities, and complexity for the selected line or position. Lower-level
+query modes such as `--runtime-hazards`, `--capabilities`, `--complexity`,
+`--check-reachability`, and `--implies` remain available for focused output and
+JSON automation.
+
 ## What It Can Prove Today
 
 - Analyzer contracts:
@@ -508,6 +535,9 @@ For the full generated galleries:
 
 ## Deeper Docs
 
+- [Contracts and analyzer diagnostics](docs/contracts.md)
+- [Proof query CLI and API workflow](docs/proof-queries.md)
+- [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
 - [Diagnostic example gallery](docs/diagnostic-examples.md)
 - [Symbolic query examples](docs/symbolic-query-examples.md)
 - [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)

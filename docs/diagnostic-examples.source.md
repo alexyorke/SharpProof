@@ -10,6 +10,6 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0020`.
+from `SP0002` through `SP0023`.
 
 <!-- DIAGNOSTIC_EXAMPLES -->

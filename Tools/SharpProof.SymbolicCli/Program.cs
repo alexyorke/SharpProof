@@ -18,6 +18,12 @@ try
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
+    if (options.Explain)
+    {
+        PrintExplainResult(options, smtAnalysis!);
+        return 0;
+    }
+
     object result;
     if (options.RuntimeHazards)
     {
@@ -275,6 +281,129 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
     if (result.SmtDiagnostics.IsConfigured)
     {
         PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+}
+
+static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService smtAnalysis)
+{
+    var service = new SymbolicQueryService();
+    var source = SymbolicSourceInput.FromFile(options.FilePath!);
+    var queryOptions = options.CreateQueryOptions(smtAnalysis, includeResultFilter: false);
+    var pointTarget = options.Position.HasValue
+        ? SymbolicQueryTarget.Position(options.Position.Value)
+        : SymbolicQueryTarget.Point(options.Line, options.Column);
+
+    Console.WriteLine("SharpProof explanation");
+    Console.WriteLine($"File: {options.FilePath}");
+    Console.WriteLine(options.Position.HasValue
+        ? $"Target: position {options.Position.Value}"
+        : $"Target: line {options.Line}, column {options.Column}");
+
+    var pointResult = service
+        .Query(new SymbolicQueryRequest(source, pointTarget, queryOptions))
+        .InnerResult;
+    if (pointResult is SymbolicSourceQueryResult point)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Invariant proof");
+        Console.WriteLine($"Node: {point.NodeKind}");
+        Console.WriteLine($"Method: {point.MethodName ?? "<unknown>"}");
+        Console.WriteLine($"Program point: {point.ProgramPointKind}");
+        Console.WriteLine($"Merged invariant: {point.MergedInvariantText}");
+        Console.WriteLine($"Reachability: {point.Reachability}");
+        Console.WriteLine($"Reachability reason: {point.ReachabilityReason}");
+        Console.WriteLine(
+            "Proof outcomes: " +
+            $"Total={point.ProofOutcomes.TotalCount}, " +
+            $"ProvenTrue={point.ProofOutcomes.ProvenTrueCount}, " +
+            $"ProvenFalse={point.ProofOutcomes.ProvenFalseCount}, " +
+            $"Unreachable={point.ProofOutcomes.UnreachableCount}, " +
+            $"Unknown={point.ProofOutcomes.UnknownCount}");
+        foreach (var proof in point.ConditionProofs)
+        {
+            Console.WriteLine(
+                $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
+                $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
+            Console.WriteLine($"Implication reason: {proof.Reason}");
+        }
+    }
+    else
+    {
+        Console.WriteLine();
+        Console.WriteLine("Invariant proof");
+        Console.WriteLine($"Result kind: {pointResult.GetType().Name}");
+    }
+
+    if (!options.Position.HasValue)
+    {
+        var hazards = service.QueryRuntimeHazards(
+            new SymbolicRuntimeHazardRequest(
+                source,
+                SymbolicQueryTarget.Line(options.Line),
+                queryOptions,
+                options.CreateRuntimeHazardOptions()));
+        Console.WriteLine();
+        Console.WriteLine("Runtime hazards");
+        Console.WriteLine($"Count: {hazards.HazardCount}");
+        Console.WriteLine("Status summary: " + FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
+        foreach (var hazard in hazards.Hazards.Take(5))
+        {
+            Console.WriteLine(
+                $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
+                $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
+        }
+    }
+
+    PrintExplainCapabilitySummary(service.QueryCapabilities(
+        new SymbolicCapabilityRequest(source, pointTarget, queryOptions)));
+    PrintExplainComplexitySummary(service.QueryComplexity(
+        new SymbolicComplexityRequest(source, pointTarget, queryOptions)));
+
+    if (pointResult is SymbolicSourceQueryResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
+    {
+        Console.WriteLine();
+        PrintSmtDiagnostics(finalPoint.SmtDiagnostics);
+    }
+}
+
+static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
+{
+    Console.WriteLine();
+    Console.WriteLine("Capabilities");
+    Console.WriteLine($"Method: {result.MethodDisplayName}");
+    Console.WriteLine($"Capabilities: {result.CapabilityText}");
+    Console.WriteLine($"Conservative: {result.IsConservative}");
+    if (result.UnknownReasons.Count != 0)
+    {
+        Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
+    }
+
+    foreach (var site in result.Sites.Take(5))
+    {
+        var prefix = site.IsUnknown ? "Unknown" : site.CapabilityText;
+        var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
+            ? site.OperationKind
+            : site.SymbolDisplayName;
+        Console.WriteLine($"  - {prefix} via {detail} @ {site.SourceLine}:{site.SourceColumn}");
+    }
+}
+
+static void PrintExplainComplexitySummary(SymbolicComplexityResult result)
+{
+    Console.WriteLine();
+    Console.WriteLine("Complexity");
+    Console.WriteLine($"Method: {result.MethodDisplayName}");
+    Console.WriteLine($"Complexity: {result.Complexity.Text}");
+    Console.WriteLine($"Kind: {result.Complexity.Kind}");
+    Console.WriteLine($"Conservative: {result.Complexity.IsConservative}");
+    if (result.UnknownReasons.Count != 0)
+    {
+        Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
+    }
+
+    foreach (var driver in result.Drivers.Take(5))
+    {
+        Console.WriteLine($"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
     }
 }
 
@@ -840,10 +969,11 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: SharpProof.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
+Usage: SharpProof.SymbolicCli [explain] --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
 
 Options:
   --file <path>       C# source file to query.
+  explain             Print a contract-oriented explanation for one line or position by composing invariant, hazard, capability, and complexity queries.
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. With --line-invariants, selects the nearest program point on the line.
   --line-invariants   Query every statement/expression program point on the line, or the nearest point when --column is supplied.
@@ -938,6 +1068,7 @@ Capability notes:
   Capability queries resolve the containing method-like body and return proven capability categories plus unknown reasons.
 
 Examples:
+  SharpProof.SymbolicCli explain --file Example.cs --line 42 --implies "index >= 0"
   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
   SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards
@@ -1033,6 +1164,8 @@ Examples:
 
     public bool Capabilities { get; private set; }
 
+    public bool Explain { get; private set; }
+
     public bool FailOnHazard { get; private set; }
 
     public bool IncludeUnprovenHazards { get; private set; }
@@ -1075,7 +1208,7 @@ Examples:
 
     public bool CompactSummaryOnly { get; private set; }
 
-    public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
+    public bool RequiresSmt => Explain || CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
@@ -1136,6 +1269,9 @@ Examples:
             var arg = args[index];
             switch (arg)
             {
+                case "explain":
+                    options.Explain = true;
+                    break;
                 case "--help":
                 case "-h":
                     options.ShowHelp = true;
@@ -1565,6 +1701,25 @@ Examples:
             if (!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0)
             {
                 throw new ArgumentException("--line, --position, --span-start/--span-end, or --all-lines is required.");
+            }
+
+            if (options.Explain)
+            {
+                options.CheckReachability = true;
+                if (options.Json || options.CompactJson || options.InvariantJson)
+                {
+                    throw new ArgumentException("explain emits text output and cannot be combined with JSON output options.");
+                }
+
+                if (options.RuntimeHazards || options.Complexity || options.Capabilities)
+                {
+                    throw new ArgumentException("explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
+                }
+
+                if (options.AllLines || options.IsAnySpanQuery || options.LineInvariants)
+                {
+                    throw new ArgumentException("explain supports --line, --line with --column, or --position only.");
+                }
             }
 
             if (options.Complexity && options.Line == 0 && !options.Position.HasValue)

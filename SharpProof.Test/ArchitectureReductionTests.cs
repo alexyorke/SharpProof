@@ -2249,6 +2249,7 @@ namespace SharpProof.Test
             var capabilityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
             var complexityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
             var effectSummaryDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
+            var diagnosticExamplesDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
             var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
             var shippedReleaseNotes = File.ReadAllText(Path.Combine(
                 repositoryRoot,
@@ -2287,6 +2288,7 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Not.Contain("previously called"));
             Assert.That(readme, Does.Contain("## What SharpProof Does"));
             Assert.That(readme, Does.Contain("## Who It Is For"));
+            Assert.That(readme, Does.Contain("## How To Inspect Proof Results"));
             Assert.That(readme, Does.Contain("## What It Can Prove Today"));
             Assert.That(readme, Does.Contain("## Deeper Docs"));
             Assert.That(readme, Does.Contain("## Help And Feedback"));
@@ -2300,6 +2302,7 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("--complexity"));
             Assert.That(readme, Does.Contain("--runtime-hazards"));
             Assert.That(readme, Does.Contain("--check-reachability"));
+            Assert.That(readme, Does.Contain("explain --file"));
             Assert.That(readme, Does.Contain(@".\build-nuget.ps1"));
             Assert.That(readme, Does.Contain(@"artifacts\nuget"));
             Assert.That(readme, Does.Contain("## Selected Examples"));
@@ -2320,6 +2323,9 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("docs/readme-examples/runtime-hazard-divide-by-zero/input.cs"));
             Assert.That(readme, Does.Contain("docs/readme-examples/complexity-linear/input.cs"));
             Assert.That(readme, Does.Contain("docs/diagnostic-examples.md"));
+            Assert.That(readme, Does.Contain("docs/contracts.md"));
+            Assert.That(readme, Does.Contain("docs/proof-queries.md"));
+            Assert.That(readme, Does.Contain("docs/coverage-and-limits.md"));
             Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
             Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
             Assert.That(readme, Does.Contain("docs/symbolic-invariants.md"));
@@ -2327,10 +2333,16 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
             Assert.That(readmeSource, Does.Contain("## Selected Examples"));
             Assert.That(readmeSource, Does.Contain("## What SharpProof Does"));
+            Assert.That(readmeSource, Does.Contain("## How To Inspect Proof Results"));
             Assert.That(readmeSource, Does.Contain("<!-- README_EXAMPLES -->"));
             Assert.That(File.Exists(readmeGeneratorScript), Is.True);
             Assert.That(File.Exists(Path.Combine(repositoryRoot, "REMAINING_ANALYZER_BACKLOG.md")), Is.False);
-            Assert.That(File.Exists(Path.Combine(repositoryRoot, "PLAN.md")), Is.False);
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "PLAN.md")), Is.True);
+            var plan = File.ReadAllText(Path.Combine(repositoryRoot, "PLAN.md"));
+            Assert.That(plan, Does.Contain("Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API"));
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
+            Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md")), Is.True);
             Assert.That(capabilityDoc, Does.Contain("SP0015"));
             Assert.That(capabilityDoc, Does.Contain("SP0016"));
             Assert.That(capabilityDoc, Does.Contain("SP0017"));
@@ -2339,6 +2351,8 @@ namespace SharpProof.Test
             Assert.That(complexityDoc, Does.Contain("--complexity"));
             Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
             Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0023`"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0023"));
             Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));

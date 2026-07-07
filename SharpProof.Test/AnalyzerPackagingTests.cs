@@ -624,6 +624,7 @@ public sealed class Demo
             Assert.That(source, Does.Contain("--proof-condition-contains <text>"));
             Assert.That(source, Does.Contain("--complexity"));
             Assert.That(source, Does.Contain("--capabilities"));
+            Assert.That(source, Does.Contain("explain"));
             Assert.That(source, Does.Contain("new SymbolicQueryService()"));
             Assert.That(source, Does.Contain("new SymbolicQueryRequest("));
             Assert.That(source, Does.Contain("new SymbolicRuntimeHazardRequest("));
@@ -642,6 +643,7 @@ public sealed class Demo
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
             Assert.That(source, Does.Contain("Complexity:"));
             Assert.That(source, Does.Contain("Capabilities:"));
+            Assert.That(source, Does.Contain("SharpProof explanation"));
             Assert.That(source, Does.Contain("Merged invariant"));
             Assert.That(source, Does.Contain("Line merged invariant"));
             Assert.That(source, Does.Contain("Invariant merge"));
