@@ -1,13 +1,19 @@
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class NullPropagationTests
     {
+        private static readonly ImmutableArray<MetadataReference> NullPropagationFrameworkReferences =
+            AnalyzerTestHost.GetMinimalFrameworkReferences();
+
         [Test]
         public async Task PureMethodWithNullPropagation_ReportsMutablePropertyDiagnostics()
         {
@@ -33,7 +39,10 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                test,
+                frameworkReferences: NullPropagationFrameworkReferences,
+                concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
@@ -63,7 +72,10 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                test,
+                frameworkReferences: NullPropagationFrameworkReferences,
+                concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
@@ -98,7 +110,10 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                test,
+                frameworkReferences: NullPropagationFrameworkReferences,
+                concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
