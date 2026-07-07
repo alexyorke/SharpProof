@@ -308,6 +308,7 @@ namespace System.Experimental
                 autoEnableEffectSummaryJsonForAdditionalFiles: true,
                 frameworkReferences: null,
                 additionalMetadataReferences: additionalMetadataReferences,
+                concurrentAnalysis: true,
                 compilationName: "ReadmeExample_" + exampleId.Replace('-', '_'));
 
             var formatted = ReadmeExampleFixture.FormatDiagnostics(diagnostics);
