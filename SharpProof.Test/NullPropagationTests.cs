@@ -33,7 +33,7 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
@@ -63,7 +63,7 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 
@@ -98,7 +98,7 @@ public class TestClass
     }
 }
 """;
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
             AssertExpectedNullPropagationDiagnostics(diagnostics, "TestMethod");
         }
 

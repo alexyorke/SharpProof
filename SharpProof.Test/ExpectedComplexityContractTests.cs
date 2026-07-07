@@ -79,7 +79,7 @@ public static class C
     }
 }";
 
-            var diagnostics = await GetDiagnosticsAsync(test);
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityExceededId);
             Assert.That(diagnostic.GetMessage(), Does.Contain("O(n^2)"));
             Assert.That(diagnostic.GetMessage(), Does.Contain("O(n)"));
@@ -109,7 +109,7 @@ public static class C
     }
 }";
 
-            var diagnostics = await GetDiagnosticsAsync(test);
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
             Assert.That(diagnostic.GetMessage(), Does.Contain("UnsupportedWhileLoop"));
         }
@@ -139,7 +139,7 @@ public static class C
     }
 }";
 
-            var diagnostics = await GetDiagnosticsAsync(test);
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
             Assert.That(diagnostic.GetMessage(), Does.Contain("not directly comparable"));
         }
@@ -162,7 +162,7 @@ public static class C
     }
 }";
 
-            var diagnostics = await GetDiagnosticsAsync(test);
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
             Assert.That(
                 diagnostic.GetMessage(),
@@ -183,6 +183,11 @@ public sealed class TestClass
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        private static Task<System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> GetComplexityDiagnosticsAsync(string source)
+        {
+            return GetDiagnosticsAsync(source, concurrentAnalysis: true);
         }
     }
 }

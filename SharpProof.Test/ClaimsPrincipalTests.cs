@@ -1,7 +1,7 @@
+using System.Linq;
 using System.Threading.Tasks;
+using SharpProof.Analyzer;
 using NUnit.Framework;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
 
 namespace SharpProof.Test
 {
@@ -18,13 +18,15 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|SP0002:TestMethod|}(ClaimsPrincipal principal)
+    public bool TestMethod(ClaimsPrincipal principal)
     {
         return principal.IsInRole(""admin"");
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.GetMessage(), Does.Contain("TestMethod"));
         }
     }
 }
