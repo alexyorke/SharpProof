@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -13,7 +11,11 @@ namespace SharpProof.Analyzer.Configuration
     internal sealed class DiagnosticBaseline
     {
         private const string BaselineFileName = "SharpProof.Baseline.json";
-        private static readonly Regex PropertyRegex = new Regex(@"""(?<name>id|diagnosticId|symbol|path)""\s*:\s*""(?<value>(?:\\.|[^""])*)""", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        private static readonly JsonDocumentOptions BaselineJsonOptions = new JsonDocumentOptions
+        {
+            AllowTrailingCommas = true,
+            CommentHandling = JsonCommentHandling.Skip
+        };
 
         public static readonly DiagnosticBaseline Empty = new DiagnosticBaseline(ImmutableArray<BaselineEntry>.Empty);
 
@@ -98,45 +100,92 @@ namespace SharpProof.Analyzer.Configuration
         {
             var builder = ImmutableArray.CreateBuilder<BaselineEntry>();
             var baseDirectory = GetBaseDirectory(baselinePath);
-            foreach (var objectBody in EnumerateObjectBodies(json))
+            try
             {
-                if (ContainsUnquotedBrace(objectBody))
+                using var document = JsonDocument.Parse(json, BaselineJsonOptions);
+                AddEntries(document.RootElement, baseDirectory, builder);
+            }
+            catch (JsonException)
+            {
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static void AddEntries(
+            JsonElement element,
+            string baseDirectory,
+            ImmutableArray<BaselineEntry>.Builder builder)
+        {
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in element.EnumerateArray())
+                {
+                    AddEntries(item, baseDirectory, builder);
+                }
+
+                return;
+            }
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            TryAddEntry(element, baseDirectory, builder);
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Array ||
+                    property.Value.ValueKind == JsonValueKind.Object)
+                {
+                    AddEntries(property.Value, baseDirectory, builder);
+                }
+            }
+        }
+
+        private static void TryAddEntry(
+            JsonElement element,
+            string baseDirectory,
+            ImmutableArray<BaselineEntry>.Builder builder)
+        {
+            string? id = null;
+            string? symbol = null;
+            string? path = null;
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.String)
                 {
                     continue;
                 }
 
-                string? id = null;
-                string? symbol = null;
-                string? path = null;
-
-                foreach (Match propertyMatch in PropertyRegex.Matches(objectBody))
+                var value = property.Value.GetString();
+                if (string.IsNullOrWhiteSpace(value))
                 {
-                    var name = propertyMatch.Groups["name"].Value;
-                    var value = UnescapeJsonString(propertyMatch.Groups["value"].Value);
-                    if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
-                    {
-                        id = value;
-                    }
-                    else if (string.Equals(name, "symbol", StringComparison.OrdinalIgnoreCase))
-                    {
-                        symbol = value;
-                    }
-                    else if (string.Equals(name, "path", StringComparison.OrdinalIgnoreCase))
-                    {
-                        path = value;
-                    }
+                    continue;
                 }
 
-                if (!string.IsNullOrWhiteSpace(id) &&
-                    !string.IsNullOrWhiteSpace(symbol) &&
-                    !string.IsNullOrWhiteSpace(path))
+                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
                 {
-                    builder.Add(new BaselineEntry(id!, symbol!, path!, baseDirectory));
+                    id = value;
+                }
+                else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
+                {
+                    symbol = value;
+                }
+                else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
+                {
+                    path = value;
                 }
             }
 
-            return builder.ToImmutable();
+            if (!string.IsNullOrWhiteSpace(id) &&
+                !string.IsNullOrWhiteSpace(symbol) &&
+                !string.IsNullOrWhiteSpace(path))
+            {
+                builder.Add(new BaselineEntry(id!, symbol!, path!, baseDirectory));
+            }
         }
 
         private static string GetBaseDirectory(string baselinePath)
@@ -148,177 +197,6 @@ namespace SharpProof.Analyzer.Configuration
 
             var directory = System.IO.Path.GetDirectoryName(baselinePath);
             return string.IsNullOrWhiteSpace(directory) ? string.Empty : NormalizePath(directory!);
-        }
-
-        private static IEnumerable<string> EnumerateObjectBodies(string json)
-        {
-            var objectStarts = new Stack<int>();
-            var inString = false;
-            var escaped = false;
-
-            for (var i = 0; i < json.Length; i++)
-            {
-                var ch = json[i];
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (ch == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (ch == '"')
-                    {
-                        inString = false;
-                    }
-
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    inString = true;
-                }
-                else if (ch == '{')
-                {
-                    objectStarts.Push(i + 1);
-                }
-                else if (ch == '}' && objectStarts.Count > 0)
-                {
-                    var start = objectStarts.Pop();
-                    yield return json.Substring(start, i - start);
-                }
-            }
-        }
-
-        private static bool ContainsUnquotedBrace(string value)
-        {
-            var inString = false;
-            var escaped = false;
-
-            foreach (var ch in value)
-            {
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (ch == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (ch == '"')
-                    {
-                        inString = false;
-                    }
-
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    inString = true;
-                }
-                else if (ch == '{' || ch == '}')
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static string UnescapeJsonString(string value)
-        {
-            var builder = new StringBuilder(value.Length);
-            for (var i = 0; i < value.Length; i++)
-            {
-                var ch = value[i];
-                if (ch != '\\' || i + 1 >= value.Length)
-                {
-                    builder.Append(ch);
-                    continue;
-                }
-
-                var escape = value[++i];
-                switch (escape)
-                {
-                    case '"':
-                    case '\\':
-                    case '/':
-                        builder.Append(escape);
-                        break;
-                    case 'b':
-                        builder.Append('\b');
-                        break;
-                    case 'f':
-                        builder.Append('\f');
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        break;
-                    case 'u' when i + 4 < value.Length:
-                        var unicodeValue = 0;
-                        var validUnicodeEscape = true;
-                        for (var j = 1; j <= 4; j++)
-                        {
-                            var digit = HexValue(value[i + j]);
-                            if (digit < 0)
-                            {
-                                validUnicodeEscape = false;
-                                break;
-                            }
-
-                            unicodeValue = (unicodeValue << 4) + digit;
-                        }
-
-                        if (validUnicodeEscape)
-                        {
-                            builder.Append((char)unicodeValue);
-                            i += 4;
-                        }
-                        else
-                        {
-                            builder.Append("\\u");
-                        }
-
-                        break;
-                    default:
-                        builder.Append('\\').Append(escape);
-                        break;
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static int HexValue(char ch)
-        {
-            if (ch >= '0' && ch <= '9')
-            {
-                return ch - '0';
-            }
-
-            if (ch >= 'a' && ch <= 'f')
-            {
-                return ch - 'a' + 10;
-            }
-
-            if (ch >= 'A' && ch <= 'F')
-            {
-                return ch - 'A' + 10;
-            }
-
-            return -1;
         }
 
         private static string NormalizePath(string path)

@@ -132,6 +132,25 @@ public class TestClass
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId), Is.False);
         }
 
+        [Test]
+        public async Task Baseline_IgnoresInvalidJson()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void Impure()
+    {
+        Console.WriteLine(""impure"");
+    }
+}", "{ invalid json");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
         private static string Baseline(string id, string symbol, string path)
         {
             return @"{
