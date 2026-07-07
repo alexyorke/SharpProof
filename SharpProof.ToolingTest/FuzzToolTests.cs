@@ -127,6 +127,18 @@ public class KnownImpureConsoleCase
         }
 
         [Test]
+        public void FuzzOptions_Parse_RejectsInvalidDurationsAsArgumentErrors()
+        {
+            var nonFinite = Assert.Throws<ArgumentException>(
+                static () => FuzzOptions.Parse(new[] { "--iterations", "0", "--seconds", "Infinity" }));
+            Assert.That(nonFinite!.Message, Does.Contain("--seconds expects a finite non-negative number."));
+
+            var outOfRange = Assert.Throws<ArgumentException>(
+                static () => FuzzOptions.Parse(new[] { "--iterations", "0", "--hours", "1E100" }));
+            Assert.That(outOfRange!.Message, Does.Contain("--hours expects a duration within TimeSpan range."));
+        }
+
+        [Test]
         public async Task FuzzRunner_RunCasesAsync_DedupesRepeatedInterestingCases_AndCapsSavedCasesPerFamily()
         {
             var outputDirectory = CreateOutputDirectory();

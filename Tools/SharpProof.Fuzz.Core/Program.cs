@@ -102,13 +102,13 @@ Options:
                     options = options with { Iterations = ReadInt(args, ref i, arg) };
                     break;
                 case "--seconds":
-                    options = options with { Duration = TimeSpan.FromSeconds(ReadDouble(args, ref i, arg)) };
+                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromSeconds) };
                     break;
                 case "--minutes":
-                    options = options with { Duration = TimeSpan.FromMinutes(ReadDouble(args, ref i, arg)) };
+                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromMinutes) };
                     break;
                 case "--hours":
-                    options = options with { Duration = TimeSpan.FromHours(ReadDouble(args, ref i, arg)) };
+                    options = options with { Duration = ReadDuration(args, ref i, arg, TimeSpan.FromHours) };
                     break;
                 case "--seed":
                     options = options with { Seed = ReadInt(args, ref i, arg) };
@@ -186,9 +186,26 @@ Options:
     private static double ReadDouble(string[] args, ref int index, string option)
     {
         var value = ReadString(args, ref index, option);
-        return double.TryParse(value, out var parsed) && parsed >= 0
+        return double.TryParse(value, out var parsed) && double.IsFinite(parsed) && parsed >= 0
             ? parsed
-            : throw new ArgumentException($"{option} expects a non-negative number.");
+            : throw new ArgumentException($"{option} expects a finite non-negative number.");
+    }
+
+    private static TimeSpan ReadDuration(
+        string[] args,
+        ref int index,
+        string option,
+        Func<double, TimeSpan> createDuration)
+    {
+        var value = ReadDouble(args, ref index, option);
+        try
+        {
+            return createDuration(value);
+        }
+        catch (OverflowException ex)
+        {
+            throw new ArgumentException($"{option} expects a duration within TimeSpan range.", ex);
+        }
     }
 
     private static string ReadString(string[] args, ref int index, string option)
