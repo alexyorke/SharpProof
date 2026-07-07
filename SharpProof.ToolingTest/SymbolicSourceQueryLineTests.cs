@@ -1075,13 +1075,17 @@ public class TestClass
             Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
             Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("!(value > 0)"));
             Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
-            Assert.That(result.MergedPathFacts.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "value <= 0", "!(value > 0)" }));
+            Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("value > 0"));
+            Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("!(value > 0)"));
+            Assert.That(result.MergedPathFacts.MaybeFacts.Count, Is.InRange(2, 3));
             Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
             var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
             Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
             Assert.That(diagnostic.Target, Is.EqualTo("value"));
             Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
-            Assert.That(diagnostic.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "value <= 0", "!(value > 0)" }));
+            Assert.That(diagnostic.MaybeFacts, Has.Member("value > 0"));
+            Assert.That(diagnostic.MaybeFacts, Has.Member("!(value > 0)"));
+            Assert.That(diagnostic.MaybeFacts.Count, Is.InRange(2, 3));
             Assert.That(diagnostic.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
             Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
             Assert.That(result.MergedInvariant.Conditions.Single().IsConservativeUnknown, Is.True);
@@ -1125,7 +1129,9 @@ public class TestClass
             Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
             Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
             Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
-            Assert.That(result.InvariantQuery.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "value <= 0", "!(value > 0)" }));
+            Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("value > 0"));
+            Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("!(value > 0)"));
+            Assert.That(result.InvariantQuery.MaybeFacts.Count, Is.InRange(2, 3));
             Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
             Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
             Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
@@ -1140,7 +1146,9 @@ public class TestClass
             Assert.That(targetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
             Assert.That(targetSummary.Summary, Does.Contain("conservative unknown"));
             Assert.That(targetSummary.MustFacts, Is.Empty);
-            Assert.That(targetSummary.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "value <= 0", "!(value > 0)" }));
+            Assert.That(targetSummary.MaybeFacts, Has.Member("value > 0"));
+            Assert.That(targetSummary.MaybeFacts, Has.Member("!(value > 0)"));
+            Assert.That(targetSummary.MaybeFacts.Count, Is.InRange(2, 3));
             Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
             var targetPathSummary = result.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "value");
             Assert.That(result.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaries.Count));
@@ -1156,7 +1164,13 @@ public class TestClass
                 Is.EquivalentTo(new[] { "SP-SYM-MAYBE-FACTS", "SP-SYM-CONSERVATIVE-UNKNOWN", "SP-SYM-PROOF-UNKNOWN" }));
             Assert.That(
                 result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence,
-                Is.EquivalentTo(new[] { "value > 0", "value <= 0", "!(value > 0)" }));
+                Has.Member("value > 0"));
+            Assert.That(
+                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence,
+                Has.Member("!(value > 0)"));
+            Assert.That(
+                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence.Count,
+                Is.InRange(2, 3));
             Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
             Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
             Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));

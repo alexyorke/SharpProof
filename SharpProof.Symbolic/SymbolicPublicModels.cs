@@ -241,9 +241,9 @@ namespace SharpProof.Symbolic
 
         private static string FormatFactText(SymbolicFact fact)
         {
-            var text = SymbolicIrFormulaEncoder.TryEncode(fact, out var formula)
+            var text = (fact.Confidence == SymbolicFactConfidence.Exact && SymbolicIrFormulaEncoder.TryEncode(fact.Atom, out var formula))
                 ? SymbolicFormulaDisplay.Format(formula)
-                : fact.Atom.ToString() ?? string.Empty;
+                : fact.Atom.ToString();
             return fact.Polarity ? text : "!(" + text + ")";
         }
     }

@@ -1564,8 +1564,7 @@ public class TestClass
                 "return index;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("LessThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("<", StringComparison.Ordinal) &&
                                            fact.Contains("Length", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1588,8 +1587,7 @@ public class TestClass
                 "for (; index < values.Length; index++)");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("LessThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("<", StringComparison.Ordinal) &&
                                            fact.Contains("Length", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1661,7 +1659,7 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
                                            fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1687,7 +1685,7 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
                                            fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1713,7 +1711,7 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
                                            fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1740,8 +1738,8 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains(@"\A[A-Z][0-9]\z", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\\A[A-Z][0-9]\\z", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1764,7 +1762,7 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtStringContainsFormula", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains(".Contains", StringComparison.Ordinal) &&
                                            fact.Contains("SKU", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1790,9 +1788,8 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains("sku", StringComparison.Ordinal) &&
-                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains("sku", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1817,9 +1814,8 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains(@"\Asku\z", StringComparison.Ordinal) &&
-                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\\Asku\\z", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1846,15 +1842,12 @@ public class TestClass
                 "return input.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains("sku", StringComparison.Ordinal) &&
-                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains(@"\Apre", StringComparison.Ordinal) &&
-                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
-                                           fact.Contains(@"tail\z", StringComparison.Ordinal) &&
-                                           fact.Contains("IgnoreCase", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains("sku", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains(@"\\Apre", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Regex.IsMatch", StringComparison.Ordinal) &&
+                                           fact.Contains(@"tail\\z", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1873,7 +1866,7 @@ public class TestClass
                 "return code.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("SmtStringConcatTerm", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("+", StringComparison.Ordinal) &&
                                            fact.Contains("-01", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1897,8 +1890,8 @@ public class TestClass
                 "return values[index];");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("<", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains(">=", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1923,8 +1916,8 @@ public class TestClass
 
             Assert.That(facts, Is.Not.Empty);
             Assert.That(facts.Any(fact => fact.Contains("inRange", StringComparison.Ordinal) &&
-                                           fact.Contains("And", StringComparison.Ordinal) &&
-                                           fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
+                                           fact.Contains("&&", StringComparison.Ordinal) &&
+                                           fact.Contains("<", StringComparison.Ordinal)), Is.True);
             Assert.That(facts.Any(fact => fact.Contains("inRange", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1949,7 +1942,7 @@ public class TestClass
                 "return value;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("2", StringComparison.Ordinal)), Is.True);
         }
 
@@ -1974,8 +1967,7 @@ public class TestClass
                 "return 10 / value;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
 
@@ -2000,10 +1992,10 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains(">", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal)), Is.True);
         }
@@ -2029,11 +2021,10 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal)), Is.True);
         }
@@ -2059,8 +2050,7 @@ public class TestClass
                 "return 10 / value;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
@@ -2089,11 +2079,10 @@ public class TestClass
                 "return value;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.False);
         }
@@ -2117,9 +2106,9 @@ public class TestClass
                 "value + 1");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains(">", StringComparison.Ordinal) &&
                                            fact.Contains("10", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("<", StringComparison.Ordinal) &&
                                            fact.Contains("20", StringComparison.Ordinal)), Is.True);
         }
 
@@ -2142,8 +2131,7 @@ public class TestClass
                 "10 / value");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
@@ -2167,10 +2155,10 @@ public class TestClass
                 "10 / divisor");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains(">", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal)), Is.True);
         }
@@ -2190,9 +2178,9 @@ public class TestClass
                 "second");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("first", StringComparison.Ordinal) &&
-                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+                                           fact.Contains("null", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -2210,9 +2198,9 @@ public class TestClass
                 "Length");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("NotEqual", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!=", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
-                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+                                           fact.Contains("null", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -5264,9 +5252,9 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
-                                           fact.Contains("Add", StringComparison.Ordinal) &&
+                                           fact.Contains("+", StringComparison.Ordinal) &&
                                            fact.Contains("1", StringComparison.Ordinal)), Is.True);
         }
 
@@ -5287,9 +5275,9 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
-                                           fact.Contains("Add", StringComparison.Ordinal) &&
+                                           fact.Contains("+", StringComparison.Ordinal) &&
                                            fact.Contains("1", StringComparison.Ordinal)), Is.True);
         }
 
@@ -5311,7 +5299,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("1", StringComparison.Ordinal)), Is.True);
         }
@@ -5332,7 +5320,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("1", StringComparison.Ordinal)), Is.True);
         }
@@ -5816,8 +5804,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
@@ -5845,7 +5832,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
@@ -5873,8 +5860,7 @@ public class TestClass
 }",
                 "return 10 / divisor;");
 
-            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("!", StringComparison.Ordinal) && fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.False);
         }
@@ -5903,7 +5889,7 @@ public class TestClass
 }",
                 "return 10 / divisor;");
 
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("1", StringComparison.Ordinal)), Is.True);
         }
@@ -6124,7 +6110,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("divisor", StringComparison.Ordinal) &&
                                            fact.Contains("0", StringComparison.Ordinal)), Is.True);
         }
@@ -6145,9 +6131,9 @@ public class TestClass
                 "return value.Length;");
 
             Assert.That(facts, Is.Not.Empty);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+            Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                            fact.Contains("value", StringComparison.Ordinal) &&
-                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+                                           fact.Contains("null", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -7265,7 +7251,7 @@ public class TestClass
                 "return 10 / divisor;");
 
             Assert.That(facts.Any(fact => fact.Contains("divisor", StringComparison.Ordinal) &&
-                                           fact.Contains("Equal", StringComparison.Ordinal)), Is.False);
+                                           fact.Contains("==", StringComparison.Ordinal)), Is.False);
         }
 
         [Test]
@@ -14863,7 +14849,7 @@ public class TestClass
 
             return SymbolicProgramPointFacts
                 .CollectCompletedLoopExitInvariantFacts(loopStatement, semanticModel, CancellationToken.None)
-                .Select(static fact => fact.ToString() ?? string.Empty)
+                .Select(static fact => SymbolicFormulaDisplay.Format(fact))
                 .ToArray();
         }
 

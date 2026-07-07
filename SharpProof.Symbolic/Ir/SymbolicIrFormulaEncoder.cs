@@ -370,14 +370,14 @@ namespace SharpProof.Symbolic.Ir
         {
             return formula is SmtVariable variable
                 ? variable.Name
-                : formula.ToString() ?? string.Empty;
+                : "?";
         }
 
         private static string CreateElementAccessIndexText(SmtFormula index)
         {
             return index is SmtIntegerConstant constant
                 ? constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                : index.ToString() ?? string.Empty;
+                : "?";
         }
     }
 }

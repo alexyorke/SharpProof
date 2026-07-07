@@ -324,7 +324,7 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
             Console.WriteLine(
                 $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
                 $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
-            Console.WriteLine($"Implication reason: {proof.Reason}");
+            Console.WriteLine(                $"Implication reason: {proof.GetDisplayReason()}");
         }
     }
     else
@@ -806,7 +806,7 @@ static void PrintPointResult(
                 $"contained={proof.ContainsRequestedPosition}");
         }
 
-        Console.WriteLine($"Implication reason: {proof.Reason}");
+        Console.WriteLine(                $"Implication reason: {proof.GetDisplayReason()}");
     }
 
     PrintProofOutcomeSummary(result.ProofOutcomes, indent: "");

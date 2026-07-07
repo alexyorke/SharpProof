@@ -19,8 +19,9 @@ namespace SharpProof.Symbolic.Smt
         private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
 
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
+        [ThreadStatic]
+        private static PurityProofSearch? t_sharedProofSearch;
         private readonly object _solverLock = new();
-        private PurityProofSearch? _proofSearch;
         private long _consumedQueryTicks;
         private int _executedQueryCount;
         private bool _solverUnavailable;
@@ -195,26 +196,36 @@ namespace SharpProof.Symbolic.Smt
             }
 
             _disposed = true;
-            DisposeProofSearch();
+            // Note: We deliberately do not dispose the thread-local solver context here
+            // to allow caching and reuse across SmtAnalysisService instances on the same thread.
         }
 
         private PurityProofSearch GetOrCreateProofSearch()
         {
-            if (_proofSearch != null)
+            if (t_sharedProofSearch == null)
             {
-                return _proofSearch;
+                t_sharedProofSearch = new PurityProofSearch();
             }
 
-            _proofSearch = new PurityProofSearch();
-            return _proofSearch;
+            return t_sharedProofSearch;
         }
 
         private void DisposeProofSearch()
         {
             lock (_solverLock)
             {
-                _proofSearch?.Dispose();
-                _proofSearch = null;
+                if (t_sharedProofSearch != null)
+                {
+                    try
+                    {
+                        t_sharedProofSearch.Dispose();
+                    }
+                    catch
+                    {
+                        // Ignore disposal errors on failed context
+                    }
+                    t_sharedProofSearch = null;
+                }
             }
         }
 

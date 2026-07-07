@@ -34,9 +34,9 @@ namespace SharpProof.Analyzer
         public const string BclFallbackGuessProperty = "sharpproof.bcl_fallback.guess";
         public const string BclFallbackConfidenceProperty = "sharpproof.bcl_fallback.confidence";
         public const string BclFallbackReasonProperty = "sharpproof.bcl_fallback.reason";
-        private static readonly LocalizableString PurityNotVerifiedTitle = "Purity Not Verified";
+        private static readonly LocalizableString PurityNotVerifiedTitle = "Purity Not Proven";
         private static readonly LocalizableString PurityNotVerifiedMessageFormat = "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure";
-        private static readonly LocalizableString PurityNotVerifiedDescription = "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status.";
+        private static readonly LocalizableString PurityNotVerifiedDescription = "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the symbolic proof evidence.";
 
         public static readonly DiagnosticDescriptor PurityNotVerifiedRule = new DiagnosticDescriptor(
             id: PurityNotVerifiedId,
@@ -100,7 +100,7 @@ namespace SharpProof.Analyzer
         public const string ExceptionEdgesProperty = "sharpproof.exceptions.edges";
         private static readonly LocalizableString ExceptionSummaryTitle = "Method May Throw Exceptions";
         private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
-        private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all.";
+        private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
 
         public static readonly DiagnosticDescriptor ExceptionSummaryRule = new DiagnosticDescriptor(
             id: ExceptionSummaryId,
@@ -114,7 +114,7 @@ namespace SharpProof.Analyzer
         public const string UncaughtExceptionSiteId = "SP0011";
         private static readonly LocalizableString UncaughtExceptionSiteTitle = "Operation May Throw Uncaught Exceptions";
         private static readonly LocalizableString UncaughtExceptionSiteMessageFormat = "Operation '{0}' may throw uncaught exceptions: {1}";
-        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all.";
+        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.";
 
         public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = new DiagnosticDescriptor(
             id: UncaughtExceptionSiteId,
@@ -158,9 +158,9 @@ namespace SharpProof.Analyzer
             description: CapabilityViolationDescription);
 
         public const string CapabilityUnknownId = "SP0016";
-        private static readonly LocalizableString CapabilityUnknownTitle = "Capability Contract Not Fully Verified";
+        private static readonly LocalizableString CapabilityUnknownTitle = "Capability Contract Not Proven";
         private static readonly LocalizableString CapabilityUnknownMessageFormat = "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}";
-        private static readonly LocalizableString CapabilityUnknownDescription = "Reports operations whose capability set could not be conservatively proven under the current capability analysis.";
+        private static readonly LocalizableString CapabilityUnknownDescription = "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the capability proof evidence.";
 
         public static readonly DiagnosticDescriptor CapabilityUnknownRule = new DiagnosticDescriptor(
             id: CapabilityUnknownId,
@@ -192,7 +192,7 @@ namespace SharpProof.Analyzer
         public const string EnsuresFailureReasonProperty = "sharpproof.ensures.failure_reason";
         private static readonly LocalizableString EnsuresNotProvenTitle = "Postcondition Not Proven";
         private static readonly LocalizableString EnsuresNotProvenMessageFormat = "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'";
-        private static readonly LocalizableString EnsuresNotProvenDescription = "Reports return sites that contradict a declared [Ensures] postcondition.";
+        private static readonly LocalizableString EnsuresNotProvenDescription = "Reports return sites that contradict a declared [Ensures] postcondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence for each return site.";
 
         public static readonly DiagnosticDescriptor EnsuresNotProvenRule = new DiagnosticDescriptor(
             id: EnsuresNotProvenId,
@@ -206,7 +206,7 @@ namespace SharpProof.Analyzer
         public const string EnsuresUnsupportedId = "SP0019";
         private static readonly LocalizableString EnsuresUnsupportedTitle = "Postcondition Could Not Be Verified";
         private static readonly LocalizableString EnsuresUnsupportedMessageFormat = "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}";
-        private static readonly LocalizableString EnsuresUnsupportedDescription = "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface.";
+        private static readonly LocalizableString EnsuresUnsupportedDescription = "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
 
         public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = new DiagnosticDescriptor(
             id: EnsuresUnsupportedId,
@@ -237,7 +237,7 @@ namespace SharpProof.Analyzer
         public const string ComplexityUnknownReasonProperty = "sharpproof.complexity.unknown_reason";
         private static readonly LocalizableString ComplexityExceededTitle = "Declared Complexity Exceeded";
         private static readonly LocalizableString ComplexityExceededMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound";
-        private static readonly LocalizableString ComplexityExceededDescription = "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows.";
+        private static readonly LocalizableString ComplexityExceededDescription = "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity proof evidence.";
 
         public static readonly DiagnosticDescriptor ComplexityExceededRule = new DiagnosticDescriptor(
             id: ComplexityExceededId,
@@ -251,7 +251,7 @@ namespace SharpProof.Analyzer
         public const string ComplexityCouldNotBeVerifiedId = "SP0022";
         private static readonly LocalizableString ComplexityCouldNotBeVerifiedTitle = "Declared Complexity Could Not Be Verified";
         private static readonly LocalizableString ComplexityCouldNotBeVerifiedMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}";
-        private static readonly LocalizableString ComplexityCouldNotBeVerifiedDescription = "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound.";
+        private static readonly LocalizableString ComplexityCouldNotBeVerifiedDescription = "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity analysis details.";
 
         public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = new DiagnosticDescriptor(
             id: ComplexityCouldNotBeVerifiedId,

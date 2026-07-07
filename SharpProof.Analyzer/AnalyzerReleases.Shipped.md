@@ -4,7 +4,7 @@
 
 | Rule ID | Category | Severity | Notes |
 | ------- | -------- | -------- | ----- |
-| SP0002 | Purity | Error | Purity Not Verified: method marked [EnforcePure]/[Pure] contains operations the analyzer cannot prove pure. |
+| SP0002 | Purity | Error | Purity Not Proven: method marked [EnforcePure]/[Pure] contains operations the analyzer cannot prove pure. |
 | SP0003 | Usage | Error | Misplaced [EnforcePure]/[Pure] attribute applied to a non-method declaration. |
 | SP0004 | Purity | Warning | Missing [EnforcePure] on a method/accessor/ctor that appears pure. |
 

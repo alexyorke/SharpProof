@@ -11,7 +11,7 @@ Category: definite_divide_by_zero
 Reason: ir_state_contains_condition
 Node: DivideExpression 133-145
 Operation: 10 / divisor
-Trigger: SmtBinaryFormula { Kind = Bool, Operator = Equal, Left = SmtVariable { Kind = Int, Name = divisor#63 }, Right = SmtIntegerConstant { Kind = Int, Value = 0 } }
+Trigger: divisor == 0
 Invariant: divisor == 0
 SMT:
   Mode: Bounded

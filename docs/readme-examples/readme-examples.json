@@ -20,6 +20,36 @@
     "OutputLanguage": "text"
   },
   {
+    "Id": "sp0006-allow-sync-without-purity",
+    "Title": "[AllowSynchronization] without purity attribute warns",
+    "Summary": "`[AllowSynchronization]` without `[EnforcePure]` or `[Pure]` produces `SP0006` because synchronization contracts depend on a purity baseline.",
+    "SourcePath": "docs/readme-examples/sp0006-allow-sync-without-purity/input.cs",
+    "OutputPath": "docs/readme-examples/sp0006-allow-sync-without-purity/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0007-misplaced-allow-synchronization",
+    "Title": "Misplaced [AllowSynchronization] on a type",
+    "Summary": "`[AllowSynchronization]` is only valid on method-like declarations. Applying it to a class produces `SP0007`.",
+    "SourcePath": "docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs",
+    "OutputPath": "docs/readme-examples/sp0007-misplaced-allow-synchronization/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0008-redundant-allow-synchronization",
+    "Title": "Redundant [AllowSynchronization] without locks",
+    "Summary": "`[AllowSynchronization]` on a method with `[EnforcePure]` but no `lock` statement is reported as `SP0008` since the attribute has no effect.",
+    "SourcePath": "docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs",
+    "OutputPath": "docs/readme-examples/sp0008-redundant-allow-synchronization/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
     "Id": "sp0010-exception-summary",
     "Title": "Method-level exception summaries",
     "Summary": "With runtime-hazard summaries enabled, SharpProof can report the exception types that may escape a method body.",

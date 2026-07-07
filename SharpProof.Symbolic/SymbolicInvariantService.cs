@@ -272,7 +272,7 @@ namespace SharpProof.Symbolic
         private static string FormatCondition(SymbolicCondition condition)
         {
             return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula)
-                ? formula.ToString() ?? string.Empty
+                ? SymbolicFormulaDisplay.Format(formula)
                 : condition.ToString() ?? string.Empty;
         }
 
@@ -294,9 +294,7 @@ namespace SharpProof.Symbolic
 
         internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
         {
-            return pathConditions.Count == 0
-                ? "true"
-                : ConjoinPathConditions(pathConditions).ToString() ?? "true";
+            return SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);
         }
 
         public static SymbolicInvariantFactSummary MergeInvariantFacts(IEnumerable<IEnumerable<string>> factSets)
@@ -349,7 +347,7 @@ namespace SharpProof.Symbolic
 
         private static IReadOnlyList<string> FormatFacts(IEnumerable<SmtFormula> formulas)
         {
-            return formulas.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
+            return formulas.Select(static fact => SymbolicFormulaDisplay.Format(fact)).ToArray();
         }
 
         private static SmtFormula[] CollectInvariantsAt(

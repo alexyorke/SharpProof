@@ -349,9 +349,8 @@ public class TestClass
 }";
 
             var snapshot = GetSnapshotAtBlockContainingStatement(source, "return 10 / divisor;");
-
-            Assert.That(snapshot.Facts.Any(fact => fact.Contains("Value = 5", StringComparison.Ordinal)), Is.False);
-            Assert.That(snapshot.Facts.Count(fact => fact.Contains("Value = 0", StringComparison.Ordinal)), Is.GreaterThanOrEqualTo(1));
+            Assert.That(snapshot.Facts.Any(fact => fact.Contains("divisor == 5", StringComparison.Ordinal)), Is.False);
+            Assert.That(snapshot.Facts.Count(fact => fact.Contains("divisor == 0", StringComparison.Ordinal)), Is.GreaterThanOrEqualTo(1));
         }
 
         [Test]

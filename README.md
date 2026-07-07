@@ -165,6 +165,86 @@ Expected analyzer diagnostics:
 SP0004 Warning docs/readme-examples/sp0004-missing-enforce-pure/input.cs:3:16 Method 'Add' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.
 ```
 
+### [AllowSynchronization] without purity attribute warns
+
+`[AllowSynchronization]` without `[EnforcePure]` or `[Pure]` produces `SP0006` because synchronization contracts depend on a purity baseline.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0006_AllowSynchronizationWithoutPurityExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0006-allow-sync-without-purity/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowSynchronization]
+    public void Work()
+    {
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0006 Warning docs/readme-examples/sp0006-allow-sync-without-purity/input.cs:7:17 Method 'Work' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]
+```
+
+### Misplaced [AllowSynchronization] on a type
+
+`[AllowSynchronization]` is only valid on method-like declarations. Applying it to a class produces `SP0007`.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0007_MisplacedAllowSynchronizationExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+[AllowSynchronization]
+public sealed class TestClass
+{
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0007 Error docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs:4:2 The [AllowSynchronization] attribute can only be applied to method declarations
+```
+
+### Redundant [AllowSynchronization] without locks
+
+`[AllowSynchronization]` on a method with `[EnforcePure]` but no `lock` statement is reported as `SP0008` since the attribute has no effect.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0008_RedundantAllowSynchronizationExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    [AllowSynchronization]
+    public int Add(int left, int right)
+    {
+        return left + right;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0008 Info docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs:8:16 Method 'Add' is marked with [AllowSynchronization] but contains no synchronization constructs
+```
+
 ### Method-level exception summaries
 
 With runtime-hazard summaries enabled, SharpProof can report the exception types that may escape a method body.
@@ -235,7 +315,7 @@ Category: definite_divide_by_zero
 Reason: ir_state_contains_condition
 Node: DivideExpression 133-145
 Operation: 10 / divisor
-Trigger: SmtBinaryFormula { Kind = Bool, Operator = Equal, Left = SmtVariable { Kind = Int, Name = divisor#63 }, Right = SmtIntegerConstant { Kind = Int, Value = 0 } }
+Trigger: divisor == 0
 Invariant: divisor == 0
 SMT:
   Mode: Bounded
