@@ -271,12 +271,13 @@ namespace SharpProof.Analyzer.Configuration
                 var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
                 if (global.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
                 {
-                    if (bool.TryParse(value.Trim(), out var b)) return b;
-                    var lowered = value.Trim().ToLowerInvariant();
-                    if (lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on") return true;
+                    return TryParseBool(value, out var parsed) && parsed;
                 }
             }
-            catch { }
+            catch
+            {
+            }
+
             return false;
         }
 
@@ -290,20 +291,9 @@ namespace SharpProof.Analyzer.Configuration
                     return true;
                 }
 
-                if (bool.TryParse(value.Trim(), out var parsed))
+                if (TryParseBool(value, out var parsed))
                 {
                     return parsed;
-                }
-
-                var lowered = value.Trim().ToLowerInvariant();
-                if (lowered == "0" || lowered == "false" || lowered == "no" || lowered == "off")
-                {
-                    return false;
-                }
-
-                if (lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on")
-                {
-                    return true;
                 }
             }
             catch
@@ -320,23 +310,29 @@ namespace SharpProof.Analyzer.Configuration
                 return fallback;
             }
 
-            if (bool.TryParse(value.Trim(), out var parsed))
-            {
-                return parsed;
-            }
+            return TryParseBool(value, out var parsed) ? parsed : fallback;
+        }
 
-            var lowered = value.Trim().ToLowerInvariant();
-            if (lowered == "0" || lowered == "false" || lowered == "no" || lowered == "off")
+        private static bool TryParseBool(string value, out bool parsed)
+        {
+            switch (value.Trim().ToLowerInvariant())
             {
-                return false;
+                case "1":
+                case "true":
+                case "yes":
+                case "on":
+                    parsed = true;
+                    return true;
+                case "0":
+                case "false":
+                case "no":
+                case "off":
+                    parsed = false;
+                    return true;
+                default:
+                    parsed = false;
+                    return false;
             }
-
-            if (lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on")
-            {
-                return true;
-            }
-
-            return fallback;
         }
 
         private static MissingPuritySuggestionScope GetMissingPuritySuggestionScope(AnalyzerOptions options)
@@ -475,22 +471,19 @@ namespace SharpProof.Analyzer.Configuration
                 {
                     switch (value.Trim().ToLowerInvariant())
                     {
-                        case "off":
-                        case "false":
                         case "disabled":
-                        case "no":
-                        case "0":
                             return SmtAnalysisMode.Off;
                         case "bounded":
                         case "default":
-                        case "true":
-                        case "yes":
-                        case "on":
-                        case "1":
                             return SmtAnalysisMode.Bounded;
                         case "deep":
                         case "aggressive":
                             return SmtAnalysisMode.Deep;
+                    }
+
+                    if (TryParseBool(value, out var parsed))
+                    {
+                        return parsed ? SmtAnalysisMode.Bounded : SmtAnalysisMode.Off;
                     }
                 }
             }
