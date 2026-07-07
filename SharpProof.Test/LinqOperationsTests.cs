@@ -577,7 +577,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task LinqScalarHelpers_NoDiagnostic()
+        public async Task LinqScalarPredicateHelpers_NoDiagnostic()
         {
             var test = @"
 using System.Collections.Generic;
@@ -592,21 +592,59 @@ public class TestClass
         var allPositive = values.All(static value => value >= 0);
         var hasAny = values.Any();
         var containsOne = values.Contains(1);
+        var same = values.SequenceEqual(other);
+        return (allPositive ? 1 : 0) +
+               (hasAny ? 1 : 0) +
+               (containsOne ? 1 : 0) +
+               (same ? 1 : 0);
+    }
+}";
+
+            await AssertPurityDiagnosticsAsync(test);
+        }
+
+        [Test]
+        public async Task LinqScalarElementHelpers_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(IEnumerable<int> values)
+    {
         var count = values.Count();
         var first = values.First();
         var firstOrDefault = values.FirstOrDefault();
         var last = values.Last();
         var single = values.Single();
         var element = values.ElementAt(0);
-        var same = values.SequenceEqual(other);
+        return count + first + firstOrDefault + last + single + element;
+    }
+}";
+
+            await AssertPurityDiagnosticsAsync(test);
+        }
+
+        [Test]
+        public async Task LinqScalarPartitionHelpers_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(IEnumerable<int> values)
+    {
         var skipped = values.Skip(1);
         var taken = values.Take(2);
-        return (allPositive ? 1 : 0) +
-               (hasAny ? 1 : 0) +
-               (containsOne ? 1 : 0) +
-               (same ? 1 : 0) +
-               count + first + firstOrDefault + last + single + element +
-               skipped.FirstOrDefault() + taken.FirstOrDefault();
+        return skipped.FirstOrDefault() + taken.FirstOrDefault();
     }
 }";
 
