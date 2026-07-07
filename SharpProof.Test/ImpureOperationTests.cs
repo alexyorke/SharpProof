@@ -8,6 +8,7 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.Shar
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class ImpureOperationTests
     {
         [Test]
