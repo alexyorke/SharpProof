@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
+using System.Collections.Immutable;
 using NUnit.Framework;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Test
@@ -10,6 +12,9 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class LinqOperationsTests
     {
+        private static readonly ImmutableArray<MetadataReference> LinqFrameworkReferences =
+            AnalyzerTestHost.GetMinimalFrameworkReferences();
+
         [Test]
         public async Task SimpleLinqQuery_NoDiagnostic()
         {
@@ -1355,7 +1360,10 @@ public class TestClass
         private static async Task AssertPurityDiagnosticsAsync(string markedSource)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
+                frameworkReferences: LinqFrameworkReferences,
+                concurrentAnalysis: true);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();
