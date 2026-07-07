@@ -1290,20 +1290,20 @@ namespace SharpProof.Analyzer.Engine
                     return configuredKnownImpureResult;
                 }
 
-				if (hasTrustedGeneratedPurity)
-				{
-					if (generatedPurity.IsPure)
-					{
-						LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted pure from generated purity summary.");
-						purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-						return PurityAnalysisResult.Pure;
-					}
+                if (hasTrustedGeneratedPurity)
+                {
+                    if (generatedPurity.IsPure)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted pure from generated purity summary.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        return PurityAnalysisResult.Pure;
+                    }
 
-					if (!generatedPurity.IsPure)
-					{
-						LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted impure from generated purity summary.");
-						var generatedResult = ImpureResult(
-							declaringSyntax,
+                    if (!generatedPurity.IsPure)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted impure from generated purity summary.");
+                        var generatedResult = ImpureResult(
+                            declaringSyntax,
                             generatedPurity.PrimaryCategory,
                             symbol: methodSymbol,
                             catalogSource: "generated_purity_summary");
@@ -2503,7 +2503,7 @@ namespace SharpProof.Analyzer.Engine
             mergedPathStateFromBlocks = MergePathStatesAcrossAll(exitBlockStates.Values.ToArray());
 
             PurityAnalysisResult finalResult = PurityAnalysisResult.Pure;
-            
+
             foreach (var exitState in exitBlockStates.Values)
             {
                 if (exitState.HasPotentialImpurity)
@@ -4260,27 +4260,27 @@ namespace SharpProof.Analyzer.Engine
                         out var generatedPurity);
 
                     if (hasTrustedGeneratedPurity)
-				{
-					if (generatedPurity.IsPure)
-					{
-						LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted pure from generated purity summary.");
-						return PurityAnalysisResult.Pure;
-					}
+                    {
+                        if (generatedPurity.IsPure)
+                        {
+                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted pure from generated purity summary.");
+                            return PurityAnalysisResult.Pure;
+                        }
 
-					if (!generatedPurity.IsPure)
-					{
-						LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted impure from generated purity summary.");
-						return PurityAnalysisResult.Impure(
-							operation.Syntax,
-							PurityEvidence.Create(
-                                    generatedPurity.PrimaryCategory,
-                                    syntaxNode: operation.Syntax,
-                                    symbol: operatorMethod.OriginalDefinition,
-                                    catalogSource: "generated_purity_summary"));
+                        if (!generatedPurity.IsPure)
+                        {
+                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted impure from generated purity summary.");
+                            return PurityAnalysisResult.Impure(
+                                operation.Syntax,
+                                PurityEvidence.Create(
+                                        generatedPurity.PrimaryCategory,
+                                        syntaxNode: operation.Syntax,
+                                        symbol: operatorMethod.OriginalDefinition,
+                                        catalogSource: "generated_purity_summary"));
                         }
                     }
 
-                if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
+                    if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
                     {
                         LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is known pure BCL member.");
                         return PurityAnalysisResult.Pure;
@@ -5238,125 +5238,78 @@ namespace SharpProof.Analyzer.Engine
         {
             LogDebug($"  [UpdMap] Trying Update: OpKind={op.Kind}, CurrentImpure={currentState.HasPotentialImpurity}");
 
-              PurityAnalysisState nextState = currentState;
-              var operationToTrack = op is IExpressionStatementOperation expressionStatementOperation
-                  ? expressionStatementOperation.Operation
-                  : op;
-  
-  
-                  if (operationToTrack is ICompoundAssignmentOperation compoundAssignmentOperation)
-                  {
-                    var targetOperation = compoundAssignmentOperation.Target;
-                    var valueOperation = compoundAssignmentOperation.Value;
-                    var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
+            PurityAnalysisState nextState = currentState;
+            var operationToTrack = op is IExpressionStatementOperation expressionStatementOperation
+                ? expressionStatementOperation.Operation
+                : op;
 
-                    if (targetSymbol is ILocalSymbol compoundLocalSymbol)
+
+            if (operationToTrack is ICompoundAssignmentOperation compoundAssignmentOperation)
+            {
+                var targetOperation = compoundAssignmentOperation.Target;
+                var valueOperation = compoundAssignmentOperation.Value;
+                var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
+
+                if (targetSymbol is ILocalSymbol compoundLocalSymbol)
+                {
+                    foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(compoundLocalSymbol, context))
                     {
-                        foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(compoundLocalSymbol, context))
-                        {
-                            nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
-                        }
+                        nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
                     }
-                    else if (targetSymbol is IParameterSymbol compoundParameterSymbol)
-                    {
-                        nextState = nextState.WithIncrementedSmtSymbolVersion(compoundParameterSymbol);
-                    }
+                }
+                else if (targetSymbol is IParameterSymbol compoundParameterSymbol)
+                {
+                    nextState = nextState.WithIncrementedSmtSymbolVersion(compoundParameterSymbol);
+                }
 
-                    nextState = AddCallerVisibleMutationFact(
-                        nextState,
-                        targetOperation,
-                        currentState,
-                        operationToTrack.Syntax);
+                nextState = AddCallerVisibleMutationFact(
+                    nextState,
+                    targetOperation,
+                    currentState,
+                    operationToTrack.Syntax);
 
-                    if (targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
+                if (targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
+                {
+                    if (compoundAssignmentOperation.OperatorKind == BinaryOperatorKind.Add)
                     {
-                        if (compoundAssignmentOperation.OperatorKind == BinaryOperatorKind.Add)
+                        PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState);
+                        if (valueTargets != null &&
+                            currentState.DelegateTargetMap.TryGetValue(targetSymbol, out var currentTargets))
                         {
-                            PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState);
-                            if (valueTargets != null &&
-                                currentState.DelegateTargetMap.TryGetValue(targetSymbol, out var currentTargets))
-                            {
-                                var mergedTargets = PotentialTargets.Merge(currentTargets, valueTargets.Value);
-                                nextState = nextState.WithDelegateTarget(targetSymbol, mergedTargets);
-                                LogDebug($"    [ATF-DEL-COMPOUND] Merged delegate targets for {targetSymbol.Name}. New Map Count: {nextState.DelegateTargetMap.Count}");
-                            }
-                            else
-                            {
-                                nextState = nextState.WithDelegateTarget(targetSymbol, PotentialTargets.Unresolved);
-                                LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved because compound add target state is incomplete.");
-                            }
+                            var mergedTargets = PotentialTargets.Merge(currentTargets, valueTargets.Value);
+                            nextState = nextState.WithDelegateTarget(targetSymbol, mergedTargets);
+                            LogDebug($"    [ATF-DEL-COMPOUND] Merged delegate targets for {targetSymbol.Name}. New Map Count: {nextState.DelegateTargetMap.Count}");
                         }
                         else
                         {
                             nextState = nextState.WithDelegateTarget(targetSymbol, PotentialTargets.Unresolved);
-                            LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved after delegate compound assignment.");
+                            LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved because compound add target state is incomplete.");
                         }
                     }
-                }
-
-                  else if (operationToTrack is ICoalesceAssignmentOperation coalesceAssignmentOperation)
-                {
-                    var targetOperation = coalesceAssignmentOperation.Target;
-                    var valueOperation = coalesceAssignmentOperation.Value;
-                    var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
-                    var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
-                        ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
-                        : Array.Empty<ILocalSymbol>();
-                    if (targetSymbol is IParameterSymbol coalesceParameterSymbol)
+                    else
                     {
-                        nextState = nextState.WithIncrementedSmtSymbolVersion(coalesceParameterSymbol);
-                    }
-
-                    if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
-                        currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
-                    {
-                        nextState = ApplyWrittenLocalStateUpdates(
-                            nextState,
-                            writtenLocalSymbols,
-                            valueOperation,
-                            currentState,
-                            context.SemanticModel,
-                            context.SemanticModel.Compilation);
-                        nextState = ApplyAssignedDelegateTargets(
-                            nextState,
-                            targetSymbol,
-                            targetOperation.Type,
-                            valueOperation,
-                            writtenLocalSymbols,
-                            currentState,
-                            "[ATF-DEL-COALESCE]",
-                            "coalesce-assigned value targets are unresolved");
+                        nextState = nextState.WithDelegateTarget(targetSymbol, PotentialTargets.Unresolved);
+                        LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved after delegate compound assignment.");
                     }
                 }
+            }
 
-                else if (operationToTrack is IDeconstructionAssignmentOperation deconstructionAssignmentOperation)
+            else if (operationToTrack is ICoalesceAssignmentOperation coalesceAssignmentOperation)
+            {
+                var targetOperation = coalesceAssignmentOperation.Target;
+                var valueOperation = coalesceAssignmentOperation.Value;
+                var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
+                var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
+                    ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
+                    : Array.Empty<ILocalSymbol>();
+                if (targetSymbol is IParameterSymbol coalesceParameterSymbol)
                 {
-                    nextState = ApplyDeconstructionAssignmentStateUpdates(
-                        nextState,
-                        deconstructionAssignmentOperation,
-                        currentState,
-                        context);
+                    nextState = nextState.WithIncrementedSmtSymbolVersion(coalesceParameterSymbol);
                 }
 
-                else if (operationToTrack is IAssignmentOperation assignmentOperation)
+                if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
+                    currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
                 {
-                    var targetOperation = assignmentOperation.Target;
-                    var valueOperation = assignmentOperation.Value;
-                    var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
-                    var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
-                        ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
-                        : Array.Empty<ILocalSymbol>();
-                    if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
-                    {
-                        nextState = nextState.WithIncrementedSmtSymbolVersion(assignmentParameterSymbol);
-                        nextState = AddAssignedValueFact(
-                            nextState,
-                            assignmentParameterSymbol,
-                            valueOperation,
-                            currentState,
-                            context.SemanticModel);
-                    }
-
                     nextState = ApplyWrittenLocalStateUpdates(
                         nextState,
                         writtenLocalSymbols,
@@ -5364,11 +5317,6 @@ namespace SharpProof.Analyzer.Engine
                         currentState,
                         context.SemanticModel,
                         context.SemanticModel.Compilation);
-                    nextState = AddCallerVisibleMutationFact(
-                        nextState,
-                        targetOperation,
-                        currentState,
-                        operationToTrack.Syntax);
                     nextState = ApplyAssignedDelegateTargets(
                         nextState,
                         targetSymbol,
@@ -5376,187 +5324,239 @@ namespace SharpProof.Analyzer.Engine
                         valueOperation,
                         writtenLocalSymbols,
                         currentState,
-                        "[ATF-DEL-ASSIGN]",
-                        "assigned value targets are unresolved");
+                        "[ATF-DEL-COALESCE]",
+                        "coalesce-assigned value targets are unresolved");
                 }
+            }
 
-                else if (operationToTrack is IVariableDeclaratorOperation variableDeclaratorOperation &&
-                         variableDeclaratorOperation.Initializer?.Value is { } variableInitializer)
+            else if (operationToTrack is IDeconstructionAssignmentOperation deconstructionAssignmentOperation)
+            {
+                nextState = ApplyDeconstructionAssignmentStateUpdates(
+                    nextState,
+                    deconstructionAssignmentOperation,
+                    currentState,
+                    context);
+            }
+
+            else if (operationToTrack is IAssignmentOperation assignmentOperation)
+            {
+                var targetOperation = assignmentOperation.Target;
+                var valueOperation = assignmentOperation.Value;
+                var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
+                var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
+                    ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
+                    : Array.Empty<ILocalSymbol>();
+                if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
                 {
-                    nextState = AddDeclaredBorrowFact(
+                    nextState = nextState.WithIncrementedSmtSymbolVersion(assignmentParameterSymbol);
+                    nextState = AddAssignedValueFact(
                         nextState,
-                        variableDeclaratorOperation.Symbol,
-                        variableInitializer,
+                        assignmentParameterSymbol,
+                        valueOperation,
+                        currentState,
                         context.SemanticModel);
                 }
 
-                else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
-                {
-                    nextState = AddCallerVisibleMutationFact(
-                        nextState,
-                        incrementOrDecrementOperation.Target,
-                        currentState,
-                        operationToTrack.Syntax);
-                }
+                nextState = ApplyWrittenLocalStateUpdates(
+                    nextState,
+                    writtenLocalSymbols,
+                    valueOperation,
+                    currentState,
+                    context.SemanticModel,
+                    context.SemanticModel.Compilation);
+                nextState = AddCallerVisibleMutationFact(
+                    nextState,
+                    targetOperation,
+                    currentState,
+                    operationToTrack.Syntax);
+                nextState = ApplyAssignedDelegateTargets(
+                    nextState,
+                    targetSymbol,
+                    targetOperation.Type,
+                    valueOperation,
+                    writtenLocalSymbols,
+                    currentState,
+                    "[ATF-DEL-ASSIGN]",
+                    "assigned value targets are unresolved");
+            }
 
-                else if (operationToTrack is IInvocationOperation invocationOperation)
-                {
-                    nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
+            else if (operationToTrack is IVariableDeclaratorOperation variableDeclaratorOperation &&
+                     variableDeclaratorOperation.Initializer?.Value is { } variableInitializer)
+            {
+                nextState = AddDeclaredBorrowFact(
+                    nextState,
+                    variableDeclaratorOperation.Symbol,
+                    variableInitializer,
+                    context.SemanticModel);
+            }
 
-                    foreach (var argument in invocationOperation.Arguments)
+            else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
+            {
+                nextState = AddCallerVisibleMutationFact(
+                    nextState,
+                    incrementOrDecrementOperation.Target,
+                    currentState,
+                    operationToTrack.Syntax);
+            }
+
+            else if (operationToTrack is IInvocationOperation invocationOperation)
+            {
+                nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
+
+                foreach (var argument in invocationOperation.Arguments)
+                {
+                    if (argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.Out))
                     {
-                        if (argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.Out))
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var writtenSymbol = TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), currentState);
-                        if (writtenSymbol is ILocalSymbol localSymbol)
+                    var writtenSymbol = TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), currentState);
+                    if (writtenSymbol is ILocalSymbol localSymbol)
+                    {
+                        foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(localSymbol, context))
                         {
-                            foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(localSymbol, context))
+                            nextState = nextState
+                                .WithoutLocalConcreteType(writtenLocalSymbol)
+                                .WithoutOwnedLocalArray(writtenLocalSymbol)
+                                .WithoutDefinitelyNullLocal(writtenLocalSymbol)
+                                .WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+
+                            if (writtenLocalSymbol.Type?.TypeKind == TypeKind.Delegate)
                             {
-                                nextState = nextState
-                                    .WithoutLocalConcreteType(writtenLocalSymbol)
-                                    .WithoutOwnedLocalArray(writtenLocalSymbol)
-                                    .WithoutDefinitelyNullLocal(writtenLocalSymbol)
-                                    .WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
-
-                                if (writtenLocalSymbol.Type?.TypeKind == TypeKind.Delegate)
-                                {
-                                    nextState = nextState.WithDelegateTarget(writtenLocalSymbol, PotentialTargets.Unresolved);
-                                }
+                                nextState = nextState.WithDelegateTarget(writtenLocalSymbol, PotentialTargets.Unresolved);
                             }
                         }
-                        else if (writtenSymbol is IParameterSymbol parameterSymbol)
+                    }
+                    else if (writtenSymbol is IParameterSymbol parameterSymbol)
+                    {
+                        nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
+                    }
+                }
+            }
+
+            else if (operationToTrack is IReturnOperation returnOperation)
+            {
+                nextState = AddReturnedOwnedResourceFacts(nextState, returnOperation, currentState);
+            }
+
+            else if (operationToTrack is IUsingOperation usingOperation)
+            {
+                nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
+            }
+
+            else if (operationToTrack is IFlowCaptureOperation flowCaptureOperation)
+            {
+                if (TryResolveTrackedSymbol(flowCaptureOperation.Value, currentState) is ISymbol capturedSymbol)
+                {
+                    nextState = nextState.WithFlowCaptureSymbol(flowCaptureOperation.Id, capturedSymbol);
+                }
+
+                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(flowCaptureOperation.Value, currentState);
+                if (valueTargets != null)
+                {
+                    nextState = nextState.WithFlowCaptureTarget(flowCaptureOperation.Id, valueTargets.Value);
+                }
+
+                if (TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation, out var concreteType))
+                {
+                    nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
+                }
+
+                if (IsOwnedLocalArrayValue(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation))
+                {
+                    nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
+                }
+                else
+                {
+                    nextState = nextState.WithoutOwnedArrayFlowCapture(flowCaptureOperation.Id);
+                }
+            }
+
+            else if (operationToTrack is IVariableDeclarationGroupOperation groupOperation)
+            {
+                foreach (var declaration in groupOperation.Declarations)
+                {
+                    foreach (var declarator in declaration.Declarators)
+                    {
+                        if (declarator.Initializer != null)
                         {
-                            nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
-                        }
-                    }
-                }
+                            var initializerValue = declarator.Initializer.Value;
+                            ILocalSymbol declaredSymbol = declarator.Symbol;
 
-                else if (operationToTrack is IReturnOperation returnOperation)
-                {
-                    nextState = AddReturnedOwnedResourceFacts(nextState, returnOperation, currentState);
-                }
-
-                  else if (operationToTrack is IUsingOperation usingOperation)
-                {
-                    nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
-                }
-
-                  else if (operationToTrack is IFlowCaptureOperation flowCaptureOperation)
-                {
-                    if (TryResolveTrackedSymbol(flowCaptureOperation.Value, currentState) is ISymbol capturedSymbol)
-                    {
-                        nextState = nextState.WithFlowCaptureSymbol(flowCaptureOperation.Id, capturedSymbol);
-                    }
-
-                    PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(flowCaptureOperation.Value, currentState);
-                    if (valueTargets != null)
-                    {
-                        nextState = nextState.WithFlowCaptureTarget(flowCaptureOperation.Id, valueTargets.Value);
-                    }
-
-                    if (TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation, out var concreteType))
-                    {
-                        nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
-                    }
-
-                    if (IsOwnedLocalArrayValue(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation))
-                    {
-                        nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
-                    }
-                    else
-                    {
-                        nextState = nextState.WithoutOwnedArrayFlowCapture(flowCaptureOperation.Id);
-                    }
-                }
-
-                  else if (operationToTrack is IVariableDeclarationGroupOperation groupOperation)
-                {
-                    foreach (var declaration in groupOperation.Declarations)
-                    {
-                        foreach (var declarator in declaration.Declarators)
-                        {
-                            if (declarator.Initializer != null)
+                            if (TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation, out var concreteType))
                             {
-                                var initializerValue = declarator.Initializer.Value;
-                                ILocalSymbol declaredSymbol = declarator.Symbol;
+                                nextState = nextState.WithLocalConcreteType(declaredSymbol, concreteType);
+                            }
+                            else
+                            {
+                                nextState = nextState.WithoutLocalConcreteType(declaredSymbol);
+                            }
 
-                                if (TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation, out var concreteType))
-                                {
-                                    nextState = nextState.WithLocalConcreteType(declaredSymbol, concreteType);
-                                }
-                                else
-                                {
-                                    nextState = nextState.WithoutLocalConcreteType(declaredSymbol);
-                                }
-
-                                if (IsOwnedLocalArrayValue(initializerValue, nextState, context.SemanticModel.Compilation))
-                                {
-                                    nextState = nextState.WithOwnedLocalArray(declaredSymbol);
-                                    nextState = AddOwnedLocalArrayFacts(
-                                        nextState,
-                                        declaredSymbol,
-                                        initializerValue);
-                                }
-                                else
-                                {
-                                    nextState = nextState.WithoutOwnedLocalArray(declaredSymbol);
-                                }
-
-                                nextState = AddFreshMutableObjectFacts(
+                            if (IsOwnedLocalArrayValue(initializerValue, nextState, context.SemanticModel.Compilation))
+                            {
+                                nextState = nextState.WithOwnedLocalArray(declaredSymbol);
+                                nextState = AddOwnedLocalArrayFacts(
                                     nextState,
                                     declaredSymbol,
                                     initializerValue);
+                            }
+                            else
+                            {
+                                nextState = nextState.WithoutOwnedLocalArray(declaredSymbol);
+                            }
 
-                                if (IsDefinitelyNullValue(initializerValue, nextState))
-                                {
-                                    nextState = nextState.WithDefinitelyNullLocal(declaredSymbol);
-                                }
-                                else
-                                {
-                                    nextState = nextState.WithoutDefinitelyNullLocal(declaredSymbol);
-                                }
+                            nextState = AddFreshMutableObjectFacts(
+                                nextState,
+                                declaredSymbol,
+                                initializerValue);
 
-                                if (declaredSymbol.Type?.TypeKind == TypeKind.Delegate)
-                                {
-                                    PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(initializerValue, nextState);
-                                    if (valueTargets != null)
-                                    {
-                                        nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
-                                        LogDebug($"    [ATF-DEL-VAR] Updated map for {declaredSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
-                                    }
-                                }
+                            if (IsDefinitelyNullValue(initializerValue, nextState))
+                            {
+                                nextState = nextState.WithDefinitelyNullLocal(declaredSymbol);
+                            }
+                            else
+                            {
+                                nextState = nextState.WithoutDefinitelyNullLocal(declaredSymbol);
+                            }
 
-                                nextState = AddAssignedValueFact(
+                            if (declaredSymbol.Type?.TypeKind == TypeKind.Delegate)
+                            {
+                                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(initializerValue, nextState);
+                                if (valueTargets != null)
+                                {
+                                    nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
+                                    LogDebug($"    [ATF-DEL-VAR] Updated map for {declaredSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
+                                }
+                            }
+
+                            nextState = AddAssignedValueFact(
+                                nextState,
+                                declaredSymbol,
+                                initializerValue,
+                                nextState,
+                                context.SemanticModel);
+                            nextState = AddAssignedAliasFact(
+                                nextState,
+                                declaredSymbol,
+                                initializerValue,
+                                nextState);
+                            nextState = AddDeclaredBorrowFact(
+                                nextState,
+                                declaredSymbol,
+                                initializerValue,
+                                context.SemanticModel);
+                            if (!IsUsingResourceDeclarator(declarator))
+                            {
+                                nextState = AddOwnedDisposableLocalFacts(
                                     nextState,
                                     declaredSymbol,
                                     initializerValue,
-                                    nextState,
-                                    context.SemanticModel);
-                                nextState = AddAssignedAliasFact(
-                                    nextState,
-                                    declaredSymbol,
-                                    initializerValue,
-                                    nextState);
-                                nextState = AddDeclaredBorrowFact(
-                                    nextState,
-                                    declaredSymbol,
-                                    initializerValue,
-                                    context.SemanticModel);
-                                if (!IsUsingResourceDeclarator(declarator))
-                                {
-                                    nextState = AddOwnedDisposableLocalFacts(
-                                        nextState,
-                                        declaredSymbol,
-                                        initializerValue,
-                                        context.SemanticModel.Compilation);
-                                }
+                                    context.SemanticModel.Compilation);
                             }
                         }
                     }
                 }
+            }
 
 
             return nextState;
