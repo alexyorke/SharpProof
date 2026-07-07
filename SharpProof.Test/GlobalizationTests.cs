@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using System.Collections.Immutable;
 using NUnit.Framework;
 using System.Globalization;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 
@@ -14,8 +16,9 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class GlobalizationTests
     {
-
-
+        private static readonly ImmutableArray<MetadataReference> GlobalizationFrameworkReferences =
+            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
+                MetadataReference.CreateFromFile(typeof(CultureInfo).Assembly.Location));
 
         [Test]
         public async Task CultureInfo_InvariantCultureName_Diagnostic()
@@ -1739,6 +1742,7 @@ public class TestClass
         return Convert.ToSingle(value);
     }
 }",
+                frameworkReferences: GlobalizationFrameworkReferences,
                 concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
@@ -1805,6 +1809,7 @@ public class TestClass
         return Convert.ToDouble(value);
     }
 }",
+                frameworkReferences: GlobalizationFrameworkReferences,
                 concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
@@ -1952,6 +1957,7 @@ public class TestClass
     }
 }
 """,
+                frameworkReferences: GlobalizationFrameworkReferences,
                 concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
@@ -2291,6 +2297,7 @@ public class TestClass
     }
 }
 """,
+                frameworkReferences: GlobalizationFrameworkReferences,
                 concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
@@ -4979,7 +4986,10 @@ public class TestClass
         private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
+                frameworkReferences: GlobalizationFrameworkReferences,
+                concurrentAnalysis: true);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();

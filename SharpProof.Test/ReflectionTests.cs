@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
@@ -12,6 +14,10 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class ReflectionTests
     {
+        private static readonly ImmutableArray<MetadataReference> ReflectionFrameworkReferences =
+            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
+                MetadataReference.CreateFromFile(typeof(System.Reflection.MemberInfo).Assembly.Location));
+
         [Test]
         public async Task FieldInfoGetValue_Diagnostic()
         {
@@ -2686,7 +2692,10 @@ public class TestClass
         private static async Task AssertReflectionDiagnosticsAsync(string markedSource)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
+                frameworkReferences: ReflectionFrameworkReferences,
+                concurrentAnalysis: true);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();
