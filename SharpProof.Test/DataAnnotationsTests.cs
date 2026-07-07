@@ -14,6 +14,7 @@ using System;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class DataAnnotationsTests
     {
 
