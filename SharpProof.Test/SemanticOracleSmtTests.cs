@@ -9510,7 +9510,8 @@ public class TestClass
         {
             return AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
+                concurrentAnalysis: true);
         }
 
         private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")

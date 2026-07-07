@@ -3732,6 +3732,7 @@ public class TestClass
                     .Add("sharpproof_checked_exceptions", checkedExceptions ? "true" : "false"),
                 allowUnsafe: false,
                 frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
+                concurrentAnalysis: true,
                 compilationName: "ExceptionFlowPathFactStressTests");
         }
     }
