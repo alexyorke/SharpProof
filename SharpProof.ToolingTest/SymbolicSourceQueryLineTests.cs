@@ -3995,6 +3995,39 @@ public class TestClass
             }
         }
 
+        [Test]
+        public async Task SymbolicCli_RejectsNonPositiveLineAndColumn()
+        {
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvalidLocation-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+            try
+            {
+                var zeroLine = await SymbolicCliTestHost.RunAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    "0");
+                Assert.That(zeroLine.ExitCode, Is.EqualTo(64));
+                Assert.That(zeroLine.StandardError, Does.Contain("--line requires a positive integer value."));
+
+                var negativeColumn = await SymbolicCliTestHost.RunAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    "1",
+                    "--column",
+                    "-1");
+                Assert.That(negativeColumn.ExitCode, Is.EqualTo(64));
+                Assert.That(negativeColumn.StandardError, Does.Contain("--column requires a positive integer value."));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
         private static int FindLine(string source, string text)
         {
             var lines = source.Split('\n');

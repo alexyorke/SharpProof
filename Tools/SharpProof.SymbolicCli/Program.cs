@@ -324,7 +324,7 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
             Console.WriteLine(
                 $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
                 $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
-            Console.WriteLine(                $"Implication reason: {proof.GetDisplayReason()}");
+            Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
         }
     }
     else
@@ -806,7 +806,7 @@ static void PrintPointResult(
                 $"contained={proof.ContainsRequestedPosition}");
         }
 
-        Console.WriteLine(                $"Implication reason: {proof.GetDisplayReason()}");
+        Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
     }
 
     PrintProofOutcomeSummary(result.ProofOutcomes, indent: "");
@@ -1280,10 +1280,10 @@ Examples:
                     options.FilePath = ReadString(args, ref index, arg);
                     break;
                 case "--line":
-                    options.Line = ReadInt(args, ref index, arg);
+                    options.Line = ReadPositiveInt(args, ref index, arg);
                     break;
                 case "--column":
-                    options.Column = ReadInt(args, ref index, arg);
+                    options.Column = ReadPositiveInt(args, ref index, arg);
                     options.HasColumn = true;
                     break;
                 case "--position":
