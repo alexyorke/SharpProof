@@ -1,11 +1,13 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
+using SharpProof.Analyzer;
 
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class UsingDisposeSoundnessStressTests
     {
         [Test]
@@ -32,7 +34,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -59,7 +61,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -88,7 +90,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -115,7 +117,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -148,7 +150,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -178,7 +180,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -207,7 +209,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -237,7 +239,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -273,7 +275,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -308,7 +310,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -340,7 +342,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -378,7 +380,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -413,7 +415,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -451,7 +453,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -478,7 +480,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -505,7 +507,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -533,7 +535,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -561,7 +563,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -591,7 +593,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -620,7 +622,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -651,7 +653,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -688,7 +690,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -717,7 +719,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -757,7 +759,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -791,7 +793,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -822,7 +824,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -857,7 +859,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -893,7 +895,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -926,7 +928,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -961,7 +963,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -993,7 +995,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1025,7 +1027,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1057,7 +1059,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1091,7 +1093,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1126,7 +1128,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1160,7 +1162,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1202,7 +1204,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1245,7 +1247,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1282,7 +1284,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1318,7 +1320,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1362,7 +1364,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1400,7 +1402,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1434,7 +1436,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1467,7 +1469,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1497,7 +1499,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1528,7 +1530,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1567,7 +1569,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1599,7 +1601,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1638,7 +1640,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1670,7 +1672,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1698,7 +1700,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1727,7 +1729,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1758,7 +1760,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1789,7 +1791,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1819,7 +1821,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1855,7 +1857,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1884,7 +1886,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1922,7 +1924,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1954,7 +1956,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -1993,7 +1995,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2032,7 +2034,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -2065,7 +2067,51 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertPurityDiagnosticsAsync(test);
+        }
+
+        private static async Task AssertPurityDiagnosticsAsync(string markedSource)
+        {
+            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var purityDiagnostics = diagnostics
+                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+
+            if (expectedSpanText == null)
+            {
+                Assert.That(purityDiagnostics, Is.Empty);
+                Assert.That(diagnostics, Is.Empty);
+                return;
+            }
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+
+            var diagnostic = purityDiagnostics[0];
+            var actualSpanText = source.Substring(
+                diagnostic.Location.SourceSpan.Start,
+                diagnostic.Location.SourceSpan.Length);
+            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
+        }
+
+        private static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
+        {
+            const string prefix = "{|SP0002:";
+            const string suffix = "|}";
+            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return (markedSource, null);
+            }
+
+            var contentStart = start + prefix.Length;
+            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThanOrEqualTo(0), "Unterminated SP0002 markup.");
+
+            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
+            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
+            return (source, expectedSpanText);
         }
     }
 }

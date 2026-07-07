@@ -1738,7 +1738,8 @@ public class TestClass
     {
         return Convert.ToSingle(value);
     }
-}");
+}",
+                concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -1803,7 +1804,8 @@ public class TestClass
     {
         return Convert.ToDouble(value);
     }
-}");
+}",
+                concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -1949,7 +1951,8 @@ public class TestClass
         return Convert.ToDateTime(value);
     }
 }
-""");
+""",
+                concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -2287,7 +2290,8 @@ public class TestClass
         return {{expression}};
     }
 }
-""");
+""",
+                concurrentAnalysis: true);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -4975,7 +4979,7 @@ public class TestClass
         private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();

@@ -6,6 +6,7 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class ObjectEqualsDispatchTests
     {
         [Test]

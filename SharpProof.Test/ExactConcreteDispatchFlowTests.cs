@@ -7,6 +7,7 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class ExactConcreteDispatchFlowTests
     {
         [Test]

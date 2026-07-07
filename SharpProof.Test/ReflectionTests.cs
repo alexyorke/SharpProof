@@ -2686,7 +2686,7 @@ public class TestClass
         private static async Task AssertReflectionDiagnosticsAsync(string markedSource)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();

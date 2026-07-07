@@ -489,7 +489,8 @@ public class TestClass
                 source,
                 ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", "sites"),
                 allowUnsafe: false,
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                additionalFiles: ImmutableArray<AdditionalText>.Empty,
+                concurrentAnalysis: true);
         }
 
         private static Diagnostic SingleRuntimeHazardDiagnostic(ImmutableArray<Diagnostic> diagnostics)
