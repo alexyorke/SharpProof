@@ -232,6 +232,53 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void Classify_SyntacticDisjunctionOfKnownComparisonComplements_BypassesSolver()
+        {
+            var values = new SmtVariable("values_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var index = new SmtVariable("index_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var length = new SmtVariable(values.Name + ".Length", SmtValueKind.Int);
+            var valuesIsNotNull = new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                values,
+                new SmtNullConstant());
+            var indexIsNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                index,
+                new SmtIntegerConstant(0));
+            var indexIsInBounds = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                index,
+                length);
+            var contradiction = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, values, new SmtNullConstant()),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, new SmtIntegerConstant(0)),
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, length)));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(1),
+                maxPathConditions: 4,
+                maxExpressionNodes: 64));
+
+            var result = service.ClassifyPathFeasibility(new SmtFormula[]
+            {
+                valuesIsNotNull,
+                indexIsNonNegative,
+                indexIsInBounds,
+                contradiction,
+            });
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Classify_NestedConjunctIntegerContradiction_BypassesSolver()
         {
             var x = new SmtVariable("nested_interval_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);

@@ -1222,6 +1222,11 @@ namespace SharpProof.Symbolic.Smt
                         return true;
                     }
 
+                    if (TryEvaluateKnownComplement(formula, out value))
+                    {
+                        return true;
+                    }
+
                     switch (formula)
                     {
                         case SmtBooleanConstant booleanConstant:
@@ -1309,6 +1314,21 @@ namespace SharpProof.Symbolic.Smt
                 {
                     _booleanEvaluationDepth--;
                 }
+            }
+
+            private bool TryEvaluateKnownComplement(SmtFormula formula, out bool value)
+            {
+                foreach (var exactBoolean in _exactBooleans)
+                {
+                    if (AreSyntacticComplements(formula, exactBoolean.Key))
+                    {
+                        value = !exactBoolean.Value;
+                        return true;
+                    }
+                }
+
+                value = false;
+                return false;
             }
 
             private bool TryAddBooleanFact(SmtFormula formula, out bool hasContradiction)
