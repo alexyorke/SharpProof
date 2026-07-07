@@ -212,7 +212,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertSinglePurityDiagnosticAsync(test);
         }
 
         [Test]
@@ -225,7 +225,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int[] ProcessArray(params int[] numbers)
+    public int[] {|SP0002:ProcessArray|}(params int[] numbers)
     {
         for (int i = 0; i < numbers.Length; i++)
         {
@@ -235,11 +235,7 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                  .WithSpan(8, 18, 8, 30)
-                                  .WithArguments("ProcessArray");
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+            await AssertSinglePurityDiagnosticAsync(test);
         }
 
         [Test]
@@ -293,6 +289,45 @@ public class TestClass
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
             Assert.That(diagnostics, Is.Empty);
+        }
+
+        private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
+        {
+            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            Assert.That(expectedSpanText, Is.Not.Null);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var purityDiagnostics = diagnostics
+                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+
+            var diagnostic = purityDiagnostics[0];
+            var actualSpanText = source.Substring(
+                diagnostic.Location.SourceSpan.Start,
+                diagnostic.Location.SourceSpan.Length);
+            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
+        }
+
+        private static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
+        {
+            const string prefix = "{|SP0002:";
+            const string suffix = "|}";
+            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return (markedSource, null);
+            }
+
+            var contentStart = start + prefix.Length;
+            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThanOrEqualTo(0), "Unterminated SP0002 markup.");
+
+            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
+            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
+            return (source, expectedSpanText);
         }
     }
 }
