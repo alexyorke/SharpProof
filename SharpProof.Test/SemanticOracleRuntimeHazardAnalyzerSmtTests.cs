@@ -6,6 +6,7 @@ using SharpProof.Analyzer;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     [Category("SmtHeavy")]
     public class SemanticOracleRuntimeHazardAnalyzerSmtTests : SemanticOracleSmtTestBase
     {
