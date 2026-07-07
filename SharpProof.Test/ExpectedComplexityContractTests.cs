@@ -31,7 +31,7 @@ public static class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoComplexityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -56,7 +56,7 @@ public static class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoComplexityDiagnosticsAsync(test);
         }
 
         [Test]
@@ -196,6 +196,12 @@ public sealed class TestClass
                 source,
                 frameworkReferences: ComplexityFrameworkReferences,
                 concurrentAnalysis: true);
+        }
+
+        private static async Task AssertNoComplexityDiagnosticsAsync(string source)
+        {
+            var diagnostics = await GetComplexityDiagnosticsAsync(source);
+            Assert.That(diagnostics, Is.Empty);
         }
     }
 }
