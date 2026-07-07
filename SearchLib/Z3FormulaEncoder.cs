@@ -42,7 +42,11 @@ namespace SearchLib.Smt
         {
             var solver = _context.MkSolver();
             var parameters = _context.MkParams();
-            parameters.Add("timeout", GetTimeoutMilliseconds(timeout));
+            // rlimit is the binding budget: it counts solver work, so outcomes are
+            // deterministic under CPU load. The wall-clock timeout is a scaled-up
+            // safety net only.
+            parameters.Add("rlimit", SmtResourceBudget.GetRlimit(timeout));
+            parameters.Add("timeout", GetTimeoutMilliseconds(SmtResourceBudget.GetWallClockSafetyNet(timeout)));
             solver.Parameters = parameters;
             return solver;
         }

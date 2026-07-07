@@ -17,6 +17,38 @@ namespace SearchLib.Smt
         private const int MaxEqualitySubstitutionReplacementNodes = 32;
         private readonly Z3FormulaEncoder _encoder = new();
         private readonly Dictionary<RegexValidationKey, RegexValidationResult> _regexValidationCache = new();
+        private long _lastObservedRlimitCount;
+
+        /// <summary>
+        /// Total Z3 rlimit units consumed by checks on this solver instance. Grows
+        /// deterministically with solver work, so callers can enforce cumulative
+        /// budgets that do not depend on machine speed or load.
+        /// </summary>
+        public long ConsumedResourceCount { get; private set; }
+
+        private Status CheckAndAccountResources(Solver solver)
+        {
+            var status = solver.Check();
+            foreach (var entry in solver.Statistics.Entries)
+            {
+                if (!string.Equals(entry.Key, "rlimit count", StringComparison.Ordinal) || !entry.IsUInt)
+                {
+                    continue;
+                }
+
+                // The statistic is cumulative per Z3 context; account the delta. A
+                // smaller observation means the 32-bit counter wrapped — count the
+                // post-wrap portion rather than losing the observation entirely.
+                long observed = entry.UIntValue;
+                ConsumedResourceCount += observed >= _lastObservedRlimitCount
+                    ? observed - _lastObservedRlimitCount
+                    : observed;
+                _lastObservedRlimitCount = observed;
+                break;
+            }
+
+            return status;
+        }
 
         public Feasibility IsSatisfiable(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
         {
@@ -48,7 +80,7 @@ namespace SearchLib.Smt
                     solver.Assert(_encoder.EncodeCondition(formula));
                 }
 
-                return AdjustForApproximation(ToFeasibility(solver.Check()), containsApproximateRegex);
+                return AdjustForApproximation(ToFeasibility(CheckAndAccountResources(solver)), containsApproximateRegex);
             }
             catch (Exception ex) when (IsConservativeSolverFailure(ex))
             {
@@ -91,7 +123,7 @@ namespace SearchLib.Smt
                     solver.Assert(_encoder.EncodeCondition(formula));
                 }
 
-                var pathFeasibility = ToFeasibility(solver.Check());
+                var pathFeasibility = ToFeasibility(CheckAndAccountResources(solver));
                 if (pathFeasibility != Feasibility.Satisfiable)
                 {
                     return (pathFeasibility, Feasibility.Unknown);
@@ -125,7 +157,7 @@ namespace SearchLib.Smt
                     solver.Assert(_encoder.EncodeCondition(impurityCondition));
                     var combinedContainsApproximateRegex = ContainsApproximateRegex(combinedConditions);
                     return (pathFeasibility, AdjustForApproximation(
-                        ToFeasibility(solver.Check()),
+                        ToFeasibility(CheckAndAccountResources(solver)),
                         combinedContainsApproximateRegex));
                 }
                 finally

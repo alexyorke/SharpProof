@@ -23,6 +23,7 @@ namespace SharpProof.Symbolic.Smt
         private static PurityProofSearch? t_sharedProofSearch;
         private readonly object _solverLock = new();
         private long _consumedQueryTicks;
+        private long _consumedResourceCount;
         private int _executedQueryCount;
         private bool _solverUnavailable;
         private bool _disposed;
@@ -162,7 +163,15 @@ namespace SharpProof.Symbolic.Smt
 
                     Interlocked.Increment(ref _executedQueryCount);
                     var search = GetOrCreateProofSearch();
-                    return search.Classify(query, Options.QueryTimeout);
+                    var resourcesBefore = search.ConsumedResourceCount;
+                    try
+                    {
+                        return search.Classify(query, Options.QueryTimeout);
+                    }
+                    finally
+                    {
+                        Interlocked.Add(ref _consumedResourceCount, search.ConsumedResourceCount - resourcesBefore);
+                    }
                 }
             }
             catch (InvalidOperationException)
@@ -231,8 +240,16 @@ namespace SharpProof.Symbolic.Smt
 
         private bool IsMethodBudgetExceeded()
         {
-            var budgetTicks = Options.MethodBudget.TotalSeconds * Stopwatch.Frequency;
-            return Interlocked.Read(ref _consumedQueryTicks) > budgetTicks;
+            // Primary budget is deterministic solver work (rlimit units), so the
+            // cutoff does not depend on machine speed or CPU load. Wall-clock stays
+            // only as a scaled-up safety net against a wedged solver.
+            if (Interlocked.Read(ref _consumedResourceCount) > SmtResourceBudget.GetMethodRlimitBudget(Options.MethodBudget))
+            {
+                return true;
+            }
+
+            var safetyNetTicks = Options.MethodBudget.TotalSeconds * Stopwatch.Frequency * SmtResourceBudget.WallClockSafetyFactor;
+            return Interlocked.Read(ref _consumedQueryTicks) > safetyNetTicks;
         }
 
         private bool TryGetSharedResult(string queryKey, out PurityProofResult result)

@@ -19,6 +19,12 @@ namespace SearchLib.Purity
     {
         private readonly SmtSolver _solver = new();
 
+        /// <summary>
+        /// Total Z3 rlimit units consumed by classifications on this instance; see
+        /// <see cref="SmtSolver.ConsumedResourceCount"/>.
+        /// </summary>
+        public long ConsumedResourceCount => _solver.ConsumedResourceCount;
+
         public PurityProofResult Classify(SmtFormula impurityCondition, TimeSpan timeout)
         {
             return Classify(Array.Empty<SmtFormula>(), impurityCondition, timeout);
