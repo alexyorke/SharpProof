@@ -10,6 +10,8 @@ namespace SharpProof.Analyzer
 {
     internal static class MethodExpectedComplexityAnalyzer
     {
+        private static readonly SymbolicQueryService QueryService = new SymbolicQueryService();
+
         internal static void AnalyzeSymbolForExpectedComplexity(
             SyntaxNodeAnalysisContext context,
             Configuration.DiagnosticBaseline baseline)
@@ -33,11 +35,10 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            var queryService = new SymbolicQueryService();
             SymbolicComplexityResult result;
             try
             {
-                result = queryService.QueryComplexity(
+                result = QueryService.QueryComplexity(
                     new SymbolicComplexityRequest(
                         SymbolicSourceInput.FromNode(context.Node, context.SemanticModel),
                         SymbolicQueryTarget.Node()),
