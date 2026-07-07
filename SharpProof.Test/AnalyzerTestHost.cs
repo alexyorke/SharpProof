@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -479,11 +480,14 @@ public static class ConditionHost
 
         private static string CreateGlobalOptionsCacheKey(ImmutableDictionary<string, string> analyzerGlobalOptions)
         {
-            return string.Join(
-                "\n",
-                analyzerGlobalOptions
-                    .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
-                    .Select(static pair => pair.Key + "=" + pair.Value));
+            var builder = new StringBuilder();
+            foreach (var pair in analyzerGlobalOptions.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+            {
+                AppendLengthPrefixed(builder, pair.Key);
+                AppendLengthPrefixed(builder, pair.Value);
+            }
+
+            return builder.ToString();
         }
 
         private static AnalyzerOptions CreateAnalyzerOptionsWithoutAdditionalFiles(string cacheKey)
@@ -494,20 +498,52 @@ public static class ConditionHost
             }
 
             var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-            foreach (var line in cacheKey.Split('\n'))
+            var index = 0;
+            while (index < cacheKey.Length)
             {
-                var separatorIndex = line.IndexOf('=');
-                if (separatorIndex <= 0)
+                if (!TryReadLengthPrefixed(cacheKey, ref index, out var key) ||
+                    !TryReadLengthPrefixed(cacheKey, ref index, out var value) ||
+                    key.Length == 0)
                 {
-                    continue;
+                    break;
                 }
 
-                builder[line[..separatorIndex]] = line[(separatorIndex + 1)..];
+                builder[key] = value;
             }
 
             return new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
                 new TestAnalyzerConfigOptionsProvider(builder.ToImmutable()));
+        }
+
+        private static void AppendLengthPrefixed(StringBuilder builder, string value)
+        {
+            builder.Append(value.Length);
+            builder.Append(':');
+            builder.Append(value);
+        }
+
+        private static bool TryReadLengthPrefixed(string text, ref int index, out string value)
+        {
+            value = string.Empty;
+            var separatorIndex = text.IndexOf(':', index);
+            if (separatorIndex < index ||
+                !int.TryParse(text.AsSpan(index, separatorIndex - index), out var length) ||
+                length < 0)
+            {
+                return false;
+            }
+
+            var valueStart = separatorIndex + 1;
+            var valueEnd = valueStart + length;
+            if (valueEnd > text.Length)
+            {
+                return false;
+            }
+
+            value = text.Substring(valueStart, length);
+            index = valueEnd;
+            return true;
         }
 
         internal sealed class InMemoryAdditionalText : AdditionalText
