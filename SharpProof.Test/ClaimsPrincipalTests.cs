@@ -1,4 +1,6 @@
 using System.Threading.Tasks;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using NUnit.Framework;
 
@@ -7,6 +9,10 @@ namespace SharpProof.Test
     [TestFixture]
     public class ClaimsPrincipalTests
     {
+        private static readonly ImmutableArray<MetadataReference> ClaimsFrameworkReferences =
+            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
+                MetadataReference.CreateFromFile(typeof(System.Security.Claims.ClaimsPrincipal).Assembly.Location));
+
         [Test]
         public async Task ClaimsPrincipalIsInRole_Diagnostic()
         {
@@ -23,7 +29,10 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                test,
+                frameworkReferences: ClaimsFrameworkReferences,
+                concurrentAnalysis: true);
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
             Assert.That(diagnostic.GetMessage(), Does.Contain("TestMethod"));
         }

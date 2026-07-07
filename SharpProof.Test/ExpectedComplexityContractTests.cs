@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using Microsoft.CodeAnalysis;
+using System.Collections.Immutable;
 using static SharpProof.Test.AnalyzerTestHost;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
@@ -10,6 +12,9 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public sealed class ExpectedComplexityContractTests
     {
+        private static readonly ImmutableArray<MetadataReference> ComplexityFrameworkReferences =
+            GetMinimalFrameworkReferences();
+
         [Test]
         public async Task ExpectedComplexity_ConstantMethod_Passes()
         {
@@ -187,7 +192,10 @@ public sealed class TestClass
 
         private static Task<System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> GetComplexityDiagnosticsAsync(string source)
         {
-            return GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            return GetDiagnosticsAsync(
+                source,
+                frameworkReferences: ComplexityFrameworkReferences,
+                concurrentAnalysis: true);
         }
     }
 }
