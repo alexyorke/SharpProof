@@ -18,7 +18,7 @@ param(
     [string]$Filter = '',
 
     [Parameter()]
-    [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
+    [ValidateSet('All', 'Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainGeneral', 'Tooling')]
     [string]$TestLane = 'Main',
 
     [Parameter()]
@@ -220,7 +220,7 @@ function Resolve-SharpProofTestProjects
 {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('All', 'Main', 'MainSmt', 'MainGeneral', 'Tooling')]
+        [ValidateSet('All', 'Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainGeneral', 'Tooling')]
         [string]$RequestedLane,
 
         [Parameter(Mandatory = $true)]
@@ -238,6 +238,21 @@ function Resolve-SharpProofTestProjects
         ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
         LaneFilter = 'TestCategory=SmtHeavy'
     }
+    $mainSmtOracleProject = [ordered]@{
+        Name = 'MainSmtOracle'
+        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = '(FullyQualifiedName~SemanticOracleSmtTests|FullyQualifiedName~PatternSmtInvariantTests|FullyQualifiedName~ExceptionReachabilitySmtTests)'
+    }
+    $mainSmtAnalyzerProject = [ordered]@{
+        Name = 'MainSmtAnalyzer'
+        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = '(FullyQualifiedName~SemanticOracleAnalyzerSmtTests|FullyQualifiedName~DiagnosticEvidenceTests)'
+    }
+    $mainSmtFlowProject = [ordered]@{
+        Name = 'MainSmtFlow'
+        ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
+        LaneFilter = '(FullyQualifiedName~ExceptionFlowPathFactStressTests|FullyQualifiedName~SemanticOracleRuntimeHazardAnalyzerSmtTests)'
+    }
     $mainGeneralProject = [ordered]@{
         Name = 'MainGeneral'
         ProjectPath = 'SharpProof.Test\SharpProof.Test.csproj'
@@ -251,19 +266,32 @@ function Resolve-SharpProofTestProjects
 
     if ($RequestedLane -eq 'Main' -and [string]::IsNullOrWhiteSpace($Filter))
     {
-        return @($mainSmtProject, $mainGeneralProject)
+        return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject, $mainGeneralProject)
+    }
+
+    if ($RequestedLane -eq 'MainSmt' -and [string]::IsNullOrWhiteSpace($Filter))
+    {
+        return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject)
     }
 
     switch ($RequestedLane)
     {
         'Main' { }
-        'MainSmt' { return @($mainSmtProject) }
+        'MainSmt' { }
+        'MainSmtOracle' { return @($mainSmtOracleProject) }
+        'MainSmtAnalyzer' { return @($mainSmtAnalyzerProject) }
+        'MainSmtFlow' { return @($mainSmtFlowProject) }
         'MainGeneral' { return @($mainGeneralProject) }
         'Tooling' { return @($toolingProject) }
     }
 
     if ([string]::IsNullOrWhiteSpace($Filter))
     {
+        if ($RequestedLane -eq 'All')
+        {
+            return @($mainSmtOracleProject, $mainSmtAnalyzerProject, $mainSmtFlowProject, $mainGeneralProject, $toolingProject)
+        }
+
         return @($mainSmtProject, $mainGeneralProject, $toolingProject)
     }
 
@@ -295,6 +323,31 @@ function Resolve-SharpProofTestProjects
         'SemanticOracleSmtTests'))
     {
         [void]$smtHeavyFixtures.Add($fixture)
+    }
+
+    $smtOracleFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'SemanticOracleSmtTests',
+        'PatternSmtInvariantTests',
+        'ExceptionReachabilitySmtTests'))
+    {
+        [void]$smtOracleFixtures.Add($fixture)
+    }
+
+    $smtAnalyzerFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'SemanticOracleAnalyzerSmtTests',
+        'DiagnosticEvidenceTests'))
+    {
+        [void]$smtAnalyzerFixtures.Add($fixture)
+    }
+
+    $smtFlowFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'ExceptionFlowPathFactStressTests',
+        'SemanticOracleRuntimeHazardAnalyzerSmtTests'))
+    {
+        [void]$smtFlowFixtures.Add($fixture)
     }
 
     $matchedFixtureNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
@@ -336,7 +389,7 @@ function Resolve-SharpProofTestProjects
 
     if ($hasMainFixture -and -not $hasToolingFixture)
     {
-        if ($RequestedLane -eq 'Main')
+        if ($RequestedLane -eq 'Main' -or $RequestedLane -eq 'MainSmt')
         {
             $hasSmtHeavyFixture = $false
             $hasMainGeneralFixture = $false
@@ -359,6 +412,51 @@ function Resolve-SharpProofTestProjects
 
             if ($hasSmtHeavyFixture -and -not $hasMainGeneralFixture)
             {
+                $needsOracle = $false
+                $needsAnalyzer = $false
+                $needsFlow = $false
+                foreach ($fixture in $matchedFixtures)
+                {
+                    if ($smtOracleFixtures.Contains($fixture))
+                    {
+                        $needsOracle = $true
+                    }
+                    elseif ($smtAnalyzerFixtures.Contains($fixture))
+                    {
+                        $needsAnalyzer = $true
+                    }
+                    elseif ($smtFlowFixtures.Contains($fixture))
+                    {
+                        $needsFlow = $true
+                    }
+                }
+
+                $selectedSmtProjects = New-Object System.Collections.Generic.List[object]
+                if ($needsOracle)
+                {
+                    $selectedSmtProjects.Add($mainSmtOracleProject)
+                }
+
+                if ($needsAnalyzer)
+                {
+                    $selectedSmtProjects.Add($mainSmtAnalyzerProject)
+                }
+
+                if ($needsFlow)
+                {
+                    $selectedSmtProjects.Add($mainSmtFlowProject)
+                }
+
+                if ($selectedSmtProjects.Count -gt 0)
+                {
+                    return @($selectedSmtProjects.ToArray())
+                }
+
+                return @($mainSmtProject)
+            }
+
+            if ($RequestedLane -eq 'MainSmt')
+            {
                 return @($mainSmtProject)
             }
 
@@ -380,7 +478,7 @@ function Get-SharpProofDefaultWorkerCount
 {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Main', 'MainSmt', 'MainGeneral', 'Tooling')]
+        [ValidateSet('Main', 'MainSmt', 'MainSmtOracle', 'MainSmtAnalyzer', 'MainSmtFlow', 'MainGeneral', 'Tooling')]
         [string]$LaneName
     )
 
@@ -389,6 +487,9 @@ function Get-SharpProofDefaultWorkerCount
     {
         'Main' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
         'MainSmt' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
+        'MainSmtOracle' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
+        'MainSmtAnalyzer' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
+        'MainSmtFlow' { return [Math]::Max(1, [Math]::Min($processorCount, 4)) }
         'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 12)) }
         'Tooling'
         {
