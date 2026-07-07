@@ -643,8 +643,7 @@ the expected Windows Job Object:
 
 ```powershell
 .\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release
-.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Main
-.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Tooling
+.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
 The impacted-test wrapper can accelerate local loops, but full CI remains the

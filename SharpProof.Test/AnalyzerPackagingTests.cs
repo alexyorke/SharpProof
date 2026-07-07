@@ -930,8 +930,7 @@ public static class TestClass
             var workflowPath = Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml");
             var source = File.ReadAllText(workflowPath);
 
-            Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Main"));
-            Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane Tooling"));
+            Assert.That(source, Does.Contain("Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All"));
             Assert.That(source, Does.Contain("dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs"));
             Assert.That(source, Does.Contain("dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs"));
             Assert.That(source, Does.Contain("SharpProof.Attributes package"));

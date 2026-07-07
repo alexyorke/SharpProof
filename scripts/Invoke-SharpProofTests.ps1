@@ -39,6 +39,9 @@ param(
     [ValidateRange(0, 86400)]
     [int]$TimeoutSeconds = 0,
 
+    [Parameter()]
+    [switch]$SequentialLanes,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$DotnetTestArgs
 )
@@ -391,8 +394,9 @@ Push-Location $repoRoot
 $exitCode = 0
 try
 {
+    $wrapperPath = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
     $projectCount = $selectedProjects.Count
-    foreach ($project in $selectedProjects)
+    $laneSpecs = @(foreach ($project in $selectedProjects)
     {
         $projectResultsDirectory = $effectiveResultsDirectory
         if (-not [string]::IsNullOrWhiteSpace($effectiveResultsDirectory) -and $projectCount -gt 1)
@@ -445,26 +449,161 @@ try
             $testArgs.Add($argument)
         }
 
-        & (Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1') -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @testArgs
-        $projectExitCode = $LASTEXITCODE
-        if ($projectExitCode -ne 0)
+        [pscustomobject]@{
+            Name = [string]$project.Name
+            ProjectPath = [string]$project.ProjectPath
+            TestArgs = $testArgs
+            ResultsDirectory = $projectResultsDirectory
+        }
+    })
+
+    $runLanesConcurrently = $laneSpecs.Count -gt 1 -and -not $SequentialLanes
+
+    if ($runLanesConcurrently -and -not $NoBuild)
+    {
+        # Concurrent lanes must not build concurrently: they share most of the project
+        # graph and MSBuild does not coordinate simultaneous writes to the same outputs.
+        foreach ($spec in $laneSpecs)
         {
-            $exitCode = $projectExitCode
-            break
+            & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds build $spec.ProjectPath --configuration $Configuration --verbosity minimal
+            if ($LASTEXITCODE -ne 0)
+            {
+                $exitCode = $LASTEXITCODE
+                break
+            }
+        }
+
+        if ($exitCode -eq 0)
+        {
+            foreach ($spec in $laneSpecs)
+            {
+                if (-not $spec.TestArgs.Contains('--no-build'))
+                {
+                    $spec.TestArgs.Add('--no-build')
+                }
+            }
+        }
+    }
+
+    if ($exitCode -eq 0 -and $runLanesConcurrently)
+    {
+        # Each background lane runs in its own PowerShell process with output redirected
+        # to files. Start-Job is unsuitable here: the dotnet child inherits the job's
+        # stdout pipe, and its raw output corrupts the job's CliXML transport.
+        $powerShellPath = (Get-Process -Id $PID).Path
+        $backgroundLanes = @(foreach ($spec in ($laneSpecs | Select-Object -Skip 1))
+        {
+            $laneId = [guid]::NewGuid().ToString('N')
+            $laneScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) "sharpproof-lane-$laneId.ps1"
+            $laneStdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) "sharpproof-lane-$laneId.out.log"
+            $laneStderrPath = Join-Path ([System.IO.Path]::GetTempPath()) "sharpproof-lane-$laneId.err.log"
+
+            $quotedTestArgs = @($spec.TestArgs | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ', '
+            $laneScriptLines = @(
+                "Set-Location -LiteralPath '$($repoRoot -replace "'", "''")'",
+                "`$laneArgs = @($quotedTestArgs)",
+                "& '$($wrapperPath -replace "'", "''")' -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @laneArgs",
+                'exit $LASTEXITCODE'
+            )
+            Set-Content -LiteralPath $laneScriptPath -Value ($laneScriptLines -join [Environment]::NewLine) -Encoding utf8
+
+            $laneProcess = Start-Process -FilePath $powerShellPath `
+                -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $laneScriptPath + '"')) `
+                -RedirectStandardOutput $laneStdoutPath `
+                -RedirectStandardError $laneStderrPath `
+                -NoNewWindow `
+                -PassThru
+            # Cache the process handle now; without this, ExitCode is $null after the
+            # process exits and the lane failure would be silently reported as success.
+            $null = $laneProcess.Handle
+
+            [pscustomobject]@{
+                Spec = $spec
+                Process = $laneProcess
+                ScriptPath = $laneScriptPath
+                StdoutPath = $laneStdoutPath
+                StderrPath = $laneStderrPath
+            }
+        })
+
+        $foregroundSpec = $laneSpecs[0]
+        Write-Host "Running the $($foregroundSpec.Name) lane with $($backgroundLanes.Count) lane(s) in the background: $(($backgroundLanes | ForEach-Object { $_.Spec.Name }) -join ', ')"
+        $foregroundArgs = $foregroundSpec.TestArgs
+        & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @foregroundArgs
+        $laneExitCodes = @{ ($foregroundSpec.Name) = $LASTEXITCODE }
+
+        foreach ($backgroundLane in $backgroundLanes)
+        {
+            $backgroundLane.Process.WaitForExit()
+            $laneRawExitCode = $backgroundLane.Process.ExitCode
+            $laneExitCodes[$backgroundLane.Spec.Name] = if ($null -eq $laneRawExitCode) { 1 } else { [int]$laneRawExitCode }
+
+            Write-Host ''
+            Write-Host "=== $($backgroundLane.Spec.Name) lane output ==="
+            foreach ($outputPath in @($backgroundLane.StdoutPath, $backgroundLane.StderrPath))
+            {
+                if ((Test-Path -LiteralPath $outputPath) -and (Get-Item -LiteralPath $outputPath).Length -gt 0)
+                {
+                    Get-Content -LiteralPath $outputPath | Write-Host
+                }
+            }
+
+            Remove-Item -LiteralPath $backgroundLane.ScriptPath, $backgroundLane.StdoutPath, $backgroundLane.StderrPath -Force -ErrorAction SilentlyContinue
+        }
+
+        foreach ($spec in $laneSpecs)
+        {
+            if ($laneExitCodes[$spec.Name] -ne 0)
+            {
+                $exitCode = $laneExitCodes[$spec.Name]
+                break
+            }
         }
 
         if ($Profile)
         {
-            $trxPath = Join-Path $projectResultsDirectory 'profile.trx'
-            if (Test-Path -LiteralPath $trxPath)
+            foreach ($spec in $laneSpecs)
             {
-                Write-Host ''
-                Write-Host "Slowest test cases from $trxPath ($($project.Name))"
-                Write-SlowestTestsFromTrx -TrxPath $trxPath -Top $Top
+                $trxPath = Join-Path $spec.ResultsDirectory 'profile.trx'
+                if (Test-Path -LiteralPath $trxPath)
+                {
+                    Write-Host ''
+                    Write-Host "Slowest test cases from $trxPath ($($spec.Name))"
+                    Write-SlowestTestsFromTrx -TrxPath $trxPath -Top $Top
+                }
+                else
+                {
+                    Write-Warning "TRX profile was requested, but no profile.trx file was produced in $($spec.ResultsDirectory)."
+                }
             }
-            else
+        }
+    }
+    elseif ($exitCode -eq 0)
+    {
+        foreach ($spec in $laneSpecs)
+        {
+            $laneArgs = $spec.TestArgs
+            & $wrapperPath -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @laneArgs
+            $projectExitCode = $LASTEXITCODE
+            if ($projectExitCode -ne 0)
             {
-                Write-Warning "TRX profile was requested, but no profile.trx file was produced in $projectResultsDirectory."
+                $exitCode = $projectExitCode
+                break
+            }
+
+            if ($Profile)
+            {
+                $trxPath = Join-Path $spec.ResultsDirectory 'profile.trx'
+                if (Test-Path -LiteralPath $trxPath)
+                {
+                    Write-Host ''
+                    Write-Host "Slowest test cases from $trxPath ($($spec.Name))"
+                    Write-SlowestTestsFromTrx -TrxPath $trxPath -Top $Top
+                }
+                else
+                {
+                    Write-Warning "TRX profile was requested, but no profile.trx file was produced in $($spec.ResultsDirectory)."
+                }
             }
         }
     }
