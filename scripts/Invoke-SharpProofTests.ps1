@@ -675,6 +675,10 @@ try
         if ($NoBuild)
         {
             $testArgs.Add('--no-build')
+            if (-not $testArgs.Contains('--no-restore'))
+            {
+                $testArgs.Add('--no-restore')
+            }
         }
 
         if (-not [string]::IsNullOrWhiteSpace($effectiveFilter))
@@ -741,6 +745,11 @@ try
                 if (-not $spec.TestArgs.Contains('--no-build'))
                 {
                     $spec.TestArgs.Add('--no-build')
+                }
+
+                if (-not $spec.TestArgs.Contains('--no-restore'))
+                {
+                    $spec.TestArgs.Add('--no-restore')
                 }
             }
         }
