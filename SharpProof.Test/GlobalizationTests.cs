@@ -11,6 +11,7 @@ using SharpProof.Attributes;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class GlobalizationTests
     {
 

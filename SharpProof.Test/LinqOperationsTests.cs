@@ -9,6 +9,7 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class LinqOperationsTests
     {
         [Test]
@@ -1354,5 +1355,4 @@ public class TestClass
         }
     }
 }
-
 

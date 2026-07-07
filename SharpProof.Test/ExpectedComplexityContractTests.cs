@@ -7,6 +7,7 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public sealed class ExpectedComplexityContractTests
     {
         [Test]

@@ -12,6 +12,7 @@ using System.Linq;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class ParamsArrayTests
     {
         [Test]
@@ -289,5 +290,4 @@ public class TestClass
         }
     }
 }
-
 
