@@ -214,25 +214,18 @@ namespace SharpProof.Analyzer.Configuration
         private static ImmutableHashSet<string> GetValues(AnalyzerOptions options, string key)
         {
             var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-            try
+            if (TryGetGlobalOption(options, key, out var value))
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                    var item = token.Trim();
+                    if (item.Length > 0)
                     {
-                        var item = token.Trim();
-                        if (item.Length > 0)
-                        {
-                            builder.Add(item);
-                        }
+                        builder.Add(item);
                     }
                 }
             }
-            catch
-            {
-                // Ignore config parsing issues; default to empty overrides
-            }
+
             return builder.ToImmutable();
         }
 
@@ -266,38 +259,21 @@ namespace SharpProof.Analyzer.Configuration
 
         private static bool GetBool(AnalyzerOptions options, string key)
         {
-            try
-            {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
-                {
-                    return TryParseBool(value, out var parsed) && parsed;
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
+            return TryGetGlobalOption(options, key, out var value) &&
+                   TryParseBool(value, out var parsed) &&
+                   parsed;
         }
 
         private static bool GetBoolOrDefaultTrue(AnalyzerOptions options, string key)
         {
-            try
+            if (!TryGetGlobalOption(options, key, out var value))
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (!global.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
-                {
-                    return true;
-                }
-
-                if (TryParseBool(value, out var parsed))
-                {
-                    return parsed;
-                }
+                return true;
             }
-            catch
+
+            if (TryParseBool(value, out var parsed))
             {
+                return parsed;
             }
 
             return true;
@@ -337,67 +313,47 @@ namespace SharpProof.Analyzer.Configuration
 
         private static MissingPuritySuggestionScope GetMissingPuritySuggestionScope(AnalyzerOptions options)
         {
-            try
+            if (TryGetGlobalOption(options, ConfigKeys.SuggestMissingEnforcePureScope, out var value))
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(ConfigKeys.SuggestMissingEnforcePureScope, out var value) && !string.IsNullOrWhiteSpace(value))
+                switch (value.Trim().ToLowerInvariant())
                 {
-                    switch (value.Trim().ToLowerInvariant())
-                    {
-                        case "all":
-                            return MissingPuritySuggestionScope.All;
-                        case "public":
-                        case "public-only":
-                            return MissingPuritySuggestionScope.Public;
-                        case "internal":
-                        case "internal-only":
-                            return MissingPuritySuggestionScope.Internal;
-                        case "off":
-                        case "none":
-                        case "false":
-                            return MissingPuritySuggestionScope.Off;
-                    }
+                    case "all":
+                        return MissingPuritySuggestionScope.All;
+                    case "public":
+                    case "public-only":
+                        return MissingPuritySuggestionScope.Public;
+                    case "internal":
+                    case "internal-only":
+                        return MissingPuritySuggestionScope.Internal;
+                    case "off":
+                    case "none":
+                    case "false":
+                        return MissingPuritySuggestionScope.Off;
                 }
             }
-            catch { }
 
             return MissingPuritySuggestionScope.All;
         }
 
         private static string GetPurityProfile(AnalyzerOptions options)
         {
-            try
+            if (TryGetGlobalOption(options, ConfigKeys.PurityProfile, out var value))
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(ConfigKeys.PurityProfile, out var value) && !string.IsNullOrWhiteSpace(value))
+                var normalized = value.Trim().ToLowerInvariant();
+                if (normalized == "strict" || normalized == "balanced" || normalized == "pragmatic")
                 {
-                    var normalized = value.Trim().ToLowerInvariant();
-                    if (normalized == "strict" || normalized == "balanced" || normalized == "pragmatic")
-                    {
-                        return normalized;
-                    }
+                    return normalized;
                 }
             }
-            catch { }
 
             return "balanced";
         }
 
         private static RuntimeHazardMode GetRuntimeHazardMode(AnalyzerOptions options, RuntimeHazardMode fallback)
         {
-            try
-            {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value) && !string.IsNullOrWhiteSpace(value))
-                {
-                    return ParseRuntimeHazardMode(value, fallback);
-                }
-            }
-            catch
-            {
-            }
-
-            return fallback;
+            return TryGetGlobalOption(options, ConfigKeys.RuntimeHazardMode, out var value)
+                ? ParseRuntimeHazardMode(value, fallback)
+                : fallback;
         }
 
         private static RuntimeHazardMode GetRuntimeHazardMode(AnalyzerConfigOptions options, RuntimeHazardMode fallback)
@@ -462,31 +418,24 @@ namespace SharpProof.Analyzer.Configuration
 
         private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)
         {
-            try
+            if (TryGetGlobalOption(options, ConfigKeys.SmtMode, out var value))
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(ConfigKeys.SmtMode, out var value) && !string.IsNullOrWhiteSpace(value))
+                switch (value.Trim().ToLowerInvariant())
                 {
-                    switch (value.Trim().ToLowerInvariant())
-                    {
-                        case "disabled":
-                            return SmtAnalysisMode.Off;
-                        case "bounded":
-                        case "default":
-                            return SmtAnalysisMode.Bounded;
-                        case "deep":
-                        case "aggressive":
-                            return SmtAnalysisMode.Deep;
-                    }
-
-                    if (TryParseBool(value, out var parsed))
-                    {
-                        return parsed ? SmtAnalysisMode.Bounded : SmtAnalysisMode.Off;
-                    }
+                    case "disabled":
+                        return SmtAnalysisMode.Off;
+                    case "bounded":
+                    case "default":
+                        return SmtAnalysisMode.Bounded;
+                    case "deep":
+                    case "aggressive":
+                        return SmtAnalysisMode.Deep;
                 }
-            }
-            catch
-            {
+
+                if (TryParseBool(value, out var parsed))
+                {
+                    return parsed ? SmtAnalysisMode.Bounded : SmtAnalysisMode.Off;
+                }
             }
 
             return fallback;
@@ -494,18 +443,11 @@ namespace SharpProof.Analyzer.Configuration
 
         private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
         {
-            try
+            if (TryGetGlobalOption(options, key, out var value) &&
+                int.TryParse(value.Trim(), out var parsed) &&
+                parsed > 0)
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(key, out var value) &&
-                    int.TryParse(value.Trim(), out var parsed) &&
-                    parsed > 0)
-                {
-                    return parsed;
-                }
-            }
-            catch
-            {
+                return parsed;
             }
 
             return fallback;
@@ -540,17 +482,12 @@ namespace SharpProof.Analyzer.Configuration
 
         private static int GetNonNegativeInt(AnalyzerOptions options, string key)
         {
-            try
+            if (TryGetGlobalOption(options, key, out var value) &&
+                int.TryParse(value.Trim(), out var parsed) &&
+                parsed >= 0)
             {
-                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
-                if (global.TryGetValue(key, out var value) &&
-                    int.TryParse(value.Trim(), out var parsed) &&
-                    parsed >= 0)
-                {
-                    return parsed;
-                }
+                return parsed;
             }
-            catch { }
 
             return 0;
         }
@@ -562,6 +499,25 @@ namespace SharpProof.Analyzer.Configuration
                    parsed >= 0
                 ? parsed
                 : fallback;
+        }
+
+        private static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value)
+        {
+            try
+            {
+                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
+                if (global.TryGetValue(key, out var found) && !string.IsNullOrWhiteSpace(found))
+                {
+                    value = found;
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            value = string.Empty;
+            return false;
         }
     }
 
