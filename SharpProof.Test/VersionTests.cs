@@ -1,11 +1,10 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
 
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class VersionTests
     {
         [Test]
@@ -24,7 +23,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
         }
 
         [Test]
@@ -55,7 +54,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertNoAnalyzerDiagnosticsAsync(test);
+        }
+
+        private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            Assert.That(diagnostics, Is.Empty);
         }
     }
 }
