@@ -249,9 +249,14 @@ function Resolve-SharpProofTestProjects
         LaneFilter = ''
     }
 
+    if ($RequestedLane -eq 'Main' -and [string]::IsNullOrWhiteSpace($Filter))
+    {
+        return @($mainSmtProject, $mainGeneralProject)
+    }
+
     switch ($RequestedLane)
     {
-        'Main' { return @($mainSmtProject, $mainGeneralProject) }
+        'Main' { }
         'MainSmt' { return @($mainSmtProject) }
         'MainGeneral' { return @($mainGeneralProject) }
         'Tooling' { return @($toolingProject) }
@@ -279,9 +284,31 @@ function Resolve-SharpProofTestProjects
         [void]$toolingFixtures.Add($fixture)
     }
 
-    $matchedFixtures = @([regex]::Matches($Filter, 'SharpProof\.Test\.([A-Za-z_][A-Za-z0-9_]*)') |
-        ForEach-Object { $_.Groups[1].Value } |
-        Sort-Object -Unique)
+    $smtHeavyFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($fixture in @(
+        'DiagnosticEvidenceTests',
+        'ExceptionFlowPathFactStressTests',
+        'ExceptionReachabilitySmtTests',
+        'PatternSmtInvariantTests',
+        'SemanticOracleAnalyzerSmtTests',
+        'SemanticOracleRuntimeHazardAnalyzerSmtTests',
+        'SemanticOracleSmtTests'))
+    {
+        [void]$smtHeavyFixtures.Add($fixture)
+    }
+
+    $matchedFixtureNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($match in [regex]::Matches($Filter, 'SharpProof\.Test\.([A-Za-z_][A-Za-z0-9_]*)'))
+    {
+        [void]$matchedFixtureNames.Add($match.Groups[1].Value)
+    }
+
+    foreach ($match in [regex]::Matches($Filter, 'FullyQualifiedName~([A-Za-z_][A-Za-z0-9_]*)'))
+    {
+        [void]$matchedFixtureNames.Add($match.Groups[1].Value)
+    }
+
+    $matchedFixtures = @($matchedFixtureNames | Sort-Object)
 
     if ($matchedFixtures.Count -eq 0)
     {
@@ -309,6 +336,40 @@ function Resolve-SharpProofTestProjects
 
     if ($hasMainFixture -and -not $hasToolingFixture)
     {
+        if ($RequestedLane -eq 'Main')
+        {
+            $hasSmtHeavyFixture = $false
+            $hasMainGeneralFixture = $false
+            foreach ($fixture in $matchedFixtures)
+            {
+                if ($toolingFixtures.Contains($fixture))
+                {
+                    continue
+                }
+
+                if ($smtHeavyFixtures.Contains($fixture))
+                {
+                    $hasSmtHeavyFixture = $true
+                }
+                else
+                {
+                    $hasMainGeneralFixture = $true
+                }
+            }
+
+            if ($hasSmtHeavyFixture -and -not $hasMainGeneralFixture)
+            {
+                return @($mainSmtProject)
+            }
+
+            if ($hasMainGeneralFixture -and -not $hasSmtHeavyFixture)
+            {
+                return @($mainGeneralProject)
+            }
+
+            return @($mainSmtProject, $mainGeneralProject)
+        }
+
         return @($mainProject)
     }
 
