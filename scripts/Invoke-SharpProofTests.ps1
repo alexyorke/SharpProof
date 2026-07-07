@@ -328,7 +328,7 @@ function Get-SharpProofDefaultWorkerCount
     {
         'Main' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
         'MainSmt' { return [Math]::Max(1, [Math]::Min($processorCount, 8)) }
-        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 20)) }
+        'MainGeneral' { return [Math]::Max(1, [Math]::Min($processorCount, 12)) }
         'Tooling' { return [Math]::Max(1, [Math]::Min($processorCount, 20)) }
     }
 }
