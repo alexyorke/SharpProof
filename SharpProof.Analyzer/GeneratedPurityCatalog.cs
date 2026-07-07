@@ -304,43 +304,43 @@ namespace SharpProof.Analyzer
             return TryGetTrustedPurityByMethodKeys(methodSymbol.ContainingAssembly, runtimeMethodKeys, compilation, out classification);
         }
 
-		private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
-		{
-			var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
-			if (sourcePriorityComparison != 0)
-			{
-				return sourcePriorityComparison;
-			}
+        private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
+        {
+            var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
+            if (sourcePriorityComparison != 0)
+            {
+                return sourcePriorityComparison;
+            }
 
-			var leftPriority = GetClassificationPriority(left.Classification);
-			var rightPriority = GetClassificationPriority(right.Classification);
-			var priorityComparison = leftPriority.CompareTo(rightPriority);
-			if (priorityComparison != 0)
-			{
-				return priorityComparison;
-			}
+            var leftPriority = GetClassificationPriority(left.Classification);
+            var rightPriority = GetClassificationPriority(right.Classification);
+            var priorityComparison = leftPriority.CompareTo(rightPriority);
+            if (priorityComparison != 0)
+            {
+                return priorityComparison;
+            }
 
-			var leftPrimaryCategory = left.Classification.PrimaryCategory ?? string.Empty;
-			var rightPrimaryCategory = right.Classification.PrimaryCategory ?? string.Empty;
-			var primaryCategoryComparison = string.CompareOrdinal(leftPrimaryCategory, rightPrimaryCategory);
-			if (primaryCategoryComparison != 0)
-			{
-				return primaryCategoryComparison;
-			}
+            var leftPrimaryCategory = left.Classification.PrimaryCategory ?? string.Empty;
+            var rightPrimaryCategory = right.Classification.PrimaryCategory ?? string.Empty;
+            var primaryCategoryComparison = string.CompareOrdinal(leftPrimaryCategory, rightPrimaryCategory);
+            if (primaryCategoryComparison != 0)
+            {
+                return primaryCategoryComparison;
+            }
 
-			return string.CompareOrdinal(left.Symbol, right.Symbol);
-		}
+            return string.CompareOrdinal(left.Symbol, right.Symbol);
+        }
 
-		private static int GetClassificationPriority(PurityEntry classification)
-		{
-			return classification.Classification switch
-			{
-				"impure" => 3,
-				"pure" => 2,
-				"conservative_unknown" => 1,
-				_ => 0,
-			};
-		}
+        private static int GetClassificationPriority(PurityEntry classification)
+        {
+            return classification.Classification switch
+            {
+                "impure" => 3,
+                "pure" => 2,
+                "conservative_unknown" => 1,
+                _ => 0,
+            };
+        }
 
         internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation, out bool canBeOverridden)
         {
@@ -365,15 +365,21 @@ namespace SharpProof.Analyzer
             string json,
             int sourcePriority)
         {
-            foreach (var entry in ParseEntries(json, sourcePriority))
+            try
             {
-                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                foreach (var entry in ParseEntries(json, sourcePriority))
                 {
-                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                    entriesBySymbol.Add(entry.Symbol, builder);
-                }
+                    if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                    {
+                        builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                        entriesBySymbol.Add(entry.Symbol, builder);
+                    }
 
-                builder.Add(entry);
+                    builder.Add(entry);
+                }
+            }
+            catch (JsonException)
+            {
             }
         }
 

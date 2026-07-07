@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
@@ -46,6 +47,30 @@ public class TestClass
 
             Assert.That(symbols, Has.Some.Contains("TestClass.First"));
             Assert.That(symbols, Has.Some.Contains("TestClass.Second"));
+        }
+
+        [Test]
+        public async Task InvalidEffectSummaryJson_IsIgnored()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void Pure()
+    {
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add(
+                    "sharpproof_enable_effect_summary_json",
+                    "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "SharpProof.EffectSummary.json",
+                        "{ invalid json")));
+
+            Assert.That(diagnostics, Is.Empty);
         }
     }
 }

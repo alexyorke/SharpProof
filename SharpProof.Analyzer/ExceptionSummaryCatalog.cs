@@ -188,15 +188,21 @@ namespace SharpProof.Analyzer
             string json,
             int sourcePriority)
         {
-            foreach (var entry in ParseEntries(json, sourcePriority))
+            try
             {
-                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                foreach (var entry in ParseEntries(json, sourcePriority))
                 {
-                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                    entriesBySymbol.Add(entry.Symbol, builder);
-                }
+                    if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                    {
+                        builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                        entriesBySymbol.Add(entry.Symbol, builder);
+                    }
 
-                builder.Add(entry);
+                    builder.Add(entry);
+                }
+            }
+            catch (JsonException)
+            {
             }
         }
 
