@@ -1,14 +1,21 @@
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
-    SharpProof.Analyzer.SharpProofAnalyzer>;
+using static SharpProof.Test.AnalyzerTestHost;
 
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class UnsafeTests
     {
+        private static readonly ImmutableArray<MetadataReference> UnsafeFrameworkReferences =
+            GetMinimalFrameworkReferences().Add(
+                MetadataReference.CreateFromFile(typeof(System.Runtime.CompilerServices.Unsafe).Assembly.Location));
+
         [Test]
         public async Task UnsafeReadUnaligned_NoDiagnostic()
         {
@@ -26,7 +33,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertUnsafeNoDiagnosticsAsync(test);
         }
 
         [Test]
@@ -46,7 +53,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertUnsafeNoDiagnosticsAsync(test);
         }
 
         [Test]
@@ -65,7 +72,7 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertUnsafeNoDiagnosticsAsync(test);
         }
 
         [Test]
@@ -84,7 +91,56 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertUnsafeSinglePurityDiagnosticAsync(test);
+        }
+
+        private static async Task AssertUnsafeNoDiagnosticsAsync(string source)
+        {
+            var diagnostics = await GetDiagnosticsAsync(
+                source,
+                frameworkReferences: UnsafeFrameworkReferences,
+                concurrentAnalysis: true);
+            Assert.That(diagnostics, Is.Empty);
+        }
+
+        private static async Task AssertUnsafeSinglePurityDiagnosticAsync(string markedSource)
+        {
+            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            Assert.That(expectedSpanText, Is.Not.Null);
+
+            var diagnostics = await GetDiagnosticsAsync(
+                source,
+                frameworkReferences: UnsafeFrameworkReferences,
+                concurrentAnalysis: true);
+            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+            var actualSpanText = source.Substring(
+                diagnostic.Location.SourceSpan.Start,
+                diagnostic.Location.SourceSpan.Length);
+            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
+        }
+
+        private static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
+        {
+            const string prefix = "{|SP0002:";
+            const string suffix = "|}";
+            var start = markedSource.IndexOf(prefix, System.StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return (markedSource, null);
+            }
+
+            var contentStart = start + prefix.Length;
+            var end = markedSource.IndexOf(suffix, contentStart, System.StringComparison.Ordinal);
+            if (end < 0)
+            {
+                throw new System.InvalidOperationException("Missing closing SP0002 markup.");
+            }
+
+            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
+            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
+            return (source, expectedSpanText);
         }
     }
 }
