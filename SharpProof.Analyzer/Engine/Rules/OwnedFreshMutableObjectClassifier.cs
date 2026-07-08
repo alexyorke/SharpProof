@@ -162,7 +162,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInField(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel, cancellationToken))
+                        ConstructorStoresParameterInMember(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel, cancellationToken))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -212,7 +212,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInProperty(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel, cancellationToken))
+                        ConstructorStoresParameterInMember(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel, cancellationToken))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -347,10 +347,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool ConstructorStoresParameterInField(
+        private static bool ConstructorStoresParameterInMember(
             IMethodSymbol constructor,
             IParameterSymbol parameter,
-            IFieldSymbol fieldSymbol,
+            ISymbol memberSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
@@ -368,46 +368,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
 
                     if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
-                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter) ||
-                        assignmentOperation.Target is not IFieldReferenceOperation fieldReference ||
-                        !SymbolEqualityComparer.Default.Equals(fieldReference.Field, fieldSymbol) ||
-                        !IsThisOrImplicitInstance(fieldReference.Instance))
+                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
                     {
                         continue;
                     }
 
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ConstructorStoresParameterInProperty(
-            IMethodSymbol constructor,
-            IParameterSymbol parameter,
-            IPropertySymbol propertySymbol,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
-                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
-                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
+                    var (targetMember, targetInstance) = assignmentOperation.Target switch
                     {
-                        continue;
-                    }
-
-                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
-                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter) ||
-                        assignmentOperation.Target is not IPropertyReferenceOperation propertyReference ||
-                        !SymbolEqualityComparer.Default.Equals(propertyReference.Property, propertySymbol) ||
-                        !IsThisOrImplicitInstance(propertyReference.Instance))
+                        IFieldReferenceOperation fieldReference => ((ISymbol?)fieldReference.Field, fieldReference.Instance),
+                        IPropertyReferenceOperation propertyReference => (propertyReference.Property, propertyReference.Instance),
+                        _ => (null, null)
+                    };
+                    if (targetMember == null ||
+                        !SymbolEqualityComparer.Default.Equals(targetMember, memberSymbol) ||
+                        !IsThisOrImplicitInstance(targetInstance))
                     {
                         continue;
                     }
