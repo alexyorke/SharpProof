@@ -2347,20 +2347,21 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var methodSymbol = invocationOperation.TargetMethod;
             if (methodSymbol.Name != methodName ||
-                methodSymbol.Parameters.Length != parameterCount)
-            {
-                return false;
-            }
-
-            var systemType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Type");
-            if (systemType == null ||
-                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
+                methodSymbol.Parameters.Length != parameterCount ||
+                !IsMemberOfMetadataType(methodSymbol, context, "System.Type"))
             {
                 return false;
             }
 
             return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
         }
+
+        private static bool IsMemberOfMetadataType(
+            IMethodSymbol methodSymbol,
+            PurityAnalysisContext context,
+            string metadataName) =>
+            context.SemanticModel.Compilation.GetTypeByMetadataName(metadataName) is { } metadataType &&
+            SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, metadataType);
 
         private static bool TryCheckStringComparerInvocationPurity(
             IInvocationOperation invocationOperation,
@@ -2372,19 +2373,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var methodSymbol = invocationOperation.TargetMethod;
             if (methodSymbol.Name is not ("Compare" or "Equals") ||
-                methodSymbol.Parameters.Length != 2)
-            {
-                return false;
-            }
-
-            var stringComparerType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.StringComparer");
-            if (stringComparerType == null ||
-                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, stringComparerType))
-            {
-                return false;
-            }
-
-            if (invocationOperation.Instance == null ||
+                methodSymbol.Parameters.Length != 2 ||
+                !IsMemberOfMetadataType(methodSymbol, context, "System.StringComparer") ||
+                invocationOperation.Instance == null ||
                 !IsTrustedGeneratedPureStringComparerSingleton(invocationOperation.Instance, context))
             {
                 return false;
@@ -2402,24 +2393,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.Name is not ("HasFlag" or "ToString"))
+            if (!IsMemberOfMetadataType(methodSymbol, context, "System.Enum"))
             {
                 return false;
             }
 
-            var enumType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Enum");
-            if (enumType == null ||
-                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, enumType))
-            {
-                return false;
-            }
-
-            if (methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1)
-            {
-                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
-            }
-
-            if (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0)
+            if ((methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1) ||
+                (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0))
             {
                 return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
             }
@@ -2436,23 +2416,14 @@ namespace SharpProof.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            var formattableStringType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.FormattableString");
-            if (formattableStringType == null ||
-                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, formattableStringType))
+            if (!IsMemberOfMetadataType(methodSymbol, context, "System.FormattableString"))
             {
                 return false;
             }
 
-            if (methodSymbol.IsStatic &&
-                methodSymbol.Name == "Invariant" &&
-                methodSymbol.Parameters.Length == 1)
-            {
-                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
-            }
-
-            if (!methodSymbol.IsStatic &&
-                methodSymbol.Name == "ToString" &&
-                methodSymbol.Parameters.Length == 1)
+            if (methodSymbol.Parameters.Length == 1 &&
+                ((methodSymbol.IsStatic && methodSymbol.Name == "Invariant") ||
+                    (!methodSymbol.IsStatic && methodSymbol.Name == "ToString")))
             {
                 return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
             }
