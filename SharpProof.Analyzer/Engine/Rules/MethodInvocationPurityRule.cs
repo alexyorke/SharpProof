@@ -2276,6 +2276,30 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
+        private static void AddKnownInterfaceImplementation(
+            INamedTypeSymbol type,
+            IMethodSymbol target,
+            ISet<IMethodSymbol> targets,
+            CancellationToken cancellationToken)
+        {
+            if (!ImplementsInterface(type, target.ContainingType))
+            {
+                return;
+            }
+
+            if (type.Kind == SymbolKind.NamedType &&
+                (type.TypeKind == TypeKind.Interface ||
+                 type.TypeKind == TypeKind.Struct ||
+                 type.TypeKind == TypeKind.Class))
+            {
+                var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
+                if (implementation != null)
+                {
+                    targets.Add(implementation.OriginalDefinition);
+                }
+            }
+        }
+
         private static bool IsComparerType(ITypeSymbol? typeSymbol)
         {
             return typeSymbol is INamedTypeSymbol namedType &&
@@ -3688,22 +3712,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             }
                         }
 
-                        if (!ImplementsInterface(type, target.ContainingType))
-                        {
-                            continue;
-                        }
-
-                        if (type.Kind == SymbolKind.NamedType &&
-                            (type.TypeKind == TypeKind.Interface ||
-                             type.TypeKind == TypeKind.Struct ||
-                             type.TypeKind == TypeKind.Class))
-                        {
-                            var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
-                            if (implementation != null)
-                            {
-                                targets.Add(implementation.OriginalDefinition);
-                            }
-                        }
+                        AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
                     }
 
                     if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
@@ -3717,19 +3726,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!ImplementsInterface(type, target.ContainingType))
-                    {
-                        continue;
-                    }
-
-                    if (type.Kind == SymbolKind.NamedType && (type.TypeKind == TypeKind.Interface || type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class))
-                    {
-                        var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
-                        if (implementation != null)
-                        {
-                            targets.Add(implementation.OriginalDefinition);
-                        }
-                    }
+                    AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
                 }
 
                 if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
