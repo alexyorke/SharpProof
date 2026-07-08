@@ -5416,7 +5416,8 @@ namespace SharpProof.Analyzer.Engine
                         valueOperation,
                         currentState,
                         context.SemanticModel,
-                        context.SemanticModel.Compilation);
+                        context.SemanticModel.Compilation,
+                        context.CancellationToken);
                     nextState = ApplyAssignedDelegateTargets(
                         nextState,
                         targetSymbol,
@@ -5454,7 +5455,8 @@ namespace SharpProof.Analyzer.Engine
                         assignmentParameterSymbol,
                         valueOperation,
                         currentState,
-                        context.SemanticModel);
+                        context.SemanticModel,
+                        context.CancellationToken);
                 }
 
                 nextState = ApplyWrittenLocalStateUpdates(
@@ -5463,7 +5465,8 @@ namespace SharpProof.Analyzer.Engine
                     valueOperation,
                     currentState,
                     context.SemanticModel,
-                    context.SemanticModel.Compilation);
+                    context.SemanticModel.Compilation,
+                    context.CancellationToken);
                 nextState = AddCallerVisibleMutationFact(
                     nextState,
                     targetOperation,
@@ -5487,7 +5490,8 @@ namespace SharpProof.Analyzer.Engine
                     nextState,
                     variableDeclaratorOperation.Symbol,
                     variableInitializer,
-                    context.SemanticModel);
+                    context.SemanticModel,
+                    context.CancellationToken);
             }
 
             else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
@@ -5634,7 +5638,8 @@ namespace SharpProof.Analyzer.Engine
                                 declaredSymbol,
                                 initializerValue,
                                 nextState,
-                                context.SemanticModel);
+                                context.SemanticModel,
+                                context.CancellationToken);
                             nextState = AddAssignedAliasFact(
                                 nextState,
                                 declaredSymbol,
@@ -5644,7 +5649,8 @@ namespace SharpProof.Analyzer.Engine
                                 nextState,
                                 declaredSymbol,
                                 initializerValue,
-                                context.SemanticModel);
+                                context.SemanticModel,
+                                context.CancellationToken);
                             if (!IsUsingResourceDeclarator(declarator))
                             {
                                 nextState = AddOwnedDisposableLocalFacts(
@@ -5686,7 +5692,8 @@ namespace SharpProof.Analyzer.Engine
                         assignment.Value,
                         currentState,
                         context.SemanticModel,
-                        context.SemanticModel.Compilation);
+                        context.SemanticModel.Compilation,
+                        context.CancellationToken);
                     nextState = ApplyAssignedDelegateTargets(
                         nextState,
                         targetSymbol,
@@ -5705,7 +5712,8 @@ namespace SharpProof.Analyzer.Engine
                         parameterSymbol,
                         assignment.Value,
                         currentState,
-                        context.SemanticModel);
+                        context.SemanticModel,
+                        context.CancellationToken);
                 }
 
                 nextState = AddCallerVisibleMutationFact(
@@ -7117,8 +7125,10 @@ namespace SharpProof.Analyzer.Engine
             ISymbol targetSymbol,
             IOperation? valueOperation,
             PurityAnalysisState valueState,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (valueOperation?.Syntax is not ExpressionSyntax valueExpression)
             {
                 return currentState;
@@ -7133,7 +7143,7 @@ namespace SharpProof.Analyzer.Engine
                     targetSymbol,
                     valueExpression,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var assignedFact,
                     valueState.GetSmtSymbolVersion,
                     currentState.GetSmtSymbolVersion) &&
@@ -7148,14 +7158,15 @@ namespace SharpProof.Analyzer.Engine
                     semanticModel,
                     SymbolicIrLowerer.TryLowerTerm,
                     "analyzer.assignment",
-                    "analyzer.assignment.value");
+                    "analyzer.assignment.value",
+                    cancellationToken);
             }
 
             if (SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
                     targetSymbol,
                     valueExpression,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var lengthAssignedFact,
                     valueState.GetSmtSymbolVersion,
                     currentState.GetSmtSymbolVersion) &&
@@ -7170,7 +7181,8 @@ namespace SharpProof.Analyzer.Engine
                     semanticModel,
                     TryLowerAssignedLengthTerm,
                     "analyzer.assignment.length",
-                    "analyzer.assignment.length");
+                    "analyzer.assignment.length",
+                    cancellationToken);
             }
 
             if (TryCreateReferenceBackedLengthFact(
@@ -7179,6 +7191,7 @@ namespace SharpProof.Analyzer.Engine
                     currentState,
                     valueState,
                     semanticModel,
+                    cancellationToken,
                     out var referenceLengthFact))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceLengthFact));
@@ -7209,7 +7222,7 @@ namespace SharpProof.Analyzer.Engine
                     targetSymbol,
                     valueExpression,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var stringAssignedFact,
                     valueState.GetSmtSymbolVersion,
                     currentState.GetSmtSymbolVersion) &&
@@ -7224,14 +7237,15 @@ namespace SharpProof.Analyzer.Engine
                     semanticModel,
                     SymbolicIrLowerer.TryLowerStringTerm,
                     "analyzer.assignment.string",
-                    "analyzer.assignment.string");
+                    "analyzer.assignment.string",
+                    cancellationToken);
             }
 
             if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts(
                     targetSymbol,
                     valueExpression,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var asExpressionFacts,
                     valueState.GetSmtSymbolVersion,
                     currentState.GetSmtSymbolVersion))
@@ -7242,7 +7256,8 @@ namespace SharpProof.Analyzer.Engine
                     asExpressionFacts,
                     valueExpression,
                     "analyzer.assignment.as_expression",
-                    "analyzer.assignment.as_expression");
+                    "analyzer.assignment.as_expression",
+                    cancellationToken);
             }
 
             if (TryCreateReferenceBackedStringContentFact(
@@ -7251,6 +7266,7 @@ namespace SharpProof.Analyzer.Engine
                     currentState,
                     valueState,
                     semanticModel,
+                    cancellationToken,
                     out var referenceStringFact))
             {
                 nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceStringFact));
@@ -7266,7 +7282,7 @@ namespace SharpProof.Analyzer.Engine
                     targetSymbol,
                     valueExpression,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var stringNonNullFact,
                     valueState.GetSmtSymbolVersion,
                     currentState.GetSmtSymbolVersion) &&
@@ -7323,8 +7339,10 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState currentState,
             ILocalSymbol declaredSymbol,
             IOperation initializerValue,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var isRefInitializer = initializerValue.Syntax.Parent is RefExpressionSyntax ||
                 initializerValue.Syntax.Ancestors().OfType<RefExpressionSyntax>().Any();
             if (!isRefInitializer &&
@@ -7334,7 +7352,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var sourceSymbol = TryResolveTrackedSymbol(initializerValue, currentState) ??
-                TryResolveRefInitializerSymbol(initializerValue.Syntax, semanticModel, currentState);
+                TryResolveRefInitializerSymbol(initializerValue.Syntax, semanticModel, currentState, cancellationToken);
             if (sourceSymbol == null)
             {
                 return currentState;
@@ -7362,21 +7380,23 @@ namespace SharpProof.Analyzer.Engine
         private static ISymbol? TryResolveRefInitializerSymbol(
             SyntaxNode initializerSyntax,
             SemanticModel semanticModel,
-            PurityAnalysisState currentState)
+            PurityAnalysisState currentState,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var refExpression = initializerSyntax.AncestorsAndSelf().OfType<RefExpressionSyntax>().FirstOrDefault();
             if (refExpression == null)
             {
                 return null;
             }
 
-            if (semanticModel.GetOperation(refExpression.Expression) is { } operation &&
+            if (semanticModel.GetOperation(refExpression.Expression, cancellationToken) is { } operation &&
                 TryResolveTrackedSymbol(operation, currentState) is { } operationSymbol)
             {
                 return operationSymbol;
             }
 
-            return semanticModel.GetSymbolInfo(refExpression.Expression).Symbol;
+            return semanticModel.GetSymbolInfo(refExpression.Expression, cancellationToken).Symbol;
         }
 
         private static PurityAnalysisState AddAssignedSymbolicEqualityFact(
@@ -7387,14 +7407,16 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             LowerAssignedSymbolicTerm lowerValueTerm,
             string provenance,
-            string evidenceKey)
+            string evidenceKey,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula, out var targetTerm) ||
                 !lowerValueTerm(
                     valueExpression,
                     new SymbolicLoweringContext(
                         semanticModel,
-                        CancellationToken.None,
+                        cancellationToken,
                         valueState.GetSmtSymbolVersion),
                     out var valueTerm) ||
                 !CanCompareSymbolicTerms(targetTerm, valueTerm))
@@ -7442,11 +7464,13 @@ namespace SharpProof.Analyzer.Engine
             ImmutableArray<SmtFormula> formulas,
             SyntaxNode sourceNode,
             string provenance,
-            string evidenceKey)
+            string evidenceKey,
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
             foreach (var formula in formulas)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 nextState = AddSymbolicConditionFromFormula(
                     nextState,
                     formula,
@@ -7527,13 +7551,14 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState currentState,
             PurityAnalysisState valueState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SmtFormula fact)
         {
             return SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
                 targetSymbol,
                 valueExpression,
                 semanticModel,
-                CancellationToken.None,
+                cancellationToken,
                 out fact,
                 valueState.GetSmtSymbolVersion,
                 currentState.GetSmtSymbolVersion);
@@ -7545,13 +7570,14 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState currentState,
             PurityAnalysisState valueState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SmtFormula fact)
         {
             return SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
                 targetSymbol,
                 valueExpression,
                 semanticModel,
-                CancellationToken.None,
+                cancellationToken,
                 out fact,
                 valueState.GetSmtSymbolVersion,
                 currentState.GetSmtSymbolVersion);
@@ -7626,12 +7652,14 @@ namespace SharpProof.Analyzer.Engine
             IOperation valueOperation,
             PurityAnalysisState valueState,
             SemanticModel semanticModel,
-            Compilation compilation)
+            Compilation compilation,
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var ownedDisposableAliases = GetOwnedDisposableAliasSymbolsToPreserve(
                     writtenLocalSymbol,
                     currentState,
@@ -7648,7 +7676,8 @@ namespace SharpProof.Analyzer.Engine
                     writtenLocalSymbol,
                     valueOperation,
                     valueState,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
 
                 if (TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
                 {
@@ -7662,6 +7691,7 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
                 {
                     nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
@@ -7688,6 +7718,7 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (IsDefinitelyNullValue(valueOperation, valueState))
                 {
                     nextState = nextState.WithDefinitelyNullLocal(writtenLocalSymbol);

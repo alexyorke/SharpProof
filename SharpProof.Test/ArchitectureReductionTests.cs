@@ -437,6 +437,25 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void AnalyzerAssignmentFacts_ThreadCancellationTokenThroughSymbolicLowering()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "PurityAnalysisEngine.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Not.Contain("CancellationToken.None"));
+            Assert.That(source, Does.Contain("AddAssignedValueFact(\n                        nextState,\n                        assignmentParameterSymbol,\n                        valueOperation,\n                        currentState,\n                        context.SemanticModel,\n                        context.CancellationToken)"));
+            Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateAssignedValueFact(\n                    targetSymbol,\n                    valueExpression,\n                    semanticModel,\n                    cancellationToken,"));
+            Assert.That(source, Does.Contain("new SymbolicLoweringContext(\n                        semanticModel,\n                        cancellationToken,"));
+            Assert.That(source, Does.Contain("TryResolveRefInitializerSymbol(initializerValue.Syntax, semanticModel, currentState, cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetOperation(refExpression.Expression, cancellationToken)"));
+        }
+
+        [Test]
         public void AnalyzerReturnedOwnedResources_ProjectReturnedOwnershipFacts()
         {
             var repositoryRoot = FindRepositoryRoot();
