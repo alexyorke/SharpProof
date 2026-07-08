@@ -712,37 +712,10 @@ namespace SharpProof.Analyzer
         private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
             var methodName = reader.GetString(definition.Name);
             var signature = DecodeMethodSignature(reader, definition);
             return typeName + "." + methodName + signature;
-        }
-
-        private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
-        {
-            if (handle.IsNil)
-            {
-                return "<module>";
-            }
-
-            var definition = reader.GetTypeDefinition(handle);
-            var name = reader.GetString(definition.Name);
-            var declaringType = definition.GetDeclaringType();
-            if (!declaringType.IsNil)
-            {
-                return GetTypeName(reader, declaringType) + "+" + name;
-            }
-
-            var ns = reader.GetString(definition.Namespace);
-            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-        }
-
-        private static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
-        {
-            var reference = reader.GetTypeReference(handle);
-            var name = reader.GetString(reference.Name);
-            var ns = reader.GetString(reference.Namespace);
-            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
         }
 
         private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
@@ -800,61 +773,35 @@ namespace SharpProof.Analyzer
         private static string GetEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
             return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
         }
 
         private static string GetPositionalEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
             return typeName + "." + reader.GetString(definition.Name) + DecodePositionalMethodSignature(reader, definition);
         }
 
         private static string GetExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            var typeName = SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType()));
             return typeName + "." + reader.GetString(definition.Name) + DecodeExactMethodSignature(reader, definition);
         }
 
         private static string GetPositionalExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            var typeName = SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType()));
             return typeName + "." + reader.GetString(definition.Name) + DecodePositionalExactMethodSignature(reader, definition);
-        }
-
-        private static string NormalizeExactTypeName(string typeName)
-        {
-            return typeName switch
-            {
-                "System.Boolean" => "bool",
-                "System.Byte" => "byte",
-                "System.Char" => "char",
-                "System.Decimal" => "decimal",
-                "System.Double" => "double",
-                "System.Int16" => "short",
-                "System.Int32" => "int",
-                "System.Int64" => "long",
-                "System.IntPtr" => "nint",
-                "System.Object" => "object",
-                "System.SByte" => "sbyte",
-                "System.Single" => "float",
-                "System.String" => "string",
-                "System.UInt16" => "ushort",
-                "System.UInt32" => "uint",
-                "System.UInt64" => "ulong",
-                "System.UIntPtr" => "nuint",
-                "System.Void" => "void",
-                _ => typeName
-            };
         }
 
         private static string GetRoslynLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
             var rawMethodName = reader.GetString(definition.Name);
             var methodName = rawMethodName;
 
@@ -954,9 +901,9 @@ namespace SharpProof.Analyzer
             };
             public string GetSZArrayType(string elementType) => elementType + "[]";
             public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeName(metadataReader, handle));
+                => SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(metadataReader, handle));
             public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
+                => SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeReferenceName(metadataReader, handle));
             public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
                 => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         }

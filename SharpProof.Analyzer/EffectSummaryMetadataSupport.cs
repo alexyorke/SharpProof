@@ -11,6 +11,62 @@ using System.Text.Json;
 
 namespace SharpProof.Analyzer
 {
+    internal static class SummaryMetadataNames
+    {
+        internal static string NormalizeExactTypeName(string typeName)
+        {
+            return typeName switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Decimal" => "decimal",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => typeName
+            };
+        }
+
+        internal static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
+        {
+            if (handle.IsNil)
+            {
+                return "<module>";
+            }
+
+            var definition = reader.GetTypeDefinition(handle);
+            var name = reader.GetString(definition.Name);
+            var declaringType = definition.GetDeclaringType();
+            if (!declaringType.IsNil)
+            {
+                return GetTypeName(reader, declaringType) + "+" + name;
+            }
+
+            var ns = reader.GetString(definition.Namespace);
+            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+        }
+
+        internal static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
+        {
+            var reference = reader.GetTypeReference(handle);
+            var name = reader.GetString(reference.Name);
+            var ns = reader.GetString(reference.Namespace);
+            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+        }
+    }
+
     internal sealed class SummaryAssemblyIdentity
     {
         public SummaryAssemblyIdentity(string? assemblyName, string? assemblySha256, string? moduleVersionId)
