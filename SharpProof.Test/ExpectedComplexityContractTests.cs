@@ -175,6 +175,44 @@ public static class C
         }
 
         [Test]
+        public async Task ExpectedComplexity_OpenVirtualSourceCallee_ReportsSp0022()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public class Worker
+{
+    public virtual void Work(int n)
+    {
+    }
+}
+
+public sealed class LinearWorker : Worker
+{
+    public override void Work(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+        }
+    }
+}
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Constant)]
+    public static void Caller(Worker worker, int n)
+    {
+        worker.Work(n);
+    }
+}";
+
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
+            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+            Assert.That(diagnostic.GetMessage(), Does.Contain("DynamicDispatch"));
+        }
+
+        [Test]
         public async Task ExpectedComplexity_OnProperty_ReportsSp0023()
         {
             var test = @"

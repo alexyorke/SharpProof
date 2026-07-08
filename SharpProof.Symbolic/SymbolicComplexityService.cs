@@ -557,9 +557,11 @@ namespace SharpProof.Symbolic
                              static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
                 {
+                    var invocationOperation = semanticModel.GetOperation(invocationSyntax, _cancellationToken) as IInvocationOperation;
                     var invocationSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax, _cancellationToken);
                     var expressionSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax.Expression, _cancellationToken);
-                    var targetMethod = invocationSymbolInfo.Symbol as IMethodSymbol ??
+                    var targetMethod = invocationOperation?.TargetMethod ??
+                        invocationSymbolInfo.Symbol as IMethodSymbol ??
                         expressionSymbolInfo.Symbol as IMethodSymbol ??
                         invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
                         expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
@@ -609,9 +611,11 @@ namespace SharpProof.Symbolic
                              static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
                 {
+                    var invocationOperation = semanticModel.GetOperation(invocationSyntax, _cancellationToken) as IInvocationOperation;
                     var invocationSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax, _cancellationToken);
                     var expressionSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax.Expression, _cancellationToken);
-                    var targetMethod = invocationSymbolInfo.Symbol as IMethodSymbol ??
+                    var targetMethod = invocationOperation?.TargetMethod ??
+                        invocationSymbolInfo.Symbol as IMethodSymbol ??
                         expressionSymbolInfo.Symbol as IMethodSymbol ??
                         invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
                         expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
@@ -626,6 +630,7 @@ namespace SharpProof.Symbolic
 
                     invocationCosts.Add(AnalyzeMethodCall(
                         targetMethod,
+                        invocationOperation,
                         invocationSyntax,
                         semanticModel,
                         currentMethod,
@@ -926,6 +931,7 @@ namespace SharpProof.Symbolic
 
                 var callCost = AnalyzeMethodCall(
                     invocationOperation.TargetMethod,
+                    invocationOperation,
                     invocationOperation.Syntax,
                     semanticModel,
                     currentMethod,
@@ -955,6 +961,7 @@ namespace SharpProof.Symbolic
                 {
                     parts.Add(AnalyzeMethodCall(
                         objectCreationOperation.Constructor,
+                        objectCreationOperation,
                         objectCreationOperation.Syntax,
                         semanticModel,
                         currentMethod,
@@ -986,6 +993,7 @@ namespace SharpProof.Symbolic
                 {
                     parts.Add(AnalyzeMethodCall(
                         getter,
+                        propertyReferenceOperation,
                         propertyReferenceOperation.Syntax,
                         semanticModel,
                         currentMethod,
@@ -1065,6 +1073,7 @@ namespace SharpProof.Symbolic
 
             private ComplexityArtifacts AnalyzeMethodCall(
                 IMethodSymbol methodSymbol,
+                IOperation? operation,
                 SyntaxNode syntax,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1081,6 +1090,25 @@ namespace SharpProof.Symbolic
                                 methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                                 knownCost,
                                 currentMethod),
+                        });
+                }
+
+                if (operation != null &&
+                    SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation))
+                {
+                    return ComplexityArtifacts.Unknown(
+                        SymbolicComplexityUnknownReason.DynamicDispatch,
+                        syntax,
+                        syntax.SyntaxTree,
+                        _cancellationToken,
+                        calleeSummaries: new[]
+                        {
+                            new SymbolicComplexityCalleeInfo(
+                                methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                                "Unknown",
+                                SymbolicComplexityKind.Unknown,
+                                true,
+                                SymbolicComplexityUnknownReason.DynamicDispatch),
                         });
                 }
 

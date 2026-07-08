@@ -23,6 +23,7 @@ namespace SharpProof.Symbolic
         UnsupportedWhileLoop,
         UnknownCallee,
         ExternalCallee,
+        DynamicDispatch,
         RecursiveCycle,
         UnsupportedOperation,
         CancellationRequested,

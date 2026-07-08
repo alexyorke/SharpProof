@@ -281,6 +281,80 @@ public static class C
         }
 
         [Test]
+        public void OpenVirtualSourceCallee_IsConservativeUnknown()
+        {
+            const string source = """
+public class Worker
+{
+    public virtual void Work(int n)
+    {
+    }
+}
+
+public sealed class LinearWorker : Worker
+{
+    public override void Work(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+        }
+    }
+}
+
+public static class C
+{
+    public static void Caller(Worker worker, int n)
+    {
+        worker.Work(n);
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "worker.Work(n);");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Unknown));
+            Assert.That(result.UnknownReasons, Does.Contain(SymbolicComplexityUnknownReason.DynamicDispatch));
+            Assert.That(result.CalleeSummaries, Has.Some.Matches<SymbolicComplexityCalleeInfo>(
+                summary => summary.UnknownReason == SymbolicComplexityUnknownReason.DynamicDispatch));
+        }
+
+        [Test]
+        public void SealedReceiverSourceOverride_ComposesImplementationComplexity()
+        {
+            const string source = """
+public abstract class Worker
+{
+    public abstract void Work(int n);
+}
+
+public sealed class LinearWorker : Worker
+{
+    public override void Work(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+        }
+    }
+}
+
+public static class C
+{
+    public static void Caller(LinearWorker worker, int n)
+    {
+        worker.Work(n);
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "worker.Work(n);");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+            Assert.That(result.CalleeSummaries, Has.Some.Matches<SymbolicComplexityCalleeInfo>(
+                summary => summary.MethodDisplayName.Contains("LinearWorker.Work", StringComparison.Ordinal)));
+        }
+
+        [Test]
         public void ExternalUnknownCallee_ProducesUnknown()
         {
             const string source = """
