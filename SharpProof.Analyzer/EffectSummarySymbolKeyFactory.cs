@@ -345,7 +345,7 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private static string GetMetadataGenericDefinitionName(INamedTypeSymbol namedType)
+        internal static string GetMetadataGenericDefinitionName(INamedTypeSymbol namedType)
         {
             var definition = namedType.ConstructedFrom;
             if (definition.ContainingType != null)

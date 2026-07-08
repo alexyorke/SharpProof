@@ -546,6 +546,21 @@ namespace SharpProof.Symbolic
                 }
             }
 
+            private IMethodSymbol? ResolveInvocationTargetMethod(
+                InvocationExpressionSyntax invocationSyntax,
+                SemanticModel semanticModel,
+                out IInvocationOperation? invocationOperation)
+            {
+                invocationOperation = semanticModel.GetOperation(invocationSyntax, _cancellationToken) as IInvocationOperation;
+                var invocationSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax, _cancellationToken);
+                var expressionSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax.Expression, _cancellationToken);
+                return invocationOperation?.TargetMethod ??
+                    invocationSymbolInfo.Symbol as IMethodSymbol ??
+                    expressionSymbolInfo.Symbol as IMethodSymbol ??
+                    invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
+                    expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+            }
+
             private ComplexityArtifacts AnalyzeExternalInvocationFallbacks(
                 SyntaxNode bodyNode,
                 SemanticModel semanticModel)
@@ -554,14 +569,7 @@ namespace SharpProof.Symbolic
                              static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
                 {
-                    var invocationOperation = semanticModel.GetOperation(invocationSyntax, _cancellationToken) as IInvocationOperation;
-                    var invocationSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax, _cancellationToken);
-                    var expressionSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax.Expression, _cancellationToken);
-                    var targetMethod = invocationOperation?.TargetMethod ??
-                        invocationSymbolInfo.Symbol as IMethodSymbol ??
-                        expressionSymbolInfo.Symbol as IMethodSymbol ??
-                        invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
-                        expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+                    var targetMethod = ResolveInvocationTargetMethod(invocationSyntax, semanticModel, out var invocationOperation);
                     if (targetMethod == null)
                     {
                         return ComplexityArtifacts.Unknown(
@@ -608,14 +616,7 @@ namespace SharpProof.Symbolic
                              static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
                 {
-                    var invocationOperation = semanticModel.GetOperation(invocationSyntax, _cancellationToken) as IInvocationOperation;
-                    var invocationSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax, _cancellationToken);
-                    var expressionSymbolInfo = semanticModel.GetSymbolInfo(invocationSyntax.Expression, _cancellationToken);
-                    var targetMethod = invocationOperation?.TargetMethod ??
-                        invocationSymbolInfo.Symbol as IMethodSymbol ??
-                        expressionSymbolInfo.Symbol as IMethodSymbol ??
-                        invocationSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault() ??
-                        expressionSymbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+                    var targetMethod = ResolveInvocationTargetMethod(invocationSyntax, semanticModel, out var invocationOperation);
                     if (targetMethod == null)
                     {
                         return ComplexityArtifacts.Unknown(

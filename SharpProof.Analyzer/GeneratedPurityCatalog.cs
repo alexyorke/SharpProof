@@ -521,20 +521,6 @@ namespace SharpProof.Analyzer
             return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
-        private static string GetMetadataGenericDefinitionName(INamedTypeSymbol namedType)
-        {
-            var definition = namedType.ConstructedFrom;
-            if (definition.ContainingType != null)
-            {
-                return GetMetadataGenericDefinitionName(definition.ContainingType) + "+" + definition.MetadataName;
-            }
-
-            var containingNamespace = definition.ContainingNamespace?.ToDisplayString();
-            return string.IsNullOrWhiteSpace(containingNamespace)
-                ? definition.MetadataName
-                : containingNamespace + "." + definition.MetadataName;
-        }
-
         private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol namedType)
         {
             var builder = ImmutableArray.CreateBuilder<ITypeSymbol>();
