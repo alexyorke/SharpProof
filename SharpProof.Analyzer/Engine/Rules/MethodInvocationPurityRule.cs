@@ -89,12 +89,29 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return stringComparerResult;
             }
 
-            if (TryCheckEnumMemberPurity(invocationOperation, context, currentState, out var enumResult))
+            if (TryCheckMetadataMemberOperandPurity(
+                    invocationOperation,
+                    context,
+                    currentState,
+                    "System.Enum",
+                    static methodSymbol =>
+                        (methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1) ||
+                        (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0),
+                    out var enumResult))
             {
                 return enumResult;
             }
 
-            if (TryCheckFormattableStringPurity(invocationOperation, context, currentState, out var formattableStringResult))
+            if (TryCheckMetadataMemberOperandPurity(
+                    invocationOperation,
+                    context,
+                    currentState,
+                    "System.FormattableString",
+                    static methodSymbol =>
+                        methodSymbol.Parameters.Length == 1 &&
+                        ((methodSymbol.IsStatic && methodSymbol.Name == "Invariant") ||
+                            (!methodSymbol.IsStatic && methodSymbol.Name == "ToString")),
+                    out var formattableStringResult))
             {
                 return formattableStringResult;
             }
@@ -2366,51 +2383,24 @@ namespace SharpProof.Analyzer.Engine.Rules
             return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
         }
 
-        private static bool TryCheckEnumMemberPurity(
+        private static bool TryCheckMetadataMemberOperandPurity(
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            string metadataName,
+            Func<IMethodSymbol, bool> matchesMember,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (!IsMemberOfMetadataType(methodSymbol, context, "System.Enum"))
+            if (!IsMemberOfMetadataType(methodSymbol, context, metadataName) ||
+                !matchesMember(methodSymbol))
             {
                 return false;
             }
 
-            if ((methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1) ||
-                (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0))
-            {
-                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
-            }
-
-            return false;
-        }
-
-        private static bool TryCheckFormattableStringPurity(
-            IInvocationOperation invocationOperation,
-            PurityAnalysisContext context,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            out PurityAnalysisEngine.PurityAnalysisResult result)
-        {
-            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            var methodSymbol = invocationOperation.TargetMethod;
-            if (!IsMemberOfMetadataType(methodSymbol, context, "System.FormattableString"))
-            {
-                return false;
-            }
-
-            if (methodSymbol.Parameters.Length == 1 &&
-                ((methodSymbol.IsStatic && methodSymbol.Name == "Invariant") ||
-                    (!methodSymbol.IsStatic && methodSymbol.Name == "ToString")))
-            {
-                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
-            }
-
-            return false;
+            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
         }
 
         private static bool EnsureInvocationOperandsArePure(
