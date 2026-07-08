@@ -775,6 +775,7 @@ namespace SharpProof.Symbolic
             SmtAnalysis = smtAnalysis;
             ImpliedConditions = impliedConditions?
                 .Where(static condition => !string.IsNullOrWhiteSpace(condition))
+                .Select(static condition => condition.Trim())
                 .ToImmutableArray() ?? ImmutableArray<string>.Empty;
             IncludeExpressionProgramPoints = includeExpressionProgramPoints;
             IncludeCurrentStatementCompletionFacts = includeCurrentStatementCompletionFacts;

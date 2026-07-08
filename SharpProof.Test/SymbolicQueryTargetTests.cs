@@ -7,6 +7,14 @@ namespace SharpProof.Test
     public sealed class SymbolicQueryTargetTests
     {
         [Test]
+        public void QueryOptions_TrimsImpliedConditions()
+        {
+            var options = new SymbolicQueryOptions(impliedConditions: new[] { " value > 0 ", "\t", "\nother < 10\r\n" });
+
+            Assert.That(options.ImpliedConditions, Is.EqualTo(new[] { "value > 0", "other < 10" }));
+        }
+
+        [Test]
         public void LineSpan_EndLineBeforeStartLine_Throws()
         {
             var exception = Assert.Throws<ArgumentOutOfRangeException>(
