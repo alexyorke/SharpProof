@@ -1055,14 +1055,6 @@ All public `Query*` methods accept `SmtAnalysisService smtAnalysis` but only `Qu
 
 ---
 
-## 113. `IsIntegralOrEnumType` diverges between two source files — `System_Char` inconsistent
-
-**Files:** `CSharpMathPatternRecognizer.cs:89-101` vs `SwitchPathConditionBuilder.cs:2251-2263`
-
-Both define private `IsIntegralOrEnumType`. `CSharpMathPatternRecognizer` includes `SpecialType.System_Char`; `SwitchPathConditionBuilder` does not. A `char` switch governing expression could be classified as integral by one but not the other, causing translation failures in pattern-based switch analysis.
-
----
-
 ## 114. `CreateSubsequenceInRangeFormula` uses `Int32.MaxValue` for 64-bit SMT integers
 
 **File:** `SharpProof.Symbolic/Smt/SmtFormulaFactory.cs:141`

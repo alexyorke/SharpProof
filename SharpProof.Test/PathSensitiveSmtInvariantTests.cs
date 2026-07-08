@@ -69,6 +69,54 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCharListPatternElementFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public char TestMethod(char[] values)
+    {
+        switch (values)
+        {
+            case ['x', ..]:
+                return values[0];
+            default:
+                return '0';
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return values[0];");
+            var proof = ProveAtMarker(source, marker, "values[0] == 'x'");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesCharTuplePatternElementFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod((char Key, int Value) pair)
+    {
+        switch (pair)
+        {
+            case ('x', var value):
+                return value;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return value;");
+            var proof = ProveAtMarker(source, marker, "pair.Key == 'x'");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadFixedLengthLowerBound()
         {
             const string source = @"
@@ -307,6 +355,31 @@ public class TestClass
 
             var marker = FindMarker(source, "return 10 / value;");
             var proof = ProveAtMarker(source, marker, "value != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_SwitchStatementCharDefaultExcludesPriorCase()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(char value)
+    {
+        switch (value)
+        {
+            case 'x':
+                return 0;
+            default:
+                var result = value;
+                return result;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return result;");
+            var proof = ProveAtMarker(source, marker, "value != 'x'");
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }

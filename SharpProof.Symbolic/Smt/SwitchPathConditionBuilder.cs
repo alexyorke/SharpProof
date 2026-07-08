@@ -2251,6 +2251,7 @@ namespace SharpProof.Symbolic.Smt
         private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
         {
             return typeSymbol.SpecialType is
+                SpecialType.System_Char or
                 SpecialType.System_SByte or
                 SpecialType.System_Byte or
                 SpecialType.System_Int16 or
