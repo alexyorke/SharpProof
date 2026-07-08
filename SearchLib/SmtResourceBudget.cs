@@ -38,9 +38,14 @@ namespace SearchLib.Smt
 
         public static TimeSpan GetWallClockSafetyNet(TimeSpan budget)
         {
-            if (budget >= TimeSpan.FromMilliseconds(TimeSpan.MaxValue.TotalMilliseconds / WallClockSafetyFactor))
+            if (budget.Ticks > TimeSpan.MaxValue.Ticks / WallClockSafetyFactor)
             {
                 return TimeSpan.MaxValue;
+            }
+
+            if (budget.Ticks < TimeSpan.MinValue.Ticks / WallClockSafetyFactor)
+            {
+                return TimeSpan.MinValue;
             }
 
             return TimeSpan.FromTicks(budget.Ticks * WallClockSafetyFactor);
