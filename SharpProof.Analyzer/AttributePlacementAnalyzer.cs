@@ -178,27 +178,8 @@ namespace SharpProof.Analyzer
         {
             return compilation.GetTypeByMetadataName(qualifiedMetadataName)
                 ?? compilation.GetTypeByMetadataName(fallbackMetadataName)
-                ?? FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
+                ?? AttributeSymbolResolution.FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
         }
 
-        private static INamedTypeSymbol? FindTypeByName(INamespaceSymbol namespaceSymbol, string typeName)
-        {
-            var directMatch = namespaceSymbol.GetTypeMembers(typeName).FirstOrDefault();
-            if (directMatch != null)
-            {
-                return directMatch;
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                var nestedMatch = FindTypeByName(nestedNamespace, typeName);
-                if (nestedMatch != null)
-                {
-                    return nestedMatch;
-                }
-            }
-
-            return null;
-        }
     }
 }

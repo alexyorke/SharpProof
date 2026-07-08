@@ -220,7 +220,7 @@ namespace SharpProof.Analyzer
                  entry.Classification.Categories.Contains("abstract", StringComparer.Ordinal));
         }
 
-        private static bool IsFrameworkAssemblyName(string? assemblyName)
+        internal static bool IsFrameworkAssemblyName(string? assemblyName)
         {
             if (string.IsNullOrWhiteSpace(assemblyName))
             {

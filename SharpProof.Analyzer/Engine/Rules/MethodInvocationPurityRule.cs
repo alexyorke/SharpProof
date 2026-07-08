@@ -354,7 +354,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var dispatchWasProvenPure = false;
             if (!ShouldDeferToSpecializedDispatchPurity(invokedMethodSymbol) &&
-                IsPotentiallyDispatchedMethod(invokedMethodSymbol, context.SemanticModel.Compilation)
+                DispatchedMemberResolution.IsPotentiallyDispatchedMethod(invokedMethodSymbol, context.SemanticModel.Compilation)
                 && (invokedMethodSymbol.IsStatic
                     ? invocationOperation.Instance == null
                     : invocationOperation.Instance != null
@@ -862,23 +862,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
-            return !IsFrameworkAssemblyName(assemblyName);
-        }
-
-        private static bool IsFrameworkAssemblyName(string? assemblyName)
-        {
-            if (string.IsNullOrEmpty(assemblyName))
-            {
-                return false;
-            }
-
-            var name = assemblyName!;
-            return name == "mscorlib" ||
-                name == "netstandard" ||
-                name == "System" ||
-                name == "System.Private.CoreLib" ||
-                name.StartsWith("System.", StringComparison.Ordinal) ||
-                name.StartsWith("Microsoft.", StringComparison.Ordinal);
+            return !GeneratedPurityCatalog.IsFrameworkAssemblyName(assemblyName);
         }
 
         private static bool TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(
@@ -984,27 +968,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return true;
-        }
-
-        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
-        {
-            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                methodSymbol.IsAbstract)
-            {
-                return true;
-            }
-
-            if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride)
-            {
-                return false;
-            }
-
-            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
-            {
-                return canBeOverridden;
-            }
-
-            return !methodSymbol.IsSealed;
         }
 
         private static bool IsLinqEnumerableInvocation(IMethodSymbol methodSymbol, Compilation compilation)
