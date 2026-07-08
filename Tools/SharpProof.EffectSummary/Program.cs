@@ -2191,7 +2191,7 @@ internal static class AssemblyEffectSummarizer
             return false;
         }
 
-        return calls.All(IsPurityNeutralIntrinsicHelperCall);
+        return calls.All(PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall);
     }
 
     private static bool IsFreshOwnedObjectWrite(
@@ -2223,23 +2223,9 @@ internal static class AssemblyEffectSummarizer
         return calls.All(IsFreshObjectInitializationHelperCall);
     }
 
-    private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
-    {
-        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
-    }
-
     private static bool IsFreshObjectInitializationHelperCall(string callSymbol)
     {
-        return IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
+        return PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
             callSymbol.Contains(".ctor(", StringComparison.Ordinal);
     }
 

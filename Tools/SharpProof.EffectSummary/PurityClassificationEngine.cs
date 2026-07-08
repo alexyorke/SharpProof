@@ -4444,7 +4444,7 @@ internal static class PurityClassificationEngine
         return "none";
     }
 
-    private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
+    internal static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
