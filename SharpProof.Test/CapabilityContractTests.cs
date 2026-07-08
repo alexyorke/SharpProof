@@ -129,6 +129,40 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task AllowedCapabilities_None_OpenVirtualSourceCallee_ReportsUnknown()
+        {
+            var test = @"
+using System;
+using SharpProof.Attributes;
+
+public class Worker
+{
+    public virtual void Work()
+    {
+    }
+}
+
+public sealed class ConsoleWorker : Worker
+{
+    public override void Work()
+    {
+        Console.WriteLine(""hello"");
+    }
+}
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod(Worker worker)
+    {
+        {|SP0016:worker.Work()|};
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task CapabilityViolationDiagnostic_IncludesStructuredProperties()
         {
             var diagnostics = await GetDiagnosticsAsync(@"
@@ -216,6 +250,77 @@ public static class C
 
             Assert.That(result.Capabilities.HasFlag(SymbolicCapability.Console), Is.True);
             Assert.That(result.Sites, Has.Some.Matches<SymbolicCapabilitySite>(site => site.IsTransitive && site.SymbolDisplayName.Contains("Helper", System.StringComparison.Ordinal)));
+        }
+
+        [Test]
+        public void QueryCapabilities_OpenVirtualSourceCall_ReturnsDynamicDispatchUnknown()
+        {
+            const string source = """
+using System;
+
+public class Worker
+{
+    public virtual void Work()
+    {
+    }
+}
+
+public sealed class ConsoleWorker : Worker
+{
+    public override void Work()
+    {
+        Console.WriteLine("hello");
+    }
+}
+
+public static class C
+{
+    public static void Outer(Worker worker)
+    {
+        worker.Work();
+    }
+}
+""";
+
+            var result = QueryCapabilitiesAtMarker(source, "worker.Work();");
+
+            Assert.That(result.HasUnknowns, Is.True);
+            Assert.That(result.Sites, Has.Some.Matches<SymbolicCapabilitySite>(site => site.UnknownReason == SymbolicCapabilityUnknownReason.DynamicDispatch));
+        }
+
+        [Test]
+        public void QueryCapabilities_SealedReceiverSourceOverride_AnalyzesImplementation()
+        {
+            const string source = """
+using System;
+
+public abstract class Worker
+{
+    public abstract void Work();
+}
+
+public sealed class ConsoleWorker : Worker
+{
+    public override void Work()
+    {
+        Console.WriteLine("hello");
+    }
+}
+
+public static class C
+{
+    public static void Outer(ConsoleWorker worker)
+    {
+        worker.Work();
+    }
+}
+""";
+
+            var result = QueryCapabilitiesAtMarker(source, "worker.Work();");
+
+            Assert.That(result.HasUnknowns, Is.False);
+            Assert.That(result.Capabilities.HasFlag(SymbolicCapability.Console), Is.True);
+            Assert.That(result.Sites, Has.Some.Matches<SymbolicCapabilitySite>(site => site.IsTransitive && site.SymbolDisplayName.Contains("ConsoleWorker.Work", System.StringComparison.Ordinal)));
         }
 
         private static SymbolicCapabilityResult QueryCapabilitiesAtMarker(
