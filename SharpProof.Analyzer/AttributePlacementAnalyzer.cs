@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,13 +9,13 @@ namespace SharpProof.Analyzer
     {
         internal static void AnalyzeNonMethodDeclaration(SyntaxNodeAnalysisContext context)
         {
-            var enforcePureAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute");
-            var pureAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute");
-            var allowSynchronizationAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute");
-            var zeroAllocationsAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute");
-            var allowedCapabilitiesAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowedCapabilitiesAttribute", "AllowedCapabilitiesAttribute");
-            var ensuresAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute");
-            var expectedComplexityAttributeSymbol = ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ExpectedComplexityAttribute", "ExpectedComplexityAttribute");
+            var enforcePureAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute");
+            var pureAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute");
+            var allowSynchronizationAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute");
+            var zeroAllocationsAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute");
+            var allowedCapabilitiesAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowedCapabilitiesAttribute", "AllowedCapabilitiesAttribute");
+            var ensuresAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute");
+            var expectedComplexityAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ExpectedComplexityAttribute", "ExpectedComplexityAttribute");
 
             if (enforcePureAttributeSymbol == null &&
                 pureAttributeSymbol == null &&
@@ -172,13 +169,6 @@ namespace SharpProof.Analyzer
             return IsAllowedPurityTarget(node) ||
                    node is PropertyDeclarationSyntax ||
                    node is IndexerDeclarationSyntax;
-        }
-
-        private static INamedTypeSymbol? ResolveAttributeSymbol(Compilation compilation, string qualifiedMetadataName, string fallbackMetadataName)
-        {
-            return compilation.GetTypeByMetadataName(qualifiedMetadataName)
-                ?? compilation.GetTypeByMetadataName(fallbackMetadataName)
-                ?? AttributeSymbolResolution.FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
         }
 
     }
