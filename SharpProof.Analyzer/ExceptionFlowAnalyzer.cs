@@ -519,7 +519,7 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            var rootOperation = GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken);
+            var rootOperation = MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, includeConversionOperators: false);
             if (rootOperation == null)
             {
                 yield break;
@@ -562,37 +562,6 @@ namespace SharpProof.Analyzer
                 default:
                     return false;
             }
-        }
-
-        private static IOperation? GetMethodBodyRootOperation(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            return methodNode switch
-            {
-                MethodDeclarationSyntax methodDeclaration when methodDeclaration.Body != null =>
-                    semanticModel.GetOperation(methodDeclaration.Body, cancellationToken),
-                MethodDeclarationSyntax methodDeclaration when methodDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(methodDeclaration.ExpressionBody.Expression, cancellationToken),
-                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.Body != null =>
-                    semanticModel.GetOperation(constructorDeclaration.Body, cancellationToken),
-                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(constructorDeclaration.ExpressionBody.Expression, cancellationToken),
-                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.Body != null =>
-                    semanticModel.GetOperation(operatorDeclaration.Body, cancellationToken),
-                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(operatorDeclaration.ExpressionBody.Expression, cancellationToken),
-                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.Body != null =>
-                    semanticModel.GetOperation(accessorDeclaration.Body, cancellationToken),
-                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(accessorDeclaration.ExpressionBody.Expression, cancellationToken),
-                LocalFunctionStatementSyntax localFunction when localFunction.Body != null =>
-                    semanticModel.GetOperation(localFunction.Body, cancellationToken),
-                LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
-                    semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
-                _ => semanticModel.GetOperation(methodNode, cancellationToken)
-            };
         }
 
         private static Location? GetIdentifierLocation(SyntaxNode node)

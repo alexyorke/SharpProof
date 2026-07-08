@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -48,7 +49,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            var rootOperation = GetMethodBodyRootOperation(context.Node, context.SemanticModel, context.CancellationToken);
+            var rootOperation = MethodBodyOperationResolver.GetMethodBodyRootOperation(context.Node, context.SemanticModel, context.CancellationToken, includeConversionOperators: false);
             if (rootOperation == null)
             {
                 return;
@@ -252,37 +253,6 @@ namespace SharpProof.Analyzer
             var originalDefinition = namedType.OriginalDefinition;
             return originalDefinition.ContainingNamespace?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System" &&
                 (originalDefinition.Name == "Span" || originalDefinition.Name == "ReadOnlySpan");
-        }
-
-        private static IOperation? GetMethodBodyRootOperation(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            return methodNode switch
-            {
-                MethodDeclarationSyntax methodDeclaration when methodDeclaration.Body != null =>
-                    semanticModel.GetOperation(methodDeclaration.Body, cancellationToken),
-                MethodDeclarationSyntax methodDeclaration when methodDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(methodDeclaration.ExpressionBody.Expression, cancellationToken),
-                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.Body != null =>
-                    semanticModel.GetOperation(constructorDeclaration.Body, cancellationToken),
-                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(constructorDeclaration.ExpressionBody.Expression, cancellationToken),
-                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.Body != null =>
-                    semanticModel.GetOperation(operatorDeclaration.Body, cancellationToken),
-                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(operatorDeclaration.ExpressionBody.Expression, cancellationToken),
-                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.Body != null =>
-                    semanticModel.GetOperation(accessorDeclaration.Body, cancellationToken),
-                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.ExpressionBody != null =>
-                    semanticModel.GetOperation(accessorDeclaration.ExpressionBody.Expression, cancellationToken),
-                LocalFunctionStatementSyntax localFunction when localFunction.Body != null =>
-                    semanticModel.GetOperation(localFunction.Body, cancellationToken),
-                LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
-                    semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
-                _ => semanticModel.GetOperation(methodNode, cancellationToken)
-            };
         }
 
         private static INamedTypeSymbol? ResolveAttributeSymbol(Compilation compilation, string qualifiedMetadataName, string fallbackMetadataName)
