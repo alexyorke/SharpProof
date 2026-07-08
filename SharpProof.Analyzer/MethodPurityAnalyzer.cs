@@ -136,7 +136,8 @@ namespace SharpProof.Analyzer
                 methodSymbol,
                 context.SemanticModel,
                 enforceOrPureAttributeSymbol,
-                allowSynchronizationAttributeSymbol);
+                allowSynchronizationAttributeSymbol,
+                context.CancellationToken);
             bool isPure = purityResult.IsPure;
 
             var effectiveMissingPuritySuggestions = AnalyzerConfiguration.GetMissingPuritySuggestionOptions(

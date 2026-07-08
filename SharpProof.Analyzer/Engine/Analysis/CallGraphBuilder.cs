@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Operations;
@@ -9,27 +10,32 @@ namespace SharpProof.Analyzer.Engine.Analysis
 {
     internal static class CallGraphBuilder
     {
-        public static CallGraph Build(Compilation compilation)
+        public static CallGraph Build(Compilation compilation, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
 
             foreach (var tree in compilation.SyntaxTrees)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var model = compilation.GetSemanticModel(tree);
-                var root = tree.GetRoot();
-                var operations = root.DescendantNodes().Select(n => model.GetOperation(n)).OfType<IMethodBodyOperation>();
+                var root = tree.GetRoot(cancellationToken);
+                var operations = root.DescendantNodes().Select(n => model.GetOperation(n, cancellationToken)).OfType<IMethodBodyOperation>();
                 foreach (var body in operations)
                 {
-                    var containingMethod = model.GetEnclosingSymbol(body.Syntax.SpanStart) as IMethodSymbol;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var containingMethod = model.GetEnclosingSymbol(body.Syntax.SpanStart, cancellationToken) as IMethodSymbol;
                     if (containingMethod == null) continue;
                     var callees = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
                     var delegateTargetsBySymbol = new Dictionary<ISymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
                     foreach (var inv in body.Descendants().OfType<IInvocationOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (inv.Syntax != null &&
                             ExecutionVisibility.IsInStaticallyUnreachableBranch(
                                 inv.Syntax,
-                                model))
+                                model,
+                                cancellationToken))
                         {
                             continue;
                         }
@@ -44,7 +50,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                             var isBaseReference = IsBaseReference(inv.Instance);
                             if (!isBaseReference)
                             {
-                                foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation))
+                                foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation, cancellationToken))
                                 {
                                     callees.Add(impl);
                                 }
@@ -55,6 +61,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Include user-defined operator methods and conversion operators
                     foreach (var bin in body.Descendants().OfType<IBinaryOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (bin.OperatorMethod != null)
                         {
                             callees.Add(bin.OperatorMethod.OriginalDefinition);
@@ -63,6 +70,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var un in body.Descendants().OfType<IUnaryOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (un.OperatorMethod != null)
                         {
                             callees.Add(un.OperatorMethod.OriginalDefinition);
@@ -71,6 +79,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var compound in body.Descendants().OfType<ICompoundAssignmentOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (compound.OperatorMethod != null)
                         {
                             callees.Add(compound.OperatorMethod.OriginalDefinition);
@@ -79,6 +88,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var incrementOrDecrement in body.Descendants().OfType<IIncrementOrDecrementOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (incrementOrDecrement.OperatorMethod != null &&
                             PurityAnalysisEngine.ShouldAnalyzeCompoundAssignmentOperator(incrementOrDecrement.OperatorMethod.OriginalDefinition))
                         {
@@ -88,6 +98,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var conv in body.Descendants().OfType<IConversionOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var method = conv.Conversion.MethodSymbol;
                         if (conv.Conversion.IsUserDefined && method != null)
                         {
@@ -98,6 +109,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Include constructor initializer targets (base()/this())
                     foreach (var ctorBody in body.Descendants().OfType<IConstructorBodyOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var init = ctorBody.Initializer;
                         if (init is IInvocationOperation initInv && initInv.TargetMethod != null)
                         {
@@ -107,6 +119,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var methodRef in body.Descendants().OfType<IMethodReferenceOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (methodRef.Method != null)
                         {
                             callees.Add(methodRef.Method.OriginalDefinition);
@@ -116,6 +129,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Include property accessor methods when properties are referenced
                     foreach (var propRef in body.Descendants().OfType<IPropertyReferenceOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var getter = propRef.Property?.GetMethod;
                         if (getter != null)
                         {
@@ -125,6 +139,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var del in body.Descendants().OfType<IDelegateCreationOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (del.Target is IMethodReferenceOperation target && target.Method != null)
                         {
                             callees.Add(target.Method.OriginalDefinition);
@@ -133,6 +148,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var anon in body.Descendants().OfType<IAnonymousFunctionOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (anon.Symbol != null)
                         {
                             callees.Add(anon.Symbol.OriginalDefinition);
@@ -142,8 +158,10 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Conservatively add edges for awaited invocations
                     foreach (var awaitOp in body.Descendants().OfType<IAwaitOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         foreach (var awaitedInv in awaitOp.Operation.DescendantsAndSelf().OfType<IInvocationOperation>())
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (awaitedInv.TargetMethod != null)
                             {
                                 callees.Add(awaitedInv.TargetMethod.OriginalDefinition);
@@ -154,6 +172,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Capture delegate assignments and initializations to map symbols -> potential target methods
                     foreach (var assignment in body.Descendants().OfType<IAssignmentOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var targetSymbol = TryResolveSymbol(assignment.Target);
                         if (targetSymbol == null) continue;
                         IMethodSymbol? targetMethod = null;
@@ -194,6 +213,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Capture delegate compound assignments (e.g., "+=") to accumulate targets
                     foreach (var compound in body.Descendants().OfType<ICompoundAssignmentOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (compound.Target?.Type?.TypeKind != TypeKind.Delegate) continue;
                         var targetSymbol = TryResolveSymbol(compound.Target);
                         if (targetSymbol == null) continue;
@@ -230,6 +250,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // For compound property assignments and increment/decrement, include property setters
                     foreach (var compoundProp in body.Descendants().OfType<ICompoundAssignmentOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (compoundProp.Target is IPropertyReferenceOperation prop && prop.Property?.SetMethod != null)
                         {
                             callees.Add(prop.Property.SetMethod.OriginalDefinition);
@@ -238,6 +259,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var incdec in body.Descendants().OfType<IIncrementOrDecrementOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (incdec.Target is IPropertyReferenceOperation prop && prop.Property != null)
                         {
                             if (prop.Property.GetMethod != null)
@@ -250,6 +272,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // Capture event handler subscriptions (+=) mapping event symbols to potential handler targets
                     foreach (var evtAssign in body.Descendants().OfType<IEventAssignmentOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var eventSymbol = TryResolveSymbol(evtAssign.EventReference);
                         if (eventSymbol == null) continue;
                         IMethodSymbol? targetMethod = null;
@@ -284,10 +307,13 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
                     foreach (var group in body.Descendants().OfType<IVariableDeclarationGroupOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         foreach (var decl in group.Declarations)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             foreach (var d in decl.Declarators)
                             {
+                                cancellationToken.ThrowIfCancellationRequested();
                                 if (d.Initializer?.Value is IMethodReferenceOperation mr3)
                                 {
                                     var sym = d.Symbol;
@@ -315,6 +341,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     // For delegate invocations, add edges to mapped potential targets
                     foreach (var inv in body.Descendants().OfType<IInvocationOperation>())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (inv.TargetMethod?.Name == "Invoke" && inv.TargetMethod.ContainingType?.TypeKind == TypeKind.Delegate)
                         {
                             var sym = TryResolveSymbol(inv.Instance);
@@ -334,15 +361,17 @@ namespace SharpProof.Analyzer.Engine.Analysis
             // Optional CFG-guided pass to conservatively add invocation edges discovered per-block
             foreach (var tree in compilation.SyntaxTrees)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var model = compilation.GetSemanticModel(tree);
-                var root = tree.GetRoot();
-                var methods = root.DescendantNodes().Select(n => model.GetDeclaredSymbol(n)).OfType<IMethodSymbol>();
+                var root = tree.GetRoot(cancellationToken);
+                var methods = root.DescendantNodes().Select(n => model.GetDeclaredSymbol(n, cancellationToken)).OfType<IMethodSymbol>();
                 foreach (var method in methods)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (method == null) continue;
                     var declSyntaxRef = method.DeclaringSyntaxReferences.FirstOrDefault();
                     if (declSyntaxRef == null) continue;
-                    var bodyNode = declSyntaxRef.GetSyntax();
+                    var bodyNode = declSyntaxRef.GetSyntax(cancellationToken);
                     Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph? cfg = null;
                     try
                     {
@@ -357,8 +386,10 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     var callerSetBuilder = callerSet.ToBuilder();
                     foreach (var block in cfg.Blocks)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         foreach (var op in block.Operations)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (op is IInvocationOperation inv && inv.TargetMethod != null)
                             {
                                 var target = inv.TargetMethod.OriginalDefinition;
@@ -367,7 +398,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                                 var isBaseReference = IsBaseReference(inv.Instance);
                                 if (!isBaseReference)
                                 {
-                                    foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation))
+                                    foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation, cancellationToken))
                                     {
                                         callerSetBuilder.Add(impl);
                                     }
@@ -394,13 +425,17 @@ namespace SharpProof.Analyzer.Engine.Analysis
             };
         }
 
-        private static IEnumerable<IMethodSymbol> ResolvePotentialTargetsForVirtualOrInterfaceCall(IMethodSymbol target, Compilation compilation)
+        private static IEnumerable<IMethodSymbol> ResolvePotentialTargetsForVirtualOrInterfaceCall(
+            IMethodSymbol target,
+            Compilation compilation,
+            CancellationToken cancellationToken)
         {
             // Interface dispatch: include implementations in types that implement the interface
             if (target.ContainingType?.TypeKind == TypeKind.Interface)
             {
                 foreach (var type in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!ImplementsInterface(type, target.ContainingType)) continue;
                     var impl = type.FindImplementationForInterfaceMember(target) as IMethodSymbol;
                     if (impl != null)
@@ -408,7 +443,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                         yield return impl.OriginalDefinition;
                     }
                 }
-                if (!target.IsAbstract || HasMethodBody(target))
+                if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                 {
                     yield return target;
                 }
@@ -423,9 +458,11 @@ namespace SharpProof.Analyzer.Engine.Analysis
                 {
                     foreach (var type in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (!DerivesFrom(type, baseType)) continue;
                         foreach (var member in type.GetMembers())
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (member is IMethodSymbol m &&
                                 OverridesTargetMethod(m, target))
                             {
@@ -512,7 +549,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
             return false;
         }
 
-        private static bool HasMethodBody(IMethodSymbol methodSymbol)
+        private static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
         {
             if (methodSymbol.DeclaringSyntaxReferences.Length == 0)
             {
@@ -521,7 +558,8 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
             foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
             {
-                var methodSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var methodSyntax = syntaxReference.GetSyntax(cancellationToken);
                 if (methodSyntax is Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclaration &&
                     (methodDeclaration.Body != null || methodDeclaration.ExpressionBody != null))
                 {

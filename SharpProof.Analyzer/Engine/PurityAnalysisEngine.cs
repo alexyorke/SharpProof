@@ -1142,12 +1142,14 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-            IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null)
+            IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null,
+            CancellationToken cancellationToken = default)
         {
 
 
 
 
+            cancellationToken.ThrowIfCancellationRequested();
             var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
             var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEqualityComparer.Default);
             if (initialPurityCache != null)
@@ -1169,7 +1171,8 @@ namespace SharpProof.Analyzer.Engine
                 visited,
                 purityCache,
                 _smtAnalysis,
-                _purityService
+                _purityService,
+                cancellationToken
             );
 
             LogDebug($"<< Exit DeterminePurity ({GetPuritySource(result)}): {methodSymbol.ToDisplayString(_signatureFormat)}, Final IsPure={result.IsPure}");
@@ -1200,9 +1203,11 @@ namespace SharpProof.Analyzer.Engine
             HashSet<IMethodSymbol> visited,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
-            CompilationPurityService? purityService = null)
+            CompilationPurityService? purityService = null,
+            CancellationToken cancellationToken = default)
         {
 
+            cancellationToken.ThrowIfCancellationRequested();
             var activeSmtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
             var indent = new string(' ', visited.Count * 2);
             LogDebug($"{indent}>> Enter DeterminePurity: {methodSymbol.ToDisplayString()}");
@@ -1233,7 +1238,7 @@ namespace SharpProof.Analyzer.Engine
 
             try
             {
-                var declaringSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                var declaringSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
 
                 if (HasImpureAttribute(methodSymbol))
                 {
@@ -1336,18 +1341,18 @@ namespace SharpProof.Analyzer.Engine
                 }
 
 
-                SyntaxNode? bodySyntaxNode = GetBodySyntaxNode(methodSymbol, default);
+                SyntaxNode? bodySyntaxNode = GetBodySyntaxNode(methodSymbol, cancellationToken);
 
 
                 if (methodSymbol.ReturnsByRef)
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} returns by ref. IMPURE.");
 
-                    SyntaxNode? locationSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax()?.DescendantNodesAndSelf()
+                    SyntaxNode? locationSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)?.DescendantNodesAndSelf()
                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.RefTypeSyntax>()
                         .FirstOrDefault();
 
-                    locationSyntax ??= methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax()?.DescendantNodesAndSelf()
+                    locationSyntax ??= methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)?.DescendantNodesAndSelf()
                                             .FirstOrDefault(n => n is Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax ins && ins.Identifier.ValueText == methodSymbol.Name)
                                             ?.Parent;
 
@@ -1457,7 +1462,7 @@ namespace SharpProof.Analyzer.Engine
                 {
                     try
                     {
-                        methodBodyIOperation = semanticModel.GetOperation(bodySyntaxNode, default);
+                        methodBodyIOperation = semanticModel.GetOperation(bodySyntaxNode, cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -1487,7 +1492,8 @@ namespace SharpProof.Analyzer.Engine
                             methodSymbol,
                             purityCache,
                             activeSmtAnalysis,
-                            purityService);
+                            purityService,
+                            cancellationToken);
                     }
                     else
                     {
@@ -1502,6 +1508,7 @@ namespace SharpProof.Analyzer.Engine
                             purityCache,
                             activeSmtAnalysis,
                             purityService,
+                            cancellationToken,
                             out mergedDelegateTargetsFromCfg,
                             out mergedOwnedArrayFlowCapturesFromCfg,
                             out mergedOwnedLocalArraysFromCfg,
@@ -1530,7 +1537,7 @@ namespace SharpProof.Analyzer.Engine
                             purityCache,
                             methodSymbol,
                             _purityRules,
-                            CancellationToken.None,
+                            cancellationToken,
                             purityService,
                             activeSmtAnalysis);
 
@@ -1573,7 +1580,7 @@ namespace SharpProof.Analyzer.Engine
                                 var returnPurity = CheckSingleOperation(returnOp, postCfgContext, returnState);
                                 if (!returnPurity.IsPure)
                                 {
-                                    if (IsImpurityProvenUnreachable(returnPurity, semanticModel, activeSmtAnalysis))
+                                    if (IsImpurityProvenUnreachable(returnPurity, semanticModel, activeSmtAnalysis, cancellationToken))
                                     {
                                         continue;
                                     }
@@ -1602,7 +1609,7 @@ namespace SharpProof.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking ForEach enumerator runtime purity...");
                         foreach (var forEachOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IForEachLoopOperation>())
                         {
-                            if (ShouldSkipPostCfgDirectPurityProbe(forEachOp, semanticModel, activeSmtAnalysis))
+                            if (ShouldSkipPostCfgDirectPurityProbe(forEachOp, semanticModel, activeSmtAnalysis, cancellationToken))
                             {
                                 LogDebug($"{indent}    Post-CFG: Skipping statically unreachable foreach enumerator runtime check: {forEachOp.Syntax}");
                                 continue;
@@ -1633,7 +1640,7 @@ namespace SharpProof.Analyzer.Engine
                             if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                                     firstThrowOp.Syntax,
                                     semanticModel,
-                                    CancellationToken.None,
+                                    cancellationToken,
                                     activeSmtAnalysis))
                             {
                                 LogDebug($"{indent}    Post-CFG: Skipping statically unreachable throw: {firstThrowOp.Syntax}");
@@ -1670,7 +1677,7 @@ namespace SharpProof.Analyzer.Engine
                         {
                             foreach (var catchClause in tryOp.Catches)
                             {
-                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService);
+                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService, cancellationToken);
                                 if (!catchResult.IsPure)
                                 {
                                     result = catchResult;
@@ -1679,7 +1686,7 @@ namespace SharpProof.Analyzer.Engine
                             }
                             if (tryOp.Finally != null)
                             {
-                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService);
+                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService, cancellationToken);
                                 if (!finallyResult.IsPure)
                                 {
                                     result = finallyResult;
@@ -1693,7 +1700,7 @@ namespace SharpProof.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Known Impure Invocations...");
                         foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IInvocationOperation>())
                         {
-                            if (ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis))
+                            if (ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis, cancellationToken))
                             {
                                 continue;
                             }
@@ -1786,7 +1793,7 @@ namespace SharpProof.Analyzer.Engine
                         {
                             if (!IsParameterlessDisposeInvocation(invocationOp) ||
                                 invocationOp.Syntax.FirstAncestorOrSelf<FinallyClauseSyntax>() != null ||
-                                ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis))
+                                ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis, cancellationToken))
                             {
                                 continue;
                             }
@@ -1818,7 +1825,7 @@ namespace SharpProof.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Checked Operations...");
                         foreach (var operation in ExecutionVisibility.VisibleDescendants(methodBodyIOperation))
                         {
-                            if (ShouldSkipPostCfgDirectPurityProbe(operation, semanticModel, activeSmtAnalysis))
+                            if (ShouldSkipPostCfgDirectPurityProbe(operation, semanticModel, activeSmtAnalysis, cancellationToken))
                             {
                                 continue;
                             }
@@ -1856,7 +1863,7 @@ namespace SharpProof.Analyzer.Engine
                                     purityCache,
                                     methodSymbol,
                                     _purityRules,
-                                    CancellationToken.None,
+                                    cancellationToken,
                                     purityService,
                                     activeSmtAnalysis);
                                 var operatorPurity = GetCalleePurity(operatorMethod, contextForOp);
@@ -1904,7 +1911,8 @@ namespace SharpProof.Analyzer.Engine
         private static bool ShouldSkipPostCfgDirectPurityProbe(
             IOperation operation,
             SemanticModel semanticModel,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken)
         {
             if (operation.Syntax == null)
             {
@@ -1916,7 +1924,7 @@ namespace SharpProof.Analyzer.Engine
                 if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                         syntax,
                         semanticModel,
-                        CancellationToken.None,
+                        cancellationToken,
                         smtAnalysis))
                 {
                     return true;
@@ -1929,7 +1937,8 @@ namespace SharpProof.Analyzer.Engine
         private static bool IsImpurityProvenUnreachable(
             PurityAnalysisResult result,
             SemanticModel semanticModel,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken)
         {
             if (result.IsPure ||
                 result.ImpureSyntaxNode == null)
@@ -1942,7 +1951,7 @@ namespace SharpProof.Analyzer.Engine
                 if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                         syntax,
                         semanticModel,
-                        CancellationToken.None,
+                        cancellationToken,
                         smtAnalysis))
                 {
                     return true;
@@ -2357,12 +2366,14 @@ namespace SharpProof.Analyzer.Engine
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
             CompilationPurityService? purityService,
+            CancellationToken cancellationToken,
             out ImmutableDictionary<ISymbol, PotentialTargets> mergedDelegateTargetsFromBlocks,
             out ImmutableHashSet<CaptureId> mergedOwnedArrayFlowCapturesFromBlocks,
             out ImmutableHashSet<ISymbol> mergedOwnedLocalArraysFromBlocks,
             out ImmutableDictionary<ISymbol, INamedTypeSymbol> mergedLocalConcreteTypesFromBlocks,
             out SymbolicState mergedPathStateFromBlocks)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             mergedDelegateTargetsFromBlocks = ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
             mergedOwnedArrayFlowCapturesFromBlocks = ImmutableHashSet<CaptureId>.Empty;
             mergedOwnedLocalArraysFromBlocks = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
@@ -2447,7 +2458,8 @@ namespace SharpProof.Analyzer.Engine
                     containingMethodSymbol,
                     purityCache,
                     smtAnalysis,
-                    purityService);
+                    purityService,
+                    cancellationToken);
 
                 exitBlockStates[currentBlock] = stateAfter;
                 LogDebug($"  [CFG] State after Block #{currentBlock.Ordinal}: Impure={stateAfter.HasPotentialImpurity}");
@@ -2455,7 +2467,7 @@ namespace SharpProof.Analyzer.Engine
 
 
                 LogDebug($"  [CFG] Propagating stateAfter (Impure={stateAfter.HasPotentialImpurity}) to successors of Block #{currentBlock.Ordinal}.");
-                if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, out var takeConditionalSuccessor))
+                if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken, out var takeConditionalSuccessor))
                 {
                     var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
                     var takenSuccessor = takeConditionalSuccessor
@@ -2465,7 +2477,7 @@ namespace SharpProof.Analyzer.Engine
                         : (trueUsesConditionalSuccessor
                             ? currentBlock.FallThroughSuccessor?.Destination
                             : currentBlock.ConditionalSuccessor?.Destination);
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, takeConditionalSuccessor, smtAnalysis, out var takenState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, takeConditionalSuccessor, smtAnalysis, cancellationToken, out var takenState))
                     {
                         PropagateToSuccessor(takenSuccessor, takenState, blockStates, worklist, inQueue);
                     }
@@ -2474,12 +2486,12 @@ namespace SharpProof.Analyzer.Engine
                 {
                     var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
 
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, trueUsesConditionalSuccessor, smtAnalysis, out var conditionalState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var conditionalState))
                     {
                         PropagateToSuccessor(currentBlock.ConditionalSuccessor?.Destination, conditionalState, blockStates, worklist, inQueue);
                     }
 
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, !trueUsesConditionalSuccessor, smtAnalysis, out var fallThroughState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, !trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var fallThroughState))
                     {
                         PropagateToSuccessor(currentBlock.FallThroughSuccessor?.Destination, fallThroughState, blockStates, worklist, inQueue);
                     }
@@ -3114,8 +3126,10 @@ namespace SharpProof.Analyzer.Engine
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
-            CompilationPurityService? purityService)
+            CompilationPurityService? purityService,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebug($"ApplyTransferFunction START for Block #{block.Ordinal} - Initial State: Impure={stateBefore.HasPotentialImpurity}");
 
             if (stateBefore.HasPotentialImpurity)
@@ -3143,7 +3157,7 @@ namespace SharpProof.Analyzer.Engine
                 purityCache,
                 containingMethodSymbol,
                 _purityRules,
-                CancellationToken.None,
+                cancellationToken,
                 purityService,
                 smtAnalysis);
 
@@ -3163,7 +3177,7 @@ namespace SharpProof.Analyzer.Engine
                     currentStateInBlock = currentStateInBlock.WithFlowCaptureResult(flowCap.Id, valResult);
                     if (!valResult.IsPure)
                     {
-                        if (IsImpurityProvenUnreachable(valResult, semanticModel, smtAnalysis))
+                        if (IsImpurityProvenUnreachable(valResult, semanticModel, smtAnalysis, cancellationToken))
                         {
                             continue;
                         }
@@ -3181,7 +3195,7 @@ namespace SharpProof.Analyzer.Engine
 
                 if (!opResult.IsPure)
                 {
-                    if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis))
+                    if (IsImpurityProvenUnreachable(opResult, semanticModel, smtAnalysis, cancellationToken))
                     {
                         continue;
                     }
@@ -3233,7 +3247,7 @@ namespace SharpProof.Analyzer.Engine
                 var branchValueResult = CheckSingleOperation(block.BranchValue, ruleContext, currentStateInBlock);
                 if (!branchValueResult.IsPure)
                 {
-                    if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis))
+                    if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis, cancellationToken))
                     {
                         LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Branch Value: {block.BranchValue.Kind} ({block.BranchValue.Syntax})");
                         currentStateInBlock = currentStateInBlock.WithImpurity(branchValueResult, block.BranchValue.Syntax);
@@ -3298,8 +3312,10 @@ namespace SharpProof.Analyzer.Engine
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
-            CompilationPurityService? purityService)
+            CompilationPurityService? purityService,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var pureAttributeSymbol = semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute");
             var context = new Rules.PurityAnalysisContext(
                 semanticModel,
@@ -3310,7 +3326,7 @@ namespace SharpProof.Analyzer.Engine
                 purityCache,
                 containingMethodSymbol,
                 _purityRules,
-                CancellationToken.None,
+                cancellationToken,
                 purityService,
                 smtAnalysis);
 
@@ -3588,6 +3604,7 @@ namespace SharpProof.Analyzer.Engine
             IOperation? branchValue,
             SemanticModel semanticModel,
             SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
             out bool takeConditionalSuccessor)
         {
             takeConditionalSuccessor = false;
@@ -3601,13 +3618,13 @@ namespace SharpProof.Analyzer.Engine
 
             if (branchValue?.Syntax is ExpressionSyntax expressionSyntax)
             {
-                if (ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(expressionSyntax, semanticModel, CancellationToken.None, smtAnalysis))
+                if (ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(expressionSyntax, semanticModel, cancellationToken, smtAnalysis))
                 {
                     takeConditionalSuccessor = true;
                     return true;
                 }
 
-                if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(expressionSyntax, semanticModel, CancellationToken.None, smtAnalysis))
+                if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(expressionSyntax, semanticModel, cancellationToken, smtAnalysis))
                 {
                     takeConditionalSuccessor = false;
                     return true;
@@ -3699,6 +3716,7 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             bool takeConditionalSuccessor,
             SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
             out PurityAnalysisState successorState)
         {
             successorState = currentState;
@@ -3715,7 +3733,7 @@ namespace SharpProof.Analyzer.Engine
                 expressionSyntax,
                 takeConditionalSuccessor,
                 semanticModel,
-                CancellationToken.None,
+                cancellationToken,
                 out var symbolicBranchState,
                 currentState.GetSmtSymbolVersion);
             if (addedSymbolicBranchAssumption)
@@ -3727,7 +3745,7 @@ namespace SharpProof.Analyzer.Engine
                 expressionSyntax,
                 takeConditionalSuccessor,
                 semanticModel,
-                CancellationToken.None,
+                cancellationToken,
                 nextPathConditionsBuilder,
                 currentState.GetSmtSymbolVersion,
                 addTranslatedFormulaFallback: true);
@@ -3819,6 +3837,7 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             bool branchWhenTrue,
             SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
             out PurityAnalysisState branchState)
         {
             return TryCreateSuccessorState(
@@ -3827,6 +3846,7 @@ namespace SharpProof.Analyzer.Engine
                 semanticModel,
                 branchWhenTrue,
                 smtAnalysis,
+                cancellationToken,
                 out branchState);
         }
 
@@ -3835,6 +3855,7 @@ namespace SharpProof.Analyzer.Engine
             IOperation? condition,
             SemanticModel semanticModel,
             SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken,
             out bool value)
         {
             value = false;
@@ -3852,13 +3873,13 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: true, semanticModel, smtAnalysis))
+            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: true, semanticModel, smtAnalysis, cancellationToken))
             {
                 value = false;
                 return true;
             }
 
-            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: false, semanticModel, smtAnalysis))
+            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: false, semanticModel, smtAnalysis, cancellationToken))
             {
                 value = true;
                 return true;
@@ -3993,7 +4014,8 @@ namespace SharpProof.Analyzer.Engine
             ExpressionSyntax expressionSyntax,
             bool branchWhenTrue,
             SemanticModel semanticModel,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken)
         {
             var pathState = currentState.PathState;
             if (SymbolicReachabilityService.TryCollectBranchState(
@@ -4001,7 +4023,7 @@ namespace SharpProof.Analyzer.Engine
                     expressionSyntax,
                     branchWhenTrue,
                     semanticModel,
-                    CancellationToken.None,
+                    cancellationToken,
                     out var branchPathState,
                     currentState.GetSmtSymbolVersion))
             {
@@ -4013,7 +4035,7 @@ namespace SharpProof.Analyzer.Engine
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,
-                CancellationToken.None,
+                cancellationToken,
                 pathConditionsBuilder,
                 currentState.GetSmtSymbolVersion,
                 collectDomainFactsBeforeBranchAssumptions: true,
@@ -4157,7 +4179,7 @@ namespace SharpProof.Analyzer.Engine
                 ExecutionVisibility.IsEvaluationPathUnsatisfiableUsingSmt(
                     operation.Syntax,
                     context.SemanticModel,
-                    CancellationToken.None,
+                    context.CancellationToken,
                     currentState.PathConditions,
                     currentState.GetSmtSymbolVersion,
                     context.SmtAnalysis))
@@ -4169,7 +4191,7 @@ namespace SharpProof.Analyzer.Engine
             if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                     operation.Syntax,
                     context.SemanticModel,
-                    CancellationToken.None,
+                    context.CancellationToken,
                     context.SmtAnalysis))
             {
                 LogDebug($"    [CSO] Operation is in a statically unreachable branch. Treating as Pure: {operation.Syntax}");
@@ -4862,7 +4884,8 @@ namespace SharpProof.Analyzer.Engine
                     methodSymbol.OriginalDefinition,
                     context.SemanticModel,
                     context.EnforcePureAttributeSymbol,
-                    context.AllowSynchronizationAttributeSymbol);
+                    context.AllowSynchronizationAttributeSymbol,
+                    context.CancellationToken);
             }
             else
             {
@@ -4874,7 +4897,8 @@ namespace SharpProof.Analyzer.Engine
                     context.VisitedMethods,
                     context.PurityCache,
                     context.SmtAnalysis,
-                    context.PurityService);
+                    context.PurityService,
+                    context.CancellationToken);
             }
 
             return IsRecursivePlaceholderImpurity(result)

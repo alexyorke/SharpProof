@@ -37,6 +37,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     binaryOperation.LeftOperand,
                     context.SemanticModel,
                     context.SmtAnalysis,
+                    context.CancellationToken,
                     out var leftAnd) &&
                 !leftAnd)
             {
@@ -50,6 +51,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     binaryOperation.LeftOperand,
                     context.SemanticModel,
                     context.SmtAnalysis,
+                    context.CancellationToken,
                     out var leftOr) &&
                 leftOr)
             {
@@ -67,6 +69,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context.SemanticModel,
                     branchWhenTrue: true,
                     context.SmtAnalysis,
+                    context.CancellationToken,
                     out rightState))
                 {
                     PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable && right operand. Binary operation is Pure.");
@@ -81,6 +84,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context.SemanticModel,
                     branchWhenTrue: false,
                     context.SmtAnalysis,
+                    context.CancellationToken,
                     out rightState))
                 {
                     PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable || right operand. Binary operation is Pure.");

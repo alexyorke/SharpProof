@@ -5,6 +5,7 @@ using NUnit.Framework;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 using SharpProof.Analyzer;
@@ -39,6 +40,52 @@ namespace SharpProof.Test
 
             var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
+            Assert.That(callGraphField.GetValue(service), Is.Null);
+        }
+
+        [Test]
+        public void CompilationPurityService_CanceledPurityRequest_DoesNotBuildCallGraph()
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(@"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Caller() => Shared();
+
+    private int Shared() => 42;
+}");
+            var compilation = CSharpCompilation.Create(
+                "CanceledPurityRequestTest",
+                new[] { syntaxTree },
+                new[]
+                {
+                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                    MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
+                },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
+            var testClass = compilation.GetTypeByMetadataName("TestClass")!;
+            var caller = testClass.GetMembers("Caller").OfType<IMethodSymbol>().Single();
+
+            var serviceType = typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", throwOnError: true)!;
+            var service = Activator.CreateInstance(
+                serviceType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { compilation },
+                culture: null);
+            var callGraphField = serviceType.GetField("_callGraph", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            var exception = Assert.Throws<TargetInvocationException>(
+                () => getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, cancellation.Token }));
+
+            Assert.That(exception!.InnerException, Is.TypeOf<OperationCanceledException>());
             Assert.That(callGraphField.GetValue(service), Is.Null);
         }
 
@@ -85,13 +132,13 @@ public class TestClass
 
             Assert.That(callGraphField.GetValue(service), Is.Null);
 
-            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller1, semanticModel, enforcePureAttributeSymbol, null });
+            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller1, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
             var firstCallGraph = callGraphField.GetValue(service);
 
             Assert.That(firstResult, Is.Not.Null);
             Assert.That(firstCallGraph, Is.Not.Null);
 
-            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller2, semanticModel, enforcePureAttributeSymbol, null });
+            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller2, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(secondResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(firstCallGraph));
@@ -138,14 +185,14 @@ public class TestClass
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
             Assert.That(callGraphField.GetValue(service), Is.Null);
 
-            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null });
+            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
             var builtCallGraph = callGraphField.GetValue(service);
 
             Assert.That(firstResult, Is.Not.Null);
             Assert.That(builtCallGraph, Is.Not.Null);
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
 
-            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null });
+            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(secondResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
@@ -198,20 +245,20 @@ public class TestClass
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
             Assert.That(callGraphField.GetValue(service), Is.Null);
 
-            var firstResult = getPurityMethod.Invoke(service, new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null });
+            var firstResult = getPurityMethod.Invoke(service, new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
             var builtCallGraph = callGraphField.GetValue(service);
 
             Assert.That(firstResult, Is.Not.Null);
             Assert.That(builtCallGraph, Is.Not.Null);
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
 
-            var secondResult = getPurityMethod.Invoke(service, new object?[] { m12, semanticModel, enforcePureAttributeSymbol, null });
+            var secondResult = getPurityMethod.Invoke(service, new object?[] { m12, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(secondResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(2));
 
-            var thirdResult = getPurityMethod.Invoke(service, new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null });
+            var thirdResult = getPurityMethod.Invoke(service, new object?[] { m0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(thirdResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
@@ -277,7 +324,7 @@ public class TestClass
             Assert.That(fixedPointField.GetValue(service), Is.Null);
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(0));
 
-            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller0, semanticModel, enforcePureAttributeSymbol, null });
+            var firstResult = getPurityMethod.Invoke(service, new object?[] { caller0, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
             var builtCallGraph = callGraphField.GetValue(service);
             var builtFixedPoint = fixedPointField.GetValue(service);
 
@@ -286,14 +333,14 @@ public class TestClass
             Assert.That(builtFixedPoint, Is.Not.Null);
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(1));
 
-            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller10, semanticModel, enforcePureAttributeSymbol, null });
+            var secondResult = getPurityMethod.Invoke(service, new object?[] { caller10, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(secondResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));
             Assert.That(fixedPointField.GetValue(service), Is.SameAs(builtFixedPoint));
             Assert.That(GetCount(purityCacheField.GetValue(service)!), Is.EqualTo(2));
 
-            var thirdResult = getPurityMethod.Invoke(service, new object?[] { caller19, semanticModel, enforcePureAttributeSymbol, null });
+            var thirdResult = getPurityMethod.Invoke(service, new object?[] { caller19, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
 
             Assert.That(thirdResult, Is.Not.Null);
             Assert.That(callGraphField.GetValue(service), Is.SameAs(builtCallGraph));

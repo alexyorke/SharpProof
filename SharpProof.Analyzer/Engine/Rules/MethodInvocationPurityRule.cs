@@ -28,7 +28,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
                     visibilitySyntax,
                     context.SemanticModel,
-                    System.Threading.CancellationToken.None,
+                    context.CancellationToken,
                     context.SmtAnalysis))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Invocation is in an SMT-proven unreachable branch. Treating as pure.");
@@ -240,22 +240,22 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                     else
                     {
-                    PurityAnalysisEngine.LogDebug($"  [MIR]   Checking LINQ source argument purity: {sourceOperation.Kind}");
-                    var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
+                        PurityAnalysisEngine.LogDebug($"  [MIR]   Checking LINQ source argument purity: {sourceOperation.Kind}");
+                        var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
 
-                    if (!sourceResult.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"  [MIR] --> IMPURE (LINQ source argument was impure)");
+                        if (!sourceResult.IsPure)
+                        {
+                            PurityAnalysisEngine.LogDebug($"  [MIR] --> IMPURE (LINQ source argument was impure)");
 
-                        return sourceResult;
-                    }
+                            return sourceResult;
+                        }
 
-                    var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceOperation, context, currentState);
-                    if (!sourceEnumeratorResult.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ source GetEnumerator was impure)");
-                        return sourceEnumeratorResult;
-                    }
+                        var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceOperation, context, currentState);
+                        if (!sourceEnumeratorResult.IsPure)
+                        {
+                            PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ source GetEnumerator was impure)");
+                            return sourceEnumeratorResult;
+                        }
                     }
                 }
                 else
@@ -420,12 +420,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             // Skip cctor check only when the generated runtime summary already classifies the method as pure,
             // or when a known-pure override has already taken precedence.
-                    if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
-                        && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
-                        && !isImmutableHashSetCreateRangeWithComparer
-                        && !PurityAnalysisEngine.IsKnownPureBCLMember(
-                            originalDefinitionSymbol,
-                            context.SemanticModel.Compilation))
+            if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
+                && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
+                && !isImmutableHashSetCreateRangeWithComparer
+                && !PurityAnalysisEngine.IsKnownPureBCLMember(
+                    originalDefinitionSymbol,
+                    context.SemanticModel.Compilation))
             {
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)

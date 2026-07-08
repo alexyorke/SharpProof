@@ -37,6 +37,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     conditionalOperation.Condition,
                     context.SemanticModel,
                     context.SmtAnalysis,
+                    context.CancellationToken,
                     out var constantCondition))
             {
                 var reachableBranch = constantCondition ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
@@ -51,6 +52,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         context.SemanticModel,
                         constantCondition,
                         context.SmtAnalysis,
+                        context.CancellationToken,
                         out reachableBranchState);
                     var reachableBranchResult = PurityAnalysisEngine.CheckSingleOperation(reachableBranch, context, reachableBranchState);
                     if (!reachableBranchResult.IsPure)
@@ -72,6 +74,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         context.SemanticModel,
                         branchWhenTrue: true,
                         context.SmtAnalysis,
+                        context.CancellationToken,
                         out var whenTrueState))
                 {
                     var whenTrueResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenTrue, context, whenTrueState);
@@ -103,6 +106,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         context.SemanticModel,
                         branchWhenTrue: false,
                         context.SmtAnalysis,
+                        context.CancellationToken,
                         out var whenFalseState))
                 {
                     var whenFalseResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenFalse, context, whenFalseState);
