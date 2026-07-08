@@ -34,7 +34,7 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EnsureFixedPoint(enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, cancellationToken);

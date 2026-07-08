@@ -1142,8 +1142,8 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-            IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken,
+            IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null)
         {
 
 
@@ -1171,8 +1171,8 @@ namespace SharpProof.Analyzer.Engine
                 visited,
                 purityCache,
                 _smtAnalysis,
-                _purityService,
-                cancellationToken
+                cancellationToken,
+                _purityService
             );
 
             LogDebug($"<< Exit DeterminePurity ({GetPuritySource(result)}): {methodSymbol.ToDisplayString(_signatureFormat)}, Final IsPure={result.IsPure}");
@@ -1203,8 +1203,8 @@ namespace SharpProof.Analyzer.Engine
             HashSet<IMethodSymbol> visited,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
-            CompilationPurityService? purityService = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken,
+            CompilationPurityService? purityService = null)
         {
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -2318,7 +2318,7 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState currentState,
             IOperation methodBodyOperation,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
             foreach (var tryStatement in methodBodyOperation.Syntax.DescendantNodes().OfType<TryStatementSyntax>())
@@ -4979,8 +4979,8 @@ namespace SharpProof.Analyzer.Engine
                     context.VisitedMethods,
                     context.PurityCache,
                     context.SmtAnalysis,
-                    context.PurityService,
-                    context.CancellationToken);
+                    context.CancellationToken,
+                    context.PurityService);
             }
 
             return IsRecursivePlaceholderImpurity(result)
@@ -5768,7 +5768,7 @@ namespace SharpProof.Analyzer.Engine
             IOperation targetOperation,
             PurityAnalysisState currentState,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             targetOperation = SkipImplicitConversions(targetOperation) ?? targetOperation;
             if (TryResolveTrackedSymbol(targetOperation, currentState) is { } trackedSymbol)

@@ -60,8 +60,8 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     model,
                     enforcePureAttributeSymbol,
                     allowSynchronizationAttributeSymbol,
-                    results,
-                    cancellationToken);
+                    cancellationToken,
+                    results);
                 if (!results.TryGetValue(method, out var prior) || prior.IsPure != purity.IsPure)
                 {
                     results[method] = purity;

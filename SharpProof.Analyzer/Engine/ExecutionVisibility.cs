@@ -44,7 +44,7 @@ namespace SharpProof.Analyzer.Engine
         public static bool IsInStaticallyUnreachableBranch(
             SyntaxNode syntaxNode,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             return IsInStaticallyUnreachableBranchUsingSmt(syntaxNode, semanticModel, cancellationToken, smtAnalysis: null);
         }
@@ -859,7 +859,7 @@ namespace SharpProof.Analyzer.Engine
         public static bool IsConditionAlwaysTrue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             return IsConditionAlwaysTrueUsingSmt(expression, semanticModel, cancellationToken, smtAnalysis: null);
         }
@@ -880,7 +880,7 @@ namespace SharpProof.Analyzer.Engine
         public static bool IsConditionAlwaysFalse(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             return IsConditionAlwaysFalseUsingSmt(expression, semanticModel, cancellationToken, smtAnalysis: null);
         }

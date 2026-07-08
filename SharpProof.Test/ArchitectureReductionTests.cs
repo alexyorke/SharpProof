@@ -586,11 +586,11 @@ namespace SharpProof.Test
         }
 
         [Test]
-        public void AnalyzerRuleHelpers_RequireExplicitCancellationTokens()
+        public void AnalyzerHelpers_RequireExplicitCancellationTokens()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var ruleFiles = Directory.GetFiles(
-                    Path.Combine(repositoryRoot, "SharpProof.Analyzer", "Engine", "Rules"),
+            var analyzerFiles = Directory.GetFiles(
+                    Path.Combine(repositoryRoot, "SharpProof.Analyzer"),
                     "*.cs",
                     SearchOption.AllDirectories)
                 .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
@@ -602,7 +602,7 @@ namespace SharpProof.Test
                 })
                 .ToArray();
 
-            var offenders = ruleFiles
+            var offenders = analyzerFiles
                 .Where(static file => System.Text.RegularExpressions.Regex.IsMatch(
                     file.Source,
                     @"CancellationToken\s+cancellationToken\s*=\s*default"))

@@ -10,7 +10,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
 {
     internal static class CallGraphBuilder
     {
-        public static CallGraph Build(Compilation compilation, CancellationToken cancellationToken = default)
+        public static CallGraph Build(Compilation compilation, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
