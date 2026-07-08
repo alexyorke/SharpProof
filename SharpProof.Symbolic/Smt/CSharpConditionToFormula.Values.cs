@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;

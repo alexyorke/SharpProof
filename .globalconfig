@@ -1,3 +1,4 @@
 is_global = true
 
 sharpproof_enable_effect_summary_json = false
+dotnet_diagnostic.IDE0005.severity = warning

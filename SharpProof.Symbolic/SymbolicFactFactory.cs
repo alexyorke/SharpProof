@@ -1,10 +1,7 @@
-using System;
 using System.Globalization;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SharpProof.Symbolic.Smt;
 using SearchLib.Smt;
 
 namespace SharpProof.Symbolic
