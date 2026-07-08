@@ -121,6 +121,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task Baseline_TrimsStringValues()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void Impure()
+    {
+        Console.WriteLine(""impure"");
+    }
+}", @"{
+  ""diagnostics"": [
+    {
+      ""id"": "" SP0002 "",
+      ""symbol"": ""\n M:TestClass.Impure \t"",
+      ""path"": "" src/ProductionCode.cs ""
+    }
+  ]
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Baseline_SuppressesExactSp0004Match()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

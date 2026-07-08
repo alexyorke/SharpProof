@@ -165,6 +165,7 @@ namespace SharpProof.Analyzer.Configuration
                     continue;
                 }
 
+                value = value!.Trim();
                 if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
                 {
