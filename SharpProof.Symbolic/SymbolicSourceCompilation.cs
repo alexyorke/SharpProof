@@ -49,15 +49,16 @@ namespace SharpProof.Symbolic
                 new CSharpParseOptions(LanguageVersion.Preview),
                 filePath,
                 cancellationToken: cancellationToken);
-            var referenceArray = references?.ToImmutableArray();
-            if (!referenceArray.HasValue || referenceArray.Value.IsDefaultOrEmpty)
+            var referenceArray = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
+            if (referenceArray.IsDefaultOrEmpty)
             {
                 referenceArray = GetTrustedPlatformReferences();
             }
+
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
-                referenceArray.Value,
+                referenceArray,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             return (syntaxTree, compilation);
         }
