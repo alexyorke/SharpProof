@@ -1556,8 +1556,10 @@ namespace SharpProof.Analyzer.Engine
                             AddStraightLineResourceActionFacts(
                                 postCfgReturnState,
                                 methodBodyIOperation,
-                                semanticModel),
-                            methodBodyIOperation);
+                                semanticModel,
+                                cancellationToken),
+                            methodBodyIOperation,
+                            cancellationToken);
                         var visibleReturnOperations = ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
                             .OfType<IReturnOperation>()
                             .ToArray();
@@ -1576,7 +1578,8 @@ namespace SharpProof.Analyzer.Engine
                                 var returnState = AddCompletedStraightLineUsingDisposeFacts(
                                     postCfgReturnState,
                                     methodBodyIOperation,
-                                    returnOp);
+                                    returnOp,
+                                    cancellationToken);
                                 var returnPurity = CheckSingleOperation(returnOp, postCfgContext, returnState);
                                 if (!returnPurity.IsPure)
                                 {
@@ -1892,6 +1895,7 @@ namespace SharpProof.Analyzer.Engine
                         postCfgExitResourceState.Value,
                         methodSymbol,
                         semanticModel,
+                        cancellationToken,
                         out var missingDisposeResult))
                 {
                     result = missingDisposeResult;
@@ -2004,11 +2008,13 @@ namespace SharpProof.Analyzer.Engine
         private static PurityAnalysisState AddCompletedStraightLineUsingDisposeFacts(
             PurityAnalysisState currentState,
             IOperation methodBodyOperation,
-            IReturnOperation returnOperation)
+            IReturnOperation returnOperation,
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
             foreach (var usingOperation in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IUsingOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (usingOperation.Syntax.Span.End > returnOperation.Syntax.SpanStart ||
                     !IsStraightLineUsingStatement(usingOperation.Syntax))
                 {
@@ -2023,11 +2029,13 @@ namespace SharpProof.Analyzer.Engine
 
         private static PurityAnalysisState AddScopeEndResourceDisposeFacts(
             PurityAnalysisState currentState,
-            IOperation methodBodyOperation)
+            IOperation methodBodyOperation,
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
             foreach (var usingOperation in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IUsingOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(usingOperation.Syntax))
                 {
                     continue;
@@ -2038,6 +2046,7 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var usingDeclaration in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IUsingDeclarationOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(usingDeclaration.Syntax))
                 {
                     continue;
@@ -2052,11 +2061,13 @@ namespace SharpProof.Analyzer.Engine
         private static PurityAnalysisState AddStraightLineResourceActionFacts(
             PurityAnalysisState currentState,
             IOperation methodBodyOperation,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var nextState = currentState;
             foreach (var declarationGroup in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IVariableDeclarationGroupOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(declarationGroup.Syntax))
                 {
                     continue;
@@ -2064,8 +2075,10 @@ namespace SharpProof.Analyzer.Engine
 
                 foreach (var declaration in declarationGroup.Declarations)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     foreach (var declarator in declaration.Declarators)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (declarator.Initializer?.Value is { } initializer)
                         {
                             nextState = AddAssignedAliasFact(
@@ -2085,6 +2098,7 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var deconstructionAssignment in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IDeconstructionAssignmentOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(deconstructionAssignment.Syntax))
                 {
                     continue;
@@ -2093,11 +2107,13 @@ namespace SharpProof.Analyzer.Engine
                 nextState = AddDeconstructedResourceAcquisitionFacts(
                     nextState,
                     deconstructionAssignment,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
             }
 
             foreach (var assignmentSyntax in methodBodyOperation.Syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(assignmentSyntax))
                 {
                     continue;
@@ -2106,11 +2122,13 @@ namespace SharpProof.Analyzer.Engine
                 nextState = AddDeconstructedResourceAcquisitionFacts(
                     nextState,
                     assignmentSyntax,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
             }
 
             foreach (var invocation in ExecutionVisibility.VisibleDescendants(methodBodyOperation).OfType<IInvocationOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsStraightLineUsingStatement(invocation.Syntax))
                 {
                     continue;
@@ -2125,7 +2143,8 @@ namespace SharpProof.Analyzer.Engine
         private static PurityAnalysisState AddDeconstructedResourceAcquisitionFacts(
             PurityAnalysisState nextState,
             AssignmentExpressionSyntax assignmentSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (!IsDeconstructionAssignmentSyntax(assignmentSyntax.Left))
             {
@@ -2135,9 +2154,11 @@ namespace SharpProof.Analyzer.Engine
             foreach (var assignment in EnumerateDeconstructionSyntaxAssignments(
                          assignmentSyntax.Left,
                          assignmentSyntax.Right,
-                         semanticModel))
+                         semanticModel,
+                         cancellationToken))
             {
-                var valueOperation = semanticModel.GetOperation(assignment.Value);
+                cancellationToken.ThrowIfCancellationRequested();
+                var valueOperation = semanticModel.GetOperation(assignment.Value, cancellationToken);
                 if (valueOperation == null)
                 {
                     continue;
@@ -2168,7 +2189,8 @@ namespace SharpProof.Analyzer.Engine
         private static IEnumerable<DeconstructionSyntaxAssignmentElement> EnumerateDeconstructionSyntaxAssignments(
             ExpressionSyntax target,
             ExpressionSyntax value,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             target = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(target);
             value = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(value);
@@ -2177,7 +2199,8 @@ namespace SharpProof.Analyzer.Engine
                 foreach (var assignment in EnumerateDeconstructionDesignationAssignments(
                              declarationExpression.Designation,
                              value,
-                             semanticModel))
+                             semanticModel,
+                             cancellationToken))
                 {
                     yield return assignment;
                 }
@@ -2194,7 +2217,8 @@ namespace SharpProof.Analyzer.Engine
                     foreach (var nested in EnumerateDeconstructionSyntaxAssignments(
                                  targetTuple.Arguments[i].Expression,
                                  valueTuple.Arguments[i].Expression,
-                                 semanticModel))
+                                 semanticModel,
+                                 cancellationToken))
                     {
                         yield return nested;
                     }
@@ -2204,7 +2228,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             if (target is IdentifierNameSyntax identifierName &&
-                semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol)
+                semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol)
             {
                 yield return new DeconstructionSyntaxAssignmentElement(localSymbol, value);
             }
@@ -2213,11 +2237,12 @@ namespace SharpProof.Analyzer.Engine
         private static IEnumerable<DeconstructionSyntaxAssignmentElement> EnumerateDeconstructionDesignationAssignments(
             VariableDesignationSyntax designation,
             ExpressionSyntax value,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             value = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(value);
             if (designation is SingleVariableDesignationSyntax singleVariable &&
-                semanticModel.GetDeclaredSymbol(singleVariable) is ILocalSymbol localSymbol)
+                semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken) is ILocalSymbol localSymbol)
             {
                 yield return new DeconstructionSyntaxAssignmentElement(localSymbol, value);
                 yield break;
@@ -2232,7 +2257,8 @@ namespace SharpProof.Analyzer.Engine
                     foreach (var nested in EnumerateDeconstructionDesignationAssignments(
                                  parenthesized.Variables[i],
                                  tuple.Arguments[i].Expression,
-                                 semanticModel))
+                                 semanticModel,
+                                 cancellationToken))
                     {
                         yield return nested;
                     }
@@ -2256,16 +2282,19 @@ namespace SharpProof.Analyzer.Engine
         private static PurityAnalysisState AddDeconstructedResourceAcquisitionFacts(
             PurityAnalysisState nextState,
             IDeconstructionAssignmentOperation deconstructionAssignment,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var assignment in EnumerateDeconstructionAssignments(
                          deconstructionAssignment.Target,
                          deconstructionAssignment.Value))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (TryResolveDeconstructionTargetSymbol(
                         assignment.Target,
                         nextState,
-                        semanticModel) is not ILocalSymbol localSymbol)
+                        semanticModel,
+                        cancellationToken) is not ILocalSymbol localSymbol)
                 {
                     continue;
                 }
@@ -2288,11 +2317,13 @@ namespace SharpProof.Analyzer.Engine
         private static PurityAnalysisState AddFinallyResourceDisposeFacts(
             PurityAnalysisState currentState,
             IOperation methodBodyOperation,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
             var nextState = currentState;
             foreach (var tryStatement in methodBodyOperation.Syntax.DescendantNodes().OfType<TryStatementSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (tryStatement.Finally?.Block is not { } finallyBlock)
                 {
                     continue;
@@ -2300,10 +2331,11 @@ namespace SharpProof.Analyzer.Engine
 
                 foreach (var invocation in finallyBlock.DescendantNodes().OfType<InvocationExpressionSyntax>())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                         memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
-                        semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } resourceSymbol ||
-                        !FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
+                        semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } resourceSymbol ||
+                        !FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel, cancellationToken))
                     {
                         continue;
                     }
@@ -2536,14 +2568,17 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState state,
             IMethodSymbol containingMethodSymbol,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out PurityAnalysisResult result)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             result = PurityAnalysisResult.Pure;
 
             var ownedResources = new Dictionary<SymbolicTerm, ISymbol?>();
             var releasedResources = new HashSet<SymbolicTerm>();
             foreach (var fact in state.PathState.Facts)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!fact.Polarity ||
                     fact.Confidence != SymbolicFactConfidence.Exact)
                 {
@@ -2572,18 +2607,19 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var resource in ownedResources)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (IsResourceReleased(resource.Key, releasedResources, state, new HashSet<SymbolicTerm>()))
                 {
                     continue;
                 }
 
                 if (resource.Value != null &&
-                    IsOwnedResourceReleasedOnAllSyntaxPaths(containingMethodSymbol, resource.Value, semanticModel))
+                    IsOwnedResourceReleasedOnAllSyntaxPaths(containingMethodSymbol, resource.Value, semanticModel, cancellationToken))
                 {
                     continue;
                 }
 
-                var syntax = containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                var syntax = containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
                 if (syntax == null)
                 {
                     return false;
@@ -2603,6 +2639,7 @@ namespace SharpProof.Analyzer.Engine
             if (TryFindAliasedOwnedResourceLostByReassignment(
                     containingMethodSymbol,
                     semanticModel,
+                    cancellationToken,
                     out var aliasLeakSyntax,
                     out var aliasLeakSymbol))
             {
@@ -2623,11 +2660,13 @@ namespace SharpProof.Analyzer.Engine
         private static bool IsOwnedResourceReleasedOnAllSyntaxPaths(
             IMethodSymbol containingMethodSymbol,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in containingMethodSymbol.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not MethodDeclarationSyntax { Body: { } body } methodDeclaration)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax { Body: { } body } methodDeclaration)
                 {
                     continue;
                 }
@@ -2635,7 +2674,8 @@ namespace SharpProof.Analyzer.Engine
                 var methodSemanticModel = semanticModel.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree);
                 for (var index = 0; index < body.Statements.Count; index++)
                 {
-                    if (!DeclaresSymbol(body.Statements[index], resourceSymbol, methodSemanticModel))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!DeclaresSymbol(body.Statements[index], resourceSymbol, methodSemanticModel, cancellationToken))
                     {
                         continue;
                     }
@@ -2646,7 +2686,8 @@ namespace SharpProof.Analyzer.Engine
                         initiallyReleased: false,
                         endIsTerminal: true,
                         resourceSymbol,
-                        methodSemanticModel);
+                        methodSemanticModel,
+                        cancellationToken);
                     return summary.AllTerminalPathsReleased;
                 }
             }
@@ -2657,11 +2698,13 @@ namespace SharpProof.Analyzer.Engine
         private static bool DeclaresSymbol(
             StatementSyntax statement,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var declarator in statement.DescendantNodesAndSelf().OfType<VariableDeclaratorSyntax>())
             {
-                if (semanticModel.GetDeclaredSymbol(declarator) is { } declaredSymbol &&
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is { } declaredSymbol &&
                     SymbolEqualityComparer.Default.Equals(declaredSymbol, resourceSymbol))
                 {
                     return true;
@@ -2676,13 +2719,15 @@ namespace SharpProof.Analyzer.Engine
             bool initiallyReleased,
             bool endIsTerminal,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var allTerminalPathsReleased = true;
             var currentStates = new List<bool> { initiallyReleased };
 
             foreach (var statement in statements)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (currentStates.Count == 0)
                 {
                     break;
@@ -2691,11 +2736,13 @@ namespace SharpProof.Analyzer.Engine
                 var nextStates = new List<bool>();
                 foreach (var released in currentStates)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var summary = AnalyzeResourceReleaseStatement(
                         statement,
                         released,
                         resourceSymbol,
-                        semanticModel);
+                        semanticModel,
+                        cancellationToken);
                     allTerminalPathsReleased &= summary.AllTerminalPathsReleased;
                     nextStates.AddRange(summary.FallthroughReleasedStates);
                 }
@@ -2718,12 +2765,13 @@ namespace SharpProof.Analyzer.Engine
             StatementSyntax statement,
             bool initiallyReleased,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (statement is ReturnStatementSyntax returnStatement)
             {
                 return new ResourceReleasePathSummary(
-                    initiallyReleased || IsReturnedSymbol(returnStatement, resourceSymbol, semanticModel),
+                    initiallyReleased || IsReturnedSymbol(returnStatement, resourceSymbol, semanticModel, cancellationToken),
                     ImmutableArray<bool>.Empty);
             }
 
@@ -2734,7 +2782,8 @@ namespace SharpProof.Analyzer.Engine
                     initiallyReleased,
                     endIsTerminal: false,
                     resourceSymbol,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
                 var elseSummary = ifStatement.Else == null
                     ? new ResourceReleasePathSummary(true, ImmutableArray.Create(initiallyReleased))
                     : AnalyzeResourceReleaseStatements(
@@ -2742,7 +2791,8 @@ namespace SharpProof.Analyzer.Engine
                         initiallyReleased,
                         endIsTerminal: false,
                         resourceSymbol,
-                        semanticModel);
+                        semanticModel,
+                        cancellationToken);
 
                 return new ResourceReleasePathSummary(
                     thenSummary.AllTerminalPathsReleased && elseSummary.AllTerminalPathsReleased,
@@ -2755,7 +2805,8 @@ namespace SharpProof.Analyzer.Engine
                     switchStatement,
                     initiallyReleased,
                     resourceSymbol,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
             }
 
             if (statement is WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax)
@@ -2772,11 +2823,12 @@ namespace SharpProof.Analyzer.Engine
                     initiallyReleased,
                     endIsTerminal: false,
                     resourceSymbol,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
             }
 
             if (statement is TryStatementSyntax { Finally.Block: { } finallyBlock } &&
-                FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel))
+                FinallyBlockReleasesResource(finallyBlock, resourceSymbol, semanticModel, cancellationToken))
             {
                 return new ResourceReleasePathSummary(
                     true,
@@ -2784,7 +2836,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var released = initiallyReleased ||
-                DisposesSymbol(statement, resourceSymbol, semanticModel);
+                DisposesSymbol(statement, resourceSymbol, semanticModel, cancellationToken);
             return new ResourceReleasePathSummary(
                 true,
                 ImmutableArray.Create(released));
@@ -2794,7 +2846,8 @@ namespace SharpProof.Analyzer.Engine
             SwitchStatementSyntax switchStatement,
             bool initiallyReleased,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var allTerminalPathsReleased = true;
             var fallthroughStates = ImmutableArray.CreateBuilder<bool>();
@@ -2802,13 +2855,15 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var section in switchStatement.Sections)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 hasDefault |= section.Labels.OfType<DefaultSwitchLabelSyntax>().Any();
                 var summary = AnalyzeResourceReleaseStatements(
                     section.Statements.ToArray(),
                     initiallyReleased,
                     endIsTerminal: false,
                     resourceSymbol,
-                    semanticModel);
+                    semanticModel,
+                    cancellationToken);
 
                 allTerminalPathsReleased &= summary.AllTerminalPathsReleased;
                 fallthroughStates.AddRange(summary.FallthroughReleasedStates);
@@ -2834,14 +2889,16 @@ namespace SharpProof.Analyzer.Engine
         private static bool FinallyBlockReleasesResource(
             BlockSyntax finallyBlock,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var summary = AnalyzeResourceReleaseStatements(
                 finallyBlock.Statements.ToArray(),
                 initiallyReleased: false,
                 endIsTerminal: false,
                 resourceSymbol,
-                semanticModel);
+                semanticModel,
+                cancellationToken);
 
             return summary.AllTerminalPathsReleased &&
                 summary.FallthroughReleasedStates.Length > 0 &&
@@ -2851,10 +2908,11 @@ namespace SharpProof.Analyzer.Engine
         private static bool IsReturnedSymbol(
             ReturnStatementSyntax returnStatement,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (returnStatement.Expression == null ||
-                semanticModel.GetSymbolInfo(returnStatement.Expression).Symbol is not { } returnedSymbol)
+                semanticModel.GetSymbolInfo(returnStatement.Expression, cancellationToken).Symbol is not { } returnedSymbol)
             {
                 return false;
             }
@@ -2862,24 +2920,28 @@ namespace SharpProof.Analyzer.Engine
             return GetResourceSymbolsVisibleAt(
                     resourceSymbol,
                     returnStatement,
-                    semanticModel)
+                    semanticModel,
+                    cancellationToken)
                 .Contains(returnedSymbol);
         }
 
         private static bool DisposesSymbol(
             StatementSyntax statement,
             ISymbol resourceSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var relatedSymbols = GetResourceSymbolsVisibleAt(
                 resourceSymbol,
                 statement,
-                semanticModel);
+                semanticModel,
+                cancellationToken);
             foreach (var invocation in statement.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                     memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
-                    semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } disposedSymbol)
+                    semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } disposedSymbol)
                 {
                     continue;
                 }
@@ -2896,7 +2958,8 @@ namespace SharpProof.Analyzer.Engine
         private static HashSet<ISymbol> GetResourceSymbolsVisibleAt(
             ISymbol resourceSymbol,
             SyntaxNode observationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var containingBlock = observationSyntax
                 .AncestorsAndSelf()
@@ -2915,7 +2978,7 @@ namespace SharpProof.Analyzer.Engine
                 observationSyntax,
                 containingBlock,
                 semanticModel,
-                CancellationToken.None);
+                cancellationToken);
         }
 
         private readonly struct ResourceReleasePathSummary
@@ -2936,12 +2999,14 @@ namespace SharpProof.Analyzer.Engine
         private static bool TryFindAliasedOwnedResourceLostByReassignment(
             IMethodSymbol containingMethodSymbol,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode syntax,
             out ISymbol? symbol)
         {
             foreach (var syntaxReference in containingMethodSymbol.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not MethodDeclarationSyntax methodDeclaration ||
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax methodDeclaration ||
                     methodDeclaration.Body == null)
                 {
                     continue;
@@ -2950,9 +3015,10 @@ namespace SharpProof.Analyzer.Engine
                 var methodSemanticModel = semanticModel.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree);
                 foreach (var declarator in methodDeclaration.Body.DescendantNodes().OfType<VariableDeclaratorSyntax>())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (declarator.Initializer?.Value == null ||
-                        methodSemanticModel.GetDeclaredSymbol(declarator) is not ILocalSymbol resourceLocal ||
-                        methodSemanticModel.GetOperation(declarator.Initializer.Value) is not { } initializerOperation ||
+                        methodSemanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol resourceLocal ||
+                        methodSemanticModel.GetOperation(declarator.Initializer.Value, cancellationToken) is not { } initializerOperation ||
                         !IsOwnedDisposableObjectCreationValue(initializerOperation, methodSemanticModel.Compilation))
                     {
                         continue;
@@ -2962,9 +3028,9 @@ namespace SharpProof.Analyzer.Engine
                         .OfType<VariableDeclaratorSyntax>()
                         .Where(aliasDeclarator => aliasDeclarator.SpanStart > declarator.SpanStart &&
                                                   aliasDeclarator.Initializer?.Value != null &&
-                                                  methodSemanticModel.GetSymbolInfo(aliasDeclarator.Initializer.Value).Symbol is ILocalSymbol initializerSymbol &&
+                                                  methodSemanticModel.GetSymbolInfo(aliasDeclarator.Initializer.Value, cancellationToken).Symbol is ILocalSymbol initializerSymbol &&
                                                   SymbolEqualityComparer.Default.Equals(initializerSymbol, resourceLocal))
-                        .Select(aliasDeclarator => methodSemanticModel.GetDeclaredSymbol(aliasDeclarator))
+                        .Select(aliasDeclarator => methodSemanticModel.GetDeclaredSymbol(aliasDeclarator, cancellationToken))
                         .OfType<ILocalSymbol>()
                         .ToArray();
                     if (aliases.Length == 0)
@@ -2976,7 +3042,8 @@ namespace SharpProof.Analyzer.Engine
                         resourceLocal,
                         declarator.SpanStart,
                         methodDeclaration.Body,
-                        methodSemanticModel);
+                        methodSemanticModel,
+                        cancellationToken);
                     if (reassignment == null)
                     {
                         continue;
@@ -2987,18 +3054,21 @@ namespace SharpProof.Analyzer.Engine
                             methodDeclaration.Body,
                             declarator.SpanStart,
                             reassignment.SpanStart,
-                            methodSemanticModel) ||
+                            methodSemanticModel,
+                            cancellationToken) ||
                         WasAnySymbolDisposedInSpan(
                             aliases,
                             methodDeclaration.Body,
                             reassignment.SpanStart,
                             methodDeclaration.Body.Span.End,
-                            methodSemanticModel) ||
+                            methodSemanticModel,
+                            cancellationToken) ||
                         IsAnySymbolReturnedAfter(
                             aliases,
                             reassignment.SpanStart,
                             methodDeclaration.Body,
-                            methodSemanticModel))
+                            methodSemanticModel,
+                            cancellationToken))
                     {
                         continue;
                     }
@@ -3018,12 +3088,14 @@ namespace SharpProof.Analyzer.Engine
             ILocalSymbol localSymbol,
             int spanStart,
             SyntaxNode searchRoot,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var assignment in searchRoot.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (assignment.SpanStart <= spanStart ||
-                    semanticModel.GetSymbolInfo(assignment.Left).Symbol is not ILocalSymbol assignedLocal ||
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol assignedLocal ||
                     !SymbolEqualityComparer.Default.Equals(assignedLocal, localSymbol))
                 {
                     continue;
@@ -3040,16 +3112,18 @@ namespace SharpProof.Analyzer.Engine
             SyntaxNode searchRoot,
             int spanStart,
             int spanEnd,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var symbolSet = new HashSet<ISymbol>(symbols, SymbolEqualityComparer.Default);
             foreach (var invocation in searchRoot.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (invocation.SpanStart < spanStart ||
                     invocation.SpanStart >= spanEnd ||
                     invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                     memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
-                    semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } disposedSymbol)
+                    semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } disposedSymbol)
                 {
                     continue;
                 }
@@ -3067,14 +3141,16 @@ namespace SharpProof.Analyzer.Engine
             IEnumerable<ISymbol> symbols,
             int spanStart,
             SyntaxNode searchRoot,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var symbolSet = new HashSet<ISymbol>(symbols, SymbolEqualityComparer.Default);
             foreach (var returnStatement in searchRoot.DescendantNodes().OfType<ReturnStatementSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (returnStatement.SpanStart <= spanStart ||
                     returnStatement.Expression == null ||
-                    semanticModel.GetSymbolInfo(returnStatement.Expression).Symbol is not { } returnedSymbol)
+                    semanticModel.GetSymbolInfo(returnStatement.Expression, cancellationToken).Symbol is not { } returnedSymbol)
                 {
                     continue;
                 }
@@ -5599,7 +5675,8 @@ namespace SharpProof.Analyzer.Engine
                 var targetSymbol = TryResolveDeconstructionTargetSymbol(
                     assignment.Target,
                     currentState,
-                    context.SemanticModel);
+                    context.SemanticModel,
+                    context.CancellationToken);
                 if (targetSymbol is ILocalSymbol localSymbol)
                 {
                     var writtenLocalSymbols = EnumerateWrittenLocalSymbols(localSymbol, context).ToArray();
@@ -5670,7 +5747,8 @@ namespace SharpProof.Analyzer.Engine
         private static ISymbol? TryResolveDeconstructionTargetSymbol(
             IOperation targetOperation,
             PurityAnalysisState currentState,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
             targetOperation = SkipImplicitConversions(targetOperation) ?? targetOperation;
             if (TryResolveTrackedSymbol(targetOperation, currentState) is { } trackedSymbol)
@@ -5686,20 +5764,20 @@ namespace SharpProof.Analyzer.Engine
                 }
 
                 if (declarationExpression.Syntax is DeclarationExpressionSyntax { Designation: SingleVariableDesignationSyntax designation } &&
-                    semanticModel.GetDeclaredSymbol(designation) is { } declaredSymbol)
+                    semanticModel.GetDeclaredSymbol(designation, cancellationToken) is { } declaredSymbol)
                 {
                     return declaredSymbol;
                 }
             }
 
             if (targetOperation.Syntax is SingleVariableDesignationSyntax singleVariable &&
-                semanticModel.GetDeclaredSymbol(singleVariable) is { } singleVariableSymbol)
+                semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken) is { } singleVariableSymbol)
             {
                 return singleVariableSymbol;
             }
 
             return targetOperation.Syntax is IdentifierNameSyntax identifier
-                ? semanticModel.GetSymbolInfo(identifier).Symbol
+                ? semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol
                 : null;
         }
 

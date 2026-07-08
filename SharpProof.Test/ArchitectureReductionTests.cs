@@ -417,6 +417,26 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void AnalyzerMissingDisposal_ThreadsCancellationTokenThroughResourceReleaseAnalysis()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "PurityAnalysisEngine.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Contain("TryCreateMissingOwnedResourceDisposalResult(\n                        postCfgExitResourceState.Value,\n                        methodSymbol,\n                        semanticModel,\n                        cancellationToken,\n                        out var missingDisposeResult)"));
+            Assert.That(source, Does.Contain("IsOwnedResourceReleasedOnAllSyntaxPaths(containingMethodSymbol, resource.Value, semanticModel, cancellationToken)"));
+            Assert.That(source, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax"));
+            Assert.That(source, Does.Contain("semanticModel.GetSymbolInfo(returnStatement.Expression, cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol"));
+            Assert.That(source, Does.Contain("GetRelatedLocalAliases(\n                resourceSymbol,\n                observationSyntax,\n                containingBlock,\n                semanticModel,\n                cancellationToken)"));
+        }
+
+        [Test]
         public void AnalyzerReturnedOwnedResources_ProjectReturnedOwnershipFacts()
         {
             var repositoryRoot = FindRepositoryRoot();
