@@ -1016,19 +1016,7 @@ namespace SharpProof.Analyzer
                     }
 
                     AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
-                    AddNotNullParameterNormalCompletionFacts(
-                        declarator.Initializer.Value,
-                        localDeclaration,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                    AddDoesNotReturnIfNormalCompletionFacts(
-                        declarator.Initializer.Value,
-                        localDeclaration,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                    AddArrayCreationNormalCompletionFacts(
+                    AddExpressionNormalCompletionFacts(
                         declarator.Initializer.Value,
                         localDeclaration,
                         semanticModel,
@@ -1082,24 +1070,13 @@ namespace SharpProof.Analyzer
                     }
                 }
 
-                AddArrayCreationNormalCompletionFacts(
+                AddExpressionNormalCompletionFacts(
                     assignment.Right,
                     expressionStatement,
                     semanticModel,
                     cancellationToken,
-                    facts);
-                AddNotNullParameterNormalCompletionFacts(
-                    assignment.Right,
-                    expressionStatement,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
-                AddDoesNotReturnIfNormalCompletionFacts(
-                    assignment.Right,
-                    expressionStatement,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
+                    facts,
+                    addArrayFactsFirst: true);
                 return;
             }
 
@@ -1140,19 +1117,7 @@ namespace SharpProof.Analyzer
             }
             else if (statement is ExpressionStatementSyntax completedExpressionStatement)
             {
-                AddNotNullParameterNormalCompletionFacts(
-                    completedExpressionStatement.Expression,
-                    completedExpressionStatement,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
-                AddDoesNotReturnIfNormalCompletionFacts(
-                    completedExpressionStatement.Expression,
-                    completedExpressionStatement,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
-                AddArrayCreationNormalCompletionFacts(
+                AddExpressionNormalCompletionFacts(
                     completedExpressionStatement.Expression,
                     completedExpressionStatement,
                     semanticModel,
@@ -1165,6 +1130,28 @@ namespace SharpProof.Analyzer
                 {
                     facts.Add(loopFact);
                 }
+            }
+        }
+
+        private static void AddExpressionNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts,
+            bool addArrayFactsFirst = false)
+        {
+            if (addArrayFactsFirst)
+            {
+                AddArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            }
+
+            AddNotNullParameterNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            AddDoesNotReturnIfNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+
+            if (!addArrayFactsFirst)
+            {
+                AddArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             }
         }
 
@@ -1404,110 +1391,99 @@ namespace SharpProof.Analyzer
             var effectiveValueIsTarget =
                 hasThrowGuard &&
                 ExpressionMatchesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken);
+            var effectiveValueDoesNotReferenceTarget =
+                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken);
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateAssignedValueFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var assignedValueFact))
+            if (effectiveValueDoesNotReferenceTarget)
             {
-                facts.Add(assignedValueFact);
-            }
+                if (SymbolicReachabilityService.TryCreateAssignedValueFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var assignedValueFact))
+                {
+                    facts.Add(assignedValueFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
-            {
                 SymbolicReachabilityService.AddNullableAssignedValueFacts(
                     targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
                     facts);
-            }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var builtInLengthFact))
-            {
-                facts.Add(builtInLengthFact);
-            }
+                if (SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var builtInLengthFact))
+                {
+                    facts.Add(builtInLengthFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var referenceLengthFact))
-            {
-                facts.Add(referenceLengthFact);
-            }
+                if (SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var referenceLengthFact))
+                {
+                    facts.Add(referenceLengthFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateCollectionExpressionLengthLowerBoundFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    out var lowerBoundLengthFact))
-            {
-                facts.Add(lowerBoundLengthFact);
-            }
+                if (SymbolicReachabilityService.TryCreateCollectionExpressionLengthLowerBoundFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        out var lowerBoundLengthFact))
+                {
+                    facts.Add(lowerBoundLengthFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
-            {
                 SymbolicReachabilityService.AddArrayDimensionLengthAssignedValueFacts(
                     targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
                     facts);
-            }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
-            {
                 SymbolicReachabilityService.AddReferenceBackedArrayDimensionLengthFacts(
                     targetSymbol,
                     effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
                     facts);
-            }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var stringContentFact))
-            {
-                facts.Add(stringContentFact);
-            }
+                if (SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var stringContentFact))
+                {
+                    facts.Add(stringContentFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var referenceStringFact))
-            {
-                facts.Add(referenceStringFact);
-            }
+                if (SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var referenceStringFact))
+                {
+                    facts.Add(referenceStringFact);
+                }
 
-            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
-                    targetSymbol,
-                    effectiveValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var stringNonNullFact))
-            {
-                facts.Add(stringNonNullFact);
+                if (SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
+                        targetSymbol,
+                        effectiveValueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var stringNonNullFact))
+                {
+                    facts.Add(stringNonNullFact);
+                }
             }
 
             if (hasThrowGuard &&
@@ -1524,7 +1500,7 @@ namespace SharpProof.Analyzer
             }
             else if (hasThrowGuard &&
                      requiresNonNullValue &&
-                     !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
+                     effectiveValueDoesNotReferenceTarget)
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
