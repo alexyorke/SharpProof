@@ -137,22 +137,24 @@ namespace SharpProof.Analyzer.Engine.Rules
                             catalogSource: knownImpureMemberSource));
                 }
 
-                return CheckPropertyGetterPurity(
+                return DispatchedMemberResolution.CheckGetterPurity(
                     property,
                     receiverType,
                     hasStableConcreteReceiver,
                     operation,
-                    context);
+                    context,
+                    nameof(ListPatternPurityRule));
             }
 
             if (member is IMethodSymbol method)
             {
-                return CheckMethodPurity(
+                return DispatchedMemberResolution.CheckMethodPurity(
                     method,
                     receiverType,
                     hasStableConcreteReceiver,
                     operation,
-                    context);
+                    context,
+                    nameof(ListPatternPurityRule));
             }
 
             if (PurityAnalysisEngine.IsKnownImpure(member))
@@ -169,70 +171,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyGetterPurity(
-            IPropertySymbol propertySymbol,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            IOperation operation,
-            PurityAnalysisContext context)
-        {
-            var getter = DispatchedMemberResolution.ResolveGetter(
-                propertySymbol,
-                receiverType,
-                hasStableConcreteReceiver,
-                context.SemanticModel.Compilation);
-            if (getter == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    operation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        ruleName: nameof(ListPatternPurityRule),
-                        operation: operation,
-                        symbol: propertySymbol.GetMethod));
-            }
-
-            var getterPurity = PurityAnalysisEngine.GetCalleePurity(getter, context);
-            return getterPurity.IsPure
-                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : getterPurity.WithCallee(getter, operation.Syntax);
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckMethodPurity(
-            IMethodSymbol? method,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            IOperation operation,
-            PurityAnalysisContext context)
-        {
-            if (method == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            var targetMethod = DispatchedMemberResolution.ResolveMethod(
-                method,
-                receiverType,
-                hasStableConcreteReceiver,
-                context.SemanticModel.Compilation);
-            if (targetMethod == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    operation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        nameof(ListPatternPurityRule),
-                        operation,
-                        syntaxNode: operation.Syntax,
-                        symbol: method));
-            }
-
-            var result = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
-            return result.IsPure
-                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : result.WithCallee(targetMethod, operation.Syntax);
         }
 
         private static IOperation? GetMatchedInputOperation(IOperation operation)

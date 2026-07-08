@@ -96,6 +96,74 @@ namespace SharpProof.Analyzer.Engine.Rules
             return methodSymbol.IsAbstract ? null : methodSymbol.OriginalDefinition;
         }
 
+        internal static PurityAnalysisEngine.PurityAnalysisResult CheckGetterPurity(
+            IPropertySymbol propertySymbol,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            IOperation operation,
+            PurityAnalysisContext context,
+            string ruleName)
+        {
+            var getter = ResolveGetter(
+                propertySymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
+            if (getter == null)
+            {
+                return DynamicDispatch(operation, ruleName, propertySymbol.GetMethod);
+            }
+
+            var getterPurity = PurityAnalysisEngine.GetCalleePurity(getter, context);
+            return getterPurity.IsPure
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : getterPurity.WithCallee(getter, operation.Syntax);
+        }
+
+        internal static PurityAnalysisEngine.PurityAnalysisResult CheckMethodPurity(
+            IMethodSymbol? methodSymbol,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            IOperation operation,
+            PurityAnalysisContext context,
+            string ruleName)
+        {
+            if (methodSymbol == null)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            var targetMethod = ResolveMethod(
+                methodSymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
+            if (targetMethod == null)
+            {
+                return DynamicDispatch(operation, ruleName, methodSymbol);
+            }
+
+            var methodPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
+            return methodPurity.IsPure
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : methodPurity.WithCallee(targetMethod, operation.Syntax);
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult DynamicDispatch(
+            IOperation operation,
+            string ruleName,
+            ISymbol? symbol)
+        {
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                operation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "dynamic_dispatch",
+                    ruleName,
+                    operation,
+                    syntaxNode: operation.Syntax,
+                    symbol: symbol));
+        }
+
         internal static INamedTypeSymbol? GetKnownReceiverType(
             IOperation? instanceOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,

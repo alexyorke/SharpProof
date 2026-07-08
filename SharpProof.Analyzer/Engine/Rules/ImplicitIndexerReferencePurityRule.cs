@@ -50,12 +50,13 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (implicitIndexerReferenceOperation.LengthSymbol is IPropertySymbol lengthProperty)
             {
-                var lengthResult = CheckPropertyGetterPurity(
+                var lengthResult = DispatchedMemberResolution.CheckGetterPurity(
                     lengthProperty,
                     receiverType,
                     hasStableConcreteReceiver,
                     implicitIndexerReferenceOperation,
-                    context);
+                    context,
+                    nameof(ImplicitIndexerReferencePurityRule));
                 if (!lengthResult.IsPure)
                 {
                     return lengthResult;
@@ -79,18 +80,20 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             return indexerSymbol switch
             {
-                IPropertySymbol propertySymbol => CheckPropertyGetterPurity(
+                IPropertySymbol propertySymbol => DispatchedMemberResolution.CheckGetterPurity(
                     propertySymbol,
                     receiverType,
                     hasStableConcreteReceiver,
                     implicitIndexerReferenceOperation,
-                    context),
-                IMethodSymbol methodSymbol => CheckMethodPurity(
+                    context,
+                    nameof(ImplicitIndexerReferencePurityRule)),
+                IMethodSymbol methodSymbol => DispatchedMemberResolution.CheckMethodPurity(
                     methodSymbol,
                     receiverType,
                     hasStableConcreteReceiver,
                     implicitIndexerReferenceOperation,
-                    context),
+                    context,
+                    nameof(ImplicitIndexerReferencePurityRule)),
                 _ => PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     implicitIndexerReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -99,64 +102,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         operation: implicitIndexerReferenceOperation,
                         symbol: indexerSymbol))
             };
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyGetterPurity(
-            IPropertySymbol propertySymbol,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
-            PurityAnalysisContext context)
-        {
-            var getter = DispatchedMemberResolution.ResolveGetter(
-                propertySymbol,
-                receiverType,
-                hasStableConcreteReceiver,
-                context.SemanticModel.Compilation);
-            if (getter == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    implicitIndexerReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        ruleName: nameof(ImplicitIndexerReferencePurityRule),
-                        operation: implicitIndexerReferenceOperation,
-                        symbol: propertySymbol.GetMethod));
-            }
-
-            var getterPurity = PurityAnalysisEngine.GetCalleePurity(getter, context);
-            return getterPurity.IsPure
-                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : getterPurity.WithCallee(getter, implicitIndexerReferenceOperation.Syntax);
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckMethodPurity(
-            IMethodSymbol methodSymbol,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
-            PurityAnalysisContext context)
-        {
-            var targetMethod = DispatchedMemberResolution.ResolveMethod(
-                methodSymbol,
-                receiverType,
-                hasStableConcreteReceiver,
-                context.SemanticModel.Compilation);
-            if (targetMethod == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    implicitIndexerReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        ruleName: nameof(ImplicitIndexerReferencePurityRule),
-                        operation: implicitIndexerReferenceOperation,
-                        symbol: methodSymbol));
-            }
-
-            var methodPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
-            return methodPurity.IsPure
-                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : methodPurity.WithCallee(targetMethod, implicitIndexerReferenceOperation.Syntax);
         }
 
         private static bool IsPartOfAssignmentTarget(IOperation operation)
