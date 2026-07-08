@@ -54,5 +54,26 @@ namespace SharpProof.Analyzer.Engine.Analysis
 
             return false;
         }
+
+        internal static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+        {
+            if (methodSymbol.DeclaringSyntaxReferences.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var methodSyntax = syntaxReference.GetSyntax(cancellationToken);
+                if (methodSyntax is Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclaration &&
+                    (methodDeclaration.Body != null || methodDeclaration.ExpressionBody != null))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 }

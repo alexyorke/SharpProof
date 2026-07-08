@@ -67,5 +67,19 @@ namespace SharpProof.Symbolic
             fromEnd = true;
             return true;
         }
+
+        public static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
+        {
+            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
+            {
+                foreach (var sizeExpression in rankSpecifier.Sizes)
+                {
+                    if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    {
+                        yield return sizeExpression;
+                    }
+                }
+            }
+        }
     }
 }

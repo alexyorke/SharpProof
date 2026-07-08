@@ -3653,7 +3653,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         {
                             targets.Add(exactImplementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
+                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3668,7 +3668,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         {
                             targets.Add(implementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
+                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3684,7 +3684,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         {
                             targets.Add(implementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
+                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3715,7 +3715,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
                     }
 
-                    if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
+                    if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
                     {
                         targets.Add(target);
                     }
@@ -3729,7 +3729,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
                 }
 
-                if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
+                if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
                 {
                     targets.Add(target);
                 }
@@ -3821,7 +3821,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (member is IMethodSymbol candidate &&
-                    HasMethodBody(candidate, cancellationToken) &&
+                    TypeHierarchyEnumeration.HasMethodBody(candidate, cancellationToken) &&
                     HasMatchingSignature(candidate, interfaceMethod))
                 {
                     return candidate;
@@ -3964,27 +3964,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return operation;
-        }
-
-        private static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-        {
-            if (methodSymbol.DeclaringSyntaxReferences.Length == 0)
-            {
-                return false;
-            }
-
-            foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var methodSyntax = syntaxReference.GetSyntax(cancellationToken);
-                if (methodSyntax is Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclaration &&
-                    (methodDeclaration.Body != null || methodDeclaration.ExpressionBody != null))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsBaseReference(IOperation? operation)

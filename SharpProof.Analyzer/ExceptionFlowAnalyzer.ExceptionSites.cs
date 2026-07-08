@@ -626,7 +626,7 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
+            foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (!SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
                         lengthExpression,
@@ -978,20 +978,6 @@ namespace SharpProof.Analyzer
 
             conversionOperation = null!;
             return false;
-        }
-
-        private static IEnumerable<ExpressionSyntax> GetArrayLengthExpressions(ArrayCreationExpressionSyntax arrayCreation)
-        {
-            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
-            {
-                foreach (var size in rankSpecifier.Sizes)
-                {
-                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
-                    {
-                        yield return size;
-                    }
-                }
-            }
         }
 
         private static bool IsKnownMissingNullableValueByPriorAssignment(

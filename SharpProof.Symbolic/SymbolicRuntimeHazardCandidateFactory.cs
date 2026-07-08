@@ -1304,7 +1304,7 @@ namespace SharpProof.Symbolic
             var triggerCondition = default(SymbolicCondition);
             var subject = default(SymbolicTerm);
             var allTriggersAreIr = true;
-            foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
+            foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (!TryCreateNegativeLengthTrigger(
                         lengthExpression,
@@ -2766,20 +2766,6 @@ namespace SharpProof.Symbolic
         {
             var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
             return typeInfo.ConvertedType ?? typeInfo.Type;
-        }
-
-        private static IEnumerable<ExpressionSyntax> GetArrayLengthExpressions(ArrayCreationExpressionSyntax arrayCreation)
-        {
-            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
-            {
-                foreach (var size in rankSpecifier.Sizes)
-                {
-                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
-                    {
-                        yield return size;
-                    }
-                }
-            }
         }
 
         private static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(StackAllocArrayCreationExpressionSyntax stackAllocCreation)

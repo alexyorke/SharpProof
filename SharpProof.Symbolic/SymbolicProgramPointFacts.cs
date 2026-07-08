@@ -5865,7 +5865,7 @@ namespace SharpProof.Symbolic
                 return;
             }
 
-            foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
+            foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
                     !TryCreateIntegerValueFormula(
@@ -5900,7 +5900,7 @@ namespace SharpProof.Symbolic
             }
 
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
+            foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
                     !SymbolicIrLowerer.TryLowerTerm(sizeExpression, context, out var sizeTerm) ||
@@ -10544,20 +10544,6 @@ namespace SharpProof.Symbolic
                     TryCreateArrayDimensionLengthFormula(assignedSymbol, dimension, out var targetLength))
                 {
                     AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
-                }
-            }
-        }
-
-        private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
-        {
-            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
-            {
-                foreach (var sizeExpression in rankSpecifier.Sizes)
-                {
-                    if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
-                    {
-                        yield return sizeExpression;
-                    }
                 }
             }
         }

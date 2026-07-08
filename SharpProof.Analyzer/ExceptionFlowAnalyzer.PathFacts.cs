@@ -1300,7 +1300,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            foreach (var sizeExpression in GetExplicitArraySizeExpressions(arrayCreation))
+            foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
             {
                 if (AnyConditionSymbolMutatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
                     !SymbolicReachabilityService.TryCreateExpressionNonNegativeComparison(
@@ -1533,20 +1533,6 @@ namespace SharpProof.Analyzer
                      effectiveValueIsTarget)
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
-            }
-        }
-
-        private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
-        {
-            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
-            {
-                foreach (var sizeExpression in rankSpecifier.Sizes)
-                {
-                    if (!sizeExpression.IsKind(SyntaxKind.OmittedArraySizeExpression))
-                    {
-                        yield return sizeExpression;
-                    }
-                }
             }
         }
 
