@@ -614,6 +614,40 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void ProductionFallbackCatches_DoNotSwallowCancellation()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var productionRoots = new[]
+            {
+                "SharpProof.Analyzer",
+                "SharpProof.Symbolic",
+                "SearchLib",
+            };
+            var productionFiles = productionRoots
+                .SelectMany(root => Directory.GetFiles(
+                    Path.Combine(repositoryRoot, root),
+                    "*.cs",
+                    SearchOption.AllDirectories))
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                })
+                .ToArray();
+
+            var offenders = productionFiles
+                .Where(static file =>
+                    System.Text.RegularExpressions.Regex.IsMatch(file.Source, @"catch\s*\{") ||
+                    System.Text.RegularExpressions.Regex.IsMatch(file.Source, @"catch\s*\(\s*Exception(?:\s+\w+)?\s*\)(?!\s*when)"))
+                .Select(static file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
         public void SymbolicProductionCode_DoesNotDropCancellationTokens()
         {
             var repositoryRoot = FindRepositoryRoot();

@@ -1464,7 +1464,7 @@ namespace SharpProof.Analyzer.Engine
                     {
                         methodBodyIOperation = semanticModel.GetOperation(bodySyntaxNode, cancellationToken);
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         LogDebug($"{indent}  Post-CFG: Error getting IOperation for method body: {ex.Message}");
                         methodBodyIOperation = null;
@@ -2419,7 +2419,7 @@ namespace SharpProof.Analyzer.Engine
                 cfg = ControlFlowGraph.Create(bodyNode, semanticModel);
                 LogDebug($"CFG created successfully for node: {bodyNode.Kind()}");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 LogDebug($"Error creating ControlFlowGraph for {containingMethodSymbol.ToDisplayString()}: {ex.Message}. Assuming impure.");
                 return PurityAnalysisResult.Impure(bodyNode);

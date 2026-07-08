@@ -116,7 +116,7 @@ namespace SharpProof.Analyzer.Configuration
                     GetNonNegativeInt(treeOptions, ConfigKeys.SuggestMissingEnforcePureMinComplexity, fallback.MinimumComplexity),
                     GetValues(treeOptions, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters, fallback.NamespaceFilters));
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -132,7 +132,7 @@ namespace SharpProof.Analyzer.Configuration
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.EmitExplanations, fallback);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -148,7 +148,7 @@ namespace SharpProof.Analyzer.Configuration
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.ReportBclFallbackGuesses, fallback);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -164,7 +164,7 @@ namespace SharpProof.Analyzer.Configuration
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.ReportExceptions, fallback);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -180,7 +180,7 @@ namespace SharpProof.Analyzer.Configuration
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.CheckedExceptions, fallback);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -196,7 +196,7 @@ namespace SharpProof.Analyzer.Configuration
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetRuntimeHazardMode(treeOptions, fallback);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return fallback;
             }
@@ -513,7 +513,7 @@ namespace SharpProof.Analyzer.Configuration
                     return true;
                 }
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
             }
 

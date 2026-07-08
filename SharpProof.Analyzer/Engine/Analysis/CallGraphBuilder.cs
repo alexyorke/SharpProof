@@ -377,7 +377,10 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     {
                         cfg = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(bodyNode, model);
                     }
-                    catch { cfg = null; }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        cfg = null;
+                    }
                     if (cfg == null) continue;
                     if (!edges.TryGetValue(method.OriginalDefinition, out var callerSet))
                     {

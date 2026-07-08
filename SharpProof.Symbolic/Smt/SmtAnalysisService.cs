@@ -229,7 +229,7 @@ namespace SharpProof.Symbolic.Smt
                     {
                         t_sharedProofSearch.Dispose();
                     }
-                    catch
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         // Ignore disposal errors on failed context
                     }
