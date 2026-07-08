@@ -198,7 +198,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorRuntimeMemberPurity(
+        internal static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorRuntimeMemberPurity(
             ITypeSymbol enumeratorType,
             SyntaxNode foreachSyntax,
             PurityAnalysisContext context)

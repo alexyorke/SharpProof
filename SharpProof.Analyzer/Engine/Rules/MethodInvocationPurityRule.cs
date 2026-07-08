@@ -3804,36 +3804,19 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return enumeratorPurity.WithCallee(getEnumerator, unwrappedSource.Syntax);
                 }
 
-                var runtimePurity = CheckLinqEnumeratorRuntimeMemberPurity(
-                    getEnumerator,
-                    sourceType,
-                    context,
-                    unwrappedSource.Syntax);
-                if (!runtimePurity.IsPure)
+                foreach (var enumeratorType in EnumerateLinqReturnedEnumeratorTypes(
+                             getEnumerator,
+                             sourceType,
+                             context.SemanticModel,
+                             context.CancellationToken))
                 {
-                    return runtimePurity;
-                }
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqEnumeratorRuntimeMemberPurity(
-            IMethodSymbol getEnumerator,
-            ITypeSymbol sourceType,
-            PurityAnalysisContext context,
-            SyntaxNode callSite)
-        {
-            foreach (var enumeratorType in EnumerateLinqReturnedEnumeratorTypes(getEnumerator, sourceType, context.SemanticModel, context.CancellationToken))
-            {
-                context.CancellationToken.ThrowIfCancellationRequested();
-                foreach (var runtimeMember in EnumerateLinqEnumeratorRuntimeMembers(enumeratorType))
-                {
-                    context.CancellationToken.ThrowIfCancellationRequested();
-                    var runtimePurity = PurityAnalysisEngine.GetCalleePurity(runtimeMember.OriginalDefinition, context);
+                    var runtimePurity = LoopPurityRule.CheckForEachEnumeratorRuntimeMemberPurity(
+                        enumeratorType,
+                        unwrappedSource.Syntax,
+                        context);
                     if (!runtimePurity.IsPure)
                     {
-                        return runtimePurity.WithCallee(runtimeMember.OriginalDefinition, callSite);
+                        return runtimePurity;
                     }
                 }
             }
@@ -3951,34 +3934,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 namedType.DeclaringSyntaxReferences.Length > 0)
             {
                 enumeratorTypes.Add(namedType.OriginalDefinition);
-            }
-        }
-
-        private static IEnumerable<IMethodSymbol> EnumerateLinqEnumeratorRuntimeMembers(INamedTypeSymbol enumeratorType)
-        {
-            foreach (var moveNext in enumeratorType
-                         .GetMembers("MoveNext")
-                         .OfType<IMethodSymbol>()
-                         .Where(method => method.Parameters.Length == 0 && method.DeclaringSyntaxReferences.Length > 0))
-            {
-                yield return moveNext;
-            }
-
-            foreach (var currentGetter in enumeratorType
-                         .GetMembers("Current")
-                         .OfType<IPropertySymbol>()
-                         .Select(property => property.GetMethod)
-                         .Where(method => method != null && method.DeclaringSyntaxReferences.Length > 0))
-            {
-                yield return currentGetter!;
-            }
-
-            foreach (var dispose in enumeratorType
-                         .GetMembers("Dispose")
-                         .OfType<IMethodSymbol>()
-                         .Where(method => method.Parameters.Length == 0 && method.DeclaringSyntaxReferences.Length > 0))
-            {
-                yield return dispose;
             }
         }
 
