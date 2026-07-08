@@ -1150,38 +1150,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             IPropertySymbol targetProperty,
             HashSet<IMethodSymbol> targets)
         {
-            ISymbol? implementation = null;
-            if (targetProperty.ContainingType?.TypeKind == TypeKind.Interface)
+            var getter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+                targetProperty,
+                receiverType,
+                preferSetter: false);
+            if (getter != null)
             {
-                implementation = receiverType.FindImplementationForInterfaceMember(targetProperty) ??
-                    (targetProperty.GetMethod == null
-                        ? null
-                        : receiverType.FindImplementationForInterfaceMember(targetProperty.GetMethod));
-            }
-            else
-            {
-                for (INamedTypeSymbol? current = receiverType; current != null; current = current.BaseType)
-                {
-                    implementation = current
-                        .GetMembers(targetProperty.Name)
-                        .OfType<IPropertySymbol>()
-                        .FirstOrDefault(property =>
-                            SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, targetProperty) ||
-                            DispatchedMemberResolution.OverridesProperty(property, targetProperty));
-                    if (implementation != null)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            if (implementation is IPropertySymbol propertySymbol && propertySymbol.GetMethod != null)
-            {
-                targets.Add(propertySymbol.GetMethod.OriginalDefinition);
-            }
-            else if (implementation is IMethodSymbol methodSymbol)
-            {
-                targets.Add(methodSymbol.OriginalDefinition);
+                targets.Add(getter.OriginalDefinition);
             }
         }
 
