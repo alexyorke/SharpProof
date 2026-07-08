@@ -6,9 +6,6 @@ namespace SharpProof.Analyzer.Engine
     internal static class BclPurityFallbackClassifier
     {
         public const string CatalogSource = BclPurityFallbackHeuristics.CatalogSource;
-        public const string ProbablyPure = BclPurityFallbackHeuristics.ProbablyPure;
-        public const string ProbablyImpure = BclPurityFallbackHeuristics.ProbablyImpure;
-        public const string Unknown = BclPurityFallbackHeuristics.Unknown;
 
         public readonly struct Classification
         {
