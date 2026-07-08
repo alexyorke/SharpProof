@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Symbolic.Smt;
@@ -444,7 +445,7 @@ namespace SharpProof.Analyzer.Configuration
         private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
         {
             if (TryGetGlobalOption(options, key, out var value) &&
-                int.TryParse(value.Trim(), out var parsed) &&
+                int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
                 parsed > 0)
             {
                 return parsed;
@@ -483,7 +484,7 @@ namespace SharpProof.Analyzer.Configuration
         private static int GetNonNegativeInt(AnalyzerOptions options, string key)
         {
             if (TryGetGlobalOption(options, key, out var value) &&
-                int.TryParse(value.Trim(), out var parsed) &&
+                int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
                 parsed >= 0)
             {
                 return parsed;
@@ -495,7 +496,7 @@ namespace SharpProof.Analyzer.Configuration
         private static int GetNonNegativeInt(AnalyzerConfigOptions options, string key, int fallback)
         {
             return options.TryGetValue(key, out var value) &&
-                   int.TryParse(value.Trim(), out var parsed) &&
+                   int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
                    parsed >= 0
                 ? parsed
                 : fallback;

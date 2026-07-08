@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
@@ -72,5 +74,61 @@ public class TestClass
 
             Assert.That(diagnostics, Is.Empty);
         }
+
+        [Test]
+        public void SmtNumericConfiguration_ParsesSignedOverridesWithInvariantCulture()
+        {
+            var originalCulture = CultureInfo.CurrentCulture;
+            var customCulture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            customCulture.NumberFormat.PositiveSign = "p";
+
+            try
+            {
+                CultureInfo.CurrentCulture = customCulture;
+
+                var options = ReadSmtOptions(
+                    ImmutableDictionary<string, string>.Empty
+                        .Add("sharpproof_smt_timeout_ms", "+321")
+                        .Add("sharpproof_smt_method_budget_ms", "+4321")
+                        .Add("sharpproof_smt_max_path_conditions", "+123")
+                        .Add("sharpproof_smt_max_expression_nodes", "+4567"));
+
+                Assert.That(options.TimeoutMs, Is.EqualTo(321));
+                Assert.That(options.MethodBudgetMs, Is.EqualTo(4321));
+                Assert.That(options.MaxPathConditions, Is.EqualTo(123));
+                Assert.That(options.MaxExpressionNodes, Is.EqualTo(4567));
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = originalCulture;
+            }
+        }
+
+        private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
+        {
+            var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+            var configurationType = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
+            var fromOptions = configurationType.GetMethod(
+                "FromOptions",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+            var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
+            var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
+            var smtOptionsType = smtOptions.GetType();
+            var queryTimeout = (TimeSpan)smtOptionsType.GetProperty("QueryTimeout")!.GetValue(smtOptions)!;
+            var methodBudget = (TimeSpan)smtOptionsType.GetProperty("MethodBudget")!.GetValue(smtOptions)!;
+
+            return new SmtOptionsSnapshot(
+                (int)queryTimeout.TotalMilliseconds,
+                (int)methodBudget.TotalMilliseconds,
+                (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
+                (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!);
+        }
+
+        private readonly record struct SmtOptionsSnapshot(
+            int TimeoutMs,
+            int MethodBudgetMs,
+            int MaxPathConditions,
+            int MaxExpressionNodes);
     }
 }
