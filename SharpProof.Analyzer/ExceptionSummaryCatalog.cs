@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -24,18 +22,15 @@ namespace SharpProof.Analyzer
         private static readonly SymbolDisplayFormat EffectSummaryParameterTypeFormat = new SymbolDisplayFormat(
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+        private static readonly EffectSummaryIdentityResolver IdentityResolver =
+            new EffectSummaryIdentityResolver(
+                normalizeSignatureTypeNames: false,
+                includeMethodAttributes: false,
+                requireMetadataLocation: true,
+                CreateEffectSummaryKey);
 
         public static readonly ExceptionSummaryCatalog Empty = new ExceptionSummaryCatalog(
             ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
-
-        private static readonly ConcurrentDictionary<string, ActualAssemblyIdentity?> AssemblyIdentityCache =
-            new ConcurrentDictionary<string, ActualAssemblyIdentity?>(StringComparer.OrdinalIgnoreCase);
-        private static readonly ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>> MethodIdentityCache =
-            new ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>>(StringComparer.OrdinalIgnoreCase);
-        private static readonly ConcurrentDictionary<string, string?> RuntimeImplementationAssemblyPathCache =
-            new ConcurrentDictionary<string, string?>(StringComparer.Ordinal);
-        private static readonly ConcurrentDictionary<string, string> RuntimeImplementationAssemblyPathByAssemblyNameCache =
-            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
 
         private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
@@ -76,10 +71,10 @@ namespace SharpProof.Analyzer
             var matchedExceptionEdges = new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(StringComparer.Ordinal);
             var actualAssemblyIdentity = compilation is null
                 ? null
-                : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+                : IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
             var actualMethodIdentity = compilation is null
                 ? null
-                : TryResolveActualMethodIdentity(methodSymbol, compilation);
+                : IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
 
             foreach (var key in GetSymbolKeys(methodSymbol))
             {
@@ -643,96 +638,6 @@ namespace SharpProof.Analyzer
                 ", ",
                 methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
             return containingTypeName + "." + methodName + "(" + parameterList + ")";
-        }
-
-        private static ActualMethodIdentity? TryResolveActualMethodIdentity(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
-            if (!string.IsNullOrWhiteSpace(implementationPath))
-            {
-                var path = implementationPath!;
-                if (File.Exists(path) &&
-                    TryResolveMethodIdentityFromPath(methodSymbol, path, out var implementationIdentity))
-                {
-                    return implementationIdentity;
-                }
-            }
-
-            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
-                methodSymbol,
-                compilation,
-                requireMetadataLocation: true);
-            return referencePath != null &&
-                TryResolveMethodIdentityFromPath(methodSymbol, referencePath, out var identity)
-                    ? identity
-                    : null;
-        }
-
-        private static bool TryResolveMethodIdentityFromPath(
-            IMethodSymbol methodSymbol,
-            string assemblyPath,
-            out ActualMethodIdentity identity)
-        {
-            return TryResolveMethodIdentityFromPath(GetSymbolKeys(methodSymbol), assemblyPath, out identity);
-        }
-
-        private static bool TryResolveMethodIdentityFromPath(
-            IEnumerable<string> methodKeys,
-            string assemblyPath,
-            out ActualMethodIdentity identity)
-        {
-            return SummaryMethodIdentityMap.TryResolve(
-                MethodIdentityCache,
-                methodKeys,
-                assemblyPath,
-                normalizeSignatureTypeNames: false,
-                includeMethodAttributes: false,
-                out identity);
-        }
-
-        private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
-            if (!string.IsNullOrWhiteSpace(implementationPath))
-            {
-                var path = implementationPath!;
-                if (File.Exists(path) &&
-                    TryResolveMethodIdentityFromPath(methodSymbol, path, out _))
-                {
-                    return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
-                }
-            }
-
-            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
-                methodSymbol,
-                compilation,
-                requireMetadataLocation: true);
-            return referencePath == null
-                ? null
-                : AssemblyIdentityCache.GetOrAdd(referencePath, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
-        }
-
-        private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
-        {
-            var cacheKey = CreateEffectSummaryKey(methodSymbol.OriginalDefinition);
-            return RuntimeImplementationAssemblyPathCache.GetOrAdd(
-                cacheKey,
-                _ => ResolveRuntimeImplementationAssemblyPath(GetSymbolKeys(methodSymbol), methodSymbol.ContainingAssembly));
-        }
-
-        private static string? ResolveRuntimeImplementationAssemblyPath(
-            IEnumerable<string> methodKeys,
-            IAssemblySymbol? containingAssembly)
-        {
-            return RuntimeImplementationAssemblyResolver.Resolve(
-                methodKeys,
-                containingAssembly,
-                RuntimeImplementationAssemblyPathByAssemblyNameCache,
-                static (keys, path) => TryResolveMethodIdentityFromPath(keys, path, out _));
         }
 
         private sealed class SummaryEntry

@@ -496,6 +496,139 @@ namespace SharpProof.Analyzer
         }
     }
 
+    internal sealed class EffectSummaryIdentityResolver
+    {
+        private readonly ConcurrentDictionary<string, ActualAssemblyIdentity?> _assemblyIdentityCache =
+            new ConcurrentDictionary<string, ActualAssemblyIdentity?>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>> _methodIdentityCache =
+            new ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, string?> _runtimeImplementationAssemblyPathCache =
+            new ConcurrentDictionary<string, string?>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, string> _runtimeImplementationAssemblyPathByAssemblyNameCache =
+            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        private readonly bool _normalizeSignatureTypeNames;
+        private readonly bool _includeMethodAttributes;
+        private readonly bool _requireMetadataLocation;
+        private readonly Func<IMethodSymbol, string> _methodCacheKeyFactory;
+
+        internal EffectSummaryIdentityResolver(
+            bool normalizeSignatureTypeNames,
+            bool includeMethodAttributes,
+            bool requireMetadataLocation,
+            Func<IMethodSymbol, string> methodCacheKeyFactory)
+        {
+            _normalizeSignatureTypeNames = normalizeSignatureTypeNames;
+            _includeMethodAttributes = includeMethodAttributes;
+            _requireMetadataLocation = requireMetadataLocation;
+            _methodCacheKeyFactory = methodCacheKeyFactory;
+        }
+
+        internal ActualMethodIdentity? TryResolveActualMethodIdentity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out var implementationIdentity))
+                {
+                    return implementationIdentity;
+                }
+            }
+
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                _requireMetadataLocation);
+            return referencePath != null &&
+                TryResolveMethodIdentityFromPath(methodSymbol, referencePath, out var identity)
+                    ? identity
+                    : null;
+        }
+
+        internal ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out _))
+                {
+                    return GetAssemblyIdentity(path);
+                }
+            }
+
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                _requireMetadataLocation);
+            return referencePath == null ? null : GetAssemblyIdentity(referencePath);
+        }
+
+        internal ActualAssemblyIdentity? GetAssemblyIdentity(string assemblyPath)
+        {
+            return _assemblyIdentityCache.GetOrAdd(assemblyPath, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+        }
+
+        internal bool TryResolveMethodIdentityFromPath(
+            IMethodSymbol methodSymbol,
+            string assemblyPath,
+            out ActualMethodIdentity identity)
+        {
+            return TryResolveMethodIdentityFromPath(EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol), assemblyPath, out identity);
+        }
+
+        internal bool TryResolveMethodIdentityFromPath(
+            IEnumerable<string> methodKeys,
+            string assemblyPath,
+            out ActualMethodIdentity identity)
+        {
+            return SummaryMethodIdentityMap.TryResolve(
+                _methodIdentityCache,
+                methodKeys,
+                assemblyPath,
+                _normalizeSignatureTypeNames,
+                _includeMethodAttributes,
+                out identity);
+        }
+
+        internal string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
+        {
+            var cacheKey = _methodCacheKeyFactory(methodSymbol.OriginalDefinition);
+            return _runtimeImplementationAssemblyPathCache.GetOrAdd(
+                cacheKey,
+                _ => ResolveRuntimeImplementationAssemblyPath(
+                    EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol),
+                    methodSymbol.ContainingAssembly));
+        }
+
+        internal string? TryResolveRuntimeImplementationAssemblyPath(
+            IAssemblySymbol? containingAssembly,
+            ImmutableArray<string> methodKeys,
+            string cacheKey)
+        {
+            return _runtimeImplementationAssemblyPathCache.GetOrAdd(
+                cacheKey,
+                _ => ResolveRuntimeImplementationAssemblyPath(methodKeys, containingAssembly));
+        }
+
+        private string? ResolveRuntimeImplementationAssemblyPath(
+            IEnumerable<string> methodKeys,
+            IAssemblySymbol? containingAssembly)
+        {
+            return RuntimeImplementationAssemblyResolver.Resolve(
+                methodKeys,
+                containingAssembly,
+                _runtimeImplementationAssemblyPathByAssemblyNameCache,
+                (keys, path) => TryResolveMethodIdentityFromPath(keys, path, out _));
+        }
+    }
+
     internal sealed class SummaryAssemblyIdentity
     {
         public SummaryAssemblyIdentity(string? assemblyName, string? assemblySha256, string? moduleVersionId)
