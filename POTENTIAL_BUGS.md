@@ -17,37 +17,6 @@ Analysis date: 2026-07-07
 
 ---
 
-## 2. `"smt_syntactic_no_match"` lacks a display translation
-
-**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:37`
-
-`GetDisplayStatusReason()` in `SymbolicRuntimeHazardQueryService.cs` does not handle `"smt_syntactic_no_match"`. If this code ever flows through the hazard or proof-reason display path, the raw string reaches the user.
-
----
-
-## 3. Static shared query cache is unbounded with no eviction
-
-**File:** `SharpProof.Symbolic/Smt/SmtAnalysisService.cs:17-18`
-
-```csharp
-private static readonly ConcurrentDictionary<string, PurityProofResult> s_sharedQueryCache = new(...);
-private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
-```
-
-- `s_sharedQueryCache` is never trimmed. If `UseSharedResultCache` is enabled, entries accumulate indefinitely.
-- `s_sharedQueryCacheOrder` is written to (`Enqueue`) but never read back for eviction. Dead queue.
-- The cache is limited to 4096 entries (`SharedQueryCacheEntryLimit`), but `TryAddSharedResult` checks the dictionary *after* enqueue and does not enforce the limit — it only checks `count > limit` and skips adding. The queue grows unboundedly.
-
----
-
-## 4. Race on static cache across `SmtAnalysisService` instances
-
-**File:** `SharpProof.Symbolic/Smt/SmtAnalysisService.cs:77-148`
-
-`Classify()` accesses `s_sharedQueryCache` and `s_sharedQueryCacheOrder` without synchronisation across instances. The `_solverLock` is per-instance. When `UseSharedResultCache` is `true`, concurrent instances can race on `TryGetSharedResult` / `AddSharedResult`.
-
----
-
 ## 5. `SmtAnalysisService` never recovers from transient Z3 failures
 
 **File:** `SharpProof.Symbolic/Smt/SmtAnalysisService.cs:172-176`
@@ -100,14 +69,6 @@ Combines query orchestration, ~30 public/sealed result DTOs, formatting, filteri
 - `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs` (1,049 lines)
 
 The `SymbolicRuntimeHazardQueryService` class spans three files as `partial`. Two of those files are named `*Factory*` but are technically part of the same class. `IsFallbackDerivedTriggerPrecondition` and `GetDisplayStatusReason` live in the main file, while trigger construction lives in the factory files. This spread makes it easy to accidentally duplicate logic or miss a code path.
-
----
-
-## 10. `SmtFormulaVersionRewriter` — unchecked for correctness
-
-**File:** `SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs`
-
-This rewriter transforms formula version metadata. If the version rewrite logic misses a formula subclass, stale or incorrectly-versioned formulas could reach the solver, producing wrong proof results. No tests were observed that specifically validate version rewriting.
 
 ---
 
@@ -280,18 +241,6 @@ The `"analyzer.*"` provenances (`PurityAnalysisEngine.cs:4033-4034`) are created
 
 ---
 
-## 23. `SmtSyntacticClassifier` unreachable-code pattern at line 37
-
-**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:37`
-
-```csharp
-return Unknown("smt_syntactic_no_match");
-```
-
-This returns `Unknown` with a hardcoded reason string. The `"smt_syntactic_no_match"` string is never handled by any display-translation method (`GetDisplayStatusReason`, `GetDisplayReason`, or any other reason mapper). If this `Unknown` result ever reaches a user-facing display, the raw string leaks. Classes in the same project (`SmtAnalysisService`) use `"smt_*"` prefixed reasons that *are* handled, suggesting `"smt_syntactic_no_match"` was simply missed when the display layer was added.
-
----
-
 ## 24. `SymbolicProofService` creates hidden fallback `SmtAnalysisService` with default options
 
 **File:** `SharpProof.Symbolic/SymbolicProofService.cs:1142`
@@ -325,16 +274,6 @@ compilationEndAction = context =>
 ```
 
 If the Roslyn compilation end action is not guaranteed to fire (e.g., if the analyzer host crashes, is cancelled, or the compilation object is collected early), the `SmtAnalysisService` (and its thread-static Z3 context) is never disposed. In the VS IDE, analyzer instances can be long-lived; a nondisposed Z3 context may hold native memory until the VS process exits.
-
----
-
-## 26. New untracked files on the `codex/refactor-cleanup-bugs` branch
-
-**Files:**
-- `SharpProof.Symbolic/SymbolicDispatchFacts.cs` (untracked)
-- `POTENTIAL_BUGS.md` (now gitignored)
-
-The presence of `SymbolicDispatchFacts.cs` as an untracked file on a cleanup/refactor branch suggests work-in-progress that has not been committed. If this file is expected to be part of the branch but was accidentally not staged, it represents missing code. If it is an experimental file, it should be in a `.gitignore` pattern or explicitly excluded.
 
 ---
 
@@ -473,18 +412,6 @@ The `±15%` comment at the declaration acknowledges the imprecision, but the unc
 
 ---
 
-## 34. `ConcurrentQueue` write-only pattern in static cache (dead store)
-
-**File:** `SharpProof.Symbolic/Smt/SmtAnalysisService.cs:18`
-
-```csharp
-private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
-```
-
-This queue tracks insertion order for the shared query cache. However, no code in `SmtAnalysisService.cs` ever dequeues entries. The queue grows unboundedly as queries are cached. The only consumer would be an eviction policy — but no eviction policy exists. This is either dead code (vestigial from a planned feature) or a bug waiting to happen (if eviction is ever implemented without also adding a dequeue call).
-
----
-
 ## 35. `Compile Remove` on test files hides test gaps from CI
 
 **File:** `SharpProof.Test/SharpProof.Test.csproj`
@@ -593,7 +520,6 @@ Same root cause as #45. Two additional `static readonly HashSet<string>` fields 
 
 ---
 
-**Total: 48 documented potential bugs (initial 35 + 13 from six-agent exploration).**
 
 ---
 
@@ -1005,4 +931,466 @@ If `GetManifestResourceStream` returns null (resource not found), it's silently 
 
 ---
 
-**Total: 93 documented potential bugs (initial 48 + 45 from six-agent round 2).**
+
+---
+
+## 94. `TryCollectIrSimplePatternBranchAssumptions` silently drops false-branch pattern facts
+
+**File:** `SharpProof.Symbolic/SymbolicReachabilityService.cs:513`
+
+When `branchWhenTrue` is `false`, the method returns `false` immediately without generating any pattern-binding or non-null facts. The false branch of `if (x is not SomeType)` gets zero pattern-based path conditions, potentially causing false-positive reachability results for the false branch where pattern facts (like `!= null` from type patterns) would have proven it unreachable.
+
+---
+
+## 95. `GetDependentSymbols` includes loop variable, causing false-negative loop bound rejection
+
+**File:** `SharpProof.Symbolic/SymbolicComplexityService.cs:1828-1843`
+
+`GetDependentSymbols` collects ALL `IdentifierNameSyntax` symbols from the bound expression (e.g., `i + 100`). If the bound expression references the loop variable itself, it gets added to `dependentSymbols`. Then the mutation check finds the loop variable IS mutated (by the incrementor), rejecting the bound entirely. A valid `for (int i = 0; i < i + 100; i++)` gets classified as Unknown complexity.
+
+---
+
+## 96. `ProveCondition` reports misleading reason from formula proof when IR proof was the actual failure
+
+**File:** `SharpProof.Symbolic/SymbolicSourceQueryService.cs:1383-1387`
+
+When all formula checks pass but IR state proving fails, the method falls through to return `Unknown` with `formulaTruth.Info.Reason`. The reason code comes exclusively from formula-based classification, but the actual limiting factor could have been the IR state proving step. Diagnostics report e.g. `"smt_unavailable"` when the real failure was an IR-lowering gap.
+
+---
+
+## 97. `TryParseLoopStep` misses reversed Add/SubtractExpression operands
+
+**File:** `SharpProof.Symbolic/SymbolicComplexityService.cs:1740-1756`
+
+When the loop step uses `i = 1 + i` (constant first, loop variable second), only `binaryExpression.Left` is checked for a reference to the loop symbol. The commutative pattern `i = 1 + i` is not recognized, causing the step direction to remain `None` and the entire for-loop bound analysis to fail.
+
+---
+
+## 98. `StructuralPathConditionCache.Values` unbounded `ConcurrentDictionary` growth (fourth independent cache)
+
+**File:** `SharpProof.Symbolic/SymbolicReachabilityService.cs:5149-5152`
+
+A fourth independent unbounded cache (`ConcurrentDictionary<PathConditionCacheKey, ImmutableArray<SmtFormula>>`) beyond those documented in #3, #90, and #107. Stores per-site formula snapshots for every distinct program point analyzed during a session. No eviction mechanism.
+
+---
+
+## 99. `SymbolicSourceInput.FromNode` null-conditional NRE risk in `QueryNode`
+
+**File:** `SharpProof.Symbolic/SymbolicQueryApi.cs:896`
+
+`FromNode` uses `node?.SyntaxTree.FilePath` to get `filePath`, silently producing `null` if `SyntaxTree` is null. But `QueryNode` accesses `node.SyntaxTree.FilePath` WITHOUT null-conditional. `FromNode` silently accepts a node with null SyntaxTree, but any subsequent query NREs inside `QueryNode`.
+
+---
+
+## 100. `TryTranslateConditionFormula` priority inversion: inlineable source property overrides IR formula
+
+**File:** `SharpProof.Symbolic/SymbolicReachabilityService.cs:2662-2674`
+
+When a condition expression contains an inlineable source boolean property AND IR lowering already succeeded, the legacy formula from source-property inlining REPLACES the IR-produced formula unconditionally. Source property inlining substitutes the property body verbatim, which may be less accurate than the IR representation. IR results are silently thrown away even when superior.
+
+---
+
+## 101. `AnalyzeForLoop` Unknown result double-includes `beforeCost` drivers and reasons
+
+**File:** `SharpProof.Symbolic/SymbolicComplexityService.cs:790-801`
+
+When `TryGetForLoopBound` fails, `ComplexityArtifacts.Unknown` is called with `beforeCost` as a part, which aggregates `beforeCost`'s drivers. Then `CombineSequence` aggregates ALL parts again. `beforeCost`'s driver info appears duplicated (once from inner Unknown, once from outer CombineSequence).
+
+---
+
+## 102. `GetDisplayStatusReason` leaks raw `ReachabilityReason` strings to UI
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:815-830`
+
+The switch in `GetDisplayStatusReason` handles only 11 specific SMT/trigger reason strings. `ClassifyTriggerCore` passes `analysis.ReachabilityReason` as the `StatusReason`, which can be any string. Any value not among the 11 hits the `_ => StatusReason` default and leaks raw to the user. Same class of bug as #1 and #2 but in the reachability reason path.
+
+---
+
+## 103. `UnwrapExpression` strips casts, causing missed divide-by-zero hazards for cast integral divisors
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs:2898-2906` (via `TryCreateDivideByZeroTrigger` → `TryCreateNumericZeroCondition` → `UnwrapExpression`)
+
+When the divisor is `(int)doubleVar`, the type check correctly identifies the type as `int`. But `UnwrapExpression` strips the cast, exposing the double variable. IR lowering then fails because the term has kind `Real` instead of `Int`, and the formula fallback also fails. The hazard candidate is silently dropped.
+
+---
+
+## 104. `ConditionalAccessExpressionSyntax` not handled in `EnumerateCandidatesForNode` — wasted classification work
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs:47-290`
+
+No case for `ConditionalAccessExpressionSyntax`. Descendant traversal visits inner `MemberAccessExpressionSyntax` nodes (e.g., `.Prop` inside `obj?.Prop`), creating null-dereference candidates. These are always classified as unreachable because reachability models the `?.` guard, but they still undergo full classification (invariant + SMT) before reaching that conclusion. For large codebases with many `?.` chains, this wastes CPU/memory.
+
+---
+
+## 105. `.translated` provenance bypasses formula-fallback guard — 9 trigger paths present formula-derived conditions as IR
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs:62,172,452,629,664,699,742,810,906`
+
+`CreateIrPreferredFormulaBackedExceptionPreconditionTrigger` lowers an SMT formula to IR and re-encodes it. On success, provenance is `.translated`. `IsFallbackDerivedTriggerPrecondition` only catches `.formula-fallback` and `.fallback` — `.translated` passes through. A formula-derived trigger that roundtrips through formula-to-IR is trusted as IR despite no intrinsic difference from `.formula-fallback`.
+
+---
+
+## 106. Mixed IR/non-IR aggregate length triggers silently discard IR condition data
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs:1307-1401`
+
+When a multi-dimensional array has one dimension with IR-based trigger and another with only formula-backed trigger, `allTriggersAreIr` becomes false. `CreateAggregateExceptionPreconditionTrigger` returns a formula-only trigger, dropping the partially-built IR conditions and the preserved `subject` term. IR precision for IR-capable dimensions is lost.
+
+---
+
+## 107. Third unbounded `ConcurrentDictionary` cache in `SymbolicProofService` — `EncodedStates`
+
+**File:** `SharpProof.Symbolic/SymbolicProofService.cs:1450-1451`
+
+```csharp
+internal ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates { get; } = new(StringComparer.Ordinal);
+```
+
+A third independent unbounded cache beyond those in #3 and #90. `EncodeStateUncached` stores encoded states keyed by state key. Every unique state across all analyzed program points adds one entry. No eviction, no size limit.
+
+---
+
+## 108. `TryCreateCompoundAssignmentFact` silently fails for non-constant multiplication operands
+
+**File:** `SharpProof.Symbolic/SymbolicMutationFactFactory.cs:68-71`
+
+```csharp
+case SyntaxKind.MultiplyAssignmentExpression
+    when previousValue is SmtIntegerConstant || rightValue is SmtIntegerConstant:
+```
+
+If both `previousValue` and `rightValue` are symbolic variables (e.g., `x *= y` with both as method params), the switch falls through returning false. The state update for `*=` is silently skipped — downstream analyses operate on stale state.
+
+---
+
+## 109. `SymbolicRuntimeHazardQueryService` public methods missing `smtAnalysis` null guard
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:35-283`
+
+All public `Query*` methods accept `SmtAnalysisService smtAnalysis` but only `QueryNodeRuntimeHazards` checks for null. `QueryFileRuntimeHazards`, `QuerySourceRuntimeHazards`, and others pass `smtAnalysis` to private methods that DO guard — but the NRE happens in a private method, making stack traces point to internal code rather than the public API caller.
+
+---
+
+## 111. `SyntacticFactSet` copy-constructor omits `_booleanFactInferenceDepth`
+
+**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:638-649`
+
+The copy constructor copies `_booleanEvaluationDepth` and `_conditionalBranchEvaluationDepth` but forgets `_booleanFactInferenceDepth`. When forking a `SyntacticFactSet`, the inference depth counter silently resets to 0. Each fork can recurse to `MaxBooleanFactInferenceDepth = 16` again, multiplying the intended depth limit by the number of forks.
+
+---
+
+## 112. `EnumerateConditionalConditions` yields `SmtConditionalFormula.Condition` twice
+
+**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:255-260`
+
+Line 255 yields `conditional.Condition` explicitly, then lines 257-260 recursively enumerate it again. Although the outer `seen` HashSet deduplicates, this wasted recursion adds overhead proportional to nesting depth.
+
+---
+
+## 113. `IsIntegralOrEnumType` diverges between two source files — `System_Char` inconsistent
+
+**Files:** `CSharpMathPatternRecognizer.cs:89-101` vs `SwitchPathConditionBuilder.cs:2251-2263`
+
+Both define private `IsIntegralOrEnumType`. `CSharpMathPatternRecognizer` includes `SpecialType.System_Char`; `SwitchPathConditionBuilder` does not. A `char` switch governing expression could be classified as integral by one but not the other, causing translation failures in pattern-based switch analysis.
+
+---
+
+## 114. `CreateSubsequenceInRangeFormula` uses `Int32.MaxValue` for 64-bit SMT integers
+
+**File:** `SharpProof.Symbolic/Smt/SmtFormulaFactory.cs:141`
+
+The overflow-protection formula uses `new SmtIntegerConstant(int.MaxValue)` to bound `start + count`. All SMT integer values are `long` (64-bit). A range with `start` exceeding ~2.1 billion would be spuriously flagged as overflowing.
+
+---
+
+## 115. `CreateListPatternElementFormula` embeds `record.ToString()` in synthesized variable names
+
+**File:** `SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs:1944,2164-2171`
+
+Uses string concatenation with `SmtFormula` objects, invoking `record.ToString()`. Produces names like `"SmtVariable { Name = list, Kind = Reference }[0]"`. If any field in `SmtFormula` records is renamed, `ToString()` output changes, silently breaking equality for all synthesized variables — formulas that should match will stop matching.
+
+---
+
+## 116. `TryAddPriorSwitchStatementSectionExclusions` silently drops pattern-based labels that fail translation
+
+**File:** `SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs:210-229`
+
+For `CasePatternSwitchLabelSyntax`, if `TryCreatePatternAndGuardSelectionCondition` returns `false`, `continue` silently skips the label. The resulting exclusion condition does not exclude the prior pattern-based case, making the current section's path condition too permissive.
+
+---
+
+## 118. `EnumerateConditionalConditions` no `default:` case — silently drops new formula subtypes
+
+**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:144-273`
+
+A 130-line switch handles all 11 current `SmtFormula` subtypes but omits `default:`. If a new subtype is added, `ContainsSyntacticContradiction` would miss all conditions inside the new formula type, returning false-positive "no contradiction" results. Same class of bug as #85 in a different visitor.
+
+---
+
+## 119. Affine `long.MinValue` negation silently fails, aborting contradiction detection
+
+**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:3197-3207`
+
+`TryNegate(long value, out long result)` returns `false` when `value == long.MinValue`. This propagates upward, causing the entire affine analysis to abort. For path conditions containing `long.MinValue` as a constant, contradictions like `x == long.MinValue && x > 0` pass undetected.
+
+---
+
+## 121. `SymbolicPublicModels.AddConditionFacts` silently drops negated non-fact conditions
+
+**File:** `SharpProof.Symbolic/SymbolicPublicModels.cs:228-238`
+
+Pattern match `case SymbolicNotCondition { Operand: SymbolicFactCondition }` handles only negations of bare fact conditions. `Not(And(a, b))` or `Not(Or(a, b))` falls through with no `default` handler and is silently dropped from the displayed fact list.
+
+---
+
+## 122. Contradictory-state handling diverges between `ClassifyConditionTruth` and `ClassifyImplication`
+
+**File:** `SharpProof.Symbolic/SymbolicProofService.cs:924-929` vs `:796-802`
+
+Both check `state.IsContradictory` as early exit. `ClassifyConditionTruth` returns `Unreachable`, while `ClassifyImplication` returns `ProvenTrue`. A contradictory state in implication logic is vacuously true (ex falso), so `ProvenTrue` is standard. `ClassifyConditionTruth` using `Unreachable` means callers ask "is this condition true?" and get a different answer than those asking "does state imply condition?" for the same contradictory state.
+
+---
+
+## 123. `TryResolveSourceDeclaration` first `DeclaringSyntaxReference` wins over partial method body
+
+**File:** `SharpProof.Symbolic/SymbolicCapabilityService.cs:684-706`
+
+The loop returns the *first* declaration passing `IsMethodLikeDeclaration`. For partial methods, the declaration-only part (no body) appears first. Downstream `GetMethodBodyRootOperation` returns `null` → method is `UnsupportedTarget`. The implementation is never analyzed.
+
+---
+
+## 124. `GeneratedPurityCatalog` and `ExceptionSummaryCatalog` duplicate static PE-file caches
+
+**Files:** `SharpProof.Analyzer/GeneratedPurityCatalog.cs:36-42` and `ExceptionSummaryCatalog.cs:34-41`
+
+Both declare identical sets of `ConcurrentDictionary` caches. When both effect-summary JSON and exception reporting are enabled, the same assembly file is loaded and its method identities computed twice — doubling memory and I/O. Two separate unbounded caches for the same data.
+
+---
+
+## 125. `ExceptionSummaryCatalog.GetEdgeSourcePath` falls back to symbol keys as source paths
+
+**File:** `SharpProof.Analyzer/ExceptionSummaryCatalog.cs:607-614`
+
+Fallback chain uses `CalleeExactSymbolKey` and `CalleeSymbol` as source paths when `SourcePath`/`ExceptionSourcePath`/`CallPath` are missing. These are method signatures (e.g., `System.Console.WriteLine(string)`), not file paths. This "source path" value is used in diagnostic property strings, producing nonsensical output.
+
+---
+
+## 126. `EffectSummarySymbolKeyFactory.GetMethodSymbolKeysWithAlternateContainingType` silently drops metadata keys
+
+**File:** `SharpProof.Analyzer/EffectSummarySymbolKeyFactory.cs:67-91`
+
+Filters with `key.StartsWith(originalPrefix)`. Keys generated by `CreateMetadataEffectSummaryKey`, `CreatePositionalEffectSummaryKey`, etc. use different type name formats and won't start with the original prefix. They're silently dropped, so `TryGetSystemTypeRuntimeImplementationPurity` gets far fewer alternate keys than intended.
+
+---
+
+## 127. `AttributePlacementAnalyzer` short-circuits after first misplaced attribute
+
+**File:** `SharpProof.Analyzer/AttributePlacementAnalyzer.cs:41-52`
+
+After reporting a misplaced `EnforcePure` attribute, executes `return;`. Skips checks for `Pure`, `AllowSynchronization`, `ZeroAllocations`, `AllowedCapabilities`, `Ensures`, and `ExpectedComplexity` on the same target. Same pattern at lines 64, 78, 90, 104, 117, 129. Each misplaced attribute should be reported independently.
+
+---
+
+## 128. SP0001 `ImpurityRule` declared but never registered in `SupportedDiagnostics`
+
+**File:** `SharpProof.Analyzer/SharpProofDiagnostics.cs:10-25` and `SharpProofAnalyzer.cs:20-42`
+
+`ImpurityRule` (SP0001) is defined with `isEnabledByDefault: true` and `DiagnosticSeverity.Warning`, but NOT in `SupportedDiagnostics`. Roslyn requires all reportable diagnostics to be listed there. Additionally, no code calls `Diagnostic.Create(SharpProofDiagnostics.ImpurityRule, ...)` — this diagnostic appears dead from both registration and emission sides.
+
+---
+
+## 129. `_ruleTypes` dead code in `SharpProofAnalyzer`
+
+**File:** `SharpProof.Analyzer/SharpProofAnalyzer.cs:18`
+
+```csharp
+private static readonly ImmutableArray<Type> _ruleTypes = ImmutableArray.Create<Type>();
+```
+
+This empty immutable array is never referenced anywhere. If intended for deferred rule registration, that functionality was never implemented.
+
+---
+
+## 130. `DiagnosticMessages.Designer.cs` is empty — dead resource file
+
+**File:** `SharpProof.Analyzer/Resources/DiagnosticMessages.Designer.cs`
+
+Contains only whitespace — no class, no resources, no properties. If intended to be generated from a `.resx`, generation is broken. Any code referencing `DiagnosticMessages` properties would get compilation errors.
+
+---
+
+## 131. `GetEffectivePurityAttributeSymbol` can NRE if called without guard
+
+**File:** `SharpProof.Analyzer/MethodPurityAnalyzer.cs:640-641`
+
+```csharp
+return enforcePureAttributeSymbol ?? pureAttributeSymbol!;
+```
+
+Null-forgiving on `pureAttributeSymbol`. The only callsite is guarded by an early return ensuring at least one is non-null, but the method is `internal` with no null check of its own. New callers without the same guard silent-NRE.
+
+---
+
+## 132. `MethodCapabilityAnalyzer` null-forgiving on `SourceTree` without metadata guard
+
+**File:** `SharpProof.Analyzer/MethodCapabilityAnalyzer.cs:114-117,141`
+
+Both `CreateViolationDiagnostic` and `CreateUnknownDiagnostic` use:
+```csharp
+Location.Create(methodSymbol.Locations.First().SourceTree!, new TextSpan(...))
+```
+Unlike `MethodPurityAnalyzer`, this has no `IsInMetadata` early return. `SourceTree` can be null for PE-referenced methods, even with syntax references. The `!` would NRE.
+
+---
+
+## 133. `MethodExpectedComplexityAnalyzer` silently defaults unknown enum values to Linear
+
+**File:** `SharpProof.Analyzer/MethodExpectedComplexityAnalyzer.cs:120-126,194-202`
+
+If the attribute receives an int outside `[0-2]`, `Enum.IsDefined` returns false and it falls back to `Linear`. A user writing `[ExpectedComplexity(99)]` gets no error. `GetRank` also has `_ => 1` (Linear) as default, doubling the silent fallback.
+
+---
+
+## 134. `GetRuntimeHazardMode` config parse — confusing value-to-mode mapping
+
+**File:** `SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs:376-383`
+
+`"checked"` and `"checked-exceptions"` map to `RuntimeHazardMode.Sites` (site-level runtime hazard checking), while `"report"` maps to `Summaries` (exception summary). Naming is inconsistent — a user typing `"checked-exceptions"` likely expects exception-summary behavior, not site-level checking.
+
+---
+
+## 135. `build-vsix.ps1` MSBuild exit code never checked after build
+
+**File:** `build-vsix.ps1:42`
+
+`& $msbuild $vsixProj /t:Restore,Build ... /v:m | Out-Host` — never inspects `$LASTEXITCODE`. If MSBuild fails, the script continues to find VSIX files, producing "No VSIX produced" instead of surfacing the real build error. Contrast with `build.ps1:77` which correctly checks.
+
+---
+
+## 136. `build.ps1` VSIX build bypasses job object memory guard
+
+**File:** `build.ps1:76`
+
+The VSIX build invokes MSBuild directly rather than through `Invoke-DotnetInRepo`, bypassing `JobObjectHelpers` memory limit. All other dotnet operations in `build.ps1` are memory-capped; the resource-intensive VS SDK build runs uncapped.
+
+---
+
+## 137. `build-nuget.ps1` deletes all existing `.nupkg` before pack commands succeed
+
+**File:** `build-nuget.ps1:30`
+
+`Remove-Item -Force` on existing `.nupkg` files runs before `dotnet pack`. If the first pack succeeds but the second fails, previously-built artifacts are lost. In CI this means a partial failure wipes usable packages.
+
+---
+
+## 138. Z3 version hardcoded in `SharpProof.Analyzer.csproj` `MicrosoftZ3ManagedDllPath`
+
+**File:** `SharpProof.Analyzer/SharpProof.Analyzer.csproj:16`
+
+`$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll` — version `4.12.2` baked into MSBuild property. Upgrading the `Microsoft.Z3` PackageReference in `SearchLib.csproj` would break the `GenerateBuiltInEffectSummaries` target.
+
+---
+
+## 139. Native `libz3.dll` packaged in `analyzers/dotnet/cs/` alongside managed DLLs
+
+**File:** `SharpProof.Package/SharpProof.Package.csproj:47`
+
+`libz3.dll` (native PE) placed alongside managed analyzer DLLs. For legacy NuGet consumers using `install.ps1`, the script loads all `.dll` files as analyzer references. Roslyn would attempt `Assembly.Load` on `libz3.dll`, producing `BadImageFormatException` that silently disables the analyzer.
+
+---
+
+## 140. Missing transitive NuGet dependency assemblies in package
+
+**File:** `SharpProof.Package/SharpProof.Package.csproj:43-49`
+
+Package ships `SharpProof.Analyzer.dll`, `SharpProof.Symbolic.dll`, `SearchLib.dll`, `Microsoft.Z3.dll`, and `libz3.dll`, but NOT `System.Collections.Immutable.dll` or `System.Text.Json.dll`. Direct analyzer-load scenarios (not SDK-style transitive resolution) would get `FileNotFoundException`.
+
+---
+
+## 141. `GeneratePackageOnBuild>True` causes double-packing of Attributes
+
+**File:** `SharpProof.Attributes/SharpProof.Attributes.csproj:25`
+
+Every `dotnet build` produces a `.nupkg`. `build.ps1:86` then explicitly calls `dotnet pack`, generating the same package a second time. Either overwrites or emits a conflict.
+
+---
+
+## 142. `SharpProof.CodeFixes.csproj` `LangVersion` pinned to `9.0` while all others use `preview`
+
+**File:** `SharpProof.CodeFixes/SharpProof.CodeFixes.csproj:5`
+
+C# 9 only. Every other `.csproj` uses `preview` (C# 13). Shared utilities using C# 10+ syntax (file-scoped namespaces, `record struct`) silently fail to compile in CodeFixes.
+
+---
+
+## 143. `SymbolicCliTestHost` Console redirection not exception-safe
+
+**File:** `SharpProof.ToolingTest/SymbolicCliTestHost.cs:27-29`
+
+Redirects `Console.Out`/`Console.Error` before `try`, restores in `finally`. If an uncatchable exception occurs between redirect and `finally`, console streams remain permanently corrupted for the test runner process.
+
+---
+
+## 144. `SymbolicCliTestHost` `Assembly.LoadFrom` leaks CLI assembly permanently
+
+**File:** `SharpProof.ToolingTest/SymbolicCliTestHost.cs:74`
+
+`Assembly.LoadFrom` loads the CLI DLL into the test AppDomain. Cannot be unloaded. If the CLI is rebuilt between test iterations, the stale cached assembly is used. Test runner must be fully restarted.
+
+---
+
+## 145. `AnalyzerTestHost.EmptyAnalyzerOptions` singleton shared unsafely across concurrent tests
+
+**File:** `SharpProof.Test/AnalyzerTestHost.cs:54-57`
+
+Single `static readonly` instance. `AnalyzerOptions` is not documented as thread-safe. Under `concurrentAnalysis: true`, tests sharing this instance could corrupt each other's results.
+
+---
+
+## 146. `AnalyzerTestHost.ConditionContextCache` unbounded growth
+
+**File:** `SharpProof.Test/AnalyzerTestHost.cs:45-46`
+
+`ConcurrentDictionary<string, ConditionContext>` keyed on generated source strings. Each unique `(parameterList, conditionExpression, extraSource)` tuple creates a permanent entry. Hundreds of parameterized test cases cause unbounded growth for the test run's lifetime.
+
+---
+
+## 147. `TestAnalyzerConfigOptions.TryGetValue` sets `value = string.Empty` on miss
+
+**File:** `SharpProof.Test/AnalyzerTestHost.cs:601`
+
+Sets `value = string.Empty` and returns `false` instead of leaving `value` undefined per the `AnalyzerConfigOptions` contract. Callers using `string.IsNullOrEmpty(outValue)` as shortcut for "option not set" conflate explicitly-empty with genuinely-missing.
+
+---
+
+## 148. `ToolingFuzzAnalysisCache` hardcoded RNG seed produces identical corpus every run
+
+**File:** `SharpProof.ToolingTest/ToolingFuzzAnalysisCache.cs:22`
+
+```csharp
+new FuzzCaseGenerator(20260614)
+```
+
+Fixed seed. Identical test cases across ALL runs. If a real-world bug only manifests with input patterns outside this seed's output distribution, the fuzz infrastructure will never discover it. No mechanism to vary the seed.
+
+---
+
+## 149. `SymbolicCliTestHost` target framework derived from test directory name
+
+**File:** `SharpProof.ToolingTest/SymbolicCliTestHost.cs:178`
+
+```csharp
+var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory)
+```
+
+Uses test output directory leaf name as target framework (expecting `net8.0`). If `dotnet test` outputs to a custom directory, `FindExistingCliAssemblyPath` returns `null`, triggering a full on-demand build even if the DLL already exists.
+
+---
+
+## 150. `SymbolicRuntimeHazardCandidateFactory.TryCreateDynamicNullBindingCandidate` redundant semantic check
+
+**File:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs:1071-1084`
+
+`TryCreateDynamicInvocationNullBindingCandidate` calls `TryGetDynamicNullBindingShape` which categorizes the node, then calls `TryCreateDynamicNullBindingCandidate` which redundantly checks `!IsDynamicExpression(receiver)`. The same semantic check is performed at two call sites, wasting Roslyn semantic model queries.
+
+---

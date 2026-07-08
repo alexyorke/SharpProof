@@ -197,7 +197,8 @@ namespace SharpProof.Symbolic.Smt
         private static bool IsVariableNameBoundary(string name, int index)
         {
             return index >= name.Length ||
-                !char.IsDigit(name[index]) && name[index] != '@';
+                name[index] == '.' ||
+                name[index] == '[';
         }
 
         private readonly struct SmtVersionRewrite

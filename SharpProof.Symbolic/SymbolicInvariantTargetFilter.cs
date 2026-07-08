@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace SharpProof.Symbolic
-{    internal static class SymbolicInvariantTargetFilter
+{
+    internal static class SymbolicInvariantTargetFilter
     {
         internal static IReadOnlyList<SymbolicConditionProofSummary> ApplyToProofSummaries(
             IReadOnlyList<SymbolicConditionProofSummary> proofs,
@@ -119,7 +120,9 @@ namespace SharpProof.Symbolic
             }
 
             return invariantTargets
+                .Select(NormalizeTarget)
                 .Where(availableTargets.Contains)
+                .Distinct(StringComparer.Ordinal)
                 .ToArray();
         }
 
@@ -144,7 +147,9 @@ namespace SharpProof.Symbolic
 
             var matched = new HashSet<string>(matchedTargetFilters, StringComparer.Ordinal);
             return invariantTargets
+                .Select(NormalizeTarget)
                 .Where(target => !matched.Contains(target))
+                .Distinct(StringComparer.Ordinal)
                 .ToArray();
         }
 
@@ -157,7 +162,9 @@ namespace SharpProof.Symbolic
 
         internal static bool Matches(string? target, IReadOnlyList<string> invariantTargets)
         {
-            return invariantTargets.Contains(NormalizeTarget(target), StringComparer.Ordinal);
+            var normalizedTarget = NormalizeTarget(target);
+            return invariantTargets.Any(filter =>
+                string.Equals(NormalizeTarget(filter), normalizedTarget, StringComparison.Ordinal));
         }
 
         internal static string NormalizeTarget(string? target)
