@@ -138,7 +138,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 IOperation delegateInstanceOp = invocationOperation.Instance;
                 PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Analyzing Delegate Instance Op: {delegateInstanceOp.Kind} | Syntax: {delegateInstanceOp.Syntax}");
 
-                var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(delegateInstanceOp, currentState, context.SemanticModel);
+                var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(
+                    delegateInstanceOp,
+                    currentState,
+                    context.CancellationToken,
+                    context.SemanticModel);
                 if (potentialTargets != null)
                 {
                     PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Resolved {potentialTargets.Value.MethodSymbols.Count} target(s) for delegate invocation.");
@@ -3170,6 +3174,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(
                 argument.Value,
                 currentState,
+                context.CancellationToken,
                 context.SemanticModel);
             if (potentialTargets == null ||
                 potentialTargets.Value.IsUnresolved ||

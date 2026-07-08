@@ -528,6 +528,31 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void PurityAnalysisEngine_ThreadsCancellationTokenThroughRoslynLookups()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "PurityAnalysisEngine.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Not.Contain("GetSyntax()"));
+            Assert.That(source, Does.Not.Match(@"GetOperation\([^,\r\n]+\)"));
+            Assert.That(source, Does.Not.Match(@"GetTypeInfo\([^,\r\n]+\)"));
+            Assert.That(source, Does.Not.Match(@"GetSymbolInfo\([^,\r\n]+\)"));
+            Assert.That(source, Does.Not.Match(@"GetDeclaredSymbol\([^,\r\n]+\)"));
+            Assert.That(source, Does.Contain("containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)"));
+            Assert.That(source, Does.Contain("GetOwnedDisposableAliasSymbolsToPreserve(\n                    writtenLocalSymbol,\n                    currentState,\n                    valueOperation.Syntax,\n                    semanticModel,\n                    compilation,\n                    cancellationToken)"));
+            Assert.That(source, Does.Contain("EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel, cancellationToken)"));
+            Assert.That(source, Does.Contain("context.SemanticModel.GetOperation(initializerSyntax, context.CancellationToken)"));
+            Assert.That(source, Does.Contain("ResolvePotentialTargets(\n            IOperation valueOperation,\n            PurityAnalysisState currentState,\n            CancellationToken cancellationToken,"));
+            Assert.That(source, Does.Contain("CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel, cancellationToken)"));
+            Assert.That(source, Does.Contain("model.GetOperation(initializerSyntax, cancellationToken)"));
+        }
+
+        [Test]
         public void AnalyzerAssignmentFacts_ThreadCancellationTokenThroughSymbolicLowering()
         {
             var repositoryRoot = FindRepositoryRoot();

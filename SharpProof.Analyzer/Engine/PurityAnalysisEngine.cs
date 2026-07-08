@@ -1713,7 +1713,7 @@ namespace SharpProof.Analyzer.Engine
                                 out var semanticKnownImpureCatalogSource);
                             if (invocationOp.TargetMethod != null &&
                                 !IsArrayAsReadOnlyInvocation(invocationOp) &&
-                                !IsArrayInterfaceGetEnumeratorInvocation(invocationOp, semanticModel) &&
+                                !IsArrayInterfaceGetEnumeratorInvocation(invocationOp, semanticModel, cancellationToken) &&
                                 !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                             {
                                 var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
@@ -3301,7 +3301,7 @@ namespace SharpProof.Analyzer.Engine
             {
                 var fallbackSyntax = deferredRecursiveSyntax ??
                     block.Operations.FirstOrDefault()?.Syntax ??
-                    containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
 
                 currentStateInBlock = currentStateInBlock.WithImpurity(
                     deferredRecursiveImpurity.Value,
@@ -3558,6 +3558,7 @@ namespace SharpProof.Analyzer.Engine
                 var potentialTargets = ResolvePotentialTargets(
                     invocationOperation.Instance,
                     currentState ?? PurityAnalysisState.Pure,
+                    cancellationToken,
                     semanticModel);
                 if (potentialTargets is { IsUnresolved: false } resolvedTargets &&
                     resolvedTargets.MethodSymbols.Count == 1)
@@ -5334,7 +5335,10 @@ namespace SharpProof.Analyzer.Engine
             return cctorResult.IsPure
                 ? PurityAnalysisResult.Pure
                 : PurityAnalysisResult.Impure(
-                    cctorResult.ImpureSyntaxNode ?? typeSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? throw new InvalidOperationException("Cannot find syntax node for static constructor impurity"),
+                    cctorResult.ImpureSyntaxNode ??
+                        typeSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken) ??
+                        context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken) ??
+                        throw new InvalidOperationException("Cannot find syntax node for static constructor impurity"),
                     cctorResult.Evidence);
         }
 
@@ -5377,7 +5381,7 @@ namespace SharpProof.Analyzer.Engine
                 {
                     if (compoundAssignmentOperation.OperatorKind == BinaryOperatorKind.Add)
                     {
-                        PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState);
+                        PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState, context.CancellationToken);
                         if (valueTargets != null &&
                             currentState.DelegateTargetMap.TryGetValue(targetSymbol, out var currentTargets))
                         {
@@ -5430,6 +5434,7 @@ namespace SharpProof.Analyzer.Engine
                         valueOperation,
                         writtenLocalSymbols,
                         currentState,
+                        context.CancellationToken,
                         "[ATF-DEL-COALESCE]",
                         "coalesce-assigned value targets are unresolved");
                 }
@@ -5484,6 +5489,7 @@ namespace SharpProof.Analyzer.Engine
                     valueOperation,
                     writtenLocalSymbols,
                     currentState,
+                    context.CancellationToken,
                     "[ATF-DEL-ASSIGN]",
                     "assigned value targets are unresolved");
             }
@@ -5560,7 +5566,7 @@ namespace SharpProof.Analyzer.Engine
                     nextState = nextState.WithFlowCaptureSymbol(flowCaptureOperation.Id, capturedSymbol);
                 }
 
-                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(flowCaptureOperation.Value, currentState);
+                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(flowCaptureOperation.Value, currentState, context.CancellationToken);
                 if (valueTargets != null)
                 {
                     nextState = nextState.WithFlowCaptureTarget(flowCaptureOperation.Id, valueTargets.Value);
@@ -5630,7 +5636,7 @@ namespace SharpProof.Analyzer.Engine
 
                             if (declaredSymbol.Type?.TypeKind == TypeKind.Delegate)
                             {
-                                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(initializerValue, nextState);
+                                PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(initializerValue, nextState, context.CancellationToken);
                                 if (valueTargets != null)
                                 {
                                     nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
@@ -5706,6 +5712,7 @@ namespace SharpProof.Analyzer.Engine
                         assignment.Value,
                         writtenLocalSymbols,
                         currentState,
+                        context.CancellationToken,
                         "[ATF-DEL-DECONSTRUCT]",
                         "deconstructed value targets are unresolved");
                 }
@@ -7670,7 +7677,8 @@ namespace SharpProof.Analyzer.Engine
                     currentState,
                     valueOperation.Syntax,
                     semanticModel,
-                    compilation);
+                    compilation,
+                    cancellationToken);
                 nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
                 nextState = AddPreservedOwnedDisposableAliasFacts(
                     nextState,
@@ -7742,7 +7750,8 @@ namespace SharpProof.Analyzer.Engine
             PurityAnalysisState currentState,
             SyntaxNode reassignmentSyntax,
             SemanticModel semanticModel,
-            Compilation compilation)
+            Compilation compilation,
+            CancellationToken cancellationToken)
         {
             var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
             var builder = ImmutableArray.CreateBuilder<ISymbol>();
@@ -7763,12 +7772,14 @@ namespace SharpProof.Analyzer.Engine
                     reassignedSymbol,
                     reassignmentSyntax,
                     semanticModel,
-                    compilation))
+                    compilation,
+                    cancellationToken))
             {
                 AddSyntacticAliasSymbolsToPreserve(
                     reassignedSymbol,
                     reassignmentSyntax,
                     semanticModel,
+                    cancellationToken,
                     builder,
                     seen);
             }
@@ -7881,7 +7892,8 @@ namespace SharpProof.Analyzer.Engine
             ISymbol reassignedSymbol,
             SyntaxNode reassignmentSyntax,
             SemanticModel semanticModel,
-            Compilation compilation)
+            Compilation compilation,
+            CancellationToken cancellationToken)
         {
             if (reassignedSymbol is not ILocalSymbol localSymbol)
             {
@@ -7889,7 +7901,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(static reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             if (declaratorSyntax?.Initializer?.Value == null ||
@@ -7898,23 +7910,25 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            var initializerOperation = semanticModel.GetOperation(declaratorSyntax.Initializer.Value);
+            var initializerOperation = semanticModel.GetOperation(declaratorSyntax.Initializer.Value, cancellationToken);
             if (!IsOwnedDisposableObjectCreationValue(initializerOperation!, compilation))
             {
                 return false;
             }
 
             return !WasAnySymbolDisposedBeforeObservation(
-                EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel)
+                EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel, cancellationToken)
                     .Prepend(localSymbol),
                 reassignmentSyntax,
-                semanticModel);
+                semanticModel,
+                cancellationToken);
         }
 
         private static void AddSyntacticAliasSymbolsToPreserve(
             ISymbol reassignedSymbol,
             SyntaxNode reassignmentSyntax,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             ImmutableArray<ISymbol>.Builder builder,
             HashSet<ISymbol> seen)
         {
@@ -7923,7 +7937,7 @@ namespace SharpProof.Analyzer.Engine
                 return;
             }
 
-            foreach (var aliasSymbol in EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel))
+            foreach (var aliasSymbol in EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel, cancellationToken))
             {
                 if (!SymbolEqualityComparer.Default.Equals(aliasSymbol, reassignedSymbol) &&
                     seen.Add(aliasSymbol))
@@ -7936,7 +7950,8 @@ namespace SharpProof.Analyzer.Engine
         private static IEnumerable<ILocalSymbol> EnumerateSyntacticAliases(
             ILocalSymbol sourceLocal,
             SyntaxNode observationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
             if (containingBlock == null)
@@ -7946,10 +7961,11 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (declarator.SpanStart >= observationSyntax.SpanStart ||
                     declarator.Initializer?.Value == null ||
-                    semanticModel.GetDeclaredSymbol(declarator) is not ILocalSymbol aliasSymbol ||
-                    semanticModel.GetSymbolInfo(declarator.Initializer.Value).Symbol is not ILocalSymbol initializerSymbol ||
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol aliasSymbol ||
+                    semanticModel.GetSymbolInfo(declarator.Initializer.Value, cancellationToken).Symbol is not ILocalSymbol initializerSymbol ||
                     !SymbolEqualityComparer.Default.Equals(initializerSymbol, sourceLocal))
                 {
                     continue;
@@ -7962,7 +7978,8 @@ namespace SharpProof.Analyzer.Engine
         private static bool WasAnySymbolDisposedBeforeObservation(
             IEnumerable<ISymbol> symbols,
             SyntaxNode observationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var symbolSet = new HashSet<ISymbol>(symbols, SymbolEqualityComparer.Default);
             if (symbolSet.Count == 0)
@@ -7978,10 +7995,11 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var invocation in containingBlock.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (invocation.SpanStart >= observationSyntax.SpanStart ||
                     invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                     memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
-                    semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is not { } disposedSymbol)
+                    semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } disposedSymbol)
                 {
                     continue;
                 }
@@ -8002,6 +8020,7 @@ namespace SharpProof.Analyzer.Engine
             IOperation? valueOperation,
             ILocalSymbol[] writtenLocalSymbols,
             PurityAnalysisState valueState,
+            CancellationToken cancellationToken,
             string logScope,
             string unresolvedReason)
         {
@@ -8011,7 +8030,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var nextState = currentState;
-            PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, valueState);
+            PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, valueState, cancellationToken);
             if (valueTargets != null)
             {
                 foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
@@ -8064,6 +8083,7 @@ namespace SharpProof.Analyzer.Engine
             Rules.PurityAnalysisContext context,
             HashSet<ISymbol> visited)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (!visited.Add(localSymbol))
             {
                 yield break;
@@ -8078,7 +8098,8 @@ namespace SharpProof.Analyzer.Engine
 
             foreach (var syntaxReference in localSymbol.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax declaratorSyntax ||
+                context.CancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(context.CancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax declaratorSyntax ||
                     declaratorSyntax.Initializer?.Value == null)
                 {
                     continue;
@@ -8090,7 +8111,7 @@ namespace SharpProof.Analyzer.Engine
                     initializerSyntax = refExpressionSyntax.Expression;
                 }
 
-                if (context.SemanticModel.GetOperation(initializerSyntax) is not { } initializerOperation)
+                if (context.SemanticModel.GetOperation(initializerSyntax, context.CancellationToken) is not { } initializerOperation)
                 {
                     continue;
                 }
@@ -8200,7 +8221,8 @@ namespace SharpProof.Analyzer.Engine
 
         private static bool IsArrayInterfaceGetEnumeratorInvocation(
             IInvocationOperation invocationOperation,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
@@ -8229,8 +8251,8 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            var operandType = semanticModel.GetTypeInfo(castExpression.Expression).ConvertedType ??
-                semanticModel.GetTypeInfo(castExpression.Expression).Type;
+            var operandTypeInfo = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken);
+            var operandType = operandTypeInfo.ConvertedType ?? operandTypeInfo.Type;
             return operandType is IArrayTypeSymbol;
         }
 
@@ -8736,8 +8758,13 @@ namespace SharpProof.Analyzer.Engine
         }
 
 
-        internal static PurityAnalysisEngine.PotentialTargets? ResolvePotentialTargets(IOperation valueOperation, PurityAnalysisState currentState, SemanticModel? semanticModel = null)
+        internal static PurityAnalysisEngine.PotentialTargets? ResolvePotentialTargets(
+            IOperation valueOperation,
+            PurityAnalysisState currentState,
+            CancellationToken cancellationToken,
+            SemanticModel? semanticModel = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrapped = SkipImplicitConversions(valueOperation);
             if (unwrapped == null) return null;
             if (unwrapped is IFlowCaptureReferenceOperation flowCaptureReference &&
@@ -8753,8 +8780,8 @@ namespace SharpProof.Analyzer.Engine
                     return PurityAnalysisEngine.PotentialTargets.Unresolved;
                 }
 
-                var trueTargets = ResolvePotentialTargets(conditionalOperation.WhenTrue, currentState, semanticModel);
-                var falseTargets = ResolvePotentialTargets(conditionalOperation.WhenFalse, currentState, semanticModel);
+                var trueTargets = ResolvePotentialTargets(conditionalOperation.WhenTrue, currentState, cancellationToken, semanticModel);
+                var falseTargets = ResolvePotentialTargets(conditionalOperation.WhenFalse, currentState, cancellationToken, semanticModel);
                 if (trueTargets == null || falseTargets == null)
                 {
                     return PurityAnalysisEngine.PotentialTargets.Unresolved;
@@ -8812,9 +8839,9 @@ namespace SharpProof.Analyzer.Engine
 
             if (valueSourceSymbol != null &&
                 semanticModel != null &&
-                CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel))
+                CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel, cancellationToken))
             {
-                var initializerTargets = TryResolveDelegateInitializerTargets(valueSourceSymbol, semanticModel, currentState);
+                var initializerTargets = TryResolveDelegateInitializerTargets(valueSourceSymbol, semanticModel, currentState, cancellationToken);
                 if (initializerTargets != null)
                 {
                     return initializerTargets;
@@ -8854,7 +8881,10 @@ namespace SharpProof.Analyzer.Engine
                 !receiverType.IsSealed;
         }
 
-        private static bool CanTrustDelegateInitializerSymbol(ISymbol symbol, SemanticModel semanticModel)
+        private static bool CanTrustDelegateInitializerSymbol(
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (symbol is ILocalSymbol)
             {
@@ -8864,25 +8894,30 @@ namespace SharpProof.Analyzer.Engine
             if (symbol is IFieldSymbol fieldSymbol)
             {
                 return fieldSymbol.IsReadOnly &&
-                    !HasAssignmentToField(fieldSymbol, semanticModel);
+                    !HasAssignmentToField(fieldSymbol, semanticModel, cancellationToken);
             }
 
             return false;
         }
 
-        private static bool HasAssignmentToField(IFieldSymbol fieldSymbol, SemanticModel semanticModel)
+        private static bool HasAssignmentToField(
+            IFieldSymbol fieldSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in fieldSymbol.ContainingType.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not TypeDeclarationSyntax typeDeclaration)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax typeDeclaration)
                 {
                     continue;
                 }
 
                 foreach (var assignment in typeDeclaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var model = semanticModel.Compilation.GetSemanticModel(assignment.SyntaxTree);
-                    var targetOperation = model.GetOperation(assignment.Left);
+                    var targetOperation = model.GetOperation(assignment.Left, cancellationToken);
                     var targetSymbol = TryResolveSymbol(SkipImplicitConversions(targetOperation));
                     if (SymbolEqualityComparer.Default.Equals(targetSymbol, fieldSymbol))
                     {
@@ -8894,11 +8929,16 @@ namespace SharpProof.Analyzer.Engine
             return false;
         }
 
-        private static PurityAnalysisEngine.PotentialTargets? TryResolveDelegateInitializerTargets(ISymbol symbol, SemanticModel semanticModel, PurityAnalysisState currentState)
+        private static PurityAnalysisEngine.PotentialTargets? TryResolveDelegateInitializerTargets(
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            PurityAnalysisState currentState,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
             {
-                var syntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var syntax = syntaxReference.GetSyntax(cancellationToken);
                 var model = semanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
 
                 SyntaxNode? initializerSyntax = syntax switch
@@ -8913,13 +8953,13 @@ namespace SharpProof.Analyzer.Engine
                     continue;
                 }
 
-                var initializerOperation = model.GetOperation(initializerSyntax);
+                var initializerOperation = model.GetOperation(initializerSyntax, cancellationToken);
                 if (initializerOperation == null)
                 {
                     continue;
                 }
 
-                var initializerTargets = ResolvePotentialTargets(initializerOperation, currentState, model);
+                var initializerTargets = ResolvePotentialTargets(initializerOperation, currentState, cancellationToken, model);
                 if (initializerTargets != null)
                 {
                     return initializerTargets;

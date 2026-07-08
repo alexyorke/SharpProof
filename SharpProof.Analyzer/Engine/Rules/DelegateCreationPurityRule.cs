@@ -226,7 +226,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                 }
 
-                var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(delegateCreation, currentState, context.SemanticModel);
+                var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(
+                    delegateCreation,
+                    currentState,
+                    context.CancellationToken,
+                    context.SemanticModel);
                 if (potentialTargets == null || potentialTargets.Value.IsUnresolved)
                 {
                     PurityAnalysisEngine.LogDebug("    [DelegateCreationRule] Delegate target could dispatch to unresolved runtime target. Assuming impure.");
