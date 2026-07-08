@@ -237,7 +237,7 @@ namespace SharpProof.Test
             return typeName + "." + methodName + signature;
         }
 
-        private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
+        internal static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
         {
             if (handle.IsNil)
             {
@@ -355,7 +355,7 @@ namespace SharpProof.Test
             return builder.ToImmutable();
         }
 
-        private static string NormalizeExactTypeName(string typeName)
+        internal static string NormalizeExactTypeName(string typeName)
         {
             return typeName switch
             {

@@ -228,7 +228,7 @@ public class TestClass
         private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var typeName = GeneratedPurityTestSupport.GetTypeName(reader, definition.GetDeclaringType());
             var methodName = reader.GetString(definition.Name);
             var signature = DecodeMethodSignature(reader, definition);
             return typeName + "." + methodName + signature;
@@ -237,29 +237,10 @@ public class TestClass
         private static string GetMethodExactSymbolKey(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
-            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            var typeName = GeneratedPurityTestSupport.NormalizeExactTypeName(GeneratedPurityTestSupport.GetTypeName(reader, definition.GetDeclaringType()));
             var methodName = reader.GetString(definition.Name);
             var signature = DecodeExactMethodSignature(reader, definition);
             return typeName + "." + methodName + signature;
-        }
-
-        private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
-        {
-            if (handle.IsNil)
-            {
-                return "<module>";
-            }
-
-            var definition = reader.GetTypeDefinition(handle);
-            var name = reader.GetString(definition.Name);
-            var declaringType = definition.GetDeclaringType();
-            if (!declaringType.IsNil)
-            {
-                return GetTypeName(reader, declaringType) + "+" + name;
-            }
-
-            var ns = reader.GetString(definition.Namespace);
-            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
         }
 
         private static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
@@ -294,44 +275,6 @@ public class TestClass
             {
                 return "(?)->?";
             }
-        }
-
-        private static string NormalizeExactTypeName(string typeName)
-        {
-            return typeName switch
-            {
-                "System.Boolean" => "bool",
-                "System.Byte" => "byte",
-                "System.Char" => "char",
-                "System.Decimal" => "decimal",
-                "System.Double" => "double",
-                "System.Int16" => "short",
-                "System.Int32" => "int",
-                "System.Int64" => "long",
-                "System.IntPtr" => "nint",
-                "System.Object" => "object",
-                "System.SByte" => "sbyte",
-                "System.Single" => "float",
-                "System.String" => "string",
-                "System.UInt16" => "ushort",
-                "System.UInt32" => "uint",
-                "System.UInt64" => "ulong",
-                "System.UIntPtr" => "nuint",
-                "System.Void" => "void",
-                _ => typeName
-            };
-        }
-
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-            string source,
-            (string Path, string Text)[] effectSummaryFiles,
-            ImmutableArray<MetadataReference> additionalReferences)
-        {
-            return await GetAnalyzerDiagnosticsAsync(
-                source,
-                effectSummaryFiles,
-                additionalReferences,
-                null);
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -638,9 +581,9 @@ public class TestClass
             };
             public string GetSZArrayType(string elementType) => elementType + "[]";
             public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeName(metadataReader, handle));
+                => GeneratedPurityTestSupport.NormalizeExactTypeName(GeneratedPurityTestSupport.GetTypeName(metadataReader, handle));
             public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
+                => GeneratedPurityTestSupport.NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
             public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
                 => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         }
