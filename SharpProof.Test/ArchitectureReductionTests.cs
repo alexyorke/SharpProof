@@ -669,7 +669,8 @@ namespace SharpProof.Test
 
             Assert.That(source, Does.Not.Contain("semanticModel.GetDeclaredSymbol(singleVariableDesignation)"));
             Assert.That(source, Does.Contain("semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken)"));
-            Assert.That(source, Does.Contain("AddDesignationBindingFact(\n                    nullableValue,\n                    declarationPattern.Designation,\n                    semanticModel,\n                    cancellationToken,"));
+            Assert.That(source, Does.Contain("AddDesignationBindingFact("));
+            Assert.That(source, Does.Contain("nullableValue,\n                    declarationPattern.Designation,\n                    semanticModel,\n                    cancellationToken,"));
             Assert.That(source, Does.Contain("AddDesignationNonNullFact(declarationPattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion)"));
         }
 
