@@ -1011,7 +1011,7 @@ namespace SharpProof.Test
             Assert.That(returnSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetDeclaredSymbol(designation, cancellationToken)"));
-            Assert.That(returnSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol"));
+            Assert.That(helperSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol"));
             Assert.That(returnSource, Does.Contain("RuleAnalysisHelper.ConstructorStoresParameterMatching("));
             Assert.That(helperSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("cancellationToken: cancellationToken"));

@@ -1701,7 +1701,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                           out initializerSyntax,
                           out declarationSyntax))
             {
-                if (HasAssignmentToLocalBetweenDeclarationAndObservation(
+                if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
                         localSymbol,
                         returnedValue.Syntax,
                         declarationSyntax,
@@ -2020,44 +2020,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return expression;
-        }
-
-        private static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
-            ILocalSymbol localSymbol,
-            SyntaxNode observationSyntax,
-            SyntaxNode declarationSyntax,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
-            if (containingBlock == null)
-            {
-                return false;
-            }
-
-            var start = declarationSyntax.Span.End;
-            var end = observationSyntax.SpanStart;
-            if (end <= start)
-            {
-                return false;
-            }
-
-            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (assignment.SpanStart < start || assignment.SpanStart >= end)
-                {
-                    continue;
-                }
-
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsConstructionWithEscapingParameters(

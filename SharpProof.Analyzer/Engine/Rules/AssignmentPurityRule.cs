@@ -906,7 +906,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         internal static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
-            VariableDeclaratorSyntax declaratorSyntax,
+            SyntaxNode declarationSyntax,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
@@ -917,7 +917,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var start = declaratorSyntax.Span.End;
+            var start = declarationSyntax.Span.End;
             var end = observationSyntax.SpanStart;
             if (end <= start)
             {

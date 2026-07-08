@@ -777,7 +777,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndEscape(localSymbol, delegateCreationSyntax, declaratorSyntax, semanticModel, cancellationToken))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localSymbol,
+                    delegateCreationSyntax,
+                    declaratorSyntax,
+                    semanticModel,
+                    cancellationToken))
             {
                 return false;
             }
@@ -797,45 +802,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                        semanticModel,
                        visitedLocals,
                        cancellationToken);
-        }
-
-        private static bool HasAssignmentToLocalBetweenDeclarationAndEscape(
-            ILocalSymbol localSymbol,
-            SyntaxNode delegateCreationSyntax,
-            VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var containingBlock = delegateCreationSyntax.FirstAncestorOrSelf<BlockSyntax>();
-            if (containingBlock == null)
-            {
-                return false;
-            }
-
-            var start = declaratorSyntax.Span.End;
-            var end = delegateCreationSyntax.SpanStart;
-            if (end <= start)
-            {
-                return false;
-            }
-
-            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (assignment.SpanStart < start || assignment.SpanStart >= end)
-                {
-                    continue;
-                }
-
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span, CancellationToken cancellationToken)
