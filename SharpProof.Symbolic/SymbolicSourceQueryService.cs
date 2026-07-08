@@ -2563,7 +2563,7 @@ namespace SharpProof.Symbolic
             if (string.Equals(condition.FormulaKind, "Text", StringComparison.Ordinal) &&
                 string.Equals(condition.Target, condition.Text, StringComparison.Ordinal))
             {
-                var extracted = TryExtractTextFactTarget(condition.Text);
+                var extracted = TextFactTargetExtraction.TryExtract(condition.Text);
                 if (!string.IsNullOrWhiteSpace(extracted))
                 {
                     return extracted!;
@@ -2571,49 +2571,6 @@ namespace SharpProof.Symbolic
             }
 
             return condition.Target;
-        }
-
-        private static string? TryExtractTextFactTarget(string? text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return null;
-            }
-
-            var value = text!.Trim();
-            while (value.StartsWith("!", StringComparison.Ordinal) ||
-                (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)))
-            {
-                value = value.StartsWith("!", StringComparison.Ordinal)
-                    ? value.Substring(1).TrimStart()
-                    : value.Substring(1, value.Length - 2).Trim();
-            }
-
-            for (var index = 0; index < value.Length; index++)
-            {
-                if (!SyntaxFacts.IsIdentifierStartCharacter(value[index]) && value[index] != '@')
-                {
-                    continue;
-                }
-
-                var start = index;
-                index++;
-                while (index < value.Length && SyntaxFacts.IsIdentifierPartCharacter(value[index]))
-                {
-                    index++;
-                }
-
-                var target = value.Substring(start, index - start);
-                if (index + ".Length".Length <= value.Length &&
-                    string.Equals(value.Substring(index, ".Length".Length), ".Length", StringComparison.Ordinal))
-                {
-                    target += ".Length";
-                }
-
-                return target;
-            }
-
-            return null;
         }
 
         private static TargetFactBuilder GetBuilder(
@@ -6788,74 +6745,7 @@ namespace SharpProof.Symbolic
             var reason = reasons
                 .FirstOrDefault(static item => item.TruthValue == SymbolicTruthValue.Unknown)
                 ?.Reason;
-            if (string.IsNullOrWhiteSpace(reason))
-            {
-                return SymbolicUnknownReason.Unknown;
-            }
-
-            var normalizedReason = reason!;
-            if (ContainsReason(normalizedReason, "timeout") ||
-                ContainsReason(normalizedReason, "timed_out"))
-            {
-                return SymbolicUnknownReason.Timeout;
-            }
-
-            if (ContainsReason(normalizedReason, "method_budget"))
-            {
-                return SymbolicUnknownReason.MethodBudgetExceeded;
-            }
-
-            if (ContainsReason(normalizedReason, "path_condition") ||
-                ContainsReason(normalizedReason, "max_path_conditions") ||
-                ContainsReason(normalizedReason, "too_many_path_conditions"))
-            {
-                return SymbolicUnknownReason.PathConditionBudgetExceeded;
-            }
-
-            if (ContainsReason(normalizedReason, "expression_budget") ||
-                ContainsReason(normalizedReason, "max_expression"))
-            {
-                return SymbolicUnknownReason.ExpressionBudgetExceeded;
-            }
-
-            if (ContainsReason(normalizedReason, "cancellation") ||
-                ContainsReason(normalizedReason, "cancelled") ||
-                ContainsReason(normalizedReason, "canceled"))
-            {
-                return SymbolicUnknownReason.CancellationRequested;
-            }
-
-            if (ContainsReason(normalizedReason, "encoding"))
-            {
-                return SymbolicUnknownReason.EncodingFailure;
-            }
-
-            if (ContainsReason(normalizedReason, "unsupported"))
-            {
-                return SymbolicUnknownReason.UnsupportedIrEncoding;
-            }
-
-            if (ContainsReason(normalizedReason, "smt_required") ||
-                ContainsReason(normalizedReason, "smt_disabled") ||
-                ContainsReason(normalizedReason, "smt_off"))
-            {
-                return SymbolicUnknownReason.SmtDisabled;
-            }
-
-            if (ContainsReason(normalizedReason, "z3") ||
-                ContainsReason(normalizedReason, "native") ||
-                ContainsReason(normalizedReason, "unavailable") ||
-                ContainsReason(normalizedReason, "load"))
-            {
-                return SymbolicUnknownReason.SmtUnavailable;
-            }
-
-            return SymbolicUnknownReason.Unknown;
-        }
-
-        private static bool ContainsReason(string reason, string value)
-        {
-            return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+            return SymbolicUnknownReasonClassifier.Classify(reason ?? string.Empty);
         }
 
         private readonly struct ProofReasonKey
@@ -7587,7 +7477,7 @@ namespace SharpProof.Symbolic
                 "Text",
                 "Unknown",
                 isSolverBacked: false,
-                ExtractTextFactTarget(normalizedText),
+                TextFactTargetExtraction.Extract(normalizedText),
                 isConservativeUnknown: false);
         }
 
@@ -7643,14 +7533,35 @@ namespace SharpProof.Symbolic
                 : typeName;
         }
 
-        private static string ExtractTextFactTarget(string text)
+
+
+    }
+
+    internal static class TextFactTargetExtraction
+    {
+        internal static string? TryExtract(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            return ScanIdentifierTarget(Unwrap(text!.Trim()));
+        }
+
+        internal static string Extract(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
                 return string.Empty;
             }
 
-            var value = text.Trim();
+            var value = Unwrap(text.Trim());
+            return ScanIdentifierTarget(value) ?? value;
+        }
+
+        private static string Unwrap(string value)
+        {
             while (value.StartsWith("!", StringComparison.Ordinal) ||
                 (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)))
             {
@@ -7659,6 +7570,11 @@ namespace SharpProof.Symbolic
                     : value.Substring(1, value.Length - 2).Trim();
             }
 
+            return value;
+        }
+
+        private static string? ScanIdentifierTarget(string value)
+        {
             for (var index = 0; index < value.Length; index++)
             {
                 if (!SyntaxFacts.IsIdentifierStartCharacter(value[index]) && value[index] != '@')
@@ -7683,7 +7599,7 @@ namespace SharpProof.Symbolic
                 return target;
             }
 
-            return value;
+            return null;
         }
     }
 
@@ -8010,73 +7926,7 @@ namespace SharpProof.Symbolic
                 return SymbolicUnknownReason.None;
             }
 
-            if (string.IsNullOrWhiteSpace(reason))
-            {
-                return SymbolicUnknownReason.Unknown;
-            }
-
-            if (ContainsReason(reason, "timeout") ||
-                ContainsReason(reason, "timed_out"))
-            {
-                return SymbolicUnknownReason.Timeout;
-            }
-
-            if (ContainsReason(reason, "method_budget"))
-            {
-                return SymbolicUnknownReason.MethodBudgetExceeded;
-            }
-
-            if (ContainsReason(reason, "path_condition") ||
-                ContainsReason(reason, "max_path_conditions") ||
-                ContainsReason(reason, "too_many_path_conditions"))
-            {
-                return SymbolicUnknownReason.PathConditionBudgetExceeded;
-            }
-
-            if (ContainsReason(reason, "expression_budget") ||
-                ContainsReason(reason, "max_expression"))
-            {
-                return SymbolicUnknownReason.ExpressionBudgetExceeded;
-            }
-
-            if (ContainsReason(reason, "cancellation") ||
-                ContainsReason(reason, "cancelled") ||
-                ContainsReason(reason, "canceled"))
-            {
-                return SymbolicUnknownReason.CancellationRequested;
-            }
-
-            if (ContainsReason(reason, "encoding"))
-            {
-                return SymbolicUnknownReason.EncodingFailure;
-            }
-
-            if (ContainsReason(reason, "unsupported"))
-            {
-                return SymbolicUnknownReason.UnsupportedIrEncoding;
-            }
-
-            if (ContainsReason(reason, "smt_required") ||
-                ContainsReason(reason, "smt_disabled") ||
-                ContainsReason(reason, "smt_off"))
-            {
-                return SymbolicUnknownReason.SmtDisabled;
-            }
-
-            if (ContainsReason(reason, "z3") ||
-                ContainsReason(reason, "native") ||
-                ContainsReason(reason, "unavailable") ||
-                ContainsReason(reason, "load"))
-            {
-                return SymbolicUnknownReason.SmtUnavailable;
-            }
-
-            return SymbolicUnknownReason.Unknown;
-        }
-
-        private static bool ContainsReason(string reason, string value)
-        {
-            return reason.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+            return SymbolicUnknownReasonClassifier.Classify(reason);
         }
     }
 
