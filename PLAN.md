@@ -79,6 +79,20 @@ commitments for the current preview, but they are useful backlog material.
 - Add a first-class baseline workflow: generate `SharpProof.Baseline.json` from
   current diagnostics or SARIF, explain why an entry matched, and prune entries
   that no longer suppress anything.
+- Make baseline suppression instance-granular and uniformly available across
+  every public diagnostic, including exception summaries, exception sites,
+  BCL-fallback explanation diagnostics, and usage diagnostics. Baseline entries
+  should be able to match by stable symbol, path, location, contract text,
+  operation kind, and evidence key so suppressing one allocation, capability,
+  postcondition, or exception site does not hide unrelated diagnostics in the
+  same method.
+- Add an opt-in Roslyn `DiagnosticSuppressor` layer that suppresses external
+  analyzer or compiler non-error diagnostics only when SharpProof has exact
+  proof evidence for the same location, such as proven non-null dereferences,
+  in-range indexes, non-zero divisors, unreachable switch arms, or unreachable
+  exception paths. Include suppression descriptors, proof links, allowlists for
+  supported diagnostic IDs, and tests that uncertain proofs leave the original
+  diagnostics visible.
 - Add richer diagnostic properties that let editors and build tools jump
   directly from a diagnostic to the equivalent `SharpProof.SymbolicCli explain`
   query, including target file, line, column, contract text, proof status, and
@@ -91,6 +105,11 @@ commitments for the current preview, but they are useful backlog material.
   an analysis run, with exact symbol, source of trust, configured value or
   attribute, and whether a stronger generated summary or direct contract
   overrode it.
+- Make SharpProof attribute identity and stub compatibility an explicit policy:
+  prefer fully qualified `SharpProof.Attributes` symbols, support intentional
+  source-only stubs through documented namespaces or opt-in configuration, and
+  report ambiguous or unrelated simple-name matches instead of silently treating
+  any `EnforcePureAttribute`-style type as a SharpProof contract.
 - Report every misplaced SharpProof attribute on a declaration instead of
   short-circuiting after the first one, so `[EnforcePure]`, `[Pure]`,
   `[AllowSynchronization]`, `[ZeroAllocations]`, `[AllowedCapabilities]`,
@@ -101,6 +120,10 @@ commitments for the current preview, but they are useful backlog material.
   overrides, then decide whether purity overrides, purity profile, SMT budgets,
   and effect-summary loading need per-tree behavior or a diagnostic explaining
   why they are global-only.
+- Centralize analyzer option metadata in one registry used by parsers, docs,
+  profiles, diagnostics, and impacted-test selection, and add a conformance
+  test that no live `sharpproof_*` option is consumed only as an ad hoc string
+  literal.
 - Ship ready-to-copy `.editorconfig` and `.globalconfig` profiles for
   migration, audit, CI, and strict adoption modes, including recommended
   `dotnet_diagnostic.SP*.severity` entries and `sharpproof_*` option defaults
@@ -113,6 +136,10 @@ commitments for the current preview, but they are useful backlog material.
   failures: distinguish missing `[AllowSynchronization]`, unsupported lock
   targets under `[AllowSynchronization]`, volatile/interlocked/threading
   operations, and redundant allowances, with fixable guidance for each case.
+- Either remove the currently inert `sharpproof_enable_debug_logging` surface or
+  replace it with a host-safe structured trace path, such as opt-in trace
+  diagnostics, compact JSON from the CLI, or test-only trace capture, rather
+  than no-op `LogDebug` calls that users cannot observe in analyzer hosts.
 
 ### Purity Rule Precision Targets
 
@@ -357,6 +384,22 @@ commitments for the current preview, but they are useful backlog material.
   result DTOs.
 - Add a public proof/evidence schema version and compatibility policy for
   compact JSON, diagnostic properties, effect summaries, and baseline entries.
+- Add a standalone source-query compilation profile for non-MSBuild API and CLI
+  calls, covering language version, preprocessor symbols, nullable context,
+  unsafe allowance, documentation mode, platform, optimization, and assembly
+  identity, so single-file queries can intentionally match the user's compiler
+  settings before the heavier `--project` path is needed.
+- Move CLI-only compact projections for capability, complexity, runtime-hazard,
+  and future `explain` results into `SharpProof.Symbolic` public DTOs with
+  shared schema tests, instead of keeping invariant compact output in the
+  library and other compact shapes as internal CLI classes.
+- Add solver-model witness and input-domain synthesis for point, line, span,
+  all-lines, implication, reachability, and runtime-hazard queries. Expose
+  satisfying assignments and conservative domain summaries for parameters,
+  locals, receiver state, integers/ranges, nullness, string length/content,
+  regex or prefix/suffix predicates, collection lengths, and indexes, with
+  explicit unsupported or approximate markers so users can ask what inputs
+  reach a line or trigger a specific hazard.
 - Add stable unknown-reason taxonomies for capability, complexity, runtime
   hazard, purity, and `[Ensures]` results so users can distinguish unsupported
   syntax, unsupported library modeling, solver budget, timeout, cancellation,
@@ -392,6 +435,11 @@ commitments for the current preview, but they are useful backlog material.
   source-summary generation, CI refresh, cache-key validation, and AdditionalFiles
   wiring that does not reintroduce checked-in JSON artifacts or legacy
   buildTransitive targets.
+- Make the built-in effect-summary MSBuild generation target incremental and
+  hermetic: declare inputs and outputs, skip regeneration when the artifact
+  spec, runtime assemblies, tool binary, and output resources are unchanged,
+  support an explicit inner-loop opt-out, and capture tool failures as
+  actionable build diagnostics instead of rebuilding summaries unconditionally.
 - Add analyzer-visible stale-summary evidence when supplied effect summaries are
   ignored because assembly identity, module version, method token, method-body
   hash, or the artifact spec's framework/package source no longer matches the
@@ -440,6 +488,12 @@ commitments for the current preview, but they are useful backlog material.
 - Add CI-visible package-consumer tests for all current public diagnostics, not
   only a subset, and include code-fix availability where supported by the
   package layout.
+- Decide whether `SharpProof.Symbolic` is a supported public library package or
+  an analyzer-private implementation assembly. If public, ship it as a real
+  NuGet `lib` asset with XML docs, nullable annotations, samples, Source Link,
+  and package/API compatibility baselines; if private, hide or internalize the
+  accidental public query DTO surface so consumers do not build against a DLL
+  that is only delivered under `analyzers/dotnet/cs`.
 - Add an analyzer coverage dashboard that combines Roslyn operation coverage,
   syntax-shape fuzz coverage, effect-summary coverage, and runtime-hazard
   fallback counts into one local artifact.
@@ -460,6 +514,11 @@ commitments for the current preview, but they are useful backlog material.
   `--solution`, that loads MSBuild references, parse options, `.editorconfig`
   analyzer configuration, baselines, and effect-summary AdditionalFiles so
   `explain` matches the build diagnostics users actually see.
+- Add lightweight non-project input modes for editor and automation adapters:
+  `--stdin`, `--source-text`, `--source-file-name`, source-map metadata, and a
+  JSON request envelope that can carry source text, virtual file path, target
+  location, references, parse options, implied conditions, SMT budgets, and
+  output preferences without requiring a temporary file.
 - Add a batch or streaming symbolic query mode for file lists or JSON/NDJSON
   request sets, reusing compilation, references, and SMT services across many
   point, line, hazard, capability, and complexity queries while returning
@@ -473,6 +532,19 @@ commitments for the current preview, but they are useful backlog material.
   unsupported targets, missing references, parse failures, native solver
   loading failures, timeouts, and canceled queries so automation can handle
   failures without scraping exception text.
+- Add machine-readable `explain` output, such as `explain --json`,
+  `explain --sarif`, and optional markdown reports, that composes invariant,
+  reachability, runtime-hazard, capability, complexity, and diagnostic
+  cross-links into one bounded result for IDEs, CI bots, and issue attachments.
+- Add proof and effect graph exports for debugging and review: emit DGML,
+  GraphViz DOT, or compact JSON graphs for call chains, symbolic fact
+  dependencies, exception-summary edges, capability sites, complexity drivers,
+  and effect-summary provenance so users can inspect why a result was
+  conservative without reading raw text logs.
+- Replace the hand-rolled symbolic CLI option parser with a command model that
+  supports subcommands, response files, shell completion, mutually exclusive
+  option groups, generated help, and shared validation metadata for docs and
+  tests.
 - Add editor-facing lightbulb actions for "explain this diagnostic", "generate
   baseline entry", and "open compact JSON proof evidence" when running inside
   Visual Studio or another Roslyn host.
@@ -487,6 +559,10 @@ commitments for the current preview, but they are useful backlog material.
   parser defaults, including valid values, default values, per-tree versus
   global scope, related diagnostics, and sample EditorConfig/global
   AnalyzerConfig entries, then verify README and docs snippets against it.
+- Ship optional package-delivered `.globalconfig` profiles through MSBuild
+  `.props` wiring, so consumers can enable SharpProof migration, audit, CI, or
+  strict modes with a package property while still retaining documented
+  precedence and local override behavior.
 - Move analyzer diagnostic and code-fix titles/messages into real
   resource-backed strings, remove scaffolded resource entries, and add package
   and VSIX tests that resource/satellite assemblies are present and code
