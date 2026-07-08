@@ -1242,7 +1242,7 @@ namespace SharpProof.Analyzer
         {
             return parameter.GetAttributes().Any(attribute =>
                 string.Equals(
-                    GetFullMetadataName(attribute.AttributeClass),
+                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                     NotNullAttributeName,
                     System.StringComparison.Ordinal));
         }
@@ -1294,7 +1294,7 @@ namespace SharpProof.Analyzer
             foreach (var attribute in parameter.GetAttributes())
             {
                 if (!string.Equals(
-                        GetFullMetadataName(attribute.AttributeClass),
+                        SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                         DoesNotReturnIfAttributeName,
                         System.StringComparison.Ordinal) ||
                     attribute.ConstructorArguments.Length != 1 ||
@@ -1309,21 +1309,6 @@ namespace SharpProof.Analyzer
 
             value = false;
             return false;
-        }
-
-        private static string? GetFullMetadataName(INamedTypeSymbol? type)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
-                ? type.ContainingNamespace.ToDisplayString()
-                : string.Empty;
-            return string.IsNullOrEmpty(namespaceName)
-                ? type.MetadataName
-                : namespaceName + "." + type.MetadataName;
         }
 
         private static ExpressionSyntax UnwrapAwaitedFactExpression(ExpressionSyntax expression)

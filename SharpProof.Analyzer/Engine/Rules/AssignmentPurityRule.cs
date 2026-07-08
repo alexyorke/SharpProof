@@ -217,60 +217,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
 
-            if (valueOperation != null && targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
-            {
-                PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL] Detected delegate assignment to: {targetSymbol.Name} ({targetSymbol.Kind})");
-                PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value Op Kind: {valueOperation.Kind} | Syntax: {valueOperation.Syntax}");
-
-
-                PurityAnalysisEngine.PotentialTargets? valueTargets = null;
-                if (valueOperation is IMethodReferenceOperation methodRef)
-                {
-
-                    valueTargets = PurityAnalysisEngine.PotentialTargets.FromSingle(methodRef.Method.OriginalDefinition);
-                    PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value is Method Group: {methodRef.Method.ToDisplayString()}");
-                }
-                else if (valueOperation is IDelegateCreationOperation delegateCreation)
-                {
-                    if (delegateCreation.Target is IMethodReferenceOperation lambdaRef)
-                    {
-
-                        valueTargets = PurityAnalysisEngine.PotentialTargets.FromSingle(lambdaRef.Method.OriginalDefinition);
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value is Lambda/Delegate Creation targeting: {lambdaRef.Method.ToDisplayString()}");
-                    }
-                    else
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value is Lambda/Delegate Creation with unresolvable target ({delegateCreation.Target?.Kind}). Cannot track.");
-                    }
-                }
-                else
-                {
-                    ISymbol? valueSourceSymbol = TryResolveSymbol(valueOperation);
-                    if (valueSourceSymbol != null && currentState.DelegateTargetMap.TryGetValue(valueSourceSymbol, out var sourceTargets))
-                    {
-                        valueTargets = sourceTargets;
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value is reference to {valueSourceSymbol.Name}. Propagating {sourceTargets.MethodSymbols.Count} targets.");
-                    }
-                    else
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   Value is reference ({valueOperation.Kind}) but source symbol ({valueSourceSymbol?.Name ?? "null"}) not found in map or unresolved. Cannot track.");
-                    }
-                }
-
-                if (valueTargets != null)
-                {
-
-
-                    var nextState = currentState.WithDelegateTarget(targetSymbol, valueTargets.Value);
-
-                    PurityAnalysisEngine.LogDebug($"    [AssignRule-DEL]   ---> Updating state map for {targetSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} target(s). New Map Count: {nextState.DelegateTargetMap.Count}");
-
-
-
-                }
-            }
-
-
             PurityAnalysisEngine.LogDebug("AssignmentPurityRule: Both target and value (if applicable) are pure. Result: Pure");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }

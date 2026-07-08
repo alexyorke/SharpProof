@@ -728,7 +728,7 @@ namespace SharpProof.Symbolic.Smt
             foreach (var attribute in method.GetAttributes())
             {
                 if (!string.Equals(
-                        GetFullMetadataName(attribute.AttributeClass),
+                        SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                         MemberNotNullWhenAttributeMetadataName,
                         StringComparison.Ordinal) ||
                     attribute.ConstructorArguments.Length < 2 ||
@@ -930,7 +930,7 @@ namespace SharpProof.Symbolic.Smt
             foreach (var attribute in parameter.GetAttributes())
             {
                 if (!string.Equals(
-                        GetFullMetadataName(attribute.AttributeClass),
+                        SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                         NotNullWhenAttributeMetadataName,
                         StringComparison.Ordinal) ||
                     attribute.ConstructorArguments.Length != 1 ||
@@ -945,21 +945,6 @@ namespace SharpProof.Symbolic.Smt
 
             value = false;
             return false;
-        }
-
-        private static string? GetFullMetadataName(INamedTypeSymbol? type)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
-                ? type.ContainingNamespace.ToDisplayString()
-                : string.Empty;
-            return string.IsNullOrEmpty(namespaceName)
-                ? type.MetadataName
-                : namespaceName + "." + type.MetadataName;
         }
 
         private static bool TryCreateNotNullWhenArgumentFormula(

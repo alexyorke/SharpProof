@@ -1480,7 +1480,7 @@ namespace SharpProof.Symbolic.Smt
             foreach (var attribute in attributes)
             {
                 if (!string.Equals(
-                        GetFullMetadataName(attribute.AttributeClass),
+                        SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                         NotNullIfNotNullAttributeMetadataName,
                         StringComparison.Ordinal) ||
                     attribute.ConstructorArguments.Length != 1 ||

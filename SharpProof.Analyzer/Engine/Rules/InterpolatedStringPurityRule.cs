@@ -233,18 +233,15 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
-                if (!generatedPurity.IsPure)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        interpolation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            nameof(InterpolatedStringPurityRule),
-                            interpolation,
-                            syntaxNode: interpolation.Syntax,
-                            symbol: originalDefinition,
-                            catalogSource: "generated_purity_summary"));
-                }
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    interpolation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        generatedPurity.PrimaryCategory,
+                        nameof(InterpolatedStringPurityRule),
+                        interpolation,
+                        syntaxNode: interpolation.Syntax,
+                        symbol: originalDefinition,
+                        catalogSource: "generated_purity_summary"));
             }
 
             if (PurityAnalysisEngine.IsKnownImpure(originalDefinition))
@@ -264,21 +261,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (IsFrameworkType(expressionType))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (namedType.TypeKind == TypeKind.Class &&
-                !namedType.IsSealed &&
-                toStringMethod.IsVirtual &&
-                !toStringMethod.IsSealed)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    interpolation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        nameof(InterpolatedStringPurityRule),
-                        interpolation,
-                        syntaxNode: interpolation.Syntax,
-                        symbol: toStringMethod));
             }
 
             if (originalDefinition.DeclaringSyntaxReferences.Length == 0)

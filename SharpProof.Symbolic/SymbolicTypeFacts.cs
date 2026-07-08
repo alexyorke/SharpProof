@@ -8,6 +8,21 @@ namespace SharpProof.Symbolic
 {
     internal static class SymbolicTypeFacts
     {
+        public static string? GetFullMetadataName(INamedTypeSymbol? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
+                ? type.ContainingNamespace.ToDisplayString()
+                : string.Empty;
+            return string.IsNullOrEmpty(namespaceName)
+                ? type.MetadataName
+                : namespaceName + "." + type.MetadataName;
+        }
+
         public static bool IsReferenceType(ITypeSymbol? typeSymbol)
         {
             if (typeSymbol == null)
