@@ -10,7 +10,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
     internal static class WorklistPuritySolver
     {
         public static ImmutableDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> Solve(
-            CallGraph graph,
+            ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>> graph,
             Compilation compilation,
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
@@ -23,13 +23,13 @@ namespace SharpProof.Analyzer.Engine.Analysis
             var worklist = new Queue<IMethodSymbol>();
             var reverse = new Dictionary<IMethodSymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
 
-            foreach (var method in graph.Edges
+            foreach (var method in graph
                          .OrderBy(kvp => kvp.Value.Count)
                          .Select(kvp => kvp.Key))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 worklist.Enqueue(method);
-                if (graph.Edges.TryGetValue(method, out var succs))
+                if (graph.TryGetValue(method, out var succs))
                 {
                     foreach (var callee in succs)
                     {

@@ -10,7 +10,9 @@ namespace SharpProof.Analyzer.Engine.Analysis
 {
     internal static class CallGraphBuilder
     {
-        public static CallGraph Build(Compilation compilation, CancellationToken cancellationToken)
+        public static ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>> Build(
+            Compilation compilation,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
@@ -412,7 +414,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     edges[method.OriginalDefinition] = callerSetBuilder.ToImmutable();
                 }
             }
-            return new CallGraph(edges.ToImmutableDictionary(SymbolEqualityComparer.Default));
+            return edges.ToImmutableDictionary(SymbolEqualityComparer.Default);
         }
 
         private static ISymbol? TryResolveSymbol(IOperation? operation)

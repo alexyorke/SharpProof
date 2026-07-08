@@ -81,7 +81,7 @@ namespace SharpProof.Analyzer.Engine
             }
         }
 
-        private CallGraph? _callGraph;
+        private System.Collections.Immutable.ImmutableDictionary<IMethodSymbol, System.Collections.Immutable.ImmutableHashSet<IMethodSymbol>>? _callGraph;
         private readonly Compilation _compilation;
         private volatile System.Collections.Immutable.ImmutableDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>? _fixedPoint;
     }

@@ -64,7 +64,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 				CreateAlwaysPureRule(OperationKind.DiscardPattern, "DiscardPatternRule", "Discard pattern"),
 				CreateChildOperationsPureRule(OperationKind.NegatedPattern),
 				new ListPatternPurityRule(),
-				new PropertySubpatternPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.PropertySubpattern),
 				CreateChildOperationsPureRule(OperationKind.RelationalPattern),
 				new RecursivePatternPurityRule(),
 				CreateChildOperationsPureRule(OperationKind.TypePattern, OperationKind.IsType),
@@ -75,13 +75,13 @@ namespace SharpProof.Analyzer.Engine.Rules
 				// Control Flow
 				CreateAlwaysPureRule(OperationKind.Branch, "BranchRule", "Branch operation"),
 				new SwitchStatementPurityRule(),
-				new SwitchCasePurityRule(),
+				CreateChildOperationsPureRule(OperationKind.CaseClause),
 				new SwitchExpressionPurityRule(),
 				new LoopPurityRule(),
 				new UsingStatementPurityRule(),
 				new ThrowOperationPurityRule(),
 				new LockStatementPurityRule(),
-				new YieldReturnPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.YieldReturn),
 				
 				// Returns
 				new ReturnStatementPurityRule(),
