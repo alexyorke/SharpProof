@@ -1377,8 +1377,8 @@ namespace SharpProof.Symbolic
             return new SymbolicBudgetInfo(
                 service.Options.MaxPathConditions,
                 service.Options.MaxExpressionNodes,
-                (int)service.Options.QueryTimeout.TotalMilliseconds,
-                (int)service.Options.MethodBudget.TotalMilliseconds,
+                SymbolicSmtDiagnostics.ToBoundedMilliseconds(service.Options.QueryTimeout),
+                SymbolicSmtDiagnostics.ToBoundedMilliseconds(service.Options.MethodBudget),
                 service.ExecutedQueryCount,
                 service.CacheEntryCount);
         }

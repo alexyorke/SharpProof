@@ -623,12 +623,28 @@ namespace SharpProof.Symbolic
                 true,
                 smtAnalysis.Options.Mode,
                 smtAnalysis.Options.IsEnabled,
-                checked((int)smtAnalysis.Options.QueryTimeout.TotalMilliseconds),
-                checked((int)smtAnalysis.Options.MethodBudget.TotalMilliseconds),
+                ToBoundedMilliseconds(smtAnalysis.Options.QueryTimeout),
+                ToBoundedMilliseconds(smtAnalysis.Options.MethodBudget),
                 smtAnalysis.Options.MaxPathConditions,
                 smtAnalysis.Options.MaxExpressionNodes,
                 smtAnalysis.ExecutedQueryCount,
                 smtAnalysis.CacheEntryCount);
+        }
+
+        internal static int ToBoundedMilliseconds(TimeSpan value)
+        {
+            var totalMilliseconds = value.TotalMilliseconds;
+            if (totalMilliseconds >= int.MaxValue)
+            {
+                return int.MaxValue;
+            }
+
+            if (totalMilliseconds <= int.MinValue)
+            {
+                return int.MinValue;
+            }
+
+            return (int)totalMilliseconds;
         }
     }
 

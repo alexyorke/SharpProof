@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using NUnit.Framework;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -667,6 +668,29 @@ namespace SharpProof.Test
             Assert.That(firstService.ExecutedQueryCount, Is.EqualTo(1));
             Assert.That(secondService.ExecutedQueryCount, Is.EqualTo(0));
             Assert.That(secondService.CacheEntryCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SymbolicBudgetDiagnostics_LargeBudgetsClampMilliseconds()
+        {
+            var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds((double)int.MaxValue + 1),
+                TimeSpan.FromMilliseconds((double)int.MaxValue + 2),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32);
+            using var smtAnalysis = new SmtAnalysisService(options);
+
+            var diagnostics = SymbolicSmtDiagnostics.FromService(smtAnalysis);
+            var proof = SymbolicReachabilityService.ClassifyFormulaReachability(
+                new[] { new SmtBooleanConstant(false) },
+                smtAnalysis);
+
+            Assert.That(diagnostics.QueryTimeoutMs, Is.EqualTo(int.MaxValue));
+            Assert.That(diagnostics.MethodBudgetMs, Is.EqualTo(int.MaxValue));
+            Assert.That(proof.Info.Budget, Is.Not.Null);
+            Assert.That(proof.Info.Budget!.TimeoutMilliseconds, Is.EqualTo(int.MaxValue));
+            Assert.That(proof.Info.Budget.MethodBudgetMilliseconds, Is.EqualTo(int.MaxValue));
         }
 
         [Test]
