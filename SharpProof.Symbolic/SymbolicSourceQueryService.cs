@@ -1744,7 +1744,7 @@ namespace SharpProof.Symbolic
             FilePath = filePath;
             Line = line;
             Column = column;
-            References = references?.ToImmutableArray() ?? ImmutableArray<MetadataReference>.Empty;
+            References = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
             ImpliedConditions = impliedConditions?
                 .Where(static condition => !string.IsNullOrWhiteSpace(condition))
                 .ToImmutableArray() ?? ImmutableArray<string>.Empty;

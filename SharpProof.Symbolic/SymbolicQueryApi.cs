@@ -771,7 +771,7 @@ namespace SharpProof.Symbolic
             bool includeCurrentStatementCompletionFacts = false,
             SymbolicSourceQueryFilter? filter = null)
         {
-            References = references?.ToImmutableArray() ?? ImmutableArray<MetadataReference>.Empty;
+            References = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
             SmtAnalysis = smtAnalysis;
             ImpliedConditions = impliedConditions?
                 .Where(static condition => !string.IsNullOrWhiteSpace(condition))
@@ -793,6 +793,32 @@ namespace SharpProof.Symbolic
         public bool IncludeCurrentStatementCompletionFacts { get; }
 
         public SymbolicSourceQueryFilter? Filter { get; }
+    }
+
+    internal static class SymbolicQueryOptionHelpers
+    {
+        public static ImmutableArray<MetadataReference> NormalizeReferences(
+            IEnumerable<MetadataReference>? references,
+            string parameterName)
+        {
+            if (references == null)
+            {
+                return ImmutableArray<MetadataReference>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<MetadataReference>();
+            foreach (var reference in references)
+            {
+                if (reference == null)
+                {
+                    throw new ArgumentException("References cannot contain null entries.", parameterName);
+                }
+
+                builder.Add(reference);
+            }
+
+            return builder.ToImmutable();
+        }
     }
 
     public sealed class SymbolicSourceInput

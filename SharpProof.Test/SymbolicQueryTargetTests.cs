@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Microsoft.CodeAnalysis;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Test
@@ -12,6 +13,15 @@ namespace SharpProof.Test
             var options = new SymbolicQueryOptions(impliedConditions: new[] { " value > 0 ", "\t", "\nother < 10\r\n" });
 
             Assert.That(options.ImpliedConditions, Is.EqualTo(new[] { "value > 0", "other < 10" }));
+        }
+
+        [Test]
+        public void QueryOptions_NullReferenceEntry_Throws()
+        {
+            var exception = Assert.Throws<ArgumentException>(
+                () => new SymbolicQueryOptions(references: new MetadataReference[] { null! }));
+
+            Assert.That(exception!.ParamName, Is.EqualTo("references"));
         }
 
         [Test]
