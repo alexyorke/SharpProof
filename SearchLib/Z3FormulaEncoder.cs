@@ -1558,7 +1558,6 @@ namespace SearchLib.Smt
 
             private bool TryParseCharClass(out ReExpr regex)
             {
-                regex = null!;
                 var classStart = _position - 1;
                 var savedIsExact = _isExact;
                 if (_ignoreCase)

@@ -2288,7 +2288,7 @@ internal static class AssemblyEffectSummarizer
 
             if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
             {
-                string? calledSymbol = null;
+                string? calledSymbol;
                 if (opCode == OpCodes.Newobj)
                 {
                     effects.Add("allocates_object");
@@ -4068,7 +4068,6 @@ internal static class AssemblyEffectSummarizer
             var offset = 0;
             while (offset < il.Length)
             {
-                var instructionOffset = offset;
                 var opCode = ReadOpCode(il, ref offset);
                 var operandOffset = offset;
                 var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);

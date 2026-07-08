@@ -517,7 +517,7 @@ namespace SearchLib.Smt
                 return;
             }
 
-            if (substitutions.TryGetValue(source, out var existing))
+            if (substitutions.ContainsKey(source))
             {
                 return;
             }
@@ -1719,7 +1719,6 @@ namespace SearchLib.Smt
             ref bool changed,
             out ConcreteFactPreparationStatus status)
         {
-            status = ConcreteFactPreparationStatus.Ready;
             if (coefficient == 0)
             {
                 status = constant == value
@@ -2297,7 +2296,6 @@ namespace SearchLib.Smt
             out long? scaledLower,
             out long? scaledUpper)
         {
-            scaledLower = null;
             scaledUpper = null;
             if (multiplier == 0)
             {
