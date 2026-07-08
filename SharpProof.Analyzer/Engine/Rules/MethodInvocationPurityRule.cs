@@ -2057,7 +2057,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (TryGetComparerArgument(invocationOperation, out var comparerArgument))
             {
-                return IsNullOrDefaultComparerArgument(comparerArgument);
+                return ComparerDispatchHelper.IsNullOrDefaultComparerArgument(comparerArgument);
             }
 
             return true;
@@ -2111,7 +2111,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (TryGetEqualityComparerArgument(invocationOperation, out var comparerArgument))
             {
-                return IsNullOrDefaultComparerArgument(comparerArgument);
+                return ComparerDispatchHelper.IsNullOrDefaultComparerArgument(comparerArgument);
             }
 
             return true;
@@ -2300,7 +2300,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 methodSymbol.Parameters.Length != 2 ||
                 !IsMemberOfMetadataType(methodSymbol, context, "System.StringComparer") ||
                 invocationOperation.Instance == null ||
-                !IsTrustedGeneratedPureStringComparerSingleton(invocationOperation.Instance, context))
+                !ComparerDispatchHelper.IsTrustedGeneratedPureStringComparerSingleton(invocationOperation.Instance, context))
             {
                 return false;
             }
@@ -3867,17 +3867,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context)
         {
-            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-            if (value.Type == null || IsNullOrDefaultComparerValue(value))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            return AnalyzeComparerValuePurity(
+            return ComparerDispatchHelper.CheckComparerValuePurity(
                 value,
                 context,
                 invocationOperation.Syntax,
                 invocationOperation,
+                nameof(MethodInvocationPurityRule),
                 invocationOperation.TargetMethod);
         }
 
@@ -3886,173 +3881,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisContext context)
         {
             var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
-            if (value.Type == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (IsNullOrDefaultComparerValue(value))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            return AnalyzeComparerValuePurity(
+            return ComparerDispatchHelper.CheckComparerValuePurity(
                 value,
                 context,
                 value.Syntax,
                 argument,
+                nameof(MethodInvocationPurityRule),
                 argument.Parameter);
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult AnalyzeComparerValuePurity(
-            IOperation value,
-            PurityAnalysisContext context,
-            SyntaxNode impureCalleeSyntax,
-            IOperation unresolvedDispatchOperation,
-            ISymbol? unresolvedDispatchSymbol)
-        {
-            var comparerType = value.Type;
-            if (comparerType == null)
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            var foundImplementation = false;
-            foreach (var comparisonMethod in ComparerDispatchHelper.EnumerateComparerImplementations(comparerType))
-            {
-                foundImplementation = true;
-                var comparisonPurity = PurityAnalysisEngine.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
-                if (!comparisonPurity.IsPure)
-                {
-                    return comparisonPurity.WithCallee(comparisonMethod, impureCalleeSyntax);
-                }
-            }
-
-            if (!foundImplementation && ComparerDispatchHelper.IsUnresolvedComparerDispatch(comparerType))
-            {
-                return PurityAnalysisEngine.ImpureResult(
-                    unresolvedDispatchOperation,
-                    "unknown_external_call",
-                    nameof(MethodInvocationPurityRule),
-                    PurityAnalysisEngine.TryResolveSymbol(value) ?? unresolvedDispatchSymbol);
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static bool IsNullOrDefaultComparerArgument(IArgumentOperation argument)
-        {
-            var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
-            return IsNullOrDefaultComparerValue(value) || IsDefaultComparerSingleton(value);
-        }
-
-        private static bool IsNullOrDefaultComparerValue(IOperation value)
-        {
-            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-
-            if (value.ConstantValue.HasValue && value.ConstantValue.Value == null)
-            {
-                return true;
-            }
-
-            return value is IDefaultValueOperation;
-        }
-
-        private static bool IsDefaultComparerSingleton(IOperation value)
-        {
-            return value is IPropertyReferenceOperation propertyReference &&
-                propertyReference.Property.Name == "Default" &&
-                propertyReference.Property.ContainingType is INamedTypeSymbol containingType &&
-                containingType.OriginalDefinition.ToDisplayString() is
-                    "System.Collections.Generic.EqualityComparer<T>" or
-                    "System.Collections.Generic.Comparer<T>";
-        }
-
-        private static bool IsTrustedGeneratedPureDefaultComparerSingleton(
-            IOperation value,
-            PurityAnalysisContext context)
-        {
-            if (!TryGetStaticMetadataPropertyGetter(value, "Default", out var containingType, out var getterSymbol))
-            {
-                return false;
-            }
-
-            var containingTypeDisplay = containingType.OriginalDefinition.ToDisplayString();
-            if (containingTypeDisplay is not "System.Collections.Generic.EqualityComparer<T>" and
-                not "System.Collections.Generic.Comparer<T>")
-            {
-                return false;
-            }
-
-            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
-        }
-
-        private static bool IsTrustedGeneratedPureStringComparerSingleton(
-            IOperation value,
-            PurityAnalysisContext context)
-        {
-            if (!TryGetStaticMetadataPropertyGetter(value, propertyName: null, out var containingType, out var getterSymbol))
-            {
-                return false;
-            }
-
-            if (containingType.OriginalDefinition.ToDisplayString() != "System.StringComparer")
-            {
-                return false;
-            }
-
-            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
-        }
-
-        private static bool TryGetStaticMetadataPropertyGetter(
-            IOperation value,
-            string? propertyName,
-            out INamedTypeSymbol containingType,
-            out IMethodSymbol getterSymbol)
-        {
-            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-            if (value is IPropertyReferenceOperation
-                {
-                    Property:
-                    {
-                        IsStatic: true,
-                        Name: var candidatePropertyName,
-                        ContainingType: { } candidateContainingType,
-                        GetMethod: { } candidateGetterSymbol
-                    }
-                } &&
-                (propertyName == null || candidatePropertyName == propertyName) &&
-                PurityAnalysisEngine.IsMetadataSymbol(candidateGetterSymbol))
-            {
-                containingType = candidateContainingType;
-                getterSymbol = candidateGetterSymbol;
-                return true;
-            }
-
-            containingType = null!;
-            getterSymbol = null!;
-            return false;
-        }
-
-        private static bool IsTrustedGeneratedPureMetadataGetter(
-            IMethodSymbol getterSymbol,
-            PurityAnalysisContext context)
-        {
-            return PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
-                getterSymbol,
-                context.SemanticModel.Compilation,
-                out var generatedPurity) &&
-                generatedPurity.IsPure;
         }
 
         private static bool IsImmediateFreshArrayLinqSource(

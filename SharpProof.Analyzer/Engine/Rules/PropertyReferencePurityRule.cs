@@ -640,7 +640,13 @@ namespace SharpProof.Analyzer.Engine.Rules
                 context,
                 IsConcreteDictionaryType,
                 ComparerDispatchHelper.IsComparerOrDerivedInterface,
-                value => CheckComparerValuePurity(value, propertyReferenceOperation, context));
+                value => ComparerDispatchHelper.CheckComparerValuePurity(
+                    value,
+                    context,
+                    propertyReferenceOperation.Syntax,
+                    propertyReferenceOperation,
+                    nameof(PropertyReferencePurityRule),
+                    unresolvedDispatchSymbol: null));
             if (!knownConstructionComparerResult.IsPure)
             {
                 return knownConstructionComparerResult;
@@ -671,43 +677,19 @@ namespace SharpProof.Analyzer.Engine.Rules
                             continue;
                         }
 
-                        var comparerResult = CheckComparerValuePurity(value, propertyReferenceOperation, context);
+                        var comparerResult = ComparerDispatchHelper.CheckComparerValuePurity(
+                            value,
+                            context,
+                            propertyReferenceOperation.Syntax,
+                            propertyReferenceOperation,
+                            nameof(PropertyReferencePurityRule),
+                            unresolvedDispatchSymbol: null);
                         if (!comparerResult.IsPure)
                         {
                             return comparerResult;
                         }
                     }
                 }
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckComparerValuePurity(
-            IOperation value,
-            IPropertyReferenceOperation propertyReferenceOperation,
-            PurityAnalysisContext context)
-        {
-            var foundImplementation = false;
-            foreach (var comparerMethod in ComparerDispatchHelper.EnumerateComparerImplementations(value.Type!))
-            {
-                foundImplementation = true;
-                var comparerPurity = PurityAnalysisEngine.GetCalleePurity(comparerMethod.OriginalDefinition, context);
-                if (!comparerPurity.IsPure)
-                {
-                    return comparerPurity.WithCallee(comparerMethod.OriginalDefinition, propertyReferenceOperation.Syntax);
-                }
-            }
-
-            if (!foundImplementation && ComparerDispatchHelper.IsUnresolvedComparerDispatch(value.Type!))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    propertyReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(PropertyReferencePurityRule),
-                        propertyReferenceOperation,
-                        symbol: PurityAnalysisEngine.TryResolveSymbol(value)));
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;

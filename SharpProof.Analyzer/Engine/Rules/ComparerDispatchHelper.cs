@@ -89,6 +89,73 @@ namespace SharpProof.Analyzer.Engine.Rules
                 (isComparerParameterType(namedParameterType) || IsComparerOrDerivedInterface(value.Type));
         }
 
+        internal static PurityAnalysisEngine.PurityAnalysisResult CheckComparerValuePurity(
+            IOperation value,
+            PurityAnalysisContext context,
+            SyntaxNode impureCalleeSyntax,
+            IOperation unresolvedDispatchOperation,
+            string ruleName,
+            ISymbol? unresolvedDispatchSymbol)
+        {
+            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+            var comparerType = value.Type;
+            if (comparerType == null || IsNullOrDefaultComparerValue(value))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context) ||
+                IsTrustedGeneratedPureStringComparerSingleton(value, context))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            var foundImplementation = false;
+            foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType))
+            {
+                foundImplementation = true;
+                var comparisonPurity = PurityAnalysisEngine.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
+                if (!comparisonPurity.IsPure)
+                {
+                    return comparisonPurity.WithCallee(comparisonMethod, impureCalleeSyntax);
+                }
+            }
+
+            if (!foundImplementation && IsUnresolvedComparerDispatch(comparerType))
+            {
+                return PurityAnalysisEngine.ImpureResult(
+                    unresolvedDispatchOperation,
+                    "unknown_external_call",
+                    ruleName,
+                    PurityAnalysisEngine.TryResolveSymbol(value) ?? unresolvedDispatchSymbol);
+            }
+
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        internal static bool IsNullOrDefaultComparerArgument(IArgumentOperation argument)
+        {
+            var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
+            return IsNullOrDefaultComparerValue(value) || IsDefaultComparerSingleton(value);
+        }
+
+        internal static bool IsTrustedGeneratedPureStringComparerSingleton(
+            IOperation value,
+            PurityAnalysisContext context)
+        {
+            if (!TryGetStaticMetadataPropertyGetter(value, propertyName: null, out var containingType, out var getterSymbol))
+            {
+                return false;
+            }
+
+            if (containingType.OriginalDefinition.ToDisplayString() != "System.StringComparer")
+            {
+                return false;
+            }
+
+            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
+        }
+
         internal static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)
         {
             if (comparerType is not INamedTypeSymbol namedComparerType)
@@ -182,6 +249,88 @@ namespace SharpProof.Analyzer.Engine.Rules
             var displayString = typeSymbol.OriginalDefinition.ToDisplayString();
             return displayString == "System.Collections.Generic.IEqualityComparer<T>" ||
                 displayString == "System.Collections.Generic.IComparer<T>";
+        }
+
+        private static bool IsNullOrDefaultComparerValue(IOperation value)
+        {
+            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+
+            if (value.ConstantValue.HasValue && value.ConstantValue.Value == null)
+            {
+                return true;
+            }
+
+            return value is IDefaultValueOperation;
+        }
+
+        private static bool IsDefaultComparerSingleton(IOperation value)
+        {
+            return value is IPropertyReferenceOperation propertyReference &&
+                propertyReference.Property.Name == "Default" &&
+                propertyReference.Property.ContainingType is INamedTypeSymbol containingType &&
+                containingType.OriginalDefinition.ToDisplayString() is
+                    "System.Collections.Generic.EqualityComparer<T>" or
+                    "System.Collections.Generic.Comparer<T>";
+        }
+
+        private static bool IsTrustedGeneratedPureDefaultComparerSingleton(
+            IOperation value,
+            PurityAnalysisContext context)
+        {
+            if (!TryGetStaticMetadataPropertyGetter(value, "Default", out var containingType, out var getterSymbol))
+            {
+                return false;
+            }
+
+            var containingTypeDisplay = containingType.OriginalDefinition.ToDisplayString();
+            if (containingTypeDisplay is not "System.Collections.Generic.EqualityComparer<T>" and
+                not "System.Collections.Generic.Comparer<T>")
+            {
+                return false;
+            }
+
+            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
+        }
+
+        private static bool TryGetStaticMetadataPropertyGetter(
+            IOperation value,
+            string? propertyName,
+            out INamedTypeSymbol containingType,
+            out IMethodSymbol getterSymbol)
+        {
+            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+            if (value is IPropertyReferenceOperation
+                {
+                    Property:
+                    {
+                        IsStatic: true,
+                        Name: var candidatePropertyName,
+                        ContainingType: { } candidateContainingType,
+                        GetMethod: { } candidateGetterSymbol
+                    }
+                } &&
+                (propertyName == null || candidatePropertyName == propertyName) &&
+                PurityAnalysisEngine.IsMetadataSymbol(candidateGetterSymbol))
+            {
+                containingType = candidateContainingType;
+                getterSymbol = candidateGetterSymbol;
+                return true;
+            }
+
+            containingType = null!;
+            getterSymbol = null!;
+            return false;
+        }
+
+        private static bool IsTrustedGeneratedPureMetadataGetter(
+            IMethodSymbol getterSymbol,
+            PurityAnalysisContext context)
+        {
+            return PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+                getterSymbol,
+                context.SemanticModel.Compilation,
+                out var generatedPurity) &&
+                generatedPurity.IsPure;
         }
     }
 }
