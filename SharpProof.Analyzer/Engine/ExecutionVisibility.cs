@@ -323,7 +323,7 @@ namespace SharpProof.Analyzer.Engine
                 var section = switchStatement.Sections.FirstOrDefault(candidate =>
                     candidate.Statements.Any(statement => statement.Span.Contains(syntaxNode.SpanStart)));
                 if (section != null &&
-                    !IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel) &&
+                    !IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken) &&
                     SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
                         switchStatement.Expression,
                         section,
@@ -429,7 +429,7 @@ namespace SharpProof.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel))
+            if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel, cancellationToken))
             {
                 return false;
             }
@@ -455,12 +455,15 @@ namespace SharpProof.Analyzer.Engine
                 "execution-visibility-path");
         }
 
-        private static bool IsInReachableConstantSwitchGotoSection(SyntaxNode syntaxNode, SemanticModel semanticModel)
+        private static bool IsInReachableConstantSwitchGotoSection(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var switchStatement in syntaxNode.Ancestors().OfType<SwitchStatementSyntax>())
             {
                 var section = switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
-                if (section != null && IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel))
+                if (section != null && IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -488,7 +491,7 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            if (IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel))
+            if (IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken))
             {
                 return false;
             }
@@ -504,15 +507,20 @@ namespace SharpProof.Analyzer.Engine
         private static bool IsReachableConstantSwitchGotoTarget(
             SwitchSectionSyntax section,
             SwitchStatementSyntax switchStatement,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
-            var governingValue = semanticModel.GetConstantValue(switchStatement.Expression);
+            var governingValue = semanticModel.GetConstantValue(switchStatement.Expression, cancellationToken);
             if (!governingValue.HasValue)
             {
                 return false;
             }
 
-            var initialSection = ResolveInitialConstantSwitchSection(switchStatement, semanticModel, governingValue.Value);
+            var initialSection = ResolveInitialConstantSwitchSection(
+                switchStatement,
+                semanticModel,
+                cancellationToken,
+                governingValue.Value);
             if (initialSection == null)
             {
                 return false;
@@ -532,7 +540,11 @@ namespace SharpProof.Analyzer.Engine
                         continue;
                     }
 
-                    var targetSection = ResolveConstantSwitchGotoTarget(gotoStatement, switchStatement, semanticModel);
+                    var targetSection = ResolveConstantSwitchGotoTarget(
+                        gotoStatement,
+                        switchStatement,
+                        semanticModel,
+                        cancellationToken);
                     if (targetSection == null ||
                         reachableSections.Any(reachableSection => ReferenceEquals(reachableSection, targetSection)))
                     {
@@ -549,6 +561,7 @@ namespace SharpProof.Analyzer.Engine
         private static SwitchSectionSyntax? ResolveInitialConstantSwitchSection(
             SwitchStatementSyntax switchStatement,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             object? governingValue)
         {
             SwitchSectionSyntax? defaultSection = null;
@@ -565,7 +578,7 @@ namespace SharpProof.Analyzer.Engine
 
                     if (label is CaseSwitchLabelSyntax caseLabel)
                     {
-                        var labelValue = semanticModel.GetConstantValue(caseLabel.Value);
+                        var labelValue = semanticModel.GetConstantValue(caseLabel.Value, cancellationToken);
                         if (labelValue.HasValue && ConstantValuesEqual(labelValue.Value, governingValue))
                         {
                             return section;
@@ -575,8 +588,8 @@ namespace SharpProof.Analyzer.Engine
                     }
 
                     if (label is CasePatternSwitchLabelSyntax patternLabel &&
-                        PatternMatchesConstant(patternLabel.Pattern, governingValue, semanticModel) &&
-                        WhenClauseCanMatch(patternLabel.WhenClause, semanticModel))
+                        PatternMatchesConstant(patternLabel.Pattern, governingValue, semanticModel, cancellationToken) &&
+                        WhenClauseCanMatch(patternLabel.WhenClause, semanticModel, cancellationToken))
                     {
                         return section;
                     }
@@ -589,7 +602,8 @@ namespace SharpProof.Analyzer.Engine
         private static SwitchSectionSyntax? ResolveConstantSwitchGotoTarget(
             GotoStatementSyntax gotoStatement,
             SwitchStatementSyntax switchStatement,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (gotoStatement.IsKind(SyntaxKind.GotoDefaultStatement))
             {
@@ -603,7 +617,7 @@ namespace SharpProof.Analyzer.Engine
                 return null;
             }
 
-            var gotoValue = semanticModel.GetConstantValue(gotoStatement.Expression);
+            var gotoValue = semanticModel.GetConstantValue(gotoStatement.Expression, cancellationToken);
             if (!gotoValue.HasValue)
             {
                 return null;
@@ -612,7 +626,7 @@ namespace SharpProof.Analyzer.Engine
             foreach (var section in switchStatement.Sections)
             {
                 if (section.Labels.OfType<CaseSwitchLabelSyntax>().Any(label =>
-                    semanticModel.GetConstantValue(label.Value) is { HasValue: true } labelValue &&
+                    semanticModel.GetConstantValue(label.Value, cancellationToken) is { HasValue: true } labelValue &&
                     ConstantValuesEqual(labelValue.Value, gotoValue.Value)))
                 {
                     return section;
@@ -625,30 +639,34 @@ namespace SharpProof.Analyzer.Engine
         private static bool PatternMatchesConstant(
             PatternSyntax pattern,
             object? governingValue,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             switch (pattern)
             {
                 case DiscardPatternSyntax:
                     return true;
                 case ParenthesizedPatternSyntax parenthesizedPattern:
-                    return PatternMatchesConstant(parenthesizedPattern.Pattern, governingValue, semanticModel);
+                    return PatternMatchesConstant(parenthesizedPattern.Pattern, governingValue, semanticModel, cancellationToken);
                 case ConstantPatternSyntax constantPattern:
-                    var patternValue = semanticModel.GetConstantValue(constantPattern.Expression);
+                    var patternValue = semanticModel.GetConstantValue(constantPattern.Expression, cancellationToken);
                     return patternValue.HasValue && ConstantValuesEqual(patternValue.Value, governingValue);
                 default:
                     return false;
             }
         }
 
-        private static bool WhenClauseCanMatch(WhenClauseSyntax? whenClause, SemanticModel semanticModel)
+        private static bool WhenClauseCanMatch(
+            WhenClauseSyntax? whenClause,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (whenClause == null)
             {
                 return true;
             }
 
-            var constantValue = semanticModel.GetConstantValue(whenClause.Condition);
+            var constantValue = semanticModel.GetConstantValue(whenClause.Condition, cancellationToken);
             return constantValue.HasValue &&
                 constantValue.Value is bool booleanValue &&
                 booleanValue;

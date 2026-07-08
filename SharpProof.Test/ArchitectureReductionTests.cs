@@ -575,6 +575,7 @@ namespace SharpProof.Test
                 @"GetTypeInfo\([^,\r\n]+\)",
                 @"GetSymbolInfo\([^,\r\n]+\)",
                 @"GetDeclaredSymbol\([^,\r\n]+\)",
+                @"GetConstantValue\([^,\r\n]+\)",
             };
 
             var offenders = analyzerFiles
@@ -653,6 +654,23 @@ namespace SharpProof.Test
             Assert.That(source, Does.Contain("semanticModel.GetConstantValue(expression, _cancellationToken)"));
             Assert.That(source, Does.Contain("SymbolicSourceLocation.GetLineAndColumn(\n                    syntaxTree,\n                    node.SpanStart,\n                    cancellationToken,"));
             Assert.That(source, Does.Contain("SymbolicSourceLocation.GetLineAndColumn(\n                    syntaxTree,\n                    syntax.SpanStart,\n                    cancellationToken,"));
+        }
+
+        [Test]
+        public void SymbolicPatternLowering_ThreadsCancellationTokenThroughDesignationLookups()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Symbolic",
+                    "Smt",
+                    "CSharpConditionToFormula.Patterns.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Not.Contain("semanticModel.GetDeclaredSymbol(singleVariableDesignation)"));
+            Assert.That(source, Does.Contain("semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken)"));
+            Assert.That(source, Does.Contain("AddDesignationBindingFact(\n                    nullableValue,\n                    declarationPattern.Designation,\n                    semanticModel,\n                    cancellationToken,"));
+            Assert.That(source, Does.Contain("AddDesignationNonNullFact(declarationPattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion)"));
         }
 
         [Test]

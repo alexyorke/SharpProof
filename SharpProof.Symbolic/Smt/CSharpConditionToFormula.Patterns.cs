@@ -1584,7 +1584,14 @@ namespace SharpProof.Symbolic.Smt
 
             if (pattern is DeclarationPatternSyntax declarationPattern)
             {
-                AddDesignationBindingFact(nullableValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
+                AddDesignationBindingFact(
+                    nullableValue,
+                    declarationPattern.Designation,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion,
+                    out _);
                 return;
             }
 
@@ -1633,21 +1640,22 @@ namespace SharpProof.Symbolic.Smt
             switch (pattern)
             {
                 case VarPatternSyntax varPattern:
-                    AddDesignationBindingFact(matchedValue, varPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
+                    AddDesignationBindingFact(matchedValue, varPattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion, out _);
                     return;
                 case DeclarationPatternSyntax declarationPattern:
-                    AddDesignationBindingFact(matchedValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
-                    AddDesignationNonNullFact(declarationPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddDesignationBindingFact(matchedValue, declarationPattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion, out _);
+                    AddDesignationNonNullFact(declarationPattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion);
                     return;
                 case RecursivePatternSyntax recursivePattern:
                     AddDesignationBindingFact(
                         matchedValue,
                         recursivePattern.Designation,
                         semanticModel,
+                        cancellationToken,
                         formulas,
                         getSymbolVersion,
                         out var designationValue);
-                    AddDesignationNonNullFact(recursivePattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddDesignationNonNullFact(recursivePattern.Designation, semanticModel, cancellationToken, formulas, getSymbolVersion);
                     AddRecursivePropertyPatternBindingFacts(
                         matchedValue,
                         recursivePattern,
@@ -1896,12 +1904,13 @@ namespace SharpProof.Symbolic.Smt
             SmtFormula matchedValue,
             VariableDesignationSyntax? designation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion,
             out SmtFormula? localValue)
         {
             localValue = null;
-            if (!TryCreateDesignationFormula(designation, semanticModel, getSymbolVersion, out var designationValue) ||
+            if (!TryCreateDesignationFormula(designation, semanticModel, cancellationToken, getSymbolVersion, out var designationValue) ||
                 designationValue == null ||
                 !SymbolicFactFactory.CanCompareSmtValues(designationValue, matchedValue))
             {
@@ -1911,7 +1920,7 @@ namespace SharpProof.Symbolic.Smt
             localValue = designationValue;
             formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, localValue, matchedValue));
 
-            if (TryCreateDesignationStringFormula(designation, semanticModel, getSymbolVersion, out var designationString) &&
+            if (TryCreateDesignationStringFormula(designation, semanticModel, cancellationToken, getSymbolVersion, out var designationString) &&
                 TryCreateStringContentFormula(matchedValue, out var matchedString))
             {
                 formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, designationString, matchedString));
@@ -1921,10 +1930,11 @@ namespace SharpProof.Symbolic.Smt
         private static void AddDesignationNonNullFact(
             VariableDesignationSyntax? designation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             ICollection<SmtFormula> formulas,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (!TryCreateDesignationFormula(designation, semanticModel, getSymbolVersion, out var designationValue) ||
+            if (!TryCreateDesignationFormula(designation, semanticModel, cancellationToken, getSymbolVersion, out var designationValue) ||
                 designationValue is not { Kind: SmtValueKind.Reference })
             {
                 return;
@@ -1936,13 +1946,14 @@ namespace SharpProof.Symbolic.Smt
         private static bool TryCreateDesignationStringFormula(
             VariableDesignationSyntax? designation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             Func<ISymbol, int>? getSymbolVersion,
             out SmtFormula formula)
         {
             formula = null!;
             if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
                 singleVariableDesignation.Identifier.ValueText == "_" ||
-                semanticModel.GetDeclaredSymbol(singleVariableDesignation) is not ILocalSymbol localSymbol ||
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol ||
                 localSymbol.Type.SpecialType != SpecialType.System_String)
             {
                 return false;
@@ -1975,13 +1986,14 @@ namespace SharpProof.Symbolic.Smt
         private static bool TryCreateDesignationFormula(
             VariableDesignationSyntax? designation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             Func<ISymbol, int>? getSymbolVersion,
             out SmtFormula formula)
         {
             formula = null!;
             if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
                 singleVariableDesignation.Identifier.ValueText == "_" ||
-                semanticModel.GetDeclaredSymbol(singleVariableDesignation) is not ILocalSymbol localSymbol)
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
             {
                 return false;
             }
