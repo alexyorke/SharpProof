@@ -422,7 +422,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
         }
 
-        private static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
+        internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
         {
             var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
