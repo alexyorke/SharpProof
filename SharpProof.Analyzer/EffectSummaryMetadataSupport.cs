@@ -363,6 +363,45 @@ namespace SharpProof.Analyzer
         }
     }
 
+    internal static class SummaryAssemblyReferenceResolver
+    {
+        internal static string? FindContainingAssemblyReferencePath(
+            IMethodSymbol methodSymbol,
+            Compilation compilation,
+            bool requireMetadataLocation)
+        {
+            if (requireMetadataLocation &&
+                methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            {
+                return null;
+            }
+
+            return FindAssemblyReferencePath(methodSymbol.ContainingAssembly, compilation);
+        }
+
+        internal static string? FindAssemblyReferencePath(
+            IAssemblySymbol containingAssembly,
+            Compilation compilation)
+        {
+            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
+            {
+                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+                if (assemblySymbol == null ||
+                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, containingAssembly))
+                {
+                    continue;
+                }
+
+                var referencePath = reference.FilePath;
+                return string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath)
+                    ? null
+                    : referencePath;
+            }
+
+            return null;
+        }
+    }
+
     internal static class RuntimeImplementationAssemblyResolver
     {
         internal static string? Resolve(

@@ -524,31 +524,14 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
-            {
-                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                if (assemblySymbol == null ||
-                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, methodSymbol.ContainingAssembly))
-                {
-                    continue;
-                }
-
-                var referencePath = reference.FilePath;
-                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
-                {
-                    return null;
-                }
-
-                var path = referencePath!;
-                if (TryResolveMethodIdentityFromPath(methodSymbol, path, out var identity))
-                {
-                    return identity;
-                }
-
-                return null;
-            }
-
-            return null;
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                requireMetadataLocation: false);
+            return referencePath != null &&
+                TryResolveMethodIdentityFromPath(methodSymbol, referencePath, out var identity)
+                    ? identity
+                    : null;
         }
 
         private static bool TryResolveMethodIdentityFromPath(
@@ -586,26 +569,13 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
-            {
-                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                if (assemblySymbol == null ||
-                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, methodSymbol.ContainingAssembly))
-                {
-                    continue;
-                }
-
-                var referencePath = reference.FilePath;
-                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
-                {
-                    return null;
-                }
-
-                var path = referencePath!;
-                return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
-            }
-
-            return null;
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                requireMetadataLocation: false);
+            return referencePath == null
+                ? null
+                : AssemblyIdentityCache.GetOrAdd(referencePath, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
         }
 
         private bool TryGetTrustedPurityByMethodKeys(
@@ -635,33 +605,15 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
+            var referencePath = SummaryAssemblyReferenceResolver.FindAssemblyReferencePath(containingAssembly, compilation);
+            if (referencePath == null)
             {
-                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                if (assemblySymbol == null ||
-                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, containingAssembly))
-                {
-                    continue;
-                }
-
-                var referencePath = reference.FilePath;
-                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
-                {
-                    return false;
-                }
-
-                var path = referencePath!;
-                var assemblyIdentity = AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
-                if (TryResolveMethodIdentityFromPath(methodKeys, path, out var referenceIdentity) &&
-                    TryMatchTrustedEntry(methodKeys, assemblyIdentity, referenceIdentity, out classification))
-                {
-                    return true;
-                }
-
                 return false;
             }
 
-            return false;
+            var referenceAssemblyIdentity = AssemblyIdentityCache.GetOrAdd(referencePath, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+            return TryResolveMethodIdentityFromPath(methodKeys, referencePath, out var referenceIdentity) &&
+                TryMatchTrustedEntry(methodKeys, referenceAssemblyIdentity, referenceIdentity, out classification);
         }
 
         private bool TryMatchTrustedEntry(

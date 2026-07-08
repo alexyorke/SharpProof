@@ -660,36 +660,14 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return null;
-            }
-
-            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
-            {
-                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                if (assemblySymbol == null ||
-                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, methodSymbol.ContainingAssembly))
-                {
-                    continue;
-                }
-
-                var referencePath = reference.FilePath;
-                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
-                {
-                    return null;
-                }
-
-                var path = referencePath!;
-                if (TryResolveMethodIdentityFromPath(methodSymbol, path, out var identity))
-                {
-                    return identity;
-                }
-
-                return null;
-            }
-
-            return null;
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                requireMetadataLocation: true);
+            return referencePath != null &&
+                TryResolveMethodIdentityFromPath(methodSymbol, referencePath, out var identity)
+                    ? identity
+                    : null;
         }
 
         private static bool TryResolveMethodIdentityFromPath(
@@ -729,31 +707,13 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return null;
-            }
-
-            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
-            {
-                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                if (assemblySymbol == null ||
-                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, methodSymbol.ContainingAssembly))
-                {
-                    continue;
-                }
-
-                var referencePath = reference.FilePath;
-                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
-                {
-                    return null;
-                }
-
-                var path = referencePath!;
-                return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
-            }
-
-            return null;
+            var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
+                methodSymbol,
+                compilation,
+                requireMetadataLocation: true);
+            return referencePath == null
+                ? null
+                : AssemblyIdentityCache.GetOrAdd(referencePath, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
         }
 
         private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
