@@ -314,7 +314,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return null;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel, cancellationToken))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax, declaratorSyntax, semanticModel, cancellationToken))
             {
                 PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' is reassigned before using; using declared type for Dispose resolution.");
                 return null;
@@ -343,148 +343,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             return declaratorSyntax != null &&
-                HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel, cancellationToken);
-        }
-
-        private bool HasAssignmentToLocalBetweenDeclarationAndUsing(
-            ILocalSymbol local,
-            IOperation usingOperation,
-            VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var rootOperation = usingOperation;
-            while (rootOperation.Parent != null)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                rootOperation = rootOperation.Parent;
-            }
-
-            var declarationStart = declaratorSyntax.SpanStart;
-            var usingStart = usingOperation.Syntax.SpanStart;
-            foreach (var operation in rootOperation.DescendantsAndSelf())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (operation.Syntax.SpanStart <= declarationStart || operation.Syntax.SpanStart >= usingStart)
-                {
-                    continue;
-                }
-
-                switch (operation)
-                {
-                    case ISimpleAssignmentOperation assignment when IsLocalTarget(assignment.Target, local, semanticModel, cancellationToken):
-                    case ICompoundAssignmentOperation compoundAssignment when IsLocalTarget(compoundAssignment.Target, local, semanticModel, cancellationToken):
-                    case IIncrementOrDecrementOperation incrementOrDecrement when IsLocalTarget(incrementOrDecrement.Target, local, semanticModel, cancellationToken):
-                    case IDeconstructionAssignmentOperation deconstructionAssignment when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, local, semanticModel, cancellationToken):
-                    case IInvocationOperation invocationOperation when HasByRefLocalArgument(invocationOperation, local, semanticModel, cancellationToken):
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool ContainsLocalAssignmentTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
-            if (IsLocalTarget(unwrappedTarget, local, semanticModel, cancellationToken))
-            {
-                return true;
-            }
-
-            if (unwrappedTarget is ITupleOperation tupleOperation)
-            {
-                foreach (var element in tupleOperation.Elements)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (ContainsLocalAssignmentTarget(element, local, semanticModel, cancellationToken))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private bool HasByRefLocalArgument(IInvocationOperation invocationOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
-        {
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                    IsLocalTarget(argument.Value, local, semanticModel, cancellationToken))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool IsLocalTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
-            if (unwrappedTarget is not ILocalReferenceOperation localReferenceOperation)
-            {
-                return false;
-            }
-
-            return SymbolEqualityComparer.Default.Equals(localReferenceOperation.Local, local) ||
-                IsRefLocalAliasForLocal(
-                    localReferenceOperation.Local,
-                    local,
-                    semanticModel,
-                    new HashSet<ISymbol>(SymbolEqualityComparer.Default),
-                    cancellationToken);
-        }
-
-        private bool IsRefLocalAliasForLocal(
-            ILocalSymbol possibleAlias,
-            ILocalSymbol targetLocal,
-            SemanticModel semanticModel,
-            HashSet<ISymbol> visited,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (possibleAlias.RefKind == RefKind.None || !visited.Add(possibleAlias))
-            {
-                return false;
-            }
-
-            foreach (var syntaxReference in possibleAlias.DeclaringSyntaxReferences)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
-                    declaratorSyntax.Initializer?.Value == null)
-                {
-                    continue;
-                }
-
-                var initializerSyntax = declaratorSyntax.Initializer.Value;
-                if (initializerSyntax is RefExpressionSyntax refExpressionSyntax)
-                {
-                    initializerSyntax = refExpressionSyntax.Expression;
-                }
-
-                var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
-                var unwrappedInitializer = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
-                if (unwrappedInitializer is not ILocalReferenceOperation initializerLocalReference)
-                {
-                    continue;
-                }
-
-                if (SymbolEqualityComparer.Default.Equals(initializerLocalReference.Local, targetLocal) ||
-                    IsRefLocalAliasForLocal(initializerLocalReference.Local, targetLocal, semanticModel, visited, cancellationToken))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax, declaratorSyntax, semanticModel, cancellationToken);
         }
 
 

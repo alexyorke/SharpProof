@@ -924,16 +924,140 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            var blockOperation = semanticModel.GetOperation(containingBlock, cancellationToken);
+            if (blockOperation == null)
+            {
+                return false;
+            }
+
+            foreach (var operation in blockOperation.DescendantsAndSelf())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                if (operation.Syntax.SpanStart < start || operation.Syntax.SpanStart >= end)
                 {
                     continue;
                 }
 
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                switch (operation)
+                {
+                    case ISimpleAssignmentOperation assignment when IsLocalTarget(assignment.Target, localSymbol, semanticModel, cancellationToken):
+                    case ICompoundAssignmentOperation compoundAssignment when IsLocalTarget(compoundAssignment.Target, localSymbol, semanticModel, cancellationToken):
+                    case IIncrementOrDecrementOperation incrementOrDecrement when IsLocalTarget(incrementOrDecrement.Target, localSymbol, semanticModel, cancellationToken):
+                    case IDeconstructionAssignmentOperation deconstructionAssignment when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, localSymbol, semanticModel, cancellationToken):
+                    case IInvocationOperation invocationOperation when HasByRefLocalArgument(invocationOperation, localSymbol, semanticModel, cancellationToken):
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsLocalAssignmentTarget(
+            IOperation? targetOperation,
+            ILocalSymbol local,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
+            if (IsLocalTarget(unwrappedTarget, local, semanticModel, cancellationToken))
+            {
+                return true;
+            }
+
+            if (unwrappedTarget is ITupleOperation tupleOperation)
+            {
+                foreach (var element in tupleOperation.Elements)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (ContainsLocalAssignmentTarget(element, local, semanticModel, cancellationToken))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasByRefLocalArgument(
+            IInvocationOperation invocationOperation,
+            ILocalSymbol local,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
+                    IsLocalTarget(argument.Value, local, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsLocalTarget(
+            IOperation? targetOperation,
+            ILocalSymbol local,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
+            if (unwrappedTarget is not ILocalReferenceOperation localReferenceOperation)
+            {
+                return false;
+            }
+
+            return SymbolEqualityComparer.Default.Equals(localReferenceOperation.Local, local) ||
+                IsRefLocalAliasForLocal(
+                    localReferenceOperation.Local,
+                    local,
+                    semanticModel,
+                    new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken);
+        }
+
+        private static bool IsRefLocalAliasForLocal(
+            ILocalSymbol possibleAlias,
+            ILocalSymbol targetLocal,
+            SemanticModel semanticModel,
+            HashSet<ISymbol> visited,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (possibleAlias.RefKind == RefKind.None || !visited.Add(possibleAlias))
+            {
+                return false;
+            }
+
+            foreach (var syntaxReference in possibleAlias.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
+                    declaratorSyntax.Initializer?.Value == null)
+                {
+                    continue;
+                }
+
+                var initializerSyntax = declaratorSyntax.Initializer.Value;
+                if (initializerSyntax is RefExpressionSyntax refExpressionSyntax)
+                {
+                    initializerSyntax = refExpressionSyntax.Expression;
+                }
+
+                var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
+                var unwrappedInitializer = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
+                if (unwrappedInitializer is not ILocalReferenceOperation initializerLocalReference)
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(initializerLocalReference.Local, targetLocal) ||
+                    IsRefLocalAliasForLocal(initializerLocalReference.Local, targetLocal, semanticModel, visited, cancellationToken))
                 {
                     return true;
                 }

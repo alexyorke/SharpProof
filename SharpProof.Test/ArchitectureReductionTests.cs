@@ -365,7 +365,9 @@ namespace SharpProof.Test
 
             Assert.That(assignmentSource, Does.Contain("IsSourceAutoPropertySetter(propertyReference.Property, context.CancellationToken)"));
             Assert.That(assignmentSource, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax"));
-            Assert.That(assignmentSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken)"));
+            Assert.That(assignmentSource, Does.Contain("semanticModel.GetOperation(containingBlock, cancellationToken)"));
+            Assert.That(assignmentSource, Does.Contain("case IDeconstructionAssignmentOperation"));
+            Assert.That(assignmentSource, Does.Contain("HasByRefLocalArgument("));
             Assert.That(awaitSource, Does.Contain("IsKnownConstantTrueIsCompletedGetter(awaitInfo.IsCompletedProperty?.GetMethod, context.SemanticModel, context.CancellationToken)"));
             Assert.That(awaitSource, Does.Contain("semanticModel.GetConstantValue(expression, cancellationToken)"));
             Assert.That(propertySource, Does.Contain("IsSourceAutoPropertyGetter(propertySymbol, context.CancellationToken)"));
@@ -473,13 +475,21 @@ namespace SharpProof.Test
                     "Rules",
                     "UsingStatementPurityRule.cs"))
                 .Replace("\r\n", "\n");
+            var helperSource = ReadFileCached(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "AssignmentPurityRule.cs"))
+                .Replace("\r\n", "\n");
 
             Assert.That(source, Does.Not.Contain("GetSyntax()"));
             Assert.That(source, Does.Contain("WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel, context.CancellationToken)"));
             Assert.That(source, Does.Contain("ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing, context.CancellationToken)"));
             Assert.That(source, Does.Contain("reference.GetSyntax(cancellationToken)"));
             Assert.That(source, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
-            Assert.That(source, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax"));
+            Assert.That(source, Does.Contain("RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax, declaratorSyntax, semanticModel, cancellationToken)"));
+            Assert.That(helperSource, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax"));
         }
 
         [Test]
@@ -1011,7 +1021,9 @@ namespace SharpProof.Test
             Assert.That(returnSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetDeclaredSymbol(designation, cancellationToken)"));
-            Assert.That(helperSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol"));
+            Assert.That(helperSource, Does.Contain("semanticModel.GetOperation(containingBlock, cancellationToken)"));
+            Assert.That(helperSource, Does.Contain("case IDeconstructionAssignmentOperation"));
+            Assert.That(helperSource, Does.Contain("HasByRefLocalArgument("));
             Assert.That(returnSource, Does.Contain("RuleAnalysisHelper.ConstructorStoresParameterMatching("));
             Assert.That(helperSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("cancellationToken: cancellationToken"));
