@@ -116,38 +116,6 @@ namespace SharpProof.Analyzer
             return matchedAssignment;
         }
 
-        private static void AddPrecedingGuardConditions(
-            ISymbol symbol,
-            SyntaxNode useNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ICollection<SmtFormula> pathConditions)
-        {
-            var containingStatement = useNode
-                .AncestorsAndSelf()
-                .OfType<StatementSyntax>()
-                .FirstOrDefault(statement => statement.Parent is BlockSyntax);
-            if (containingStatement?.Parent is not BlockSyntax block)
-            {
-                return;
-            }
-
-            foreach (var statement in block.Statements)
-            {
-                if (ReferenceEquals(statement, containingStatement))
-                {
-                    break;
-                }
-
-                if (statement is IfStatementSyntax ifStatement &&
-                    !IsSymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, symbol, semanticModel, cancellationToken) &&
-                    !AnyReferencedSymbolAssignedBetween(ifStatement.Condition, block, ifStatement.Span.End, useNode.SpanStart, semanticModel, cancellationToken))
-                {
-                    AddCompletedIfStatementFacts(ifStatement, symbol, semanticModel, cancellationToken, pathConditions);
-                }
-            }
-        }
-
         private static List<SmtFormula> CollectPathConditionsForUse(
             SyntaxNode useNode,
             SemanticModel semanticModel,
@@ -1392,16 +1360,6 @@ namespace SharpProof.Analyzer
                     cancellationToken,
                     facts);
             }
-        }
-
-        private static void AddCompletedIfStatementFacts(
-            IfStatementSyntax ifStatement,
-            ISymbol symbol,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ICollection<SmtFormula> facts)
-        {
-            AddCompletedIfStatementFacts(ifStatement, new[] { symbol }, semanticModel, cancellationToken, facts);
         }
 
         private static void AddCompletedIfStatementFacts(

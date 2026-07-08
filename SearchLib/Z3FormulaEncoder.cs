@@ -569,7 +569,6 @@ namespace SearchLib.Smt
             private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRanges((@"\w", RegexOptions.None)));
             private readonly Context _context;
             private readonly string _pattern;
-            private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
             private bool _isExact = true;
             private bool _ignorePatternWhitespace;
             private bool _ignoreCase;
@@ -1977,11 +1976,6 @@ namespace SearchLib.Smt
                 {
                     return false;
                 }
-            }
-
-            private bool TryCreateCharacterRangesRegex(string atomPattern, out ReExpr regex)
-            {
-                return TryCreateCharacterRangesRegex(atomPattern, RegexOptions.None, out regex);
             }
 
             private bool TryCreateCharacterRangesRegex(string atomPattern, RegexOptions options, out ReExpr regex)

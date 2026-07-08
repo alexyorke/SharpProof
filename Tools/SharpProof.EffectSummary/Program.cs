@@ -5020,12 +5020,10 @@ internal static class AssemblyEffectSummarizer
 
 internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 {
-    private readonly MetadataReader reader;
     private readonly bool eraseGenericInstantiationsForLookup;
 
     public TypeNameProvider(MetadataReader reader, bool eraseGenericInstantiationsForLookup = false)
     {
-        this.reader = reader;
         this.eraseGenericInstantiationsForLookup = eraseGenericInstantiationsForLookup;
     }
 

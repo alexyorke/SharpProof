@@ -273,26 +273,6 @@ namespace SharpProof.Symbolic.Smt
             }
         }
 
-        private static bool TryAddIntegerIntervalFact(
-            SmtFormula formula,
-            Dictionary<SmtFormula, IntegerInterval> intervals,
-            out bool hasContradiction)
-        {
-            hasContradiction = false;
-            if (!TryGetIntegerComparison(formula, out var term, out var op, out var constant))
-            {
-                return false;
-            }
-
-            var interval = intervals.TryGetValue(term, out var existing)
-                ? existing
-                : IntegerInterval.Unbounded;
-            interval = interval.Apply(op, constant);
-            hasContradiction = interval.IsContradictory;
-            intervals[term] = interval;
-            return true;
-        }
-
         private static bool TryGetIntegerComparison(
             SmtFormula formula,
             out SmtFormula term,

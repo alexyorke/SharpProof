@@ -2743,11 +2743,6 @@ namespace SharpProof.Symbolic
             return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
         }
 
-        private static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsBuiltInMemoryType(typeSymbol);
-        }
-
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
         {
             return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);

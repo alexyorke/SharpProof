@@ -934,19 +934,6 @@ namespace SharpProof.Analyzer.Engine
             return false;
         }
 
-        private static bool IsIntegralType(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol.SpecialType is
-                SpecialType.System_SByte or
-                SpecialType.System_Byte or
-                SpecialType.System_Int16 or
-                SpecialType.System_UInt16 or
-                SpecialType.System_Int32 or
-                SpecialType.System_UInt32 or
-                SpecialType.System_Int64 or
-                SpecialType.System_UInt64;
-        }
-
         private sealed class ConditionTruthCache
         {
             public ConcurrentDictionary<ConditionTruthCacheKey, bool?> Values { get; } = new();

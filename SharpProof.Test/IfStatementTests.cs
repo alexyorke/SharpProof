@@ -11,16 +11,6 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class IfStatementTests
     {
-        private static int _impureField = 0;
-
-        private static int ImpureMethod()
-        {
-            _impureField++;
-            return _impureField;
-        }
-
-        private static bool IsEven(int n) => n % 2 == 0;
-
 
         [Test]
         public async Task PureIfElse_ShouldPass()

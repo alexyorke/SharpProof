@@ -9518,14 +9518,6 @@ public class TestClass
         private static readonly MethodInfo IsInStaticallyUnreachableBranchMethod = ExecutionVisibilityType
             .GetMethod("IsInStaticallyUnreachableBranch", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
 
-        private static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
-        {
-            return AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
-                concurrentAnalysis: true);
-        }
-
         private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")
         {
             var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);

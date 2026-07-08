@@ -2665,36 +2665,6 @@ namespace SharpProof.Symbolic.Smt
         }
 
         private static bool TryCreateEffectiveBuiltInIndexFormula(
-            ExpressionSyntax indexExpression,
-            SmtFormula lengthFormula,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula indexFormula,
-            Func<ISymbol, int>? getSymbolVersion,
-            int inlineDepth)
-        {
-            if (!TryResolveBuiltInIndexAccessIndexShape(
-                    indexExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var indexShape) ||
-                !TryCreateEffectiveBuiltInIndexFormula(
-                    indexShape,
-                    lengthFormula,
-                    semanticModel,
-                    cancellationToken,
-                    out indexFormula,
-                    getSymbolVersion,
-                    inlineDepth))
-            {
-                indexFormula = null!;
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryCreateEffectiveBuiltInIndexFormula(
             IndexExpressionShape indexShape,
             SmtFormula lengthFormula,
             SemanticModel semanticModel,

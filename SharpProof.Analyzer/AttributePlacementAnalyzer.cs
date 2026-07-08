@@ -126,21 +126,6 @@ namespace SharpProof.Analyzer
         }
 
         private static Location? FindAttributeLocation(
-            SyntaxList<AttributeListSyntax> attributeLists,
-            INamedTypeSymbol targetAttributeSymbol,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            foreach (var attributeList in attributeLists)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var location = FindAttributeLocation(attributeList, targetAttributeSymbol, semanticModel, cancellationToken);
-                if (location != null) return location;
-            }
-            return null;
-        }
-
-        private static Location? FindAttributeLocation(
             AttributeListSyntax attributeList,
             INamedTypeSymbol targetAttributeSymbol,
             SemanticModel semanticModel,

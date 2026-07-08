@@ -274,7 +274,7 @@ public class TestClass
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), genericContext: null);
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")";
             }
             catch (BadImageFormatException)
@@ -287,7 +287,7 @@ public class TestClass
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), genericContext: null);
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
             }
             catch (BadImageFormatException)
@@ -320,40 +320,6 @@ public class TestClass
                 "System.Void" => "void",
                 _ => typeName
             };
-        }
-
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-            string source,
-            string effectSummaryJson,
-            ImmutableArray<MetadataReference> additionalReferences,
-            string additionalFilePath = "SharpProof.EffectSummary.json")
-        {
-            return await GetAnalyzerDiagnosticsAsync(
-                source,
-                new[] { (additionalFilePath, effectSummaryJson) },
-                additionalReferences);
-        }
-
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-            string source,
-            string effectSummaryJson,
-            string additionalFilePath = "SharpProof.EffectSummary.json")
-        {
-            return await GetAnalyzerDiagnosticsAsync(
-                source,
-                effectSummaryJson,
-                ImmutableArray<MetadataReference>.Empty,
-                additionalFilePath);
-        }
-
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-            string source,
-            params (string Path, string Text)[] effectSummaryFiles)
-        {
-            return await GetAnalyzerDiagnosticsAsync(
-                source,
-                effectSummaryFiles,
-                ImmutableArray<MetadataReference>.Empty);
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -676,13 +642,6 @@ public class TestClass
 
         private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
         {
-            private readonly MetadataReader _reader;
-
-            public EffectSummaryTypeNameProvider(MetadataReader reader)
-            {
-                _reader = reader;
-            }
-
             public string GetArrayType(string elementType, ArrayShape shape)
             {
                 var rank = Math.Max(shape.Rank, 1);

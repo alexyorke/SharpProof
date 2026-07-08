@@ -8375,22 +8375,6 @@ namespace SharpProof.Symbolic
 
         private static bool TryGetFiniteElementExpressions(
             ExpressionSyntax expressionSyntax,
-            StatementSyntax foreachStatement,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out ImmutableArray<ExpressionSyntax> elementExpressions)
-        {
-            return TryGetFiniteElementExpressions(expressionSyntax, out elementExpressions) ||
-                TryGetPriorAssignedFiniteElementExpressions(
-                    expressionSyntax,
-                    foreachStatement,
-                    semanticModel,
-                    cancellationToken,
-                    out elementExpressions);
-        }
-
-        private static bool TryGetFiniteElementExpressions(
-            ExpressionSyntax expressionSyntax,
             out ImmutableArray<ExpressionSyntax> elementExpressions)
         {
             expressionSyntax = UnwrapExpression(expressionSyntax);
@@ -13105,19 +13089,6 @@ namespace SharpProof.Symbolic
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
         {
             return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        }
-
-        private static bool IsIntegralType(ITypeSymbol typeSymbol)
-        {
-            return typeSymbol.SpecialType is
-                SpecialType.System_SByte or
-                SpecialType.System_Byte or
-                SpecialType.System_Int16 or
-                SpecialType.System_UInt16 or
-                SpecialType.System_Int32 or
-                SpecialType.System_UInt32 or
-                SpecialType.System_Int64 or
-                SpecialType.System_UInt64;
         }
 
         private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)

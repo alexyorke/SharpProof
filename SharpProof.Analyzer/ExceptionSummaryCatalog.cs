@@ -838,7 +838,7 @@ namespace SharpProof.Analyzer
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), CreateGenericContext(reader, definition));
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")";
             }
             catch (BadImageFormatException)
@@ -851,7 +851,7 @@ namespace SharpProof.Analyzer
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), genericContext: null);
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")";
             }
             catch (BadImageFormatException)
@@ -864,7 +864,7 @@ namespace SharpProof.Analyzer
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), CreateGenericContext(reader, definition));
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
             }
             catch (BadImageFormatException)
@@ -877,7 +877,7 @@ namespace SharpProof.Analyzer
         {
             try
             {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(), genericContext: null);
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
             }
             catch (BadImageFormatException)
@@ -989,13 +989,6 @@ namespace SharpProof.Analyzer
 
         private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
         {
-            private readonly MetadataReader _reader;
-
-            public EffectSummaryTypeNameProvider(MetadataReader reader)
-            {
-                _reader = reader;
-            }
-
             public string GetArrayType(string elementType, ArrayShape shape)
             {
                 var rank = Math.Max(shape.Rank, 1);

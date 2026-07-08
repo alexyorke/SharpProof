@@ -16,10 +16,6 @@ namespace SharpProof.Test
     public class StateModificationTests
     {
 
-        private const string MinimalEnforcePureAttributeSource = @"
-[System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Constructor | System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface)]
-public sealed class EnforcePureAttribute : System.Attribute { }";
-
         [Test]
         public async Task ImpureMethodWithFieldAssignment_Diagnostic()
         {

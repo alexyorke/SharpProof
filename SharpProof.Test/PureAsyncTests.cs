@@ -14,10 +14,6 @@ namespace SharpProof.Test
     public class PureAsyncTests
     {
 
-        private const string MinimalEnforcePureAttributeSource = @"
-[System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Constructor | System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface)]
-public sealed class EnforcePureAttribute : System.Attribute { }";
-
         [Test]
         public async Task PureAsyncMethod_Diagnostic()
         {

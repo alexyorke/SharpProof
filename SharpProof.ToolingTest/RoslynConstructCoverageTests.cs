@@ -239,20 +239,6 @@ public class TestClass
             Assert.That(report.UnknownOperationKinds["FunctionPointerInvocation"], Is.EqualTo(1));
         }
 
-        private static ImmutableDictionary<OperationKind, OperationKindCoverageDecision> GetCompleteOperationKindCoverageDecisions()
-        {
-            var builder = ExplicitOperationKindCoverageDecisions.ToBuilder();
-
-            foreach (var operationKind in GetRegisteredRuleOperationKinds().Select(item => item.OperationKind).Distinct())
-            {
-                builder[operationKind] = new OperationKindCoverageDecision(
-                    OperationKindCoverageClassification.Handled,
-                    "Registered by RuleRegistry.");
-            }
-
-            return builder.ToImmutable();
-        }
-
         private static ImmutableArray<RegisteredRuleOperationKind> GetRegisteredRuleOperationKinds()
         {
             var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
@@ -385,68 +371,6 @@ public class TestClass
 
             Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(diagnostic => diagnostic.ToString())));
         }
-
-#pragma warning disable CS0619
-        private static readonly ImmutableDictionary<OperationKind, OperationKindCoverageDecision> ExplicitOperationKindCoverageDecisions =
-            new Dictionary<OperationKind, OperationKindCoverageDecision>
-            {
-                [OperationKind.None] = NotApplicable("Sentinel value; no executable operation exists."),
-                [OperationKind.Invalid] = Conservative("Invalid code is not a purity proof target."),
-                [OperationKind.YieldBreak] = ParentHandled("Iterator control flow is handled at the containing method/yield boundary."),
-                [OperationKind.Stop] = NotApplicable("Visual Basic-only debugging statement."),
-                [OperationKind.End] = NotApplicable("Visual Basic-only process termination statement."),
-                [OperationKind.RaiseEvent] = NotApplicable("Visual Basic-only event raise operation."),
-                [OperationKind.MethodReference] = ParentHandled("Method group operations are consumed by invocation or delegate-creation operations."),
-                [OperationKind.UnaryOperator] = ParentHandled("Legacy/operator-only shape; current C# executable unary expressions use Unary."),
-                [OperationKind.BinaryOperator] = ParentHandled("Legacy/operator-only shape; current C# executable binary expressions use Binary."),
-                [OperationKind.Parenthesized] = ParentHandled("Parentheses are transparent and analyzed through their contained operation."),
-                [OperationKind.ConditionalAccessInstance] = ParentHandled("Analyzed as part of the containing conditional-access operation."),
-                [OperationKind.MemberInitializer] = ParentHandled("Analyzed through object or collection initializer handling."),
-                [OperationKindValue("CollectionElementInitializer")] = ParentHandled("Analyzed through object or collection initializer handling."),
-                [OperationKind.TranslatedQuery] = ParentHandled("Query syntax is analyzed through translated invocation and expression operations."),
-                [OperationKind.AddressOf] = Conservative("Unsafe pointer address capture remains conservative."),
-                [OperationKind.DeclarationExpression] = ParentHandled("Declaration expressions are analyzed through the containing assignment, pattern, or argument."),
-                [OperationKind.OmittedArgument] = ParentHandled("Omitted arguments are analyzed through the containing invocation/default parameter handling."),
-                [OperationKind.ParameterInitializer] = ParentHandled("Default parameter values are declaration metadata, not a method-body side effect."),
-                [OperationKind.SwitchCase] = ParentHandled("Switch case structure is covered by switch and case-clause handling."),
-                [OperationKind.InterpolatedStringText] = ParentHandled("Text fragments are covered by the containing interpolated string operation."),
-                [OperationKind.Interpolation] = ParentHandled("Formatted holes are covered by the containing interpolated string operation."),
-                [OperationKind.TupleBinary] = ParentHandled("Tuple comparisons are analyzed through their child binary operations."),
-                [OperationKind.TupleBinaryOperator] = ParentHandled("Legacy/operator-only tuple comparison shape."),
-                [OperationKind.MethodBody] = ParentHandled("Legacy method-body shape; current C# operation trees use MethodBodyOperation."),
-                [OperationKind.ConstructorBody] = ParentHandled("Legacy constructor-body shape; current C# operation trees use ConstructorBodyOperation."),
-                [OperationKind.Discard] = ParentHandled("Discard expressions are analyzed through their containing assignment or pattern."),
-                [OperationKind.FlowCapture] = ParentHandled("Control-flow graph temporary captured value."),
-                [OperationKind.FlowCaptureReference] = ParentHandled("Control-flow graph temporary capture reference."),
-                [OperationKind.IsNull] = ParentHandled("Null checks are covered through binary/null-pattern handling."),
-                [OperationKind.CaughtException] = ParentHandled("Caught exception values are covered by catch-clause and local-reference handling."),
-                [OperationKind.StaticLocalInitializationSemaphore] = ParentHandled("Compiler-generated synchronization around static local initialization."),
-                [OperationKind.ReDim] = NotApplicable("Visual Basic-only array resizing operation."),
-                [OperationKind.ReDimClause] = NotApplicable("Visual Basic-only array resizing clause."),
-                [OperationKind.SwitchExpressionArm] = ParentHandled("Switch expression arms are covered by switch-expression handling."),
-                [OperationKind.InterpolatedStringHandlerCreation] = Conservative("Custom interpolated-string handlers can execute user code."),
-                [OperationKind.InterpolatedStringAddition] = Conservative("Custom interpolated-string handler append/addition can execute user code."),
-                [OperationKind.InterpolatedStringAppendLiteral] = Conservative("Custom interpolated-string handler AppendLiteral can execute user code."),
-                [OperationKind.InterpolatedStringAppendFormatted] = Conservative("Custom interpolated-string handler AppendFormatted can execute user code."),
-                [OperationKind.InterpolatedStringAppendInvalid] = Conservative("Invalid handler append shape is not a purity proof target."),
-                [OperationKind.InterpolatedStringHandlerArgumentPlaceholder] = Conservative("Handler argument placeholders are tied to custom handler execution."),
-                [OperationKind.FunctionPointerInvocation] = Conservative("Unsafe function pointer invocation remains conservative."),
-                [OperationKind.Attribute] = SyntaxOnly("Attribute analysis is handled by declaration/syntax placement checks."),
-                
-            }.ToImmutableDictionary();
-#pragma warning restore CS0619
-
-        private static readonly ImmutableArray<AnalyzerActionSurface> AnalyzerActionSurfaceManifest =
-            ImmutableArray.Create(
-                new AnalyzerActionSurface("CompilationStart", AnalyzerActionSurfaceDecision.Used, "Creates per-compilation purity, configuration, baseline, and exception-summary services."),
-                new AnalyzerActionSurface("CompilationEnd", AnalyzerActionSurfaceDecision.NotUsed, "No end-of-compilation aggregation is required for the current analyzer behavior."),
-                new AnalyzerActionSurface("Operation", AnalyzerActionSurfaceDecision.NotUsed, "SharpProof walks IOperation trees from selected declarations instead of registering per-operation actions."),
-                new AnalyzerActionSurface("OperationBlock", AnalyzerActionSurfaceDecision.NotUsed, "Method/accessor/local-function syntax actions are the current executable-code entry point."),
-                new AnalyzerActionSurface("OperationBlockStart", AnalyzerActionSurfaceDecision.NotUsed, "The engine owns operation traversal and state rather than Roslyn operation-block callbacks."),
-                new AnalyzerActionSurface("SemanticModel", AnalyzerActionSurfaceDecision.NotUsed, "Semantic models are reached from syntax-node contexts only where needed."),
-                new AnalyzerActionSurface("Symbol", AnalyzerActionSurfaceDecision.NotUsed, "Symbol checks are driven from declaration syntax to preserve placement and source-span behavior."),
-                new AnalyzerActionSurface("SyntaxNode", AnalyzerActionSurfaceDecision.Used, "Registers method, accessor, constructor, operator, local-function, and attribute-list entry points."),
-                new AnalyzerActionSurface("SyntaxTree", AnalyzerActionSurfaceDecision.NotUsed, "No file-wide syntax-only analysis is currently needed."));
 
         private static IEnumerable<OperationCorpusSnippet> OperationCorpusSnippets()
         {
@@ -711,51 +635,7 @@ public class Derived(int value) : Base(value) { }
                 SyntaxKind.PrimaryConstructorBaseType);
         }
 
-        private static OperationKindCoverageDecision NotApplicable(string rationale)
-        {
-            return new OperationKindCoverageDecision(OperationKindCoverageClassification.CSharpNotApplicable, rationale);
-        }
-
-        private static OperationKindCoverageDecision ParentHandled(string rationale)
-        {
-            return new OperationKindCoverageDecision(OperationKindCoverageClassification.ParentHandled, rationale);
-        }
-
-        private static OperationKindCoverageDecision Conservative(string rationale)
-        {
-            return new OperationKindCoverageDecision(OperationKindCoverageClassification.IntentionallyConservative, rationale);
-        }
-
-        private static OperationKindCoverageDecision SyntaxOnly(string rationale)
-        {
-            return new OperationKindCoverageDecision(OperationKindCoverageClassification.SyntaxOnlyFallback, rationale);
-        }
-
-        private static OperationKind OperationKindValue(string name)
-        {
-            return (OperationKind)Enum.Parse(typeof(OperationKind), name);
-        }
-
-        private sealed record OperationKindCoverageDecision(OperationKindCoverageClassification Classification, string Rationale);
-
-        private enum OperationKindCoverageClassification
-        {
-            Handled,
-            ParentHandled,
-            IntentionallyConservative,
-            CSharpNotApplicable,
-            SyntaxOnlyFallback
-        }
-
         private sealed record RegisteredRuleOperationKind(string RuleName, OperationKind OperationKind);
-
-        private sealed record AnalyzerActionSurface(string Name, AnalyzerActionSurfaceDecision Decision, string Rationale);
-
-        private enum AnalyzerActionSurfaceDecision
-        {
-            Used,
-            NotUsed
-        }
 
         public sealed record OperationCorpusSnippet(
             string Name,

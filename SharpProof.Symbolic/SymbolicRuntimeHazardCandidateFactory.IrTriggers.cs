@@ -912,26 +912,6 @@ namespace SharpProof.Symbolic
             return false;
         }
 
-        private static bool TryCreateIrExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind kind,
-            ExpressionSyntax subjectExpression,
-            SymbolicTerm triggeringValue,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            return TryCreateIrRelationalExceptionPreconditionTrigger(
-                kind,
-                subjectExpression,
-                SymbolicRelationOperator.Equal,
-                triggeringValue,
-                provenance,
-                semanticModel,
-                cancellationToken,
-                out trigger);
-        }
-
         private static bool TryCreateIrRelationalExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind kind,
             ExpressionSyntax subjectExpression,

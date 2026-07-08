@@ -119,24 +119,6 @@ namespace SharpProof.Symbolic.Smt
                     getSymbolVersion);
         }
 
-        private static bool TryCreateSwitchLabelCondition(
-            ExpressionSyntax governingExpression,
-            SwitchLabelSyntax label,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula formula,
-            Func<ISymbol, int>? getSymbolVersion = null)
-        {
-            return TryCreateSwitchLabelCondition(
-                governingExpression,
-                label,
-                semanticModel,
-                cancellationToken,
-                includePatternBindings: true,
-                out formula,
-                getSymbolVersion);
-        }
-
         private static bool TryCreateSwitchDefaultCondition(
             ExpressionSyntax governingExpression,
             SwitchSectionSyntax defaultSection,
@@ -1942,12 +1924,6 @@ namespace SharpProof.Symbolic.Smt
                 ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
                 : elementIndex.ToString(CultureInfo.InvariantCulture);
             return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
-        }
-
-        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
-        {
-            GetListPatternLengthShape(listPattern, out var minimumLength, out _);
-            return minimumLength;
         }
 
         private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)

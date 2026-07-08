@@ -174,16 +174,7 @@ namespace SharpProof.Symbolic.Ir
 
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? type)
         {
-            if (type is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            var metadataName = namedType.ConstructedFrom.ToDisplayString();
-            return string.Equals(metadataName, "System.Span<T>", StringComparison.Ordinal) ||
-                string.Equals(metadataName, "System.ReadOnlySpan<T>", StringComparison.Ordinal) ||
-                string.Equals(metadataName, "System.Memory<T>", StringComparison.Ordinal) ||
-                string.Equals(metadataName, "System.ReadOnlyMemory<T>", StringComparison.Ordinal);
+            return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type);
         }
     }
 }

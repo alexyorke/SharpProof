@@ -3202,12 +3202,6 @@ namespace SharpProof.Symbolic.Smt
             return pattern is DiscardPatternSyntax or VarPatternSyntax;
         }
 
-        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
-        {
-            GetListPatternLengthShape(listPattern, out var minimumLength, out _);
-            return minimumLength;
-        }
-
         private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
         {
             while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)

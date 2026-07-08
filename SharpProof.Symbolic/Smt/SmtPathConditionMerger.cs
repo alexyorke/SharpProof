@@ -242,14 +242,11 @@ namespace SharpProof.Symbolic.Smt
 
                 this.branchConditions = localBranchConditions.ToImmutableArray();
                 this.facts = localFacts.ToImmutable();
-                Condition = CreateConjunction(this.branchConditions);
                 FactsByTarget = factsByTarget.ToDictionary(
                     static kvp => kvp.Key,
                     static kvp => kvp.Value.ToArray(),
                     StringComparer.Ordinal);
             }
-
-            SmtFormula Condition { get; }
 
             internal IReadOnlyDictionary<string, MergeablePathFact[]> FactsByTarget { get; }
 
