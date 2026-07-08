@@ -1181,7 +1181,7 @@ namespace SharpProof.Analyzer
             var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression))
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension, out var indexExpression))
                 {
                     return false;
                 }
@@ -1433,25 +1433,6 @@ namespace SharpProof.Analyzer
             }
 
             return arguments.All(static argument => argument != null);
-        }
-
-        private static bool TryGetInvocationArgumentExpression(
-            IInvocationOperation invocationOperation,
-            int parameterIndex,
-            out ExpressionSyntax expression)
-        {
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if (argument.Parameter?.Ordinal == parameterIndex &&
-                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                {
-                    expression = argumentExpression;
-                    return true;
-                }
-            }
-
-            expression = null!;
-            return false;
         }
 
         private static bool IsBuiltInRangeAccessArgument(

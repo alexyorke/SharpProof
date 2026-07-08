@@ -1260,7 +1260,7 @@ namespace SharpProof.Symbolic
             var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression))
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension, out var indexExpression))
                 {
                     return false;
                 }
@@ -2414,7 +2414,7 @@ namespace SharpProof.Symbolic
 
             if (method.IsStatic ||
                 invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var firstArgument))
+                !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, parameterIndex: 0, out var firstArgument))
             {
                 return false;
             }
@@ -2537,26 +2537,7 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            return TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 1, out secondArgument);
-        }
-
-        private static bool TryGetInvocationArgumentExpression(
-            IInvocationOperation invocationOperation,
-            int parameterIndex,
-            out ExpressionSyntax expression)
-        {
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if (argument.Parameter?.Ordinal == parameterIndex &&
-                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                {
-                    expression = argumentExpression;
-                    return true;
-                }
-            }
-
-            expression = null!;
-            return false;
+            return SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, parameterIndex: 1, out secondArgument);
         }
 
         private static bool IsStringSubstringInvocation(IMethodSymbol method)

@@ -385,7 +385,7 @@ namespace SharpProof.Symbolic
             var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
             for (var dimension = 0; dimension < arrayType.Rank; dimension++)
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension, out var indexExpression) ||
                     GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Int32)
                 {
                     return false;

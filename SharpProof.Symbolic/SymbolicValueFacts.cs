@@ -65,5 +65,24 @@ namespace SharpProof.Symbolic
 
             return false;
         }
+
+        public static bool TryGetInvocationArgumentExpressionByOrdinal(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.Parameter?.Ordinal == parameterIndex &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            expression = null!;
+            return false;
+        }
     }
 }
