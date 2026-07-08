@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -14,8 +13,6 @@ namespace SharpProof.Analyzer
 
         public const string SP0002 = SharpProofDiagnostics.PurityNotVerifiedId;
         public const string SP0004 = SharpProofDiagnostics.MissingEnforcePureAttributeId;
-
-        private static readonly ImmutableArray<Type> _ruleTypes = ImmutableArray.Create<Type>();
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(SharpProofDiagnostics.PurityNotVerifiedRule,

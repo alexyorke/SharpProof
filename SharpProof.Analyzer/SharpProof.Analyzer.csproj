@@ -43,19 +43,6 @@
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>
   
-  <ItemGroup>
-    
-    <EmbeddedResource Update="Resources\DiagnosticMessages.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>DiagnosticMessages.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-    <Compile Update="Resources\DiagnosticMessages.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>DiagnosticMessages.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
   <Target Name="GenerateBuiltInEffectSummaries" BeforeTargets="AssignTargetPaths">
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
                Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
