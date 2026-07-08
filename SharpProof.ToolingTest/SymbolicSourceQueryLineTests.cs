@@ -4010,7 +4010,7 @@ public class TestClass
                     "--line",
                     "0");
                 Assert.That(zeroLine.ExitCode, Is.EqualTo(64));
-                Assert.That(zeroLine.StandardError, Does.Contain("is required"));
+                Assert.That(zeroLine.StandardError, Does.Contain("requires a positive integer value"));
 
                 var negativeColumn = await SymbolicCliTestHost.RunOutOfProcessAsync(
                     "--file",
