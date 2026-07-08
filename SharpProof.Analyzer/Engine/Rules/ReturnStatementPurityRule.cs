@@ -377,6 +377,17 @@ namespace SharpProof.Analyzer.Engine.Rules
                     catalogSource: catalogSource));
         }
 
+        private static bool NoReturnEscape(
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            escapeSyntax = null!;
+            escapeSymbol = null!;
+            catalogSource = string.Empty;
+            return false;
+        }
+
         private static IOperation? GetSourceReturnedValueOperation(
             IReturnOperation returnOperation,
             SemanticModel semanticModel,
@@ -1263,10 +1274,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryFindMutableCollectionReturnEscape(
@@ -1308,10 +1316,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
                     if (selectedBranch == null)
                     {
-                        escapeSyntax = null!;
-                        escapeSymbol = null!;
-                        catalogSource = string.Empty;
-                        return false;
+                        return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
                     }
 
                     return TryFindMutableCollectionReturnEscape(
@@ -1358,10 +1363,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                            out catalogSource);
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryFindReturnedInitializerMutableObjectEscape(
@@ -1415,10 +1417,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryFindFreshMutableObjectReturnEscape(
@@ -1513,10 +1512,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
                     if (selectedBranch == null)
                     {
-                        escapeSyntax = null!;
-                        escapeSymbol = null!;
-                        catalogSource = string.Empty;
-                        return false;
+                        return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
                     }
 
                     return TryFindFreshMutableObjectReturnEscape(
@@ -1568,10 +1564,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                            out catalogSource);
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryFindNestedCallableFreshMutableObjectReturnEscape(
@@ -1599,10 +1592,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     out escapeSymbol,
                     out var nestedCatalogSource))
             {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
+                return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
             }
 
             catalogSource = nestedCatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal)
@@ -1647,10 +1637,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     cancellationToken,
                     out var initializerOperation))
             {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
+                return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
             }
 
             initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
@@ -1669,10 +1656,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return true;
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryGetStableMutableObjectLocalEscape(
@@ -1687,10 +1671,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (!visitedLocals.Add(localSymbol))
             {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
+                return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
@@ -1709,10 +1690,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         semanticModel,
                         cancellationToken))
                 {
-                    escapeSyntax = null!;
-                    escapeSymbol = null!;
-                    catalogSource = string.Empty;
-                    return false;
+                    return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
                 }
             }
             else if (TryGetDeconstructionElementInitializer(
@@ -1730,18 +1708,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                         semanticModel,
                         cancellationToken))
                 {
-                    escapeSyntax = null!;
-                    escapeSymbol = null!;
-                    catalogSource = string.Empty;
-                    return false;
+                    return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
                 }
             }
             else
             {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
+                return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
             }
 
             var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
@@ -1785,10 +1757,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     out catalogSource);
             }
 
-            escapeSyntax = null!;
-            escapeSymbol = null!;
-            catalogSource = string.Empty;
-            return false;
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         private static bool TryGetDeconstructionElementInitializer(
