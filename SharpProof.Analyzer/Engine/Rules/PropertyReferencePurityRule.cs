@@ -291,16 +291,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return staticBclFallbackResult;
                 }
 
-                if (propertySymbol.GetMethod != null)
-                {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' has a getter. Checking getter purity via service/recursion.");
-                    var staticGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for static property '{propertySymbol.Name}': IsPure={staticGetterResult.IsPure}");
-                    return GetterResultOrPure(staticGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
-                }
-
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' has no accessible getter to analyze and is not a known pure BCL member. Read is Impure.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
+                return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"static property '{propertySymbol.Name}'", $"Static property '{propertySymbol.Name}' has no accessible getter to analyze and is not a known pure BCL member");
             }
             else
             {
@@ -333,17 +324,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
 
-                    if (propertySymbol.GetMethod != null)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance '{paramRef.Parameter.Name}' is value struct or readonly ref. Checking getter purity via service/recursion.");
-                        var parameterGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for '{propertySymbol.Name}' on parameter '{paramRef.Parameter.Name}': IsPure={parameterGetterResult.IsPure}");
-                        return GetterResultOrPure(parameterGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
-                    }
-
-
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance '{paramRef.Parameter.Name}' has no accessible getter to analyze. Read is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
+                    return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"property '{propertySymbol.Name}' on parameter '{paramRef.Parameter.Name}'", $"Instance '{paramRef.Parameter.Name}' has no accessible getter to analyze");
                 }
                 else if (instanceOperation is IInstanceReferenceOperation instanceRef && instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
                 {
@@ -357,38 +338,15 @@ namespace SharpProof.Analyzer.Engine.Rules
                     if (isReadonlyStruct)
                     {
 
-                        if (propertySymbol.GetMethod != null)
-                        {
-                            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this' within a readonly struct. Checking getter purity via service/recursion.");
-                            var readonlyStructGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for readonly struct property '{propertySymbol.Name}': IsPure={readonlyStructGetterResult.IsPure}");
-                            return GetterResultOrPure(readonlyStructGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
-                        }
-
-
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this' within a readonly struct, but property '{propertySymbol.Name}' has no accessible getter to analyze. Read is Impure.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
+                        return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"readonly struct property '{propertySymbol.Name}' on this", $"Instance is 'this' within a readonly struct, but property '{propertySymbol.Name}' has no accessible getter to analyze");
                     }
                     else if (propertySymbol.IsReadOnly)
                     {
-                        if (propertySymbol.GetMethod != null)
-                        {
-                            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this', property '{propertySymbol.Name}' is readonly (get/init-only). Checking getter purity via service/recursion.");
-                            var readonlyGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for readonly property '{propertySymbol.Name}': IsPure={readonlyGetterResult.IsPure}");
-                            return GetterResultOrPure(readonlyGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
-                        }
-
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this', property '{propertySymbol.Name}' has no accessible getter to analyze. Read is Impure.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
+                        return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"readonly property '{propertySymbol.Name}' on this", $"Instance is 'this', property '{propertySymbol.Name}' has no accessible getter to analyze");
                     }
                     else if (propertySymbol.GetMethod != null)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this', property '{propertySymbol.Name}' has a getter. Checking getter purity via service/recursion.");
-                        var thisGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for '{propertySymbol.Name}': IsPure={thisGetterResult.IsPure}");
-
-                        return GetterResultOrPure(thisGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
+                        return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"property '{propertySymbol.Name}' on this");
                     }
                     else
                     {
@@ -436,18 +394,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                     else if (propertySymbol.GetMethod != null && context.PureAttributeSymbol != null &&
                              PurityAnalysisEngine.HasAttribute(propertySymbol.GetMethod, context.PureAttributeSymbol))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property '{propertySymbol.Name}' getter has [Pure] attribute. Checking getter purity via service/recursion.");
-                        var attributedGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for [Pure] property '{propertySymbol.Name}': IsPure={attributedGetterResult.IsPure}");
-                        return GetterResultOrPure(attributedGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
+                        return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"[Pure] property '{propertySymbol.Name}'");
                     }
 
                     else if (propertySymbol.GetMethod != null)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is complex ({instanceKind}), property '{propertySymbol.Name}' has getter. Checking getter purity via service/recursion.");
-                        var complexGetterResult = PurityAnalysisEngine.GetCalleePurity(propertySymbol.GetMethod, context);
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for complex instance access to '{propertySymbol.Name}': IsPure={complexGetterResult.IsPure}");
-                        return GetterResultOrPure(complexGetterResult, propertySymbol, propertySymbol.GetMethod, propertyReferenceOperation);
+                        return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context, $"complex instance ({instanceKind}) property '{propertySymbol.Name}'");
                     }
 
                     else
@@ -1035,6 +987,25 @@ namespace SharpProof.Analyzer.Engine.Rules
             return getterResult.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : getterResult.WithCallee(getterSymbol, propertyReferenceOperation.Syntax);
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult GetterResultOrImpure(
+            IPropertySymbol propertySymbol,
+            IPropertyReferenceOperation propertyReferenceOperation,
+            PurityAnalysisContext context,
+            string getterDescription,
+            string? missingGetterMessage = null)
+        {
+            if (propertySymbol.GetMethod is not { } getter)
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] {missingGetterMessage ?? $"Property '{propertySymbol.Name}' has no accessible getter to analyze"}. Read is Impure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
+            }
+
+            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Checking getter purity for {getterDescription} via service/recursion.");
+            var getterResult = PurityAnalysisEngine.GetCalleePurity(getter, context);
+            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for {getterDescription}: IsPure={getterResult.IsPure}");
+            return GetterResultOrPure(getterResult, propertySymbol, getter, propertyReferenceOperation);
         }
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>
