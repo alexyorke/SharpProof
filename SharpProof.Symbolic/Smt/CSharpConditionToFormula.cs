@@ -2612,42 +2612,54 @@ namespace SharpProof.Symbolic.Smt
             {
                 var parameter = argument.Parameter;
                 if (parameter == null ||
-                    !TryGetValueKind(parameter.Type, out var parameterKind) ||
-                    argument.Value.Syntax is not ExpressionSyntax argumentExpression)
+                    argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
+                    !TryAddPredicateArgumentSubstitution(parameter, argumentExpression, semanticModel, cancellationToken, getSymbolVersion, inlineDepth, builder))
                 {
                     substitutions = Array.Empty<SmtVariableSubstitution>();
                     return false;
-                }
-
-                if (!TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
-                    argumentFormula == null ||
-                    argumentFormula.Kind != parameterKind)
-                {
-                    substitutions = Array.Empty<SmtVariableSubstitution>();
-                    return false;
-                }
-
-                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
-                builder.Add(new SmtVariableSubstitution(
-                    formalVariable.Name,
-                    formalVariable.Name + ".",
-                    GetFormulaMemberName(formalVariable) + ".",
-                    argumentFormula));
-
-                if (parameter.Type.SpecialType == SpecialType.System_String &&
-                    TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
-                    argumentStringFormula != null)
-                {
-                    var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
-                    builder.Add(new SmtVariableSubstitution(
-                        formalStringVariable.Name,
-                        formalStringVariable.Name + ".",
-                        GetFormulaMemberName(formalStringVariable) + ".",
-                        argumentStringFormula));
                 }
             }
 
             substitutions = builder;
+            return true;
+        }
+
+        private static bool TryAddPredicateArgumentSubstitution(
+            IParameterSymbol parameter,
+            ExpressionSyntax argumentExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            List<SmtVariableSubstitution> builder)
+        {
+            if (!TryGetValueKind(parameter.Type, out var parameterKind) ||
+                !TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
+                argumentFormula == null ||
+                argumentFormula.Kind != parameterKind)
+            {
+                return false;
+            }
+
+            var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
+            builder.Add(new SmtVariableSubstitution(
+                formalVariable.Name,
+                formalVariable.Name + ".",
+                GetFormulaMemberName(formalVariable) + ".",
+                argumentFormula));
+
+            if (parameter.Type.SpecialType == SpecialType.System_String &&
+                TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
+                argumentStringFormula != null)
+            {
+                var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
+                builder.Add(new SmtVariableSubstitution(
+                    formalStringVariable.Name,
+                    formalStringVariable.Name + ".",
+                    GetFormulaMemberName(formalStringVariable) + ".",
+                    argumentStringFormula));
+            }
+
             return true;
         }
 

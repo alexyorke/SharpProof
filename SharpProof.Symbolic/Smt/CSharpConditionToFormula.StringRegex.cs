@@ -429,33 +429,11 @@ namespace SharpProof.Symbolic.Smt
             {
                 var parameter = parameters[index];
                 var argument = invocationOperation.Arguments[index];
-                if (!TryGetValueKind(parameter.Type, out var parameterKind) ||
-                    argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
-                    !TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
-                    argumentFormula == null ||
-                    argumentFormula.Kind != parameterKind)
+                if (argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
+                    !TryAddPredicateArgumentSubstitution(parameter, argumentExpression, semanticModel, cancellationToken, getSymbolVersion, inlineDepth, builder))
                 {
                     substitutions = Array.Empty<SmtVariableSubstitution>();
                     return false;
-                }
-
-                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
-                builder.Add(new SmtVariableSubstitution(
-                    formalVariable.Name,
-                    formalVariable.Name + ".",
-                    GetFormulaMemberName(formalVariable) + ".",
-                    argumentFormula));
-
-                if (parameter.Type.SpecialType == SpecialType.System_String &&
-                    TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
-                    argumentStringFormula != null)
-                {
-                    var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
-                    builder.Add(new SmtVariableSubstitution(
-                        formalStringVariable.Name,
-                        formalStringVariable.Name + ".",
-                        GetFormulaMemberName(formalStringVariable) + ".",
-                        argumentStringFormula));
                 }
             }
 
