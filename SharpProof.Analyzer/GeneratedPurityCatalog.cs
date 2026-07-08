@@ -21,13 +21,6 @@ namespace SharpProof.Analyzer
         private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
         private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
             new Lazy<GeneratedPurityCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
-        private static readonly SymbolDisplayFormat EffectSummaryNonGenericContainingTypeFormat = new SymbolDisplayFormat(
-            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-            genericsOptions: SymbolDisplayGenericsOptions.None,
-            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
-        private static readonly SymbolDisplayFormat EffectSummaryParameterTypeFormat = new SymbolDisplayFormat(
-            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
         public static readonly GeneratedPurityCatalog Empty = new GeneratedPurityCatalog(
             ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
@@ -519,13 +512,6 @@ namespace SharpProof.Analyzer
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
         {
             return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
-        }
-
-        private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol namedType)
-        {
-            var builder = ImmutableArray.CreateBuilder<ITypeSymbol>();
-            AppendFlattenedTypeArguments(namedType, builder);
-            return builder.ToImmutable();
         }
 
         private static void AppendFlattenedTypeArguments(INamedTypeSymbol namedType, ImmutableArray<ITypeSymbol>.Builder builder)
