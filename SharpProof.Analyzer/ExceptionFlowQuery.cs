@@ -170,483 +170,384 @@ namespace SharpProof.Analyzer
 
             foreach (var divideByZeroNode in ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(divideByZeroNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(divideByZeroNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.DivideByZeroException);
-                if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     divideByZeroNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.DivideByZeroException,
-                        ExceptionCategories.DefiniteDivideByZero,
-                        ExceptionSources.BinaryOperator));
+                    smtAnalysis,
+                    ExceptionTypes.DivideByZeroException,
+                    ExceptionCategories.DefiniteDivideByZero,
+                    ExceptionSources.BinaryOperator);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var checkedOverflowNode in ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(checkedOverflowNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(checkedOverflowNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
-                if (IsCaughtWithinMethod(checkedOverflowNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     checkedOverflowNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.OverflowException,
-                        ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                        checkedOverflowNode is CastExpressionSyntax ? ExceptionSources.CheckedConversion : ExceptionSources.CheckedOperator));
+                    smtAnalysis,
+                    ExceptionTypes.OverflowException,
+                    ExceptionCategories.DefiniteCheckedIntegralOverflow,
+                    checkedOverflowNode is CastExpressionSyntax ? ExceptionSources.CheckedConversion : ExceptionSources.CheckedOperator);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var negativeArrayLengthNode in ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(negativeArrayLengthNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(negativeArrayLengthNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
-                if (IsCaughtWithinMethod(negativeArrayLengthNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     negativeArrayLengthNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.OverflowException,
-                        ExceptionCategories.DefiniteNegativeArrayLength,
-                        ExceptionSources.ArrayLength));
+                    smtAnalysis,
+                    ExceptionTypes.OverflowException,
+                    ExceptionCategories.DefiniteNegativeArrayLength,
+                    ExceptionSources.ArrayLength);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var negativeStackAllocLengthHazard in CollectProvenNegativeStackAllocLengthHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 var stackAllocNode = FindHazardSiteNode(methodNode, negativeStackAllocLengthHazard);
-                if (IsInStaticallyUnreachableBranch(stackAllocNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(stackAllocNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.OverflowException);
-                if (IsCaughtWithinMethod(stackAllocNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     stackAllocNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.OverflowException,
-                        ExceptionCategories.DefiniteNegativeStackAllocLength,
-                        ExceptionSources.StackAllocLength));
+                    smtAnalysis,
+                    ExceptionTypes.OverflowException,
+                    ExceptionCategories.DefiniteNegativeStackAllocLength,
+                    ExceptionSources.StackAllocLength);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException);
-                if (IsCaughtWithinMethod(nullDereferenceNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     nullDereferenceNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.NullReferenceException,
-                        nullDereferenceNode is AwaitExpressionSyntax ? ExceptionCategories.DefiniteAwaitNull : ExceptionCategories.DefiniteNullDereference,
-                        nullDereferenceNode is AwaitExpressionSyntax ? ExceptionSources.AwaitExpression : ExceptionSources.NullReceiver));
+                    smtAnalysis,
+                    ExceptionTypes.NullReferenceException,
+                    nullDereferenceNode is AwaitExpressionSyntax ? ExceptionCategories.DefiniteAwaitNull : ExceptionCategories.DefiniteNullDereference,
+                    nullDereferenceNode is AwaitExpressionSyntax ? ExceptionSources.AwaitExpression : ExceptionSources.NullReceiver);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var lockNullNode in ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(lockNullNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(lockNullNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentNullException);
-                if (IsCaughtWithinMethod(lockNullNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     lockNullNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.ArgumentNullException,
-                        ExceptionCategories.DefiniteLockNull,
-                        ExceptionSources.LockReceiver));
+                    smtAnalysis,
+                    ExceptionTypes.ArgumentNullException,
+                    ExceptionCategories.DefiniteLockNull,
+                    ExceptionSources.LockReceiver);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var dynamicNullBindingSite in ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(dynamicNullBindingSite.Site, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(dynamicNullBindingSite.Site, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType);
-                if (IsCaughtWithinMethod(dynamicNullBindingSite.Site, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     dynamicNullBindingSite.Site,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
-                        dynamicNullBindingSite.Category,
-                        dynamicNullBindingSite.Source));
+                    smtAnalysis,
+                    SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
+                    dynamicNullBindingSite.Category,
+                    dynamicNullBindingSite.Source);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var nullableValueAccessNode in ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(nullableValueAccessNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(nullableValueAccessNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.InvalidOperationException);
-                if (IsCaughtWithinMethod(nullableValueAccessNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     nullableValueAccessNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.InvalidOperationException,
-                        ExceptionCategories.DefiniteNullableValueWithoutValue,
-                        ExceptionSources.NullableValue));
+                    smtAnalysis,
+                    ExceptionTypes.InvalidOperationException,
+                    ExceptionCategories.DefiniteNullableValueWithoutValue,
+                    ExceptionSources.NullableValue);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var unboxNullCastNode in ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(unboxNullCastNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(unboxNullCastNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException);
-                if (IsCaughtWithinMethod(unboxNullCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     unboxNullCastNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.NullReferenceException,
-                        ExceptionCategories.DefiniteUnboxNull,
-                        ExceptionSources.Cast));
+                    smtAnalysis,
+                    ExceptionTypes.NullReferenceException,
+                    ExceptionCategories.DefiniteUnboxNull,
+                    ExceptionSources.Cast);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var invalidCastNode in ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(invalidCastNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(invalidCastNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.InvalidCastException);
-                if (IsCaughtWithinMethod(invalidCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     invalidCastNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.InvalidCastException,
-                        ExceptionCategories.DefiniteInvalidCast,
-                        ExceptionSources.Cast));
+                    smtAnalysis,
+                    ExceptionTypes.InvalidCastException,
+                    ExceptionCategories.DefiniteInvalidCast,
+                    ExceptionSources.Cast);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var arrayTypeMismatchNode in ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(arrayTypeMismatchNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(arrayTypeMismatchNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArrayTypeMismatchException);
-                if (IsCaughtWithinMethod(arrayTypeMismatchNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     arrayTypeMismatchNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.ArrayTypeMismatchException,
-                        ExceptionCategories.DefiniteArrayTypeMismatch,
-                        ExceptionSources.ArrayStore));
+                    smtAnalysis,
+                    ExceptionTypes.ArrayTypeMismatchException,
+                    ExceptionCategories.DefiniteArrayTypeMismatch,
+                    ExceptionSources.ArrayStore);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.IndexOutOfRangeException);
-                if (IsCaughtWithinMethod(indexOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     indexOutOfRangeNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.IndexOutOfRangeException,
-                        ExceptionCategories.DefiniteIndexOutOfRange,
-                        ExceptionSources.ArrayIndex));
+                    smtAnalysis,
+                    ExceptionTypes.IndexOutOfRangeException,
+                    ExceptionCategories.DefiniteIndexOutOfRange,
+                    ExceptionSources.ArrayIndex);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var arrayGetValueNode in ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(arrayGetValueNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(arrayGetValueNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.IndexOutOfRangeException);
-                if (IsCaughtWithinMethod(arrayGetValueNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     arrayGetValueNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.IndexOutOfRangeException,
-                        ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                        ExceptionSources.ArrayGetValue));
+                    smtAnalysis,
+                    ExceptionTypes.IndexOutOfRangeException,
+                    ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
+                    ExceptionSources.ArrayGetValue);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var argumentOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(argumentOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(argumentOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentOutOfRangeException);
-                if (IsCaughtWithinMethod(argumentOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     argumentOutOfRangeNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.ArgumentOutOfRangeException,
-                        ExceptionCategories.DefiniteRangeOutOfRange,
-                        argumentOutOfRangeNode is InvocationExpressionSyntax ? ExceptionSources.SpanSlice : ExceptionSources.RangeSlice));
+                    smtAnalysis,
+                    ExceptionTypes.ArgumentOutOfRangeException,
+                    ExceptionCategories.DefiniteRangeOutOfRange,
+                    argumentOutOfRangeNode is InvocationExpressionSyntax ? ExceptionSources.SpanSlice : ExceptionSources.RangeSlice);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var countIndexHazard in CollectProvenCountIndexOutOfRangeHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 var countIndexNode = FindHazardSiteNode(methodNode, countIndexHazard);
-                if (IsInStaticallyUnreachableBranch(countIndexNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(countIndexNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.ArgumentOutOfRangeException);
-                if (IsCaughtWithinMethod(countIndexNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     countIndexNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.ArgumentOutOfRangeException,
-                        ExceptionCategories.DefiniteCountIndexOutOfRange,
-                        ExceptionSources.CountIndex));
+                    smtAnalysis,
+                    ExceptionTypes.ArgumentOutOfRangeException,
+                    ExceptionCategories.DefiniteCountIndexOutOfRange,
+                    ExceptionSources.CountIndex);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var switchNoMatchHazard in CollectProvenSwitchExpressionNoMatchHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 var switchExpressionNode = FindHazardSiteNode(methodNode, switchNoMatchHazard);
-                if (IsInStaticallyUnreachableBranch(switchExpressionNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(switchExpressionNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.SwitchExpressionException);
-                if (IsCaughtWithinMethod(switchExpressionNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     switchExpressionNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        ExceptionTypes.SwitchExpressionException,
-                        ExceptionCategories.DefiniteSwitchExpressionNoMatch,
-                        ExceptionSources.SwitchExpression));
+                    smtAnalysis,
+                    ExceptionTypes.SwitchExpressionException,
+                    ExceptionCategories.DefiniteSwitchExpressionNoMatch,
+                    ExceptionSources.SwitchExpression);
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
 
             foreach (var symbolicHazard in CollectProvenAnalyzerOnlySymbolicHazards(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 var hazardNode = FindHazardSiteNode(methodNode, symbolicHazard);
-                if (IsInStaticallyUnreachableBranch(hazardNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                if (IsShadowedByThrowingFinally(hazardNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(symbolicHazard.ExceptionType);
-                if (IsCaughtWithinMethod(hazardNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    continue;
-                }
-
-                yield return new UncaughtExceptionSiteEntry(
+                var entry = TryCreateProvenExceptionSiteEntry(
                     hazardNode,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
                     methodSymbol,
-                    new ExceptionCandidate(
-                        exceptionType,
-                        symbolicHazard.ExceptionType,
-                        symbolicHazard.Category,
-                        GetAnalyzerOnlySymbolicHazardSource(symbolicHazard.Category)));
+                    smtAnalysis,
+                    symbolicHazard.ExceptionType,
+                    symbolicHazard.Category,
+                    GetAnalyzerOnlySymbolicHazardSource(symbolicHazard.Category));
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                yield return entry;
             }
+        }
+
+        private static UncaughtExceptionSiteEntry? TryCreateProvenExceptionSiteEntry(
+            SyntaxNode site,
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IMethodSymbol methodSymbol,
+            SmtAnalysisService smtAnalysis,
+            string exceptionMetadataName,
+            string category,
+            string source)
+        {
+            if (IsInStaticallyUnreachableBranch(site, semanticModel, cancellationToken, smtAnalysis))
+            {
+                return null;
+            }
+
+            if (IsShadowedByThrowingFinally(site, semanticModel, cancellationToken, smtAnalysis))
+            {
+                return null;
+            }
+
+            var exceptionType = semanticModel.Compilation.GetTypeByMetadataName(exceptionMetadataName);
+            if (IsCaughtWithinMethod(site, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                return null;
+            }
+
+            return new UncaughtExceptionSiteEntry(
+                site,
+                methodSymbol,
+                new ExceptionCandidate(
+                    exceptionType,
+                    exceptionMetadataName,
+                    category,
+                    source));
         }
 
         private static IEnumerable<SymbolicRuntimeHazard> CollectProvenNegativeStackAllocLengthHazards(
