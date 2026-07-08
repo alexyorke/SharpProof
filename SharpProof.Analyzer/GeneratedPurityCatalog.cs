@@ -553,18 +553,9 @@ namespace SharpProof.Analyzer
                 }
 
                 var path = referencePath!;
-                var methodMap = MethodIdentityCache.GetOrAdd(
-                    path,
-                    static resolvedPath => SummaryMethodIdentityMap.Load(
-                        resolvedPath,
-                        normalizeSignatureTypeNames: true,
-                        includeMethodAttributes: true));
-                foreach (var key in GetSymbolKeys(methodSymbol))
+                if (TryResolveMethodIdentityFromPath(methodSymbol, path, out var identity))
                 {
-                    if (methodMap.TryGetValue(key, out var identity))
-                    {
-                        return identity;
-                    }
+                    return identity;
                 }
 
                 return null;
@@ -578,28 +569,7 @@ namespace SharpProof.Analyzer
             string assemblyPath,
             out ActualMethodIdentity identity)
         {
-            identity = null!;
-            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
-            {
-                return false;
-            }
-
-            var implementationMethodMap = MethodIdentityCache.GetOrAdd(
-                assemblyPath,
-                static path => SummaryMethodIdentityMap.Load(
-                    path,
-                    normalizeSignatureTypeNames: true,
-                    includeMethodAttributes: true));
-            foreach (var key in GetSymbolKeys(methodSymbol))
-            {
-                if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
-                {
-                    identity = foundIdentity;
-                    return true;
-                }
-            }
-
-            return false;
+            return TryResolveMethodIdentityFromPath(GetSymbolKeys(methodSymbol), assemblyPath, out identity);
         }
 
         private static bool TryResolveMethodIdentityFromPath(
@@ -607,28 +577,13 @@ namespace SharpProof.Analyzer
             string assemblyPath,
             out ActualMethodIdentity identity)
         {
-            identity = null!;
-            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
-            {
-                return false;
-            }
-
-            var implementationMethodMap = MethodIdentityCache.GetOrAdd(
+            return SummaryMethodIdentityMap.TryResolve(
+                MethodIdentityCache,
+                methodKeys,
                 assemblyPath,
-                static path => SummaryMethodIdentityMap.Load(
-                    path,
-                    normalizeSignatureTypeNames: true,
-                    includeMethodAttributes: true));
-            foreach (var key in methodKeys)
-            {
-                if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
-                {
-                    identity = foundIdentity;
-                    return true;
-                }
-            }
-
-            return false;
+                normalizeSignatureTypeNames: true,
+                includeMethodAttributes: true,
+                out identity);
         }
 
         private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(IMethodSymbol methodSymbol, Compilation compilation)
@@ -778,83 +733,11 @@ namespace SharpProof.Analyzer
             IEnumerable<string> methodKeys,
             IAssemblySymbol? containingAssembly)
         {
-            var coreLibPath = typeof(object).Assembly.Location;
-            if (!string.IsNullOrWhiteSpace(coreLibPath) &&
-                File.Exists(coreLibPath) &&
-                TryResolveMethodIdentityFromPath(methodKeys, coreLibPath, out _))
-            {
-                return coreLibPath;
-            }
-
-            var assemblyName = containingAssembly?.Identity.Name;
-            if (!string.IsNullOrWhiteSpace(assemblyName) &&
-                RuntimeImplementationAssemblyPathByAssemblyNameCache.TryGetValue(assemblyName!, out var cachedAssemblyPath) &&
-                File.Exists(cachedAssemblyPath) &&
-                TryResolveMethodIdentityFromPath(methodKeys, cachedAssemblyPath, out _))
-            {
-                return cachedAssemblyPath;
-            }
-
-            if (!string.IsNullOrWhiteSpace(assemblyName))
-            {
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    var location = assembly.Location;
-                    if (!string.IsNullOrWhiteSpace(location) &&
-                        File.Exists(location) &&
-                        TryResolveMethodIdentityFromPath(methodKeys, location, out _))
-                    {
-                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = location;
-                        return location;
-                    }
-                }
-            }
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var location = assembly.Location;
-                if (string.IsNullOrWhiteSpace(location) ||
-                    !File.Exists(location) ||
-                    string.Equals(location, coreLibPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (TryResolveMethodIdentityFromPath(methodKeys, location, out _))
-                {
-                    if (!string.IsNullOrWhiteSpace(assemblyName))
-                    {
-                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = location;
-                    }
-
-                    return location;
-                }
-            }
-
-            foreach (var trustedPlatformAssemblyPath in RuntimeMetadataAssemblyLocator.GetTrustedPlatformAssemblyPaths())
-            {
-                if (string.Equals(trustedPlatformAssemblyPath, coreLibPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (TryResolveMethodIdentityFromPath(methodKeys, trustedPlatformAssemblyPath, out _))
-                {
-                    if (!string.IsNullOrWhiteSpace(assemblyName))
-                    {
-                        RuntimeImplementationAssemblyPathByAssemblyNameCache[assemblyName!] = trustedPlatformAssemblyPath;
-                    }
-
-                    return trustedPlatformAssemblyPath;
-                }
-            }
-
-            return null;
+            return RuntimeImplementationAssemblyResolver.Resolve(
+                methodKeys,
+                containingAssembly,
+                RuntimeImplementationAssemblyPathByAssemblyNameCache,
+                static (keys, path) => TryResolveMethodIdentityFromPath(keys, path, out _));
         }
 
         private static ImmutableArray<string> GetStaticConstructorKeys(ITypeSymbol? typeSymbol)

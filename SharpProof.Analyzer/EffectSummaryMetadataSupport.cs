@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer
 {
@@ -101,6 +103,35 @@ namespace SharpProof.Analyzer
             }
 
             return builder.ToImmutable();
+        }
+
+        internal static bool TryResolve(
+            ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>> cache,
+            IEnumerable<string> methodKeys,
+            string assemblyPath,
+            bool normalizeSignatureTypeNames,
+            bool includeMethodAttributes,
+            out ActualMethodIdentity identity)
+        {
+            identity = null!;
+            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
+            {
+                return false;
+            }
+
+            var methodMap = cache.GetOrAdd(
+                assemblyPath,
+                path => Load(path, normalizeSignatureTypeNames, includeMethodAttributes));
+            foreach (var key in methodKeys)
+            {
+                if (methodMap.TryGetValue(key, out var foundIdentity))
+                {
+                    identity = foundIdentity;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static IEnumerable<string> GetMethodKeys(
@@ -329,6 +360,100 @@ namespace SharpProof.Analyzer
             public ImmutableArray<string> TypeParameters { get; }
 
             public ImmutableArray<string> MethodParameters { get; }
+        }
+    }
+
+    internal static class RuntimeImplementationAssemblyResolver
+    {
+        internal static string? Resolve(
+            IEnumerable<string> methodKeys,
+            IAssemblySymbol? containingAssembly,
+            ConcurrentDictionary<string, string> pathByAssemblyName,
+            Func<ImmutableArray<string>, string, bool> containsMethodIdentity)
+        {
+            var keys = methodKeys.ToImmutableArray();
+            if (keys.IsDefaultOrEmpty)
+            {
+                return null;
+            }
+
+            var coreLibPath = typeof(object).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(coreLibPath) &&
+                File.Exists(coreLibPath) &&
+                containsMethodIdentity(keys, coreLibPath))
+            {
+                return coreLibPath;
+            }
+
+            var assemblyName = containingAssembly?.Identity.Name;
+            if (!string.IsNullOrWhiteSpace(assemblyName) &&
+                pathByAssemblyName.TryGetValue(assemblyName!, out var cachedAssemblyPath) &&
+                File.Exists(cachedAssemblyPath) &&
+                containsMethodIdentity(keys, cachedAssemblyPath))
+            {
+                return cachedAssemblyPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(assemblyName))
+            {
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var location = assembly.Location;
+                    if (!string.IsNullOrWhiteSpace(location) &&
+                        File.Exists(location) &&
+                        containsMethodIdentity(keys, location))
+                    {
+                        pathByAssemblyName[assemblyName!] = location;
+                        return location;
+                    }
+                }
+            }
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var location = assembly.Location;
+                if (string.IsNullOrWhiteSpace(location) ||
+                    !File.Exists(location) ||
+                    string.Equals(location, coreLibPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (containsMethodIdentity(keys, location))
+                {
+                    if (!string.IsNullOrWhiteSpace(assemblyName))
+                    {
+                        pathByAssemblyName[assemblyName!] = location;
+                    }
+
+                    return location;
+                }
+            }
+
+            foreach (var trustedPlatformAssemblyPath in RuntimeMetadataAssemblyLocator.GetTrustedPlatformAssemblyPaths())
+            {
+                if (string.Equals(trustedPlatformAssemblyPath, coreLibPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (containsMethodIdentity(keys, trustedPlatformAssemblyPath))
+                {
+                    if (!string.IsNullOrWhiteSpace(assemblyName))
+                    {
+                        pathByAssemblyName[assemblyName!] = trustedPlatformAssemblyPath;
+                    }
+
+                    return trustedPlatformAssemblyPath;
+                }
+            }
+
+            return null;
         }
     }
 
