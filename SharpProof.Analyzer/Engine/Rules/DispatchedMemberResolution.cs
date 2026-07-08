@@ -203,5 +203,149 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             return false;
         }
+
+        internal static bool TryGetIEquatableEqualsImplementation(
+            ITypeSymbol type,
+            out IMethodSymbol implementation)
+        {
+            implementation = null!;
+
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            foreach (var interfaceType in namedType.AllInterfaces)
+            {
+                if (interfaceType.OriginalDefinition.ToDisplayString() != "System.IEquatable<T>" ||
+                    interfaceType.TypeArguments.Length != 1 ||
+                    !SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], type))
+                {
+                    continue;
+                }
+
+                var interfaceEquals = interfaceType
+                    .GetMembers(nameof(IEquatable<object>.Equals))
+                    .OfType<IMethodSymbol>()
+                    .FirstOrDefault(method => method.Parameters.Length == 1);
+                if (interfaceEquals == null)
+                {
+                    continue;
+                }
+
+                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceEquals) as IMethodSymbol;
+                if (foundImplementation != null)
+                {
+                    implementation = foundImplementation;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool TryGetIComparableCompareToImplementation(
+            ITypeSymbol type,
+            out IMethodSymbol implementation)
+        {
+            implementation = null!;
+
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            foreach (var interfaceType in namedType.AllInterfaces)
+            {
+                if (interfaceType.OriginalDefinition.ToDisplayString() != "System.IComparable<T>" ||
+                    interfaceType.TypeArguments.Length != 1 ||
+                    !SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], type))
+                {
+                    continue;
+                }
+
+                var interfaceCompareTo = interfaceType
+                    .GetMembers(nameof(IComparable<object>.CompareTo))
+                    .OfType<IMethodSymbol>()
+                    .FirstOrDefault(method => method.Parameters.Length == 1);
+                if (interfaceCompareTo == null)
+                {
+                    continue;
+                }
+
+                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceCompareTo) as IMethodSymbol;
+                if (foundImplementation != null)
+                {
+                    implementation = foundImplementation;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool TryGetIComparableObjectCompareToImplementation(
+            ITypeSymbol type,
+            out IMethodSymbol implementation)
+        {
+            implementation = null!;
+
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            foreach (var interfaceType in namedType.AllInterfaces)
+            {
+                if (interfaceType.ToDisplayString() != "System.IComparable")
+                {
+                    continue;
+                }
+
+                var interfaceCompareTo = interfaceType
+                    .GetMembers(nameof(IComparable.CompareTo))
+                    .OfType<IMethodSymbol>()
+                    .FirstOrDefault(method => method.Parameters.Length == 1);
+                if (interfaceCompareTo == null)
+                {
+                    continue;
+                }
+
+                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceCompareTo) as IMethodSymbol;
+                if (foundImplementation != null)
+                {
+                    implementation = foundImplementation;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool TryGetObjectOverride(
+            ITypeSymbol type,
+            string memberName,
+            int parameterCount,
+            out IMethodSymbol implementation)
+        {
+            implementation = null!;
+
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            var foundImplementation = namedType
+                .GetMembers(memberName)
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(method => method.IsOverride && method.Parameters.Length == parameterCount);
+            if (foundImplementation == null)
+            {
+                return false;
+            }
+
+            implementation = foundImplementation;
+            return true;
+        }
     }
 }

@@ -1732,7 +1732,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (methodSymbol.Name == nameof(object.Equals) && methodSymbol.Parameters.Length == 2)
             {
-                if (TryGetIEquatableEqualsImplementation(elementType, out var equalsImplementation))
+                if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(elementType, out var equalsImplementation))
                 {
                     result = CheckResolvedEqualityImplementation(
                         equalsImplementation,
@@ -1741,7 +1741,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return true;
                 }
 
-                if (TryGetObjectOverride(elementType, nameof(object.Equals), parameterCount: 1, out var objectEqualsOverride))
+                if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.Equals), parameterCount: 1, out var objectEqualsOverride))
                 {
                     result = CheckResolvedEqualityImplementation(
                         objectEqualsOverride,
@@ -1752,7 +1752,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
             else if (methodSymbol.Name == nameof(object.GetHashCode) && methodSymbol.Parameters.Length == 1)
             {
-                if (TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
+                if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
                 {
                     result = CheckResolvedEqualityImplementation(
                         getHashCodeOverride,
@@ -3046,7 +3046,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (!TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
+            if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     invocationOperation.Syntax,
@@ -3076,7 +3076,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (requiresHashCode)
             {
-                if (!TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
+                if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         invocationOperation.Syntax,
@@ -3097,7 +3097,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
 
-            if (TryGetIEquatableEqualsImplementation(elementType, out var equalsImplementation))
+            if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(elementType, out var equalsImplementation))
             {
                 return CheckResolvedEqualityImplementation(
                     equalsImplementation,
@@ -3105,7 +3105,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context);
             }
 
-            if (TryGetObjectOverride(elementType, nameof(object.Equals), parameterCount: 1, out var objectEqualsOverride))
+            if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.Equals), parameterCount: 1, out var objectEqualsOverride))
             {
                 return CheckResolvedEqualityImplementation(
                     objectEqualsOverride,
@@ -3178,7 +3178,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (TryGetIComparableCompareToImplementation(keyType, out var compareToImplementation))
+            if (DispatchedMemberResolution.TryGetIComparableCompareToImplementation(keyType, out var compareToImplementation))
             {
                 return CheckResolvedEqualityImplementation(
                     compareToImplementation,
@@ -3186,7 +3186,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context);
             }
 
-            if (TryGetIComparableObjectCompareToImplementation(keyType, out var objectCompareToImplementation))
+            if (DispatchedMemberResolution.TryGetIComparableObjectCompareToImplementation(keyType, out var objectCompareToImplementation))
             {
                 return CheckResolvedEqualityImplementation(
                     objectCompareToImplementation,
@@ -3201,144 +3201,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     nameof(MethodInvocationPurityRule),
                     invocationOperation,
                     symbol: invocationOperation.TargetMethod));
-        }
-
-        private static bool TryGetIEquatableEqualsImplementation(
-            ITypeSymbol elementType,
-            out IMethodSymbol implementation)
-        {
-            implementation = null!;
-
-            if (elementType is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            foreach (var interfaceType in namedType.AllInterfaces)
-            {
-                if (interfaceType.OriginalDefinition.ToDisplayString() != "System.IEquatable<T>" ||
-                    interfaceType.TypeArguments.Length != 1 ||
-                    !SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], elementType))
-                {
-                    continue;
-                }
-
-                var interfaceEquals = interfaceType
-                    .GetMembers(nameof(IEquatable<object>.Equals))
-                    .OfType<IMethodSymbol>()
-                    .FirstOrDefault(method => method.Parameters.Length == 1);
-                if (interfaceEquals == null)
-                {
-                    continue;
-                }
-
-                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceEquals) as IMethodSymbol;
-                if (foundImplementation != null)
-                {
-                    implementation = foundImplementation;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryGetIComparableCompareToImplementation(
-            ITypeSymbol keyType,
-            out IMethodSymbol implementation)
-        {
-            implementation = null!;
-
-            if (keyType is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            foreach (var interfaceType in namedType.AllInterfaces)
-            {
-                if (interfaceType.OriginalDefinition.ToDisplayString() != "System.IComparable<T>" ||
-                    interfaceType.TypeArguments.Length != 1 ||
-                    !SymbolEqualityComparer.Default.Equals(interfaceType.TypeArguments[0], keyType))
-                {
-                    continue;
-                }
-
-                var interfaceCompareTo = interfaceType
-                    .GetMembers(nameof(IComparable<object>.CompareTo))
-                    .OfType<IMethodSymbol>()
-                    .FirstOrDefault(method => method.Parameters.Length == 1);
-                if (interfaceCompareTo == null)
-                {
-                    continue;
-                }
-
-                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceCompareTo) as IMethodSymbol;
-                if (foundImplementation != null)
-                {
-                    implementation = foundImplementation;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryGetIComparableObjectCompareToImplementation(
-            ITypeSymbol keyType,
-            out IMethodSymbol implementation)
-        {
-            implementation = null!;
-
-            if (keyType is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            foreach (var interfaceType in namedType.AllInterfaces)
-            {
-                if (interfaceType.ToDisplayString() != "System.IComparable")
-                {
-                    continue;
-                }
-
-                var interfaceCompareTo = interfaceType
-                    .GetMembers(nameof(IComparable.CompareTo))
-                    .OfType<IMethodSymbol>()
-                    .FirstOrDefault(method => method.Parameters.Length == 1);
-                if (interfaceCompareTo == null)
-                {
-                    continue;
-                }
-
-                var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceCompareTo) as IMethodSymbol;
-                if (foundImplementation != null)
-                {
-                    implementation = foundImplementation;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryGetObjectOverride(
-            ITypeSymbol elementType,
-            string memberName,
-            int parameterCount,
-            out IMethodSymbol implementation)
-        {
-            implementation = null!;
-
-            if (elementType is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            implementation = namedType
-                .GetMembers(memberName)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(method => method.IsOverride && method.Parameters.Length == parameterCount);
-            return implementation != null;
         }
 
         private static bool IsBuiltinValueEquality(ITypeSymbol elementType)
