@@ -1721,7 +1721,7 @@ namespace SharpProof.Symbolic.Smt
         {
             elementType = null!;
             if (typeSymbol == null ||
-                !HasInstanceInt32Member(typeSymbol, "Count"))
+                !SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count"))
             {
                 return false;
             }

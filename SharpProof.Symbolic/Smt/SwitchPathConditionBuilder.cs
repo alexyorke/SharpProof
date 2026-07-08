@@ -1606,60 +1606,19 @@ namespace SharpProof.Symbolic.Smt
                 return true;
             }
 
-            if (HasInstanceInt32Member(valueType, "Length"))
+            if (SymbolicTypeFacts.HasInstanceInt32Member(valueType, "Length"))
             {
                 memberName = "Length";
                 return true;
             }
 
-            if (HasInstanceInt32Member(valueType, "Count"))
+            if (SymbolicTypeFacts.HasInstanceInt32Member(valueType, "Count"))
             {
                 memberName = "Count";
                 return true;
             }
 
             memberName = string.Empty;
-            return false;
-        }
-
-        private static bool HasInstanceInt32Member(ITypeSymbol? valueType, string memberName)
-        {
-            if (valueType == null)
-            {
-                return false;
-            }
-
-            for (var current = valueType; current != null; current = (current as INamedTypeSymbol)?.BaseType)
-            {
-                if (HasDeclaredInstanceInt32Member(current, memberName))
-                {
-                    return true;
-                }
-            }
-
-            foreach (var interfaceType in valueType.AllInterfaces)
-            {
-                if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasDeclaredInstanceInt32Member(ITypeSymbol type, string memberName)
-        {
-            foreach (var member in type.GetMembers(memberName))
-            {
-                switch (member)
-                {
-                    case IPropertySymbol { IsStatic: false, Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
-                    case IFieldSymbol { IsStatic: false, Type.SpecialType: SpecialType.System_Int32 }:
-                        return true;
-                }
-            }
-
             return false;
         }
 
