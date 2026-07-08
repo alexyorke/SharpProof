@@ -8331,17 +8331,7 @@ namespace SharpProof.Analyzer.Engine
                 return true;
             }
 
-            if (targetMethod.Name == "ToString" &&
-                targetMethod.Parameters.Length == 0 &&
-                invocationOperation.Arguments.Length == 0)
-            {
-                return true;
-            }
-
-            if (targetMethod.Name == "ToString" &&
-                targetMethod.Parameters.Length == 1 &&
-                invocationOperation.Arguments.Length == 1 &&
-                targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            if (IsCurrentCultureSensitiveToStringInvocation(targetMethod, invocationOperation))
             {
                 return true;
             }
@@ -8419,15 +8409,7 @@ namespace SharpProof.Analyzer.Engine
                     invocationOperation.Arguments.Length == (targetMethod.Name == "ParseExact" ? 2 : 3);
             }
 
-            if (targetMethod.Name == "ToString" &&
-                invocationOperation.Arguments.Length == 0)
-            {
-                return true;
-            }
-
-            if (targetMethod.Name == "ToString" &&
-                invocationOperation.Arguments.Length == 1 &&
-                targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            if (IsCurrentCultureSensitiveToStringInvocation(targetMethod, invocationOperation))
             {
                 return true;
             }
@@ -8454,6 +8436,18 @@ namespace SharpProof.Analyzer.Engine
             }
 
             return targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsCurrentCultureSensitiveToStringInvocation(
+            IMethodSymbol targetMethod,
+            IInvocationOperation invocationOperation)
+        {
+            return targetMethod.Name == "ToString" &&
+                (targetMethod.Parameters.Length == 0 &&
+                 invocationOperation.Arguments.Length == 0 ||
+                 targetMethod.Parameters.Length == 1 &&
+                 invocationOperation.Arguments.Length == 1 &&
+                 targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String);
         }
 
         private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType)
@@ -8608,34 +8602,30 @@ namespace SharpProof.Analyzer.Engine
 
         private static bool IsSingleTimeSpanConstantFormat(IOperation? operation)
         {
-            var unwrappedOperation = SkipImplicitConversions(operation);
-            return unwrappedOperation?.ConstantValue.HasValue == true &&
-                unwrappedOperation.ConstantValue.Value is string format &&
-                (format == "c" || format == "g" || format == "G");
+            return IsSingleStringConstant(operation, static format => format is "c" or "g" or "G");
         }
 
         private static bool IsSingleDateOnlyInvariantFormat(IOperation? operation)
         {
-            var unwrappedOperation = SkipImplicitConversions(operation);
-            return unwrappedOperation?.ConstantValue.HasValue == true &&
-                unwrappedOperation.ConstantValue.Value is string format &&
-                format == "d";
+            return IsSingleStringConstant(operation, static format => format == "d");
         }
 
         private static bool IsSingleTimeOnlyInvariantFormat(IOperation? operation)
         {
-            var unwrappedOperation = SkipImplicitConversions(operation);
-            return unwrappedOperation?.ConstantValue.HasValue == true &&
-                unwrappedOperation.ConstantValue.Value is string format &&
-                format == "t";
+            return IsSingleStringConstant(operation, static format => format == "t");
         }
 
         private static bool IsSingleDateTimeOffsetRoundtripFormat(IOperation? operation)
         {
+            return IsSingleStringConstant(operation, static format => format is "O" or "o");
+        }
+
+        private static bool IsSingleStringConstant(IOperation? operation, Func<string, bool> matchesFormat)
+        {
             var unwrappedOperation = SkipImplicitConversions(operation);
             return unwrappedOperation?.ConstantValue.HasValue == true &&
                 unwrappedOperation.ConstantValue.Value is string format &&
-                (format == "O" || format == "o");
+                matchesFormat(format);
         }
 
         private static bool IsZeroStyle(IOperation? operation)
