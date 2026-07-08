@@ -2499,6 +2499,12 @@ namespace SharpProof.Analyzer.Engine
                     continue;
                 }
 
+                if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
+                {
+                    releasedResources.Add(releasedResource);
+                    continue;
+                }
+
                 switch (fact.Atom)
                 {
                     case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime:
@@ -2506,15 +2512,6 @@ namespace SharpProof.Analyzer.Engine
                         break;
                     case SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal:
                         ownedResources[disposal.Resource] = fact.Symbol;
-                        break;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
-                        releasedResources.Add(disposal.Resource);
                         break;
                 }
             }
@@ -6112,23 +6109,9 @@ namespace SharpProof.Analyzer.Engine
             var releasedResources = new HashSet<SymbolicTerm>();
             foreach (var fact in state.PathState.Facts)
             {
-                if (!fact.Polarity ||
-                    fact.Confidence != SymbolicFactConfidence.Exact)
+                if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
                 {
-                    continue;
-                }
-
-                switch (fact.Atom)
-                {
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
-                        releasedResources.Add(disposal.Resource);
-                        break;
+                    releasedResources.Add(releasedResource);
                 }
             }
 
@@ -7737,6 +7720,12 @@ namespace SharpProof.Analyzer.Engine
                     continue;
                 }
 
+                if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
+                {
+                    releasedResources.Add(releasedResource);
+                    continue;
+                }
+
                 switch (fact.Atom)
                 {
                     case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime
@@ -7746,15 +7735,6 @@ namespace SharpProof.Analyzer.Engine
                     case SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal
                         when Equals(disposal.Resource, resourceTerm):
                         hasOwnedResource = true;
-                        break;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Returned } lifetime:
-                        releasedResources.Add(lifetime.Resource);
-                        break;
-                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal:
-                        releasedResources.Add(disposal.Resource);
                         break;
                 }
             }
