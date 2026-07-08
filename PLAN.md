@@ -270,9 +270,8 @@ grouped by their original feature area.
   and macOS package-consumer coverage.
 - Enforce analyzer release tracking for every public diagnostic descriptor:
   re-enable or replace the suppressed release-tracking check, add tests that
-  `SupportedDiagnostics` and release files stay in sync, record `SP0018`
-  through `SP0023`, and either retire or intentionally ship the dead `SP0001`
-  descriptor.
+  `SupportedDiagnostics` and release files stay in sync, and record `SP0018`
+  through `SP0023`. (The dead `SP0001` descriptor has been retired.)
 - Remove the analyzer project's `RS1035` suppression by auditing host-banned
   APIs, especially filesystem, environment, reflection, and assembly-loading
   calls used for effect summaries, then route remaining analyzer inputs through
