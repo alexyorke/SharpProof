@@ -237,7 +237,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
                     if (fieldSymbol.IsReadOnly &&
-                        OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel))
+                        OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel, context.CancellationToken))
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Readonly field '{fieldSymbol.Name}' on stable local wrapper carries an owned fresh mutable object. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -262,9 +262,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
                     string fieldPureSig = fieldSymbol.OriginalDefinition.ToDisplayString();
-                bool fieldKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(
-                    fieldSymbol,
-                    context.SemanticModel.Compilation);
+                    bool fieldKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(
+                        fieldSymbol,
+                        context.SemanticModel.Compilation);
                     PurityAnalysisEngine.LogDebug($"      [FieldRefRule] Checking IsKnownPureBCLMember for instance field accessed via {instanceOperation.Kind}: '{fieldPureSig}' -> {fieldKnownPure}");
 
                     if (fieldKnownPure)

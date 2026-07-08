@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -26,6 +27,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState? currentState)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
             {
                 return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context, currentState);
@@ -38,40 +40,45 @@ namespace SharpProof.Analyzer.Engine.Rules
                     observationSyntax,
                     context.SemanticModel,
                     currentState,
-                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    context.CancellationToken);
             }
 
             return operation is IFieldReferenceOperation fieldReference &&
                    fieldReference.Field.IsReadOnly &&
-                   IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel) ||
+                   IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel, context.CancellationToken) ||
                    operation is IPropertyReferenceOperation propertyReference &&
-                   IsOwnedFreshMutableStablePropertyReference(propertyReference, observationSyntax, context.SemanticModel);
+                   IsOwnedFreshMutableStablePropertyReference(propertyReference, observationSyntax, context.SemanticModel, context.CancellationToken);
         }
 
         internal static bool IsOwnedFreshMutableLocal(
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            PurityAnalysisEngine.PurityAnalysisState? currentState)
+            PurityAnalysisEngine.PurityAnalysisState? currentState,
+            CancellationToken cancellationToken = default)
         {
             return IsOwnedFreshMutableLocal(
                 localSymbol,
                 observationSyntax,
                 semanticModel,
                 currentState,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken);
         }
 
         internal static bool IsOwnedFreshMutableReadonlyFieldReference(
             IFieldReferenceOperation fieldReferenceOperation,
             SyntaxNode observationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
             if (!TryGetStableAssignedValue(
                     fieldReferenceOperation,
                     observationSyntax,
                     semanticModel,
                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken,
                     out var valueOperation))
             {
                 return false;
@@ -81,14 +88,17 @@ namespace SharpProof.Analyzer.Engine.Rules
                 valueOperation,
                 observationSyntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken);
         }
 
         private static bool IsOwnedFreshMutableStablePropertyReference(
             IPropertyReferenceOperation propertyReferenceOperation,
             SyntaxNode observationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (propertyReferenceOperation.Property.SetMethod != null &&
                 !propertyReferenceOperation.Property.SetMethod.IsInitOnly)
             {
@@ -100,6 +110,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     observationSyntax,
                     semanticModel,
                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken,
                     out var valueOperation))
             {
                 return false;
@@ -109,7 +120,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                 valueOperation,
                 observationSyntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken);
         }
 
         private static bool TryGetStableAssignedValue(
@@ -117,6 +129,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IOperation valueOperation)
         {
             if (!TryResolveStableObjectCreationInitializer(
@@ -124,6 +137,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     observationSyntax,
                     semanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out var objectCreationOperation))
             {
                 valueOperation = null!;
@@ -132,6 +146,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), fieldReferenceOperation.Field))
                 {
                     continue;
@@ -147,7 +162,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInField(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel))
+                        ConstructorStoresParameterInField(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel, cancellationToken))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -164,6 +179,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IOperation valueOperation)
         {
             if (!TryResolveStableObjectCreationInitializer(
@@ -171,6 +187,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     observationSyntax,
                     semanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out var objectCreationOperation))
             {
                 valueOperation = null!;
@@ -179,6 +196,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), propertyReferenceOperation.Property))
                 {
                     continue;
@@ -194,7 +212,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInProperty(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel))
+                        ConstructorStoresParameterInProperty(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel, cancellationToken))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -211,8 +229,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IObjectCreationOperation objectCreationOperation)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             switch (unwrappedOperation)
             {
@@ -226,6 +246,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         observationSyntax,
                         semanticModel,
                         visitedLocals,
+                        cancellationToken,
                         out objectCreationOperation);
 
                 case IInvocationOperation invocationOperation
@@ -240,16 +261,17 @@ namespace SharpProof.Analyzer.Engine.Rules
                         observationSyntax,
                         returnedSemanticModel,
                         visitedLocals,
+                        cancellationToken,
                         out objectCreationOperation);
 
                 case IFieldReferenceOperation fieldReference when fieldReference.Field.IsReadOnly &&
-                                                                  TryGetStableAssignedValue(fieldReference, observationSyntax, semanticModel, visitedLocals, out var fieldValue):
-                    return TryResolveStableObjectCreationInitializer(fieldValue, observationSyntax, semanticModel, visitedLocals, out objectCreationOperation);
+                                                                  TryGetStableAssignedValue(fieldReference, observationSyntax, semanticModel, visitedLocals, cancellationToken, out var fieldValue):
+                    return TryResolveStableObjectCreationInitializer(fieldValue, observationSyntax, semanticModel, visitedLocals, cancellationToken, out objectCreationOperation);
 
                 case IPropertyReferenceOperation propertyReference
                     when (propertyReference.Property.SetMethod == null || propertyReference.Property.SetMethod.IsInitOnly) &&
-                         TryGetStableAssignedValue(propertyReference, observationSyntax, semanticModel, visitedLocals, out var propertyValue):
-                    return TryResolveStableObjectCreationInitializer(propertyValue, observationSyntax, semanticModel, visitedLocals, out objectCreationOperation);
+                         TryGetStableAssignedValue(propertyReference, observationSyntax, semanticModel, visitedLocals, cancellationToken, out var propertyValue):
+                    return TryResolveStableObjectCreationInitializer(propertyValue, observationSyntax, semanticModel, visitedLocals, cancellationToken, out objectCreationOperation);
 
                 default:
                     objectCreationOperation = null!;
@@ -262,8 +284,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IObjectCreationOperation objectCreationOperation)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!visitedLocals.Add(localSymbol))
             {
                 objectCreationOperation = null!;
@@ -271,7 +295,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -282,7 +306,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation is IObjectCreationOperation directObjectCreation)
             {
                 objectCreationOperation = directObjectCreation;
@@ -296,6 +320,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     initializerSyntax,
                     semanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out objectCreationOperation);
             }
 
@@ -312,6 +337,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     initializerSyntax,
                     returnedSemanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out objectCreationOperation);
             }
 
@@ -323,15 +349,18 @@ namespace SharpProof.Analyzer.Engine.Rules
             IMethodSymbol constructor,
             IParameterSymbol parameter,
             IFieldSymbol fieldSymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
             {
-                var constructorSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
                 var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
                 foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                 {
-                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
                     {
                         continue;
                     }
@@ -356,15 +385,18 @@ namespace SharpProof.Analyzer.Engine.Rules
             IMethodSymbol constructor,
             IParameterSymbol parameter,
             IPropertySymbol propertySymbol,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
             {
-                var constructorSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
                 var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
                 foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                 {
-                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
                     {
                         continue;
                     }
@@ -407,15 +439,17 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!visitedLocals.Add(localSymbol))
             {
                 return false;
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -429,7 +463,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
@@ -438,7 +472,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (initializerOperation is ILocalReferenceOperation localReference)
             {
-                return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals);
+                return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals, cancellationToken);
             }
 
             if (initializerOperation is IConditionalOperation conditionalOperation)
@@ -455,19 +489,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                         selectedBranch,
                         initializerSyntax,
                         semanticModel,
-                        visitedLocals);
+                        visitedLocals,
+                        cancellationToken);
                 }
 
                 return (conditionalOperation.WhenTrue != null &&
-                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenTrue, initializerSyntax, semanticModel, visitedLocals)) ||
+                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenTrue, initializerSyntax, semanticModel, visitedLocals, cancellationToken)) ||
                        (conditionalOperation.WhenFalse != null &&
-                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenFalse, initializerSyntax, semanticModel, visitedLocals));
+                        HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenFalse, initializerSyntax, semanticModel, visitedLocals, cancellationToken));
             }
 
             if (initializerOperation is ICoalesceOperation coalesceOperation)
             {
-                return HasStableFreshMutableObjectValueInOperation(coalesceOperation.Value, initializerSyntax, semanticModel, visitedLocals) ||
-                       HasStableFreshMutableObjectValueInOperation(coalesceOperation.WhenNull, initializerSyntax, semanticModel, visitedLocals);
+                return HasStableFreshMutableObjectValueInOperation(coalesceOperation.Value, initializerSyntax, semanticModel, visitedLocals, cancellationToken) ||
+                       HasStableFreshMutableObjectValueInOperation(coalesceOperation.WhenNull, initializerSyntax, semanticModel, visitedLocals, cancellationToken);
             }
 
             return initializerOperation != null &&
@@ -475,7 +510,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                        initializerOperation,
                        initializerSyntax,
                        semanticModel,
-                       visitedLocals);
+                       visitedLocals,
+                       cancellationToken);
         }
 
         private static bool IsOwnedFreshMutableLocal(
@@ -483,8 +519,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             PurityAnalysisEngine.PurityAnalysisState? currentState,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (currentState is { } state &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
                 PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state))
@@ -496,22 +534,26 @@ namespace SharpProof.Analyzer.Engine.Rules
                     localSymbol,
                     observationSyntax,
                     semanticModel,
-                    visitedLocals) ||
+                    visitedLocals,
+                    cancellationToken) ||
                 IsAssignedFreshMutableObjectOnAllPaths(
                     localSymbol,
                     observationSyntax,
                     semanticModel,
-                    visitedLocals);
+                    visitedLocals,
+                    cancellationToken);
         }
 
         private static bool IsAssignedFreshMutableObjectOnAllPaths(
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var containingBlock = declaratorSyntax?.FirstAncestorOrSelf<BlockSyntax>();
@@ -533,7 +575,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                 localSymbol,
                 observationSyntax,
                 semanticModel,
-                visitedLocals);
+                visitedLocals,
+                cancellationToken);
             return states.Count > 0 && states.All(static assignedFresh => assignedFresh);
         }
 
@@ -543,21 +586,25 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
             var states = new List<bool> { assignedFresh };
             foreach (var statement in statements)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var nextStates = new List<bool>();
                 foreach (var state in states)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     nextStates.AddRange(AnalyzeFreshMutableAssignment(
                         statement,
                         state,
                         localSymbol,
                         observationSyntax,
                         semanticModel,
-                        visitedLocals));
+                        visitedLocals,
+                        cancellationToken));
                 }
 
                 states = nextStates;
@@ -572,8 +619,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (statement is IfStatementSyntax ifStatement)
             {
                 var thenStates = AnalyzeFreshMutableAssignments(
@@ -582,7 +631,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                     localSymbol,
                     observationSyntax,
                     semanticModel,
-                    visitedLocals);
+                    visitedLocals,
+                    cancellationToken);
                 var elseStates = ifStatement.Else == null
                     ? new List<bool> { assignedFresh }
                     : AnalyzeFreshMutableAssignments(
@@ -591,7 +641,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                         localSymbol,
                         observationSyntax,
                         semanticModel,
-                        visitedLocals);
+                        visitedLocals,
+                        cancellationToken);
 
                 thenStates.AddRange(elseStates);
                 return thenStates;
@@ -600,7 +651,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             var current = assignedFresh;
             foreach (var assignment in statement.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>())
             {
-                if (semanticModel.GetSymbolInfo(assignment.Left).Symbol is not { } assignedSymbol ||
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
                     !SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
                 {
                     continue;
@@ -610,7 +662,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                     assignment.Right,
                     observationSyntax,
                     semanticModel,
-                    visitedLocals);
+                    visitedLocals,
+                    cancellationToken);
             }
 
             return new List<bool> { current };
@@ -627,9 +680,11 @@ namespace SharpProof.Analyzer.Engine.Rules
             ExpressionSyntax valueSyntax,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
-            var valueOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(valueSyntax));
+            cancellationToken.ThrowIfCancellationRequested();
+            var valueOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(valueSyntax, cancellationToken));
             if (valueOperation == null)
             {
                 return false;
@@ -639,15 +694,18 @@ namespace SharpProof.Analyzer.Engine.Rules
                 valueOperation,
                 observationSyntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default));
+                new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                cancellationToken);
         }
 
         private static bool HasStableFreshMutableObjectValueInOperation(
             IOperation operation,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             if (unwrappedOperation is IObjectCreationOperation objectCreationOperation)
             {
@@ -660,9 +718,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     foreach (var argument in objectCreationOperation.Arguments)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var parameter = argument.Parameter;
                         if (parameter == null ||
-                            !ConstructorStoresParameterInStableMember(objectCreationOperation.Constructor, parameter, semanticModel))
+                            !ConstructorStoresParameterInStableMember(objectCreationOperation.Constructor, parameter, semanticModel, cancellationToken))
                         {
                             continue;
                         }
@@ -671,7 +730,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                             argument.Value,
                             observationSyntax,
                             semanticModel,
-                            visitedLocals))
+                            visitedLocals,
+                            cancellationToken))
                         {
                             return true;
                         }
@@ -681,7 +741,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (unwrappedOperation is ILocalReferenceOperation localReference)
             {
-                return IsOwnedFreshMutableLocal(localReference.Local, observationSyntax, semanticModel, currentState: null, visitedLocals);
+                return IsOwnedFreshMutableLocal(localReference.Local, observationSyntax, semanticModel, currentState: null, visitedLocals, cancellationToken);
             }
 
             if (unwrappedOperation is IInvocationOperation invocationOperation &&
@@ -696,7 +756,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                     returnedOperation,
                     observationSyntax,
                     returnedSemanticModel,
-                    visitedLocals);
+                    visitedLocals,
+                    cancellationToken);
             }
 
             return false;
@@ -705,15 +766,18 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool ConstructorStoresParameterInStableMember(
             IMethodSymbol constructor,
             IParameterSymbol parameter,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
             {
-                var constructorSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
                 var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
                 foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                 {
-                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
                     {
                         continue;
                     }

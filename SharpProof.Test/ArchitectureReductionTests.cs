@@ -281,9 +281,37 @@ namespace SharpProof.Test
             Assert.That(classifierSource, Does.Contain("PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state)"));
             Assert.That(classifierSource, Does.Contain("IsAssignedFreshMutableObjectOnAllPaths("));
             Assert.That(classifierSource, Does.Contain("AnalyzeFreshMutableAssignments("));
-            Assert.That(classifierSource, Does.Contain("return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals);"));
+            Assert.That(classifierSource, Does.Contain("return IsOwnedFreshMutableLocal(localReference.Local, initializerSyntax, semanticModel, currentState: null, visitedLocals, cancellationToken);"));
             Assert.That(returnSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableLocal("));
             Assert.That(returnSource, Does.Contain("\"symbolic_fresh_mutable_object_return\""));
+        }
+
+        [Test]
+        public void FreshMutableObjectClassifier_ThreadsCancellationTokenThroughSyntaxScans()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var classifierSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "OwnedFreshMutableObjectClassifier.cs"))
+                .Replace("\r\n", "\n");
+            var fieldRuleSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "FieldReferencePurityRule.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(classifierSource, Does.Not.Contain("GetSyntax()"));
+            Assert.That(classifierSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("context.CancellationToken"));
+            Assert.That(fieldRuleSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel, context.CancellationToken)"));
         }
 
         [Test]
