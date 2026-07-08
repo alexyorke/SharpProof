@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic.Ir;
 
@@ -57,7 +58,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Lambda body analysis result: IsPure={bodyResult.IsPure}");
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
-                        TryFindCapturedLocalMutation(anonymousFunction, out var mutationSyntax, out var mutatedLocal))
+                        TryFindCapturedLocalMutation(anonymousFunction, context.CancellationToken, out var mutationSyntax, out var mutatedLocal))
                     {
                         PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda mutates captured local '{mutatedLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -77,6 +78,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             anonymousFunction,
                             currentState,
                             context.SemanticModel,
+                            context.CancellationToken,
                             out var captureSyntax,
                             out var capturedArrayLocal))
                     {
@@ -99,6 +101,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             currentState,
                             delegateCreation.Syntax,
                             context.SemanticModel,
+                            context.CancellationToken,
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
@@ -138,7 +141,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Flow lambda body analysis result: IsPure={bodyResult.IsPure}");
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
-                        TryFindCapturedLocalMutation(flowAnonymousFunction, out var mutationSyntax, out var mutatedLocal))
+                        TryFindCapturedLocalMutation(flowAnonymousFunction, context.CancellationToken, out var mutationSyntax, out var mutatedLocal))
                     {
                         PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda mutates captured local '{mutatedLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -158,6 +161,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             flowAnonymousFunction,
                             currentState,
                             context.SemanticModel,
+                            context.CancellationToken,
                             out var captureSyntax,
                             out var capturedArrayLocal))
                     {
@@ -180,6 +184,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             currentState,
                             delegateCreation.Syntax,
                             context.SemanticModel,
+                            context.CancellationToken,
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
@@ -333,39 +338,42 @@ namespace SharpProof.Analyzer.Engine.Rules
 
         private static bool TryFindCapturedLocalMutation(
             IOperation anonymousFunctionOperation,
+            CancellationToken cancellationToken,
             out SyntaxNode mutationSyntax,
             out ILocalSymbol mutatedLocal)
         {
             var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
             foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 switch (operation)
                 {
                     case IAssignmentOperation assignmentOperation
-                        when TryGetMutatedCapturedLocal(assignmentOperation.Target, lambdaSpan, out mutatedLocal):
+                        when TryGetMutatedCapturedLocal(assignmentOperation.Target, lambdaSpan, cancellationToken, out mutatedLocal):
                         mutationSyntax = assignmentOperation.Target.Syntax;
                         return true;
 
                     case ICompoundAssignmentOperation compoundAssignmentOperation
-                        when TryGetMutatedCapturedLocal(compoundAssignmentOperation.Target, lambdaSpan, out mutatedLocal):
+                        when TryGetMutatedCapturedLocal(compoundAssignmentOperation.Target, lambdaSpan, cancellationToken, out mutatedLocal):
                         mutationSyntax = compoundAssignmentOperation.Target.Syntax;
                         return true;
 
                     case IIncrementOrDecrementOperation incrementOrDecrementOperation
-                        when TryGetMutatedCapturedLocal(incrementOrDecrementOperation.Target, lambdaSpan, out mutatedLocal):
+                        when TryGetMutatedCapturedLocal(incrementOrDecrementOperation.Target, lambdaSpan, cancellationToken, out mutatedLocal):
                         mutationSyntax = incrementOrDecrementOperation.Target.Syntax;
                         return true;
 
                     case IDeconstructionAssignmentOperation deconstructionAssignmentOperation
-                        when TryGetMutatedCapturedLocal(deconstructionAssignmentOperation.Target, lambdaSpan, out mutatedLocal):
+                        when TryGetMutatedCapturedLocal(deconstructionAssignmentOperation.Target, lambdaSpan, cancellationToken, out mutatedLocal):
                         mutationSyntax = deconstructionAssignmentOperation.Target.Syntax;
                         return true;
 
                     case IInvocationOperation invocationOperation:
                         foreach (var argument in invocationOperation.Arguments)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                                TryGetMutatedCapturedLocal(argument.Value, lambdaSpan, out mutatedLocal))
+                                TryGetMutatedCapturedLocal(argument.Value, lambdaSpan, cancellationToken, out mutatedLocal))
                             {
                                 mutationSyntax = argument.Value.Syntax;
                                 return true;
@@ -384,11 +392,13 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool TryGetMutatedCapturedLocal(
             IOperation? targetOperation,
             Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            CancellationToken cancellationToken,
             out ILocalSymbol localSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
             if (unwrappedTarget is ILocalReferenceOperation localReference &&
-                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan))
+                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken))
             {
                 localSymbol = localReference.Local;
                 return true;
@@ -398,7 +408,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 foreach (var element in tupleOperation.Elements)
                 {
-                    if (TryGetMutatedCapturedLocal(element, lambdaSpan, out localSymbol))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (TryGetMutatedCapturedLocal(element, lambdaSpan, cancellationToken, out localSymbol))
                     {
                         return true;
                     }
@@ -421,7 +432,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
                 var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
                 if (operation != null &&
-                    TryFindCapturedLocalMutation(operation, out mutationSyntax, out mutatedLocal))
+                    TryFindCapturedLocalMutation(operation, context.CancellationToken, out mutationSyntax, out mutatedLocal))
                 {
                     return true;
                 }
@@ -436,13 +447,15 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation anonymousFunctionOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode captureSyntax,
             out ILocalSymbol capturedLocal)
         {
             var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
             foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
             {
-                if (TryGetCapturedOwnedLocalArray(operation, lambdaSpan, currentState, out capturedLocal))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryGetCapturedOwnedLocalArray(operation, lambdaSpan, currentState, cancellationToken, out capturedLocal))
                 {
                     captureSyntax = operation.Syntax;
                     return true;
@@ -454,6 +467,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     lambdaSpan,
                     currentState,
                     semanticModel,
+                    cancellationToken,
                     out captureSyntax,
                     out capturedLocal))
             {
@@ -482,6 +496,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         operation,
                         currentState,
                         semanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal))
                 {
@@ -499,14 +514,16 @@ namespace SharpProof.Analyzer.Engine.Rules
             Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode captureSyntax,
             out ILocalSymbol capturedLocal)
         {
             foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
             {
-                if (semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol &&
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
                     localSymbol.Type is IArrayTypeSymbol &&
-                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan) &&
+                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
                     (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
                      currentState.IsOwnedLocalArraySymbol(localSymbol)))
                 {
@@ -525,14 +542,16 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? operation,
             Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            CancellationToken cancellationToken,
             out ILocalSymbol localSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             if (unwrappedOperation is ILocalReferenceOperation localReference &&
                 localReference.Local.Type is IArrayTypeSymbol &&
                 (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState) ||
                  currentState.IsOwnedLocalArraySymbol(localReference.Local)) &&
-                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan))
+                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken))
             {
                 localSymbol = localReference.Local;
                 return true;
@@ -547,18 +566,21 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode captureSyntax,
             out ILocalSymbol capturedLocal)
         {
             var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
             foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (TryGetCapturedFreshMutableObject(
                     operation,
                     lambdaSpan,
                     currentState,
                     delegateCreationSyntax,
                     semanticModel,
+                    cancellationToken,
                     out capturedLocal))
                 {
                     captureSyntax = operation.Syntax;
@@ -571,6 +593,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     lambdaSpan,
                     currentState,
                     semanticModel,
+                    cancellationToken,
                     out captureSyntax,
                     out capturedLocal))
             {
@@ -601,6 +624,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState,
                         delegateCreationSyntax,
                         semanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal))
                 {
@@ -618,13 +642,15 @@ namespace SharpProof.Analyzer.Engine.Rules
             Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode captureSyntax,
             out ILocalSymbol capturedLocal)
         {
             foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
             {
-                if (semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol localSymbol &&
-                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan) &&
+                cancellationToken.ThrowIfCancellationRequested();
+                if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
+                    IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
                     RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
                     PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState))
                 {
@@ -640,7 +666,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         fact.Atom is SymbolicOwnershipAtom { Escaped: false } &&
                         fact.Symbol is ILocalSymbol factLocal &&
                         identifierName.Identifier.ValueText == factLocal.Name &&
-                        IsDeclaredOutsideSpan(factLocal, lambdaSpan) &&
+                        IsDeclaredOutsideSpan(factLocal, lambdaSpan, cancellationToken) &&
                         RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type))
                     {
                         captureSyntax = identifierName;
@@ -661,8 +687,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out ILocalSymbol localSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             if (unwrappedOperation is IFieldReferenceOperation fieldReference &&
                 TryGetCapturedFreshMutableObject(
@@ -671,6 +699,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     currentState,
                     delegateCreationSyntax,
                     semanticModel,
+                    cancellationToken,
                     out localSymbol))
             {
                 return true;
@@ -683,13 +712,14 @@ namespace SharpProof.Analyzer.Engine.Rules
                     currentState,
                     delegateCreationSyntax,
                     semanticModel,
+                    cancellationToken,
                     out localSymbol))
             {
                 return true;
             }
 
             if (PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedOperation, currentState) is ILocalSymbol resolvedLocal &&
-                IsDeclaredOutsideSpan(resolvedLocal, lambdaSpan) &&
+                IsDeclaredOutsideSpan(resolvedLocal, lambdaSpan, cancellationToken) &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(resolvedLocal.Type) &&
                 PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState))
             {
@@ -698,8 +728,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             if (unwrappedOperation is ILocalReferenceOperation localReferenceFallback &&
-                IsDeclaredOutsideSpan(localReferenceFallback.Local, lambdaSpan) &&
-                HasStableFreshMutableObjectInitializer(localReferenceFallback.Local, delegateCreationSyntax, semanticModel))
+                IsDeclaredOutsideSpan(localReferenceFallback.Local, lambdaSpan, cancellationToken) &&
+                HasStableFreshMutableObjectInitializer(localReferenceFallback.Local, delegateCreationSyntax, semanticModel, cancellationToken))
             {
                 localSymbol = localReferenceFallback.Local;
                 return true;
@@ -712,23 +742,27 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool HasStableFreshMutableObjectInitializer(
             ILocalSymbol localSymbol,
             SyntaxNode delegateCreationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
             return HasStableFreshMutableObjectInitializer(
                 localSymbol,
                 delegateCreationSyntax,
                 semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken);
         }
 
         private static bool HasStableFreshMutableObjectInitializer(
             ILocalSymbol localSymbol,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
-            HashSet<ILocalSymbol> visitedLocals)
+            HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -739,33 +773,36 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndEscape(localSymbol, delegateCreationSyntax, declaratorSyntax, semanticModel))
+            if (HasAssignmentToLocalBetweenDeclarationAndEscape(localSymbol, delegateCreationSyntax, declaratorSyntax, semanticModel, cancellationToken))
             {
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation)
             {
                 return IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
             }
 
             return initializerOperation is ILocalReferenceOperation aliasReference &&
-                   IsDeclaredOutsideSpan(aliasReference.Local, delegateCreationSyntax.Span) &&
+                   IsDeclaredOutsideSpan(aliasReference.Local, delegateCreationSyntax.Span, cancellationToken) &&
                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(aliasReference.Local.Type) &&
                    HasStableFreshMutableObjectInitializer(
                        aliasReference.Local,
                        delegateCreationSyntax,
                        semanticModel,
-                       visitedLocals);
+                       visitedLocals,
+                       cancellationToken);
         }
 
         private static bool HasAssignmentToLocalBetweenDeclarationAndEscape(
             ILocalSymbol localSymbol,
             SyntaxNode delegateCreationSyntax,
             VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var containingBlock = delegateCreationSyntax.FirstAncestorOrSelf<BlockSyntax>();
             if (containingBlock == null)
             {
@@ -781,12 +818,13 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (assignment.SpanStart < start || assignment.SpanStart >= end)
                 {
                     continue;
                 }
 
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
                 {
                     return true;
@@ -821,12 +859,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 });
         }
 
-        private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span)
+        private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span, CancellationToken cancellationToken = default)
         {
             var syntaxReferences = localSymbol.DeclaringSyntaxReferences;
             return syntaxReferences.Length > 0 &&
                 syntaxReferences
-                    .Select(reference => reference.GetSyntax().Span)
+                    .Select(reference => reference.GetSyntax(cancellationToken).Span)
                     .All(declarationSpan => declarationSpan.Start < span.Start || declarationSpan.End > span.End);
         }
     }

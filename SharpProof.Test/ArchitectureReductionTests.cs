@@ -719,6 +719,35 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void DelegateRule_ThreadsCancellationTokenThroughCaptureScans()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var delegateSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "DelegateCreationPurityRule.cs"))
+                .Replace("\r\n", "\n");
+            var returnSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "ReturnStatementPurityRule.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(delegateSource, Does.Not.Contain("GetSyntax()"));
+            Assert.That(delegateSource, Does.Contain("TryFindCapturedLocalMutation(anonymousFunction, context.CancellationToken"));
+            Assert.That(delegateSource, Does.Contain("semanticModel.GetSymbolInfo(identifierName, cancellationToken)"));
+            Assert.That(delegateSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
+            Assert.That(delegateSource, Does.Contain("reference.GetSyntax(cancellationToken).Span"));
+            Assert.That(delegateSource, Does.Contain("HasStableFreshMutableObjectInitializer(localReferenceFallback.Local, delegateCreationSyntax, semanticModel, cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("DelegateCreationPurityRule.TryFindCapturedFreshMutableObject(\n                        anonymousFunction,\n                        currentState,\n                        delegateTarget.Syntax,\n                        context.SemanticModel,\n                        context.CancellationToken,"));
+            Assert.That(returnSource, Does.Contain("DelegateCreationPurityRule.TryFindCapturedOwnedLocalArray(\n                        anonymousFunction,\n                        currentState,\n                        context.SemanticModel,\n                        context.CancellationToken,"));
+        }
+
+        [Test]
         public void ReturnRule_DelegatesReturnedClosureArrayCaptureToDelegateRule()
         {
             var repositoryRoot = FindRepositoryRoot();

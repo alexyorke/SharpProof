@@ -258,6 +258,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState,
                         delegateTarget.Syntax,
                         context.SemanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal);
 
@@ -267,6 +268,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState,
                         delegateTarget.Syntax,
                         context.SemanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal);
 
@@ -306,6 +308,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         anonymousFunction,
                         currentState,
                         context.SemanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal);
 
@@ -314,6 +317,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         flowAnonymousFunction,
                         currentState,
                         context.SemanticModel,
+                        context.CancellationToken,
                         out captureSyntax,
                         out capturedLocal);
 
