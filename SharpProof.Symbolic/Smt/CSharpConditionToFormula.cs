@@ -1324,7 +1324,7 @@ namespace SharpProof.Symbolic.Smt
                         invocationOperation.TargetMethod.Parameters[parameterIndex].Name,
                         parameterName,
                         StringComparison.Ordinal) ||
-                    !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression))
+                    !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression))
                 {
                     continue;
                 }

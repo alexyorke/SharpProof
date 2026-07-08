@@ -1790,7 +1790,7 @@ namespace SharpProof.Symbolic.Ir
 
             if (invocationOperation.TargetMethod.Name == "StartAt")
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
                     !TryResolveBuiltInIndexLengthShape(startExpression, context, out var start))
                 {
                     return false;
@@ -1802,7 +1802,7 @@ namespace SharpProof.Symbolic.Ir
 
             if (invocationOperation.TargetMethod.Name == "EndAt")
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
                     !TryResolveBuiltInIndexLengthShape(endExpression, context, out var end))
                 {
                     return false;
@@ -1871,7 +1871,7 @@ namespace SharpProof.Symbolic.Ir
                 !IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
                 invocationOperation.TargetMethod.ContainingType is not { } containingType ||
                 !IsSystemIndexType(containingType, context.SemanticModel.Compilation) ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
             {
                 return false;
             }
@@ -1939,39 +1939,6 @@ namespace SharpProof.Symbolic.Ir
                 typeSymbol?.SpecialType == SpecialType.System_String ||
                 SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol) ||
                 HasCountBackedIntIndexer(typeSymbol);
-        }
-
-        private static bool TryGetInvocationArgumentExpression(
-            IInvocationOperation invocationOperation,
-            int parameterIndex,
-            out ExpressionSyntax argumentExpression)
-        {
-            argumentExpression = null!;
-            if (parameterIndex < 0 ||
-                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
-            {
-                return false;
-            }
-
-            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                    argument.Value.Syntax is ExpressionSyntax expression)
-                {
-                    argumentExpression = expression;
-                    return true;
-                }
-            }
-
-            if (parameterIndex < invocationOperation.Arguments.Length &&
-                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-            {
-                argumentExpression = fallbackExpression;
-                return true;
-            }
-
-            return false;
         }
 
         private static bool TryGetObjectCreationArgumentExpression(

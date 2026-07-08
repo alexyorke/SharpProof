@@ -1780,7 +1780,7 @@ namespace SharpProof.Symbolic.Smt
                     continue;
                 }
 
-                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                if (!CSharpSyntaxFacts.TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
                 {
                     continue;
                 }
@@ -2638,7 +2638,7 @@ namespace SharpProof.Symbolic.Smt
         {
             memberValue = null;
             memberType = null;
-            if (!TryGetTuplePositionalField(receiverType, position, out var fieldSymbol) ||
+            if (!SymbolicTypeFacts.TryGetTuplePositionalField(receiverType, position, out var fieldSymbol) ||
                 !TryGetTupleElementStorageName(fieldSymbol, out var storageName) ||
                 !TryGetValueKind(fieldSymbol.Type, out var kind))
             {
@@ -2655,36 +2655,6 @@ namespace SharpProof.Symbolic.Smt
             return formula is SmtVariable variable
                 ? variable.Name
                 : formula.ToString() ?? string.Empty;
-        }
-
-        private static bool TryGetTuplePositionalField(
-            ITypeSymbol? receiverType,
-            int position,
-            out IFieldSymbol fieldSymbol)
-        {
-            fieldSymbol = null!;
-            if (receiverType is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            if (namedType.IsTupleType)
-            {
-                if (position < 0 || position >= namedType.TupleElements.Length)
-                {
-                    return false;
-                }
-
-                fieldSymbol = namedType.TupleElements[position];
-                return true;
-            }
-
-            var storageName = "Item" + (position + 1).ToString(CultureInfo.InvariantCulture);
-            fieldSymbol = namedType
-                .GetMembers(storageName)
-                .OfType<IFieldSymbol>()
-                .FirstOrDefault(static field => !field.IsStatic)!;
-            return fieldSymbol != null;
         }
 
         private static bool TryTranslatePropertySubpattern(
@@ -3016,7 +2986,7 @@ namespace SharpProof.Symbolic.Smt
                     continue;
                 }
 
-                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                if (!CSharpSyntaxFacts.TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
                 {
                     continue;
                 }
@@ -3036,41 +3006,6 @@ namespace SharpProof.Symbolic.Smt
                     formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, elementCondition);
                 }
             }
-        }
-
-        private static bool TryGetListPatternElementPosition(
-            ListPatternSyntax listPattern,
-            int patternIndex,
-            out int elementIndex,
-            out bool fromEnd)
-        {
-            elementIndex = 0;
-            fromEnd = false;
-
-            if (listPattern.Patterns[patternIndex] is SlicePatternSyntax)
-            {
-                return false;
-            }
-
-            var sliceIndex = -1;
-            for (var index = 0; index < listPattern.Patterns.Count; index++)
-            {
-                if (listPattern.Patterns[index] is SlicePatternSyntax)
-                {
-                    sliceIndex = index;
-                    break;
-                }
-            }
-
-            if (sliceIndex < 0 || patternIndex < sliceIndex)
-            {
-                elementIndex = patternIndex;
-                return true;
-            }
-
-            elementIndex = listPattern.Patterns.Count - patternIndex;
-            fromEnd = true;
-            return true;
         }
 
         private static SmtFormula CreateListPatternElementFormula(

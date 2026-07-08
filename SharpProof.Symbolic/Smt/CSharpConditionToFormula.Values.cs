@@ -1049,7 +1049,7 @@ namespace SharpProof.Symbolic.Smt
                 invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Int32 ||
                 invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
                 invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var dimensionExpression) ||
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var dimensionExpression) ||
                 !TryGetConstantNonNegativeInt(dimensionExpression, semanticModel, cancellationToken, out var dimension) ||
                 dimension >= arrayType.Rank)
             {
@@ -1340,7 +1340,7 @@ namespace SharpProof.Symbolic.Smt
             if (parameterIndex < 0 ||
                 parameterIndex >= invocationOperation.TargetMethod.Parameters.Length ||
                 !IsIntegralOrEnumType(invocationOperation.TargetMethod.Parameters[parameterIndex].Type) ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
                 !TryTranslateIntegralOperandWithSafeDivisors(
                     argumentExpression,
                     semanticModel,
@@ -1955,7 +1955,7 @@ namespace SharpProof.Symbolic.Smt
             }
             else if (invocationOperation.TargetMethod.Parameters.Length == 1)
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var fallbackExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var fallbackExpression) ||
                     !TryTranslateValue(
                         fallbackExpression,
                         semanticModel,

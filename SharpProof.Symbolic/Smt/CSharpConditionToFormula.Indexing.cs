@@ -779,7 +779,7 @@ namespace SharpProof.Symbolic.Smt
                         out _,
                         getSymbolVersion,
                         inlineDepth) ||
-                    !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 1, out var valueExpression) ||
+                    !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 1, out var valueExpression) ||
                     !TryCreateBuiltInElementAccessLengthFormula(
                         valueExpression,
                         semanticModel,
@@ -844,7 +844,7 @@ namespace SharpProof.Symbolic.Smt
             if (parameterIndex < 0 ||
                 parameterIndex >= invocationOperation.TargetMethod.Parameters.Length ||
                 invocationOperation.TargetMethod.Parameters[parameterIndex].Type.SpecialType != SpecialType.System_Int32 ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
                 !TryTranslateValue(
                     argumentExpression,
                     semanticModel,
@@ -859,39 +859,6 @@ namespace SharpProof.Symbolic.Smt
 
             argument = candidate;
             return true;
-        }
-
-        private static bool TryGetInvocationArgumentExpression(
-            IInvocationOperation invocationOperation,
-            int parameterIndex,
-            out ExpressionSyntax expression)
-        {
-            expression = null!;
-            if (parameterIndex < 0 ||
-                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
-            {
-                return false;
-            }
-
-            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                {
-                    expression = argumentExpression;
-                    return true;
-                }
-            }
-
-            if (parameterIndex < invocationOperation.Arguments.Length &&
-                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-            {
-                expression = fallbackExpression;
-                return true;
-            }
-
-            return false;
         }
 
         private static bool TryGetObjectCreationArgumentExpression(
@@ -1560,7 +1527,7 @@ namespace SharpProof.Symbolic.Smt
 
             if (invocationOperation.TargetMethod.Name == "StartAt")
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var startExpression) ||
                     !TryResolveBuiltInIndexAccessIndexShape(
                         startExpression,
                         semanticModel,
@@ -1576,7 +1543,7 @@ namespace SharpProof.Symbolic.Smt
 
             if (invocationOperation.TargetMethod.Name == "EndAt")
             {
-                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
+                if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var endExpression) ||
                     !TryResolveBuiltInIndexAccessIndexShape(
                         endExpression,
                         semanticModel,
@@ -2143,7 +2110,7 @@ namespace SharpProof.Symbolic.Smt
                 !IsSystemIndexType(returnType, semanticModel.Compilation) ||
                 invocationOperation.TargetMethod.ContainingType is not { } containingType ||
                 !IsSystemIndexType(containingType, semanticModel.Compilation) ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var valueExpression))
             {
                 return false;
             }

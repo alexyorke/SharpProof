@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -378,6 +379,36 @@ namespace SharpProof.Symbolic
             }
 
             return false;
+        }
+
+        public static bool TryGetTuplePositionalField(
+            ITypeSymbol? receiverType,
+            int position,
+            out IFieldSymbol fieldSymbol)
+        {
+            fieldSymbol = null!;
+            if (receiverType is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType)
+            {
+                if (position < 0 || position >= namedType.TupleElements.Length)
+                {
+                    return false;
+                }
+
+                fieldSymbol = namedType.TupleElements[position];
+                return true;
+            }
+
+            var storageName = "Item" + (position + 1).ToString(CultureInfo.InvariantCulture);
+            fieldSymbol = namedType
+                .GetMembers(storageName)
+                .OfType<IFieldSymbol>()
+                .FirstOrDefault(static field => !field.IsStatic)!;
+            return fieldSymbol != null;
         }
     }
 }

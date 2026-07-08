@@ -32,5 +32,40 @@ namespace SharpProof.Symbolic
                 return expression;
             }
         }
+
+        public static bool TryGetListPatternElementPosition(
+            ListPatternSyntax listPattern,
+            int patternIndex,
+            out int elementIndex,
+            out bool fromEnd)
+        {
+            elementIndex = 0;
+            fromEnd = false;
+
+            if (listPattern.Patterns[patternIndex] is SlicePatternSyntax)
+            {
+                return false;
+            }
+
+            var sliceIndex = -1;
+            for (var index = 0; index < listPattern.Patterns.Count; index++)
+            {
+                if (listPattern.Patterns[index] is SlicePatternSyntax)
+                {
+                    sliceIndex = index;
+                    break;
+                }
+            }
+
+            if (sliceIndex < 0 || patternIndex < sliceIndex)
+            {
+                elementIndex = patternIndex;
+                return true;
+            }
+
+            elementIndex = listPattern.Patterns.Count - patternIndex;
+            fromEnd = true;
+            return true;
+        }
     }
 }

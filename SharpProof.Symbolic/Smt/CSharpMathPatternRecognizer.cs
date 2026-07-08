@@ -22,7 +22,7 @@ namespace SharpProof.Symbolic.Smt
                 invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
                 invocationOperation.TargetMethod.Parameters.Length != 1 ||
                 !IsIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
-                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var argumentExpression))
+                !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var argumentExpression))
             {
                 return false;
             }
@@ -39,39 +39,6 @@ namespace SharpProof.Symbolic.Smt
             dividendExpression = remainderExpression.Left;
             divisorExpression = remainderExpression.Right;
             return true;
-        }
-
-        private static bool TryGetInvocationArgumentExpression(
-            IInvocationOperation invocationOperation,
-            int parameterIndex,
-            out ExpressionSyntax expression)
-        {
-            expression = null!;
-            if (parameterIndex < 0 ||
-                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
-            {
-                return false;
-            }
-
-            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                {
-                    expression = argumentExpression;
-                    return true;
-                }
-            }
-
-            if (parameterIndex < invocationOperation.Arguments.Length &&
-                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-            {
-                expression = fallbackExpression;
-                return true;
-            }
-
-            return false;
         }
 
         private static bool HasSupportedIntegralType(
