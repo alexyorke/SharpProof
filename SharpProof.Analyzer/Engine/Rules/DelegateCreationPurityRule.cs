@@ -785,7 +785,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation)
             {
-                return IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
+                return RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
             }
 
             return initializerOperation is ILocalReferenceOperation aliasReference &&
@@ -836,31 +836,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return false;
-        }
-
-        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
-        {
-            if (typeSymbol is not INamedTypeSymbol namedType ||
-                namedType.TypeKind == TypeKind.Delegate ||
-                namedType.IsValueType ||
-                namedType.SpecialType == SpecialType.System_String ||
-                namedType.DeclaringSyntaxReferences.Length == 0)
-            {
-                return false;
-            }
-
-            return namedType.GetMembers().Any(member =>
-                member switch
-                {
-                    IFieldSymbol field => !field.IsStatic &&
-                                          !field.IsReadOnly &&
-                                          field.DeclaredAccessibility != Accessibility.Private,
-                    IPropertySymbol property => !property.IsStatic &&
-                                                property.SetMethod != null &&
-                                                !property.SetMethod.IsInitOnly &&
-                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
-                    _ => false
-                });
         }
 
         private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span, CancellationToken cancellationToken)

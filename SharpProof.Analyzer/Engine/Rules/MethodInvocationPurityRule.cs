@@ -924,7 +924,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
+            if (RuleAnalysisHelper.IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
             {
                 var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
                 if (!inputResult.IsPure)
@@ -984,33 +984,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return true;
-        }
-
-        private static bool IsSemanticallyPureSpanLikeSliceInvocation(IInvocationOperation invocationOperation)
-        {
-            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-            if (targetMethod == null ||
-                targetMethod.MethodKind != MethodKind.Ordinary ||
-                targetMethod.Name != "Slice" ||
-                targetMethod.IsStatic)
-            {
-                return false;
-            }
-
-            var containingType = targetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
-            if (containingType is not ("System.Span<T>" or "System.ReadOnlySpan<T>" or "System.Memory<T>" or "System.ReadOnlyMemory<T>"))
-            {
-                return false;
-            }
-
-            if (targetMethod.Parameters.Length is not (1 or 2))
-            {
-                return false;
-            }
-
-            return targetMethod.Parameters.All(parameter =>
-                parameter.RefKind == RefKind.None &&
-                parameter.Type.SpecialType == SpecialType.System_Int32);
         }
 
         private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)

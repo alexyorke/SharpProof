@@ -1008,7 +1008,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             out IOperation sourceOperation)
         {
             if (operation is not IInvocationOperation invocationOperation ||
-                !IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
+                !RuleAnalysisHelper.IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
             {
                 sourceOperation = null!;
                 return false;
@@ -1033,33 +1033,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             sourceOperation = null!;
             return false;
-        }
-
-        private static bool IsSemanticallyPureSpanLikeSliceInvocation(IInvocationOperation invocationOperation)
-        {
-            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-            if (targetMethod == null ||
-                targetMethod.MethodKind != MethodKind.Ordinary ||
-                targetMethod.Name != "Slice" ||
-                targetMethod.IsStatic)
-            {
-                return false;
-            }
-
-            var containingType = targetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
-            if (containingType is not ("System.Span<T>" or "System.ReadOnlySpan<T>" or "System.Memory<T>" or "System.ReadOnlyMemory<T>"))
-            {
-                return false;
-            }
-
-            if (targetMethod.Parameters.Length is not (1 or 2))
-            {
-                return false;
-            }
-
-            return targetMethod.Parameters.All(parameter =>
-                parameter.RefKind == RefKind.None &&
-                parameter.Type.SpecialType == SpecialType.System_Int32);
         }
 
         private static bool TryGetStableArrayViewLocalReturn(
