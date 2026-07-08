@@ -26,27 +26,16 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var binaryExpression in GetRelevantDescendants<BinaryExpressionSyntax>(methodNode))
-            {
-                if (!binaryExpression.IsKind(SyntaxKind.DivideExpression) &&
-                    !binaryExpression.IsKind(SyntaxKind.ModuloExpression))
-                {
-                    continue;
-                }
-
-                var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
-                var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
-                if (!IsThrowingDivideByZeroType(rightType))
-                {
-                    continue;
-                }
-
-                if (IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return binaryExpression;
-                }
-            }
+            return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                binaryExpression =>
+                    (binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
+                     binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
+                    IsThrowingDivideByZeroExpression(binaryExpression.Right, semanticModel, cancellationToken) &&
+                    IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
@@ -55,41 +44,31 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var binaryExpression in GetRelevantDescendants<BinaryExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return binaryExpression;
-                }
-            }
-
-            foreach (var unaryExpression in GetRelevantDescendants<PrefixUnaryExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(unaryExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return unaryExpression;
-                }
-            }
-
-            foreach (var unaryExpression in GetRelevantDescendants<PostfixUnaryExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(unaryExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return unaryExpression;
-                }
-            }
-
-            foreach (var castExpression in GetRelevantDescendants<CastExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(castExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return castExpression;
-                }
-            }
+            return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    binaryExpression => IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
+                .Cast<SyntaxNode>()
+                .Concat(GetDefiniteReachableDescendants<PrefixUnaryExpressionSyntax>(
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    unaryExpression => IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis)))
+                .Concat(GetDefiniteReachableDescendants<PostfixUnaryExpressionSyntax>(
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    unaryExpression => IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis)))
+                .Concat(GetDefiniteReachableDescendants<CastExpressionSyntax>(
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    castExpression => IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken, smtAnalysis)));
         }
 
         internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
@@ -98,14 +77,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var arrayCreation in GetRelevantDescendants<ArrayCreationExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(arrayCreation, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return arrayCreation;
-                }
-            }
+            return GetDefiniteReachableDescendants<ArrayCreationExpressionSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                arrayCreation => IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
@@ -153,15 +130,14 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var lockStatement in GetRelevantDescendants<LockStatementSyntax>(methodNode))
-            {
-                if (IsReferenceDereferenceReceiver(lockStatement.Expression, semanticModel, cancellationToken) &&
-                    IsDefinitelyNullExpression(lockStatement.Expression, lockStatement, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(lockStatement, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return lockStatement;
-                }
-            }
+            return GetDefiniteReachableDescendants<LockStatementSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                lockStatement =>
+                    IsReferenceDereferenceReceiver(lockStatement.Expression, semanticModel, cancellationToken) &&
+                    IsDefinitelyNullExpression(lockStatement.Expression, lockStatement, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<DynamicNullBindingSite> GetDefiniteDynamicNullBindingSites(
@@ -210,20 +186,46 @@ namespace SharpProof.Analyzer
                 IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
         }
 
+        private static IEnumerable<TNode> GetDefiniteReachableDescendants<TNode>(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis,
+            Func<TNode, bool> isDefinite)
+            where TNode : SyntaxNode
+        {
+            return GetDefiniteDescendants<TNode>(
+                methodNode,
+                node =>
+                    isDefinite(node) &&
+                    IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
+        }
+
+        private static IEnumerable<TNode> GetDefiniteDescendants<TNode>(
+            SyntaxNode methodNode,
+            Func<TNode, bool> isDefinite)
+            where TNode : SyntaxNode
+        {
+            foreach (var node in GetRelevantDescendants<TNode>(methodNode))
+            {
+                if (isDefinite(node))
+                {
+                    yield return node;
+                }
+            }
+        }
+
         internal static IEnumerable<MemberAccessExpressionSyntax> GetDefiniteNullableValueAccessNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var memberAccess in GetRelevantDescendants<MemberAccessExpressionSyntax>(methodNode))
-            {
-                if (IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) &&
-                    IsDefinitelyMissingNullableValue(memberAccess, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return memberAccess;
-                }
-            }
+            return GetDefiniteDescendants<MemberAccessExpressionSyntax>(
+                methodNode,
+                memberAccess =>
+                    IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) &&
+                    IsDefinitelyMissingNullableValue(memberAccess, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<CastExpressionSyntax> GetDefiniteUnboxNullCastNodes(
@@ -232,14 +234,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var castExpression in GetRelevantDescendants<CastExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyUnboxNullCast(castExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(castExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return castExpression;
-                }
-            }
+            return GetDefiniteReachableDescendants<CastExpressionSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                castExpression => IsDefinitelyUnboxNullCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<CastExpressionSyntax> GetDefiniteInvalidCastNodes(
@@ -248,14 +248,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var castExpression in GetRelevantDescendants<CastExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyInvalidCast(castExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(castExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return castExpression;
-                }
-            }
+            return GetDefiniteReachableDescendants<CastExpressionSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                castExpression => IsDefinitelyInvalidCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<AssignmentExpressionSyntax> GetDefiniteArrayTypeMismatchStoreNodes(
@@ -264,14 +262,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var assignment in GetRelevantDescendants<AssignmentExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyArrayTypeMismatchStore(assignment, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(assignment, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return assignment;
-                }
-            }
+            return GetDefiniteReachableDescendants<AssignmentExpressionSyntax>(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                assignment => IsDefinitelyArrayTypeMismatchStore(assignment, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteIndexOutOfRangeNodes(
@@ -280,13 +276,14 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var elementAccess in GetRelevantDescendants<ElementAccessExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyOutOfRangeBuiltInIndexAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return elementAccess;
-                }
-            }
+            return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
+                methodNode,
+                elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    requireRangeArgument: false));
         }
 
         internal static IEnumerable<InvocationExpressionSyntax> GetDefiniteArrayGetValueIndexOutOfRangeNodes(
@@ -295,13 +292,9 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var invocation in GetRelevantDescendants<InvocationExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyOutOfRangeArrayGetValueCall(invocation, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return invocation;
-                }
-            }
+            return GetDefiniteDescendants<InvocationExpressionSyntax>(
+                methodNode,
+                invocation => IsDefinitelyOutOfRangeArrayGetValueCall(invocation, semanticModel, cancellationToken, smtAnalysis));
         }
 
         internal static IEnumerable<SyntaxNode> GetDefiniteArgumentOutOfRangeNodes(
@@ -310,21 +303,18 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            foreach (var elementAccess in GetRelevantDescendants<ElementAccessExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyOutOfRangeBuiltInRangeAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return elementAccess;
-                }
-            }
-
-            foreach (var invocation in GetRelevantDescendants<InvocationExpressionSyntax>(methodNode))
-            {
-                if (IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return invocation;
-                }
-            }
+            return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
+                    methodNode,
+                    elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
+                        elementAccess,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis,
+                        requireRangeArgument: true))
+                .Cast<SyntaxNode>()
+                .Concat(GetDefiniteDescendants<InvocationExpressionSyntax>(
+                    methodNode,
+                    invocation => IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis)));
         }
 
         internal static ITypeSymbol? GetThrownExceptionType(
@@ -389,9 +379,13 @@ namespace SharpProof.Analyzer
             return SymbolicValueFacts.IsIntegralOrDecimalZero(value);
         }
 
-        private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
+        private static bool IsThrowingDivideByZeroExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
         {
-            return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeInfo.ConvertedType ?? typeInfo.Type);
         }
 
         private static bool IsDefinitelyZeroExpression(
@@ -1104,44 +1098,23 @@ namespace SharpProof.Analyzer
                 valueExpression is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0 };
         }
 
-        private static bool IsDefinitelyOutOfRangeBuiltInIndexAccess(
+        private static bool IsDefinitelyOutOfRangeBuiltInElementAccess(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            bool requireRangeArgument)
         {
-            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken) ||
-                IsBuiltInRangeAccessArgument(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
-                    semanticModel,
-                    cancellationToken))
+            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken))
             {
                 return false;
             }
 
-            if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                    elementAccess,
-                    semanticModel,
-                    cancellationToken,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
-        }
-
-        private static bool IsDefinitelyOutOfRangeBuiltInRangeAccess(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken) ||
-                !IsBuiltInRangeAccessArgument(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
-                    semanticModel,
-                    cancellationToken))
+            var hasRangeArgument = IsBuiltInRangeAccessArgument(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                semanticModel,
+                cancellationToken);
+            if (hasRangeArgument != requireRangeArgument)
             {
                 return false;
             }
