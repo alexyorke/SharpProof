@@ -10067,12 +10067,15 @@ namespace SharpProof.Symbolic
             }
         }
 
-        private static bool TryHandleTupleDeconstructionDeclarationState(
-            ref SymbolicState state,
+        private static bool TryPrepareTupleDeconstructionDeclarationTargets(
             AssignmentExpressionSyntax assignment,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            out bool isDeconstructionDeclaration,
+            out List<ISymbol?> targetSymbols)
         {
+            isDeconstructionDeclaration = false;
+            targetSymbols = new List<ISymbol?>();
             if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                 UnwrapExpression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
                 declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation)
@@ -10080,12 +10083,12 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            var targetSymbols = new List<ISymbol?>();
+            isDeconstructionDeclaration = true;
             foreach (var variableDesignation in leftDesignation.Variables)
             {
                 if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation)
                 {
-                    return true;
+                    return false;
                 }
 
                 if (singleVariableDesignation.Identifier.ValueText == "_")
@@ -10096,7 +10099,7 @@ namespace SharpProof.Symbolic
 
                 if (semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
                 {
-                    return true;
+                    return false;
                 }
 
                 targetSymbols.Add(localSymbol.OriginalDefinition);
@@ -10105,7 +10108,26 @@ namespace SharpProof.Symbolic
             var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
             if (ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
             {
-                return true;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryHandleTupleDeconstructionDeclarationState(
+            ref SymbolicState state,
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!TryPrepareTupleDeconstructionDeclarationTargets(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out var isDeconstructionDeclaration,
+                    out var targetSymbols))
+            {
+                return isDeconstructionDeclaration;
             }
 
             AddTupleElementTargetStateFacts(
@@ -12136,39 +12158,14 @@ namespace SharpProof.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
-            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                UnwrapExpression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
-                declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation)
+            if (!TryPrepareTupleDeconstructionDeclarationTargets(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out var isDeconstructionDeclaration,
+                    out var targetSymbols))
             {
-                return false;
-            }
-
-            var targetSymbols = new List<ISymbol?>();
-            foreach (var variableDesignation in leftDesignation.Variables)
-            {
-                if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation)
-                {
-                    return true;
-                }
-
-                if (singleVariableDesignation.Identifier.ValueText == "_")
-                {
-                    targetSymbols.Add(null);
-                    continue;
-                }
-
-                if (semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
-                {
-                    return true;
-                }
-
-                targetSymbols.Add(localSymbol.OriginalDefinition);
-            }
-
-            var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
-            if (ExpressionReferencesAnySymbol(assignment.Right, nonDiscardTargets, semanticModel, cancellationToken))
-            {
-                return true;
+                return isDeconstructionDeclaration;
             }
 
             AddTupleElementTargetFacts(
