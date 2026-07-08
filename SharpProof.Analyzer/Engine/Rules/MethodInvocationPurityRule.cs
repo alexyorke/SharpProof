@@ -1702,13 +1702,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                invocationOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "unknown_external_call",
-                    nameof(MethodInvocationPurityRule),
-                    invocationOperation,
-                    symbol: methodSymbol));
+            result = CreateUnknownExternalCallImpurity(invocationOperation, methodSymbol);
             return true;
         }
 
@@ -2259,14 +2253,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (methodSymbol.Name is "ToLower" or "ToUpper" &&
                 methodSymbol.Parameters.Length == 0)
             {
-                result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "reflection_environment_source",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: methodSymbol,
-                        catalogSource: "string_default_culture_casing"));
+                result = CreateReflectionEnvironmentSourceImpurity(
+                    invocationOperation,
+                    methodSymbol,
+                    "string_default_culture_casing");
                 return true;
             }
 
@@ -2280,14 +2270,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                         return true;
                     }
 
-                    result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "reflection_environment_source",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: methodSymbol,
-                            catalogSource: "string_current_culture_comparison"));
+                    result = CreateReflectionEnvironmentSourceImpurity(
+                        invocationOperation,
+                        methodSymbol,
+                        "string_current_culture_comparison");
                     return true;
                 }
             }
@@ -2296,18 +2282,27 @@ namespace SharpProof.Analyzer.Engine.Rules
                 methodSymbol.Parameters.Length == 1 &&
                 methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
             {
-                result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "reflection_environment_source",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: methodSymbol,
-                        catalogSource: "string_default_culture_comparison"));
+                result = CreateReflectionEnvironmentSourceImpurity(
+                    invocationOperation,
+                    methodSymbol,
+                    "string_default_culture_comparison");
                 return true;
             }
 
             return false;
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult CreateReflectionEnvironmentSourceImpurity(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol methodSymbol,
+            string catalogSource)
+        {
+            return PurityAnalysisEngine.ImpureResult(
+                invocationOperation,
+                "reflection_environment_source",
+                nameof(MethodInvocationPurityRule),
+                methodSymbol,
+                catalogSource);
         }
 
         private static bool TryCheckTypeEqualityPurity(
@@ -2718,19 +2713,24 @@ namespace SharpProof.Analyzer.Engine.Rules
                 !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation, context.SemanticModel.Compilation) &&
                 !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
             {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: implementation));
+                return CreateUnknownExternalCallImpurity(invocationOperation, implementation);
             }
 
             var implementationPurity = PurityAnalysisEngine.GetCalleePurity(implementation.OriginalDefinition, context);
             return implementationPurity.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : implementationPurity.WithCallee(implementation.OriginalDefinition, invocationOperation.Syntax);
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult CreateUnknownExternalCallImpurity(
+            IInvocationOperation invocationOperation,
+            ISymbol? symbol = null)
+        {
+            return PurityAnalysisEngine.ImpureResult(
+                invocationOperation,
+                "unknown_external_call",
+                nameof(MethodInvocationPurityRule),
+                symbol ?? invocationOperation.TargetMethod);
         }
 
         private static bool TryGetEqualityComparerElementType(
@@ -2970,13 +2970,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
             {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: invocationOperation.TargetMethod));
+                return CreateUnknownExternalCallImpurity(invocationOperation);
             }
 
             return CheckResolvedEqualityImplementation(
@@ -3000,13 +2994,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.GetHashCode), parameterCount: 0, out var getHashCodeOverride))
                 {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unknown_external_call",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: invocationOperation.TargetMethod));
+                    return CreateUnknownExternalCallImpurity(invocationOperation);
                 }
 
                 var hashPurity = CheckResolvedEqualityImplementation(
@@ -3040,13 +3028,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                invocationOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "unknown_external_call",
-                    nameof(MethodInvocationPurityRule),
-                    invocationOperation,
-                    symbol: invocationOperation.TargetMethod));
+            return CreateUnknownExternalCallImpurity(invocationOperation);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDelegateArgumentTargetPurity(
@@ -3116,13 +3098,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context);
             }
 
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                invocationOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "unknown_external_call",
-                    nameof(MethodInvocationPurityRule),
-                    invocationOperation,
-                    symbol: invocationOperation.TargetMethod));
+            return CreateUnknownExternalCallImpurity(invocationOperation);
         }
 
         private static bool CanHaveExternalOverrides(IMethodSymbol methodSymbol, INamedTypeSymbol? knownReceiverType)
