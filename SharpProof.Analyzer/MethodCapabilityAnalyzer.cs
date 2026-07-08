@@ -2,7 +2,6 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
@@ -59,7 +58,7 @@ namespace SharpProof.Analyzer
             if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0 &&
                 !baseline.IsSuppressed(SharpProofDiagnostics.CapabilityUnknownId, methodSymbol, context.Node.SyntaxTree))
             {
-                var location = GetMethodLocation(context.Node) ?? context.Node.GetLocation();
+                var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
                 var properties = ImmutableDictionary<string, string?>.Empty
                     .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString());
                 context.ReportDiagnostic(Diagnostic.Create(
@@ -164,7 +163,7 @@ namespace SharpProof.Analyzer
 
             foreach (var attribute in methodSymbol.GetAttributes())
             {
-                if (!MatchesAttribute(attribute, attributeSymbol, "AllowedCapabilitiesAttribute"))
+                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, attributeSymbol, "AllowedCapabilitiesAttribute"))
                 {
                     continue;
                 }
@@ -195,32 +194,6 @@ namespace SharpProof.Analyzer
             }
 
             return false;
-        }
-
-        private static bool MatchesAttribute(
-            AttributeData attribute,
-            INamedTypeSymbol? expectedSymbol,
-            string attributeTypeName)
-        {
-            var attributeClass = attribute.AttributeClass;
-            return attributeClass != null &&
-                ((expectedSymbol != null &&
-                  SymbolEqualityComparer.Default.Equals(attributeClass.OriginalDefinition, expectedSymbol)) ||
-                 string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
-        }
-
-        private static Location? GetMethodLocation(SyntaxNode node)
-        {
-            return node switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),
-                LocalFunctionStatementSyntax localFunctionStatement => localFunctionStatement.Identifier.GetLocation(),
-                ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
-                AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Keyword.GetLocation(),
-                OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.OperatorToken.GetLocation(),
-                ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration.Type.GetLocation(),
-                _ => node.GetLocation(),
-            };
         }
 
         private static CapabilityFlags NormalizeCapabilities(CapabilityFlags capabilities)

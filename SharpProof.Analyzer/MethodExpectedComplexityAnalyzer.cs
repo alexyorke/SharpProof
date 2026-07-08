@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Symbolic;
 
@@ -130,7 +129,7 @@ namespace SharpProof.Analyzer
             foreach (var attribute in methodSymbol.GetAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!MatchesAttribute(attribute, attributeSymbol, "ExpectedComplexityAttribute"))
+                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, attributeSymbol, "ExpectedComplexityAttribute"))
                 {
                     continue;
                 }
@@ -254,7 +253,7 @@ namespace SharpProof.Analyzer
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityExceededRule,
-                GetMethodLocation(methodSymbol, cancellationToken),
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken),
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,
@@ -275,45 +274,12 @@ namespace SharpProof.Analyzer
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
-                GetMethodLocation(methodSymbol, cancellationToken),
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken),
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,
                 declaredComplexity.Text,
                 reason);
-        }
-
-        private static Location GetMethodLocation(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-        {
-            var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
-            if (syntaxReference == null)
-            {
-                return methodSymbol.Locations.First();
-            }
-
-            var node = syntaxReference.GetSyntax(cancellationToken);
-            return node switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),
-                LocalFunctionStatementSyntax localFunctionStatement => localFunctionStatement.Identifier.GetLocation(),
-                ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
-                AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Keyword.GetLocation(),
-                OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.OperatorToken.GetLocation(),
-                ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration.Type.GetLocation(),
-                _ => node.GetLocation(),
-            };
-        }
-
-        private static bool MatchesAttribute(
-            AttributeData attribute,
-            INamedTypeSymbol? expectedSymbol,
-            string attributeTypeName)
-        {
-            var attributeClass = attribute.AttributeClass;
-            return attributeClass != null &&
-                ((expectedSymbol != null &&
-                  SymbolEqualityComparer.Default.Equals(attributeClass.OriginalDefinition, expectedSymbol)) ||
-                 string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
         }
 
         private readonly record struct DeclaredComplexity(

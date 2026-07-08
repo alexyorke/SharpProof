@@ -218,7 +218,7 @@ namespace SharpProof.Analyzer
             foreach (var attribute in methodSymbol.GetAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!MatchesAttribute(attribute, ensuresAttributeSymbol, "EnsuresAttribute"))
+                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, ensuresAttributeSymbol, "EnsuresAttribute"))
                 {
                     continue;
                 }
@@ -465,18 +465,6 @@ namespace SharpProof.Analyzer
                 _ when string.IsNullOrWhiteSpace(proof.Reason) => "unknown",
                 _ => proof.Reason.Replace('_', ' '),
             };
-        }
-
-        private static bool MatchesAttribute(
-            AttributeData attribute,
-            INamedTypeSymbol? expectedSymbol,
-            string attributeTypeName)
-        {
-            var attributeClass = attribute.AttributeClass;
-            return attributeClass != null &&
-                ((expectedSymbol != null &&
-                  SymbolEqualityComparer.Default.Equals(attributeClass.OriginalDefinition, expectedSymbol)) ||
-                 string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
         }
 
         private static bool TryGetExpressionBody(SyntaxNode methodNode, out ExpressionSyntax expression)
