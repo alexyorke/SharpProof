@@ -748,6 +748,32 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void MethodInvocationRule_ThreadsCancellationTokenThroughDispatchAndLinqScans()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "MethodInvocationPurityRule.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Not.Contain("GetSyntax()"));
+            Assert.That(source, Does.Not.Match(@"semanticModel\.GetOperation\([^,\r\n]+\)"));
+            Assert.That(source, Does.Not.Match(@"semanticModel\.GetTypeInfo\([^,\r\n]+\)"));
+            Assert.That(source, Does.Contain("TryGetForeachCollectionType(syntax.Parent, context.SemanticModel, context.CancellationToken)"));
+            Assert.That(source, Does.Contain("TryGetKnownArrayReceiverTypeFromSyntax(\n                invocationOperation,\n                context.SemanticModel,\n                context.CancellationToken,"));
+            Assert.That(source, Does.Contain("ResolvePotentialDispatchTargets(\n                invokedMethodSymbol,\n                context.SemanticModel,\n                knownReceiverType,\n                invocationOperation.Instance,\n                hasExactReceiverType,\n                context.CancellationToken)"));
+            Assert.That(source, Does.Contain("ResolveKnownInterfaceImplementation(type, target, cancellationToken)"));
+            Assert.That(source, Does.Contain("HasMethodBody(target, cancellationToken)"));
+            Assert.That(source, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax"));
+            Assert.That(source, Does.Contain("GetLinqExpressionType(returnStatement.Expression, semanticModel, cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetOperation(expression, cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetTypeInfo(expression, cancellationToken).Type"));
+        }
+
+        [Test]
         public void ReturnRule_DelegatesReturnedClosureArrayCaptureToDelegateRule()
         {
             var repositoryRoot = FindRepositoryRoot();

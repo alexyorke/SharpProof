@@ -8,6 +8,7 @@ using SharpProof.Symbolic;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -1432,17 +1433,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            return TryGetForeachCollectionType(syntax.Parent, context.SemanticModel) is IArrayTypeSymbol;
+            return TryGetForeachCollectionType(syntax.Parent, context.SemanticModel, context.CancellationToken) is IArrayTypeSymbol;
         }
 
-        private static ITypeSymbol? TryGetForeachCollectionType(SyntaxNode? syntaxNode, SemanticModel semanticModel)
+        private static ITypeSymbol? TryGetForeachCollectionType(
+            SyntaxNode? syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             return syntaxNode switch
             {
                 Microsoft.CodeAnalysis.CSharp.Syntax.ForEachStatementSyntax forEachStatement =>
-                    semanticModel.GetTypeInfo(forEachStatement.Expression).Type,
+                    semanticModel.GetTypeInfo(forEachStatement.Expression, cancellationToken).Type,
                 Microsoft.CodeAnalysis.CSharp.Syntax.ForEachVariableStatementSyntax forEachVariableStatement =>
-                    semanticModel.GetTypeInfo(forEachVariableStatement.Expression).Type,
+                    semanticModel.GetTypeInfo(forEachVariableStatement.Expression, cancellationToken).Type,
                 _ => null,
             };
         }
@@ -1483,7 +1487,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                 context.SemanticModel,
                 knownReceiverType,
                 invocationOperation.Instance,
-                hasExactReceiverType)
+                hasExactReceiverType,
+                context.CancellationToken)
                 .Where(method => !method.IsAbstract && !method.IsExtern)
                 .ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
@@ -1547,7 +1552,11 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var methodSymbol = invocationOperation.TargetMethod;
             var hasOperationArrayReceiver = TryGetKnownArrayReceiverType(invocationOperation.Instance, out _);
-            var hasSyntaxArrayReceiver = TryGetKnownArrayReceiverTypeFromSyntax(invocationOperation, context.SemanticModel, out _);
+            var hasSyntaxArrayReceiver = TryGetKnownArrayReceiverTypeFromSyntax(
+                invocationOperation,
+                context.SemanticModel,
+                context.CancellationToken,
+                out _);
             if (!IsGetEnumeratorMethodName(methodSymbol) ||
                 methodSymbol.Parameters.Length != 0 ||
                 (!IsEnumerableGetEnumeratorDispatchTarget(methodSymbol) && !hasSyntaxArrayReceiver) ||
@@ -1658,6 +1667,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool TryGetKnownArrayReceiverTypeFromSyntax(
             IInvocationOperation invocationOperation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out IArrayTypeSymbol arrayType)
         {
             arrayType = null!;
@@ -1675,8 +1685,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var operandType = semanticModel.GetTypeInfo(castExpression.Expression).ConvertedType ??
-                semanticModel.GetTypeInfo(castExpression.Expression).Type;
+            var operandType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
             if (operandType is not IArrayTypeSymbol resolvedArrayType)
             {
                 return false;
@@ -3791,8 +3801,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             SemanticModel semanticModel,
             INamedTypeSymbol? knownReceiverType,
             IOperation? invocationInstance,
-            bool hasExactReceiverType)
+            bool hasExactReceiverType,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var compilation = semanticModel.Compilation;
             var target = invokedMethodSymbol.OriginalDefinition;
             var interfaceImplementationTarget = invokedMethodSymbol.ContainingType?.TypeKind == TypeKind.Interface
@@ -3806,12 +3818,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     if (hasExactReceiverType)
                     {
-                        var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
+                        var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
                         if (exactImplementation != null)
                         {
                             targets.Add(exactImplementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target))
+                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3821,12 +3833,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
                     {
-                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
+                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target))
+                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3837,12 +3849,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                     if (knownReceiverType.TypeKind == TypeKind.Struct ||
                         (knownReceiverType.TypeKind == TypeKind.Class && knownReceiverType.IsSealed))
                     {
-                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
+                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
                         }
-                        else if (!target.IsAbstract || HasMethodBody(target))
+                        else if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                         {
                             targets.Add(target.OriginalDefinition);
                         }
@@ -3853,6 +3865,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     foreach (var type in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (requiresInterfaceReceiverConstraint)
                         {
                             if (!ImplementsInterface(type, knownReceiverType))
@@ -3879,7 +3892,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                              type.TypeKind == TypeKind.Struct ||
                              type.TypeKind == TypeKind.Class))
                         {
-                            var implementation = ResolveKnownInterfaceImplementation(type, target);
+                            var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
                             if (implementation != null)
                             {
                                 targets.Add(implementation.OriginalDefinition);
@@ -3887,7 +3900,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         }
                     }
 
-                    if (!target.IsAbstract || HasMethodBody(target))
+                    if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                     {
                         targets.Add(target);
                     }
@@ -3897,6 +3910,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 foreach (var type in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!ImplementsInterface(type, target.ContainingType))
                     {
                         continue;
@@ -3904,7 +3918,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     if (type.Kind == SymbolKind.NamedType && (type.TypeKind == TypeKind.Interface || type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class))
                     {
-                        var implementation = ResolveKnownInterfaceImplementation(type, target);
+                        var implementation = ResolveKnownInterfaceImplementation(type, target, cancellationToken);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
@@ -3912,7 +3926,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                 }
 
-                if (!target.IsAbstract || HasMethodBody(target))
+                if (!target.IsAbstract || HasMethodBody(target, cancellationToken))
                 {
                     targets.Add(target);
                 }
@@ -3955,6 +3969,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     foreach (var type in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (!DerivesFrom(type, baseType))
                         {
                             continue;
@@ -3985,7 +4000,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
         private static IMethodSymbol? ResolveKnownInterfaceImplementation(
             INamedTypeSymbol receiverType,
-            IMethodSymbol interfaceMethod)
+            IMethodSymbol interfaceMethod,
+            CancellationToken cancellationToken)
         {
             var implementation = receiverType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
             if (implementation != null)
@@ -4000,8 +4016,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var member in receiverType.GetMembers(interfaceMethod.Name))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (member is IMethodSymbol candidate &&
-                    HasMethodBody(candidate) &&
+                    HasMethodBody(candidate, cancellationToken) &&
                     HasMatchingSignature(candidate, interfaceMethod))
                 {
                     return candidate;
@@ -4146,7 +4163,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             return operation;
         }
 
-        private static bool HasMethodBody(IMethodSymbol methodSymbol)
+        private static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken = default)
         {
             if (methodSymbol.DeclaringSyntaxReferences.Length == 0)
             {
@@ -4155,7 +4172,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
             {
-                var methodSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var methodSyntax = syntaxReference.GetSyntax(cancellationToken);
                 if (methodSyntax is Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclaration &&
                     (methodDeclaration.Body != null || methodDeclaration.ExpressionBody != null))
                 {
@@ -4262,10 +4280,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisContext context,
             SyntaxNode callSite)
         {
-            foreach (var enumeratorType in EnumerateLinqReturnedEnumeratorTypes(getEnumerator, sourceType, context.SemanticModel))
+            foreach (var enumeratorType in EnumerateLinqReturnedEnumeratorTypes(getEnumerator, sourceType, context.SemanticModel, context.CancellationToken))
             {
+                context.CancellationToken.ThrowIfCancellationRequested();
                 foreach (var runtimeMember in EnumerateLinqEnumeratorRuntimeMembers(enumeratorType))
                 {
+                    context.CancellationToken.ThrowIfCancellationRequested();
                     var runtimePurity = PurityAnalysisEngine.GetCalleePurity(runtimeMember.OriginalDefinition, context);
                     if (!runtimePurity.IsPure)
                     {
@@ -4280,7 +4300,8 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static IEnumerable<INamedTypeSymbol> EnumerateLinqReturnedEnumeratorTypes(
             IMethodSymbol getEnumerator,
             ITypeSymbol sourceType,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
@@ -4289,7 +4310,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in getEnumerator.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not MethodDeclarationSyntax methodDeclaration)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not MethodDeclarationSyntax methodDeclaration)
                 {
                     continue;
                 }
@@ -4297,7 +4319,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 if (methodDeclaration.ExpressionBody?.Expression != null)
                 {
                     AddConcreteLinqEnumeratorType(
-                        GetLinqExpressionType(methodDeclaration.ExpressionBody.Expression, semanticModel),
+                        GetLinqExpressionType(methodDeclaration.ExpressionBody.Expression, semanticModel, cancellationToken),
                         seen);
                 }
 
@@ -4308,13 +4330,14 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 foreach (var returnStatement in methodDeclaration.Body.DescendantNodes().OfType<ReturnStatementSyntax>())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (returnStatement.Expression == null)
                     {
                         continue;
                     }
 
                     AddConcreteLinqEnumeratorType(
-                        GetLinqExpressionType(returnStatement.Expression, semanticModel),
+                        GetLinqExpressionType(returnStatement.Expression, semanticModel, cancellationToken),
                         seen);
                 }
             }
@@ -4362,15 +4385,17 @@ namespace SharpProof.Analyzer.Engine.Rules
                 interfaceType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerator_T);
         }
 
-        private static ITypeSymbol? GetLinqExpressionType(ExpressionSyntax expression, SemanticModel semanticModel)
+        private static ITypeSymbol? GetLinqExpressionType(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
-            var operation = semanticModel.GetOperation(expression);
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = semanticModel.GetOperation(expression, cancellationToken);
             while (operation is IConversionOperation conversion)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 operation = conversion.Operand;
             }
 
-            return operation?.Type ?? semanticModel.GetTypeInfo(expression).Type;
+            return operation?.Type ?? semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         }
 
         private static void AddConcreteLinqEnumeratorType(
