@@ -95,7 +95,7 @@ namespace SharpProof.Analyzer
             return CreateMetadataDefinitionExactSummaryKey(methodSymbol);
         }
 
-        private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
+        internal static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
@@ -109,7 +109,7 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private static IEnumerable<string> GetMetadataRefKindCompatibilityKeys(string key)
+        internal static IEnumerable<string> GetMetadataRefKindCompatibilityKeys(string key)
         {
             if (key.Contains("out ", StringComparison.Ordinal))
             {
@@ -299,7 +299,7 @@ namespace SharpProof.Analyzer
             };
         }
 
-        private static string FormatSummaryType(
+        internal static string FormatSummaryType(
             ITypeSymbol typeSymbol,
             bool useOrdinalGenericParameters,
             bool useMetadataTypeNames = false)

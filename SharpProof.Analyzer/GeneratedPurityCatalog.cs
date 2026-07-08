@@ -521,80 +521,6 @@ namespace SharpProof.Analyzer
             return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
-        private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                var trimmed = value!.Trim();
-                keys.Add(trimmed);
-
-                foreach (var compatibilityKey in GetMetadataRefKindCompatibilityKeys(trimmed))
-                {
-                    keys.Add(compatibilityKey);
-                }
-            }
-        }
-
-        private static IEnumerable<string> GetMetadataRefKindCompatibilityKeys(string key)
-        {
-            if (key.Contains("out ", StringComparison.Ordinal))
-            {
-                yield return key.Replace("out ", "ref ");
-            }
-
-            if (key.Contains("ref ", StringComparison.Ordinal) &&
-                !key.Contains("ref readonly ", StringComparison.Ordinal))
-            {
-                yield return key.Replace("ref ", "out ");
-            }
-        }
-
-        private static string FormatSummaryType(
-            ITypeSymbol typeSymbol,
-            bool useOrdinalGenericParameters,
-            bool useMetadataTypeNames = false)
-        {
-            switch (typeSymbol)
-            {
-                case IArrayTypeSymbol arrayType:
-                    return FormatSummaryType(arrayType.ElementType, useOrdinalGenericParameters, useMetadataTypeNames) +
-                        "[" + new string(',', Math.Max(arrayType.Rank, 1) - 1) + "]";
-                case IPointerTypeSymbol pointerType:
-                    return FormatSummaryType(pointerType.PointedAtType, useOrdinalGenericParameters, useMetadataTypeNames) + "*";
-                case ITypeParameterSymbol typeParameter:
-                    if (!useOrdinalGenericParameters)
-                    {
-                        return typeParameter.Name;
-                    }
-
-                    return typeParameter.TypeParameterKind == TypeParameterKind.Method
-                        ? "!!" + typeParameter.Ordinal
-                        : "!" + typeParameter.Ordinal;
-                case INamedTypeSymbol namedType when useMetadataTypeNames && namedType.SpecialType != SpecialType.None:
-                    return namedType.ToDisplayString(EffectSummaryParameterTypeFormat);
-                case INamedTypeSymbol namedType when namedType.IsTupleType && !useMetadataTypeNames:
-                    return namedType.ToDisplayString(EffectSummaryParameterTypeFormat);
-                case INamedTypeSymbol namedType:
-                    var typeName = useMetadataTypeNames
-                        ? GetMetadataGenericDefinitionName(namedType)
-                        : namedType.ConstructedFrom.ToDisplayString(EffectSummaryNonGenericContainingTypeFormat);
-                    var typeArguments = useMetadataTypeNames
-                        ? GetFlattenedTypeArguments(namedType)
-                        : namedType.TypeArguments;
-                    if (typeArguments.Length == 0)
-                    {
-                        return typeName;
-                    }
-
-                    var formattedTypeArguments = string.Join(
-                        ", ",
-                        typeArguments.Select(argument => FormatSummaryType(argument, useOrdinalGenericParameters, useMetadataTypeNames)));
-                    return typeName + "<" + formattedTypeArguments + ">";
-                default:
-                    return typeSymbol.ToDisplayString(EffectSummaryParameterTypeFormat);
-            }
-        }
-
         private static string GetMetadataGenericDefinitionName(INamedTypeSymbol namedType)
         {
             var definition = namedType.ConstructedFrom;
@@ -1295,12 +1221,12 @@ namespace SharpProof.Analyzer
             }
 
             var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
-            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
+            EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
             return keys.ToImmutableArray();
         }
 
@@ -1310,7 +1236,7 @@ namespace SharpProof.Analyzer
             bool useOrdinalGenericParameters,
             bool useMetadataTypeNames)
         {
-            var containingTypeName = FormatSummaryType(typeSymbol, useOrdinalGenericParameters, useMetadataTypeNames);
+            var containingTypeName = EffectSummarySymbolKeyFactory.FormatSummaryType(typeSymbol, useOrdinalGenericParameters, useMetadataTypeNames);
             var key = containingTypeName + "..cctor()";
             return includeReturnType ? key + "->void" : key;
         }
