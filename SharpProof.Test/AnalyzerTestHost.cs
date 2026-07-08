@@ -188,6 +188,50 @@ namespace SharpProof.Test
             return diagnostics.Single(diagnostic => diagnostic.Id == diagnosticId);
         }
 
+        public static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
+        {
+            return StripDiagnosticMarkup(markedSource, SharpProofDiagnostics.PurityNotVerifiedId, required: false);
+        }
+
+        public static (string Source, string ExpectedSpanText) StripRequiredSp0002Markup(string markedSource)
+        {
+            var (source, expectedSpanText) = StripDiagnosticMarkup(
+                markedSource,
+                SharpProofDiagnostics.PurityNotVerifiedId,
+                required: true);
+            return (source, expectedSpanText!);
+        }
+
+        private static (string Source, string? ExpectedSpanText) StripDiagnosticMarkup(
+            string markedSource,
+            string diagnosticId,
+            bool required)
+        {
+            var prefix = "{|" + diagnosticId + ":";
+            const string suffix = "|}";
+            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                if (required)
+                {
+                    throw new InvalidOperationException("Expected " + diagnosticId + " markup start.");
+                }
+
+                return (markedSource, null);
+            }
+
+            var contentStart = start + prefix.Length;
+            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
+            if (end < 0)
+            {
+                throw new InvalidOperationException("Expected " + diagnosticId + " markup end.");
+            }
+
+            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
+            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
+            return (source, expectedSpanText);
+        }
+
         public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)
         {
             return CreateConditionContext(parameterList, conditionExpression, extraSource: "");

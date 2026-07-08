@@ -105,7 +105,7 @@ public class TestClass
 
         private static async Task AssertUnsafeSinglePurityDiagnosticAsync(string markedSource)
         {
-            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            var (source, expectedSpanText) = AnalyzerTestHost.StripSp0002Markup(markedSource);
             Assert.That(expectedSpanText, Is.Not.Null);
 
             var diagnostics = await GetDiagnosticsAsync(
@@ -119,28 +119,6 @@ public class TestClass
                 diagnostic.Location.SourceSpan.Start,
                 diagnostic.Location.SourceSpan.Length);
             Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
-        }
-
-        private static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
-        {
-            const string prefix = "{|SP0002:";
-            const string suffix = "|}";
-            var start = markedSource.IndexOf(prefix, System.StringComparison.Ordinal);
-            if (start < 0)
-            {
-                return (markedSource, null);
-            }
-
-            var contentStart = start + prefix.Length;
-            var end = markedSource.IndexOf(suffix, contentStart, System.StringComparison.Ordinal);
-            if (end < 0)
-            {
-                throw new System.InvalidOperationException("Missing closing SP0002 markup.");
-            }
-
-            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
-            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
-            return (source, expectedSpanText);
         }
     }
 }

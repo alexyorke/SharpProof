@@ -4985,7 +4985,7 @@ public class TestClass
 
         private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
         {
-            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            var (source, expectedSpanText) = AnalyzerTestHost.StripSp0002Markup(markedSource);
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
                 frameworkReferences: GlobalizationFrameworkReferences,
@@ -5009,25 +5009,6 @@ public class TestClass
                 diagnostic.Location.SourceSpan.Start,
                 diagnostic.Location.SourceSpan.Length);
             Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
-        }
-
-        private static (string Source, string? ExpectedSpanText) StripSp0002Markup(string markedSource)
-        {
-            const string prefix = "{|SP0002:";
-            const string suffix = "|}";
-            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
-            if (start < 0)
-            {
-                return (markedSource, null);
-            }
-
-            var contentStart = start + prefix.Length;
-            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
-            Assert.That(end, Is.GreaterThanOrEqualTo(0), "Expected SP0002 markup end.");
-
-            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
-            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
-            return (source, expectedSpanText);
         }
     }
 }

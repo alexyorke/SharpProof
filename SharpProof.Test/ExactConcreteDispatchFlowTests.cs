@@ -632,7 +632,7 @@ public class TestClass
 
         private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
         {
-            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            var (source, expectedSpanText) = AnalyzerTestHost.StripRequiredSp0002Markup(markedSource);
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -648,22 +648,5 @@ public class TestClass
             Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
             Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
         }
-
-        private static (string Source, string ExpectedSpanText) StripSp0002Markup(string markedSource)
-        {
-            const string prefix = "{|SP0002:";
-            const string suffix = "|}";
-            var start = markedSource.IndexOf(prefix, StringComparison.Ordinal);
-            Assert.That(start, Is.GreaterThanOrEqualTo(0), "Expected SP0002 markup start.");
-
-            var contentStart = start + prefix.Length;
-            var end = markedSource.IndexOf(suffix, contentStart, StringComparison.Ordinal);
-            Assert.That(end, Is.GreaterThanOrEqualTo(0), "Expected SP0002 markup end.");
-
-            var expectedSpanText = markedSource.Substring(contentStart, end - contentStart);
-            var source = markedSource.Remove(end, suffix.Length).Remove(start, prefix.Length);
-            return (source, expectedSpanText);
-        }
-
     }
 }
