@@ -516,7 +516,7 @@ static void PrintMergedPathFacts(
         {
             Console.WriteLine(
                 label + " unknown diagnostic: " +
-                $"{diagnostic.UnknownText} target={diagnostic.Target} reason={diagnostic.Reason} " +
+                $"{diagnostic.UnknownText} target={diagnostic.Target} reason={diagnostic.GetDisplayReason()} " +
                 $"maybe={string.Join("; ", diagnostic.MaybeFacts)}");
         }
     }
@@ -928,7 +928,7 @@ static void PrintProofReasonSummary(
         Console.WriteLine(
             indent +
             "Proof reason: " +
-            $"{reason.TruthValue} count={reason.Count} reason={reason.Reason}");
+            $"{reason.TruthValue} count={reason.Count} reason={reason.GetDisplayReason()}");
     }
 }
 

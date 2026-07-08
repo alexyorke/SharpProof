@@ -5876,6 +5876,29 @@ namespace SharpProof.Symbolic
         public int CandidateProgramPointCount { get; }
 
         public int UnreachableProgramPointCount { get; }
+
+        public string GetDisplayReason()
+        {
+            if (string.IsNullOrWhiteSpace(Reason))
+            {
+                return Reason ?? string.Empty;
+            }
+
+            return Reason switch
+            {
+                "not_common_to_all_candidate_program_points" => "not common to all candidate program points",
+                "smt_disabled" => "SMT disabled",
+                "smt_disposed" => "SMT solver disposed",
+                "smt_timeout" => "SMT solver timed out",
+                "smt_unavailable" => "SMT solver unavailable",
+                "smt_encoding_failure" => "SMT formula encoding failed",
+                "smt_expression_budget_exceeded" => "SMT expression node budget exceeded",
+                "smt_path_condition_budget_exceeded" => "SMT path condition budget exceeded",
+                "smt_method_budget_exceeded" => "SMT method-level budget exceeded",
+                "unsupported_formula_fallback" => "unsupported formula fallback; legacy translated trigger was not trusted as proof",
+                _ => Reason,
+            };
+        }
     }
 
     public sealed class SymbolicMergedPathFacts
@@ -6913,6 +6936,29 @@ namespace SharpProof.Symbolic
         public string Reason { get; }
 
         public int Count { get; }
+
+        public string GetDisplayReason()
+        {
+            if (string.IsNullOrWhiteSpace(Reason))
+            {
+                return Reason ?? string.Empty;
+            }
+
+            return Reason switch
+            {
+                "not_common_to_all_candidate_program_points" => "not common to all candidate program points",
+                "smt_disabled" => "SMT disabled",
+                "smt_disposed" => "SMT solver disposed",
+                "smt_timeout" => "SMT solver timed out",
+                "smt_unavailable" => "SMT solver unavailable",
+                "smt_encoding_failure" => "SMT formula encoding failed",
+                "smt_expression_budget_exceeded" => "SMT expression node budget exceeded",
+                "smt_path_condition_budget_exceeded" => "SMT path condition budget exceeded",
+                "smt_method_budget_exceeded" => "SMT method-level budget exceeded",
+                "unsupported_formula_fallback" => "unsupported formula fallback; legacy translated trigger was not trusted as proof",
+                _ => Reason,
+            };
+        }
     }
 
     public enum SymbolicConditionProofSummaryStatus
