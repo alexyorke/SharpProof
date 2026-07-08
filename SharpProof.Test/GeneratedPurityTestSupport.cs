@@ -192,8 +192,7 @@ namespace SharpProof.Test
                     var il = body.GetILBytes();
                     if (il != null)
                     {
-                        using var sha256 = SHA256.Create();
-                        methodBodySha256 = Convert.ToHexString(sha256.ComputeHash(il)).ToLowerInvariant();
+                        methodBodySha256 = Convert.ToHexString(SHA256.HashData(il)).ToLowerInvariant();
                     }
                 }
 
@@ -216,8 +215,7 @@ namespace SharpProof.Test
                 : Path.GetFileNameWithoutExtension(assemblyPath);
             var moduleVersionId = metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid).ToString("D");
             stream.Position = 0;
-            using var sha256 = SHA256.Create();
-            var assemblySha256 = Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
+            var assemblySha256 = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
             return new AssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
         }
 

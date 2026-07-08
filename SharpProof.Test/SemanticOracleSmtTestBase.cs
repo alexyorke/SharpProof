@@ -279,6 +279,8 @@ public sealed class NotNullIfNotNullIndexer
         protected static readonly Type ExecutionVisibilityType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!;
 
+        private static readonly SymbolicInvariantService SharedInvariantService = new();
+
         private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken);
 
         private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel, CancellationToken cancellationToken);
@@ -361,7 +363,7 @@ public sealed class NotNullIfNotNullIndexer
                 .DescendantNodes()
                 .OfType<StatementSyntax>()
                 .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
-            var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
+            var snapshot = SharedInvariantService.GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
         }
@@ -394,7 +396,7 @@ public sealed class NotNullIfNotNullIndexer
                 .DescendantNodes()
                 .OfType<ExpressionSyntax>()
                 .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
-            var snapshot = new SymbolicInvariantService().GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
+            var snapshot = SharedInvariantService.GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
         }

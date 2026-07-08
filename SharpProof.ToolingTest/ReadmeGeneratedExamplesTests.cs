@@ -317,7 +317,7 @@ namespace System.Experimental
 
         private static async Task VerifyCliExampleAsync(string exampleId, params string[] arguments)
         {
-            var result = await SymbolicCliTestHost.RunAsync(arguments);
+            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(arguments);
 
             Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
             ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, result.StandardOutput);

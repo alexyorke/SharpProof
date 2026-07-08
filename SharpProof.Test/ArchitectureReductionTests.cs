@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
@@ -16,6 +17,13 @@ namespace SharpProof.Test
     [TestFixture]
     public sealed class ArchitectureReductionTests
     {
+        private static readonly ConcurrentDictionary<string, string> s_fileContentCache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private static string ReadFileCached(string path)
+        {
+            return s_fileContentCache.GetOrAdd(path, File.ReadAllText);
+        }
         [Test]
         public void AnalyzerReachability_DoesNotOpenCodeBranchProofQueries()
         {
@@ -31,7 +39,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(static file =>
                     file.Source.Contains("new PurityProofQuery", StringComparison.Ordinal) ||
@@ -48,7 +56,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_IsCanonicalProofFacade()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -63,16 +71,16 @@ namespace SharpProof.Test
         public void SymbolicProofService_KeepsFormulaCompatibilityPrivate()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var legacyCompatibilitySource = File.ReadAllText(Path.Combine(
+            var legacyCompatibilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Smt",
                 "CSharpConditionToFormula.LegacyFormulaCompatibility.cs"));
-            var proofServiceSource = File.ReadAllText(Path.Combine(
+            var proofServiceSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProofService.cs"));
@@ -138,7 +146,7 @@ namespace SharpProof.Test
         public void PurityAnalysisEngine_UsesSharedProofBridgesForBranchPathConditions()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -168,7 +176,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(file => file.Source.Contains("new SmtAnalysisService(", StringComparison.Ordinal) &&
                     !allowed.Contains(file.Path))
@@ -190,13 +198,13 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(file => file.Source.Contains("new SmtAnalysisService(SmtAnalysisOptions.Default)", StringComparison.Ordinal) &&
                     !string.Equals(file.Path, "SharpProof.Symbolic/SymbolicProofService.cs", StringComparison.Ordinal))
                 .Select(file => file.Path)
                 .ToArray();
-            var proofServiceSource = File.ReadAllText(Path.Combine(
+            var proofServiceSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProofService.cs"));
@@ -210,7 +218,7 @@ namespace SharpProof.Test
         public void SymbolicRuntimeHazardQueryService_RoutesIrTriggerProofsThroughProofService()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
@@ -229,7 +237,7 @@ namespace SharpProof.Test
         public void FieldReferenceRule_DelegatesFreshOwnershipClassification()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -247,7 +255,7 @@ namespace SharpProof.Test
         public void AssignmentRule_DelegatesFreshOwnershipClassification()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -265,13 +273,13 @@ namespace SharpProof.Test
         public void FreshMutableObjectClassifier_ConsumesSymbolicAndAllPathAssignmentFacts()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var classifierSource = File.ReadAllText(Path.Combine(
+            var classifierSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "Rules",
                 "OwnedFreshMutableObjectClassifier.cs"));
-            var returnSource = File.ReadAllText(Path.Combine(
+            var returnSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -290,14 +298,14 @@ namespace SharpProof.Test
         public void FreshMutableObjectClassifier_ThreadsCancellationTokenThroughSyntaxScans()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var classifierSource = File.ReadAllText(Path.Combine(
+            var classifierSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "OwnedFreshMutableObjectClassifier.cs"))
                 .Replace("\r\n", "\n");
-            var fieldRuleSource = File.ReadAllText(Path.Combine(
+            var fieldRuleSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -318,28 +326,28 @@ namespace SharpProof.Test
         public void SmallRuleHelpers_ThreadCancellationTokenThroughSourceLookups()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var assignmentSource = File.ReadAllText(Path.Combine(
+            var assignmentSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "AssignmentPurityRule.cs"))
                 .Replace("\r\n", "\n");
-            var awaitSource = File.ReadAllText(Path.Combine(
+            var awaitSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "AwaitPurityRule.cs"))
                 .Replace("\r\n", "\n");
-            var propertySource = File.ReadAllText(Path.Combine(
+            var propertySource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "PropertyReferencePurityRule.cs"))
                 .Replace("\r\n", "\n");
-            var classifierSource = File.ReadAllText(Path.Combine(
+            var classifierSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -361,7 +369,7 @@ namespace SharpProof.Test
         public void AnalyzerOwnedArrayFlowCaptures_ProjectOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -377,7 +385,7 @@ namespace SharpProof.Test
         public void AnalyzerOwnedLocalArrays_ProjectValueOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -393,7 +401,7 @@ namespace SharpProof.Test
         public void AnalyzerFreshMutableObjects_ProjectValueOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -410,7 +418,7 @@ namespace SharpProof.Test
         public void AnalyzerDisposeInvocations_ProjectDisposalFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -428,7 +436,7 @@ namespace SharpProof.Test
         public void AnalyzerUsingStatements_ProjectImplicitDisposalFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -450,7 +458,7 @@ namespace SharpProof.Test
         public void UsingStatementRule_ThreadsCancellationTokenThroughResourceScans()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -470,7 +478,7 @@ namespace SharpProof.Test
         public void AnalyzerDisposableLocalAcquisition_ProjectsOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -489,7 +497,7 @@ namespace SharpProof.Test
         public void AnalyzerMissingDisposal_UsesPostCfgSymbolicResourceFacts()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -511,7 +519,7 @@ namespace SharpProof.Test
         public void AnalyzerMissingDisposal_ThreadsCancellationTokenThroughResourceReleaseAnalysis()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -531,7 +539,7 @@ namespace SharpProof.Test
         public void PurityAnalysisEngine_ThreadsCancellationTokenThroughRoslynLookups()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -565,7 +573,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                    Source = ReadFileCached(path).Replace("\r\n", "\n"),
                 })
                 .ToArray();
             var tokenFreeRoslynLookupPatterns = new[]
@@ -599,7 +607,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                    Source = ReadFileCached(path).Replace("\r\n", "\n"),
                 })
                 .ToArray();
 
@@ -633,7 +641,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                    Source = ReadFileCached(path).Replace("\r\n", "\n"),
                 })
                 .ToArray();
 
@@ -660,7 +668,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                    Source = ReadFileCached(path).Replace("\r\n", "\n"),
                 })
                 .ToArray();
 
@@ -676,7 +684,7 @@ namespace SharpProof.Test
         public void SymbolicComplexityService_ThreadsCancellationTokenThroughSemanticLookups()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Symbolic",
                     "SymbolicComplexityService.cs"))
@@ -694,7 +702,7 @@ namespace SharpProof.Test
         public void SymbolicPatternLowering_ThreadsCancellationTokenThroughDesignationLookups()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Symbolic",
                     "Smt",
@@ -712,7 +720,7 @@ namespace SharpProof.Test
         public void AnalyzerAssignmentFacts_ThreadCancellationTokenThroughSymbolicLowering()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -731,7 +739,7 @@ namespace SharpProof.Test
         public void AnalyzerReturnedOwnedResources_ProjectReturnedOwnershipFacts()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -749,7 +757,7 @@ namespace SharpProof.Test
         public void AnalyzerCallerVisibleMutation_ProjectsMutationFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -766,7 +774,7 @@ namespace SharpProof.Test
         public void AnalyzerAssignment_ProjectsAliasFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -782,7 +790,7 @@ namespace SharpProof.Test
         public void AnalyzerRefLocalDeclarations_ProjectBorrowFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -802,18 +810,18 @@ namespace SharpProof.Test
         public void AssignmentRule_ConsumesSymbolicBorrowFactsForRefAliasMutation()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "PurityAnalysisEngine.cs"));
-            var assignmentSource = File.ReadAllText(Path.Combine(
+            var assignmentSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "Rules",
                 "AssignmentPurityRule.cs"));
-            var invocationSource = File.ReadAllText(Path.Combine(
+            var invocationSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -844,12 +852,12 @@ namespace SharpProof.Test
         public void ReturnRule_ConsumesSymbolicOwnershipFactsForOwnedArrayEscape()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "PurityAnalysisEngine.cs"));
-            var returnSource = File.ReadAllText(Path.Combine(
+            var returnSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -868,7 +876,7 @@ namespace SharpProof.Test
         public void DelegateRule_ConsumesSymbolicOwnershipFactsForOwnedArrayCapture()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -884,7 +892,7 @@ namespace SharpProof.Test
         public void DelegateRule_ConsumesSymbolicOwnershipFactsForFreshMutableObjectCapture()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -903,14 +911,14 @@ namespace SharpProof.Test
         public void DelegateRule_ThreadsCancellationTokenThroughCaptureScans()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var delegateSource = File.ReadAllText(Path.Combine(
+            var delegateSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "DelegateCreationPurityRule.cs"))
                 .Replace("\r\n", "\n");
-            var returnSource = File.ReadAllText(Path.Combine(
+            var returnSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -932,7 +940,7 @@ namespace SharpProof.Test
         public void MethodInvocationRule_ThreadsCancellationTokenThroughDispatchAndLinqScans()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -958,20 +966,20 @@ namespace SharpProof.Test
         public void ReturnRule_ThreadsCancellationTokenThroughEscapeScans()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var returnSource = File.ReadAllText(Path.Combine(
+            var returnSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "Rules",
                     "ReturnStatementPurityRule.cs"))
                 .Replace("\r\n", "\n");
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
                     "PurityAnalysisEngine.cs"))
                 .Replace("\r\n", "\n");
-            var classifierSource = File.ReadAllText(Path.Combine(
+            var classifierSource = ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Analyzer",
                     "Engine",
@@ -1000,7 +1008,7 @@ namespace SharpProof.Test
         public void ReturnRule_DelegatesReturnedClosureArrayCaptureToDelegateRule()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1017,7 +1025,7 @@ namespace SharpProof.Test
         public void ReturnRule_DelegatesReturnedClosureFreshObjectCaptureToDelegateRule()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1034,12 +1042,12 @@ namespace SharpProof.Test
         public void ReturnRule_ConsumesSymbolicEscapeEvidenceForMutableReturns()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "PurityAnalysisEngine.cs"));
-            var returnSource = File.ReadAllText(Path.Combine(
+            var returnSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1056,7 +1064,7 @@ namespace SharpProof.Test
         public void AnalyzerByRefReturns_UseSymbolicEscapeEvidence()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1072,12 +1080,12 @@ namespace SharpProof.Test
         public void AssignmentRule_ConsumesSymbolicMutationEvidenceForCallerVisibleWrites()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "PurityAnalysisEngine.cs"));
-            var assignmentSource = File.ReadAllText(Path.Combine(
+            var assignmentSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1094,25 +1102,25 @@ namespace SharpProof.Test
         public void MemberAccessRules_UseSymbolicDisposalFactsForUseAfterDispose()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "Rules",
                 "MethodInvocationPurityRule.cs"));
-            var propertySource = File.ReadAllText(Path.Combine(
+            var propertySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "Rules",
                 "PropertyReferencePurityRule.cs"));
-            var fieldSource = File.ReadAllText(Path.Combine(
+            var fieldSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
                 "Rules",
                 "FieldReferencePurityRule.cs"));
-            var engineSource = File.ReadAllText(Path.Combine(
+            var engineSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1157,7 +1165,7 @@ namespace SharpProof.Test
         public void PostCfgChecks_CarryMergedSymbolicPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1174,7 +1182,7 @@ namespace SharpProof.Test
         public void OwnedFreshMutableObjectClassifier_IsDedicatedOwnershipHelper()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1193,11 +1201,11 @@ namespace SharpProof.Test
         public void RuntimeHazardTriggers_CreateIrPreconditionTriggersBeforeFormulaProjection()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var candidateSource = File.ReadAllText(Path.Combine(
+            var candidateSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
-            var triggerSource = File.ReadAllText(Path.Combine(
+            var triggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -1219,7 +1227,7 @@ namespace SharpProof.Test
         public void ExecutionVisibility_UsesSymbolicReachabilityForConditionProofs()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -1241,7 +1249,7 @@ namespace SharpProof.Test
         public void ForInitialEntryReachability_UsesSymbolicStateBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -1276,7 +1284,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(static file =>
                     file.Source.Contains("new Smt", StringComparison.Ordinal) ||
@@ -1296,7 +1304,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(static file =>
                     file.Source.Contains("Microsoft.CodeAnalysis", StringComparison.Ordinal) ||
@@ -1312,17 +1320,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsStringAndRegexLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var stringSource = File.ReadAllText(Path.Combine(
+            var stringSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Strings.cs"));
-            var knownApiSource = File.ReadAllText(Path.Combine(
+            var knownApiSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1350,17 +1358,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsObjectLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var objectSource = File.ReadAllText(Path.Combine(
+            var objectSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Objects.cs"));
-            var knownApiSource = File.ReadAllText(Path.Combine(
+            var knownApiSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1376,12 +1384,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsPatternLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var patternSource = File.ReadAllText(Path.Combine(
+            var patternSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1401,17 +1409,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsTupleLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var tupleSource = File.ReadAllText(Path.Combine(
+            var tupleSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Tuples.cs"));
-            var memberSource = File.ReadAllText(Path.Combine(
+            var memberSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1432,17 +1440,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsNullableLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var nullableSource = File.ReadAllText(Path.Combine(
+            var nullableSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Nullable.cs"));
-            var memberSource = File.ReadAllText(Path.Combine(
+            var memberSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1462,17 +1470,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsIndexingLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var indexingSource = File.ReadAllText(Path.Combine(
+            var indexingSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Indexing.cs"));
-            var knownApisSource = File.ReadAllText(Path.Combine(
+            var knownApisSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1505,12 +1513,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsConversionLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var conversionSource = File.ReadAllText(Path.Combine(
+            var conversionSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1530,12 +1538,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsMemberLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var memberSource = File.ReadAllText(Path.Combine(
+            var memberSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1558,17 +1566,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var numericSource = File.ReadAllText(Path.Combine(
+            var numericSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.Numerics.cs"));
-            var knownApiSource = File.ReadAllText(Path.Combine(
+            var knownApiSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1585,12 +1593,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsTypeAndValueKindHelpersInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var typeSource = File.ReadAllText(Path.Combine(
+            var typeSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1612,12 +1620,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsOperatorHelpersInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var operatorSource = File.ReadAllText(Path.Combine(
+            var operatorSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1640,17 +1648,17 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsKnownApiDispatchInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var knownApiSource = File.ReadAllText(Path.Combine(
+            var knownApiSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.KnownApis.cs"));
-            var memberSource = File.ReadAllText(Path.Combine(
+            var memberSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1674,12 +1682,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsConditionFactoriesInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var conditionSource = File.ReadAllText(Path.Combine(
+            var conditionSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1700,12 +1708,12 @@ namespace SharpProof.Test
         public void SymbolicIrLowerer_KeepsSharedUtilitiesInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
                 "SymbolicIrLowerer.cs"));
-            var utilitySource = File.ReadAllText(Path.Combine(
+            var utilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1743,7 +1751,7 @@ namespace SharpProof.Test
         public void RuntimeHazardDivideByZero_UsesIrZeroConditionBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -1790,7 +1798,7 @@ namespace SharpProof.Test
         public void RuntimeHazardIndexFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -1805,15 +1813,15 @@ namespace SharpProof.Test
         public void AnalyzerExceptionSites_UseSharedIrFirstElementAccessRangeHelper()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "ExceptionFlowAnalyzer.ExceptionSites.cs"));
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1835,11 +1843,11 @@ namespace SharpProof.Test
         public void ElementAccessRangeHelper_UsesIrMultidimensionalBoundsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1880,15 +1888,15 @@ namespace SharpProof.Test
         public void ElementAccessLengthTerms_AreLoweredBySharedIrLowerer()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1919,7 +1927,7 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1943,27 +1951,27 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var exceptionSitesSource = File.ReadAllText(Path.Combine(
+            var exceptionSitesSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "ExceptionFlowAnalyzer.ExceptionSites.cs"));
-            var exceptionQuerySource = File.ReadAllText(Path.Combine(
+            var exceptionQuerySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "ExceptionFlowQuery.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -1996,11 +2004,11 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -2043,7 +2051,7 @@ namespace SharpProof.Test
         public void RuntimeHazardNegativeLengthFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2066,16 +2074,16 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var legacyCompatibilitySource = File.ReadAllText(Path.Combine(
+            var legacyCompatibilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Smt",
                 "CSharpConditionToFormula.LegacyFormulaCompatibility.cs"));
-            var lowererSource = File.ReadAllText(Path.Combine(
+            var lowererSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
@@ -2141,7 +2149,7 @@ namespace SharpProof.Test
         public void RuntimeHazardSignedDivisionOverflowFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
@@ -2161,7 +2169,7 @@ namespace SharpProof.Test
         public void RuntimeHazardCheckedOverflowRangeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
@@ -2239,7 +2247,7 @@ namespace SharpProof.Test
         public void RuntimeHazardNullLikeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2289,11 +2297,11 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2321,11 +2329,11 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2371,11 +2379,11 @@ namespace SharpProof.Test
         public void RuntimeHazardIrTriggerBridge_LivesInDedicatedPartial()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var coreSource = File.ReadAllText(Path.Combine(
+            var coreSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.cs"));
-            var irTriggerSource = File.ReadAllText(Path.Combine(
+            var irTriggerSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2390,7 +2398,7 @@ namespace SharpProof.Test
         public void RuntimeHazardReferenceNullHelper_ReturnsIrConditionBeforeFormulaEncoding()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
@@ -2416,11 +2424,11 @@ namespace SharpProof.Test
         {
             var repositoryRoot = FindRepositoryRoot();
             var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var legacyCompatibilitySource = File.ReadAllText(Path.Combine(
+            var legacyCompatibilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Smt",
@@ -2652,14 +2660,14 @@ namespace SharpProof.Test
                 repositoryRoot,
                 "SharpProof.Vsix",
                 "source.extension.vsixmanifest"));
-            var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
-            var readmeSource = File.ReadAllText(Path.Combine(repositoryRoot, "README.source.md"));
-            var capabilityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
-            var complexityDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
-            var effectSummaryDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
-            var diagnosticExamplesDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
+            var readme = ReadFileCached(Path.Combine(repositoryRoot, "README.md"));
+            var readmeSource = ReadFileCached(Path.Combine(repositoryRoot, "README.source.md"));
+            var capabilityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
+            var complexityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
+            var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
+            var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
             var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
-            var shippedReleaseNotes = File.ReadAllText(Path.Combine(
+            var shippedReleaseNotes = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "AnalyzerReleases.Shipped.md"));
@@ -2746,7 +2754,7 @@ namespace SharpProof.Test
             Assert.That(File.Exists(readmeGeneratorScript), Is.True);
             Assert.That(File.Exists(Path.Combine(repositoryRoot, "REMAINING_ANALYZER_BACKLOG.md")), Is.False);
             Assert.That(File.Exists(Path.Combine(repositoryRoot, "PLAN.md")), Is.True);
-            var plan = File.ReadAllText(Path.Combine(repositoryRoot, "PLAN.md"));
+            var plan = ReadFileCached(Path.Combine(repositoryRoot, "PLAN.md"));
             Assert.That(plan, Does.Contain("Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API"));
             Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
             Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
@@ -2825,7 +2833,7 @@ namespace SharpProof.Test
         public void ProgramPointQueryResult_DoesNotPubliclyExposeRawFormulaAccessors()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicSourceQueryService.cs"));
@@ -2845,7 +2853,7 @@ namespace SharpProof.Test
         public void SymbolicInvariantSnapshot_DoesNotStoreRawFormulaResults()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicInvariantService.cs"));
@@ -2866,7 +2874,7 @@ namespace SharpProof.Test
         public void SymbolicInvariantImplication_UsesIrConditionEntryPoint()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicInvariantService.cs"));
@@ -2887,11 +2895,11 @@ namespace SharpProof.Test
         public void SymbolicSourceQueryResultConstruction_UsesSinglePathStateBridge()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicSourceQueryService.cs"));
-            var queryApiSource = File.ReadAllText(Path.Combine(
+            var queryApiSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicQueryApi.cs"));
@@ -2915,11 +2923,11 @@ namespace SharpProof.Test
         public void SymbolicSourceQueryService_DelegatesSpeculativeConditionFormulaFallbacks()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicSourceQueryService.cs"));
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -2944,7 +2952,7 @@ namespace SharpProof.Test
         public void SwitchPathConditionBuilder_DelegatesLegacyPatternFallbacksThroughReachability()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Smt",
@@ -2965,7 +2973,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TranslatesPatternsThroughIrBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -2990,7 +2998,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TriesIrPatternBindingsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -3021,7 +3029,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(static file =>
                     !file.Path.StartsWith("SharpProof.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
@@ -3043,7 +3051,7 @@ namespace SharpProof.Test
                 .Select(path => new
                 {
                     Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
-                    Source = File.ReadAllText(path),
+                    Source = ReadFileCached(path),
                 })
                 .Where(static file =>
                     !file.Path.StartsWith("SharpProof.Symbolic/Smt/CSharpConditionToFormula", StringComparison.Ordinal) &&
@@ -3120,7 +3128,7 @@ namespace SharpProof.Test
         public void SmtAnalysisService_RawBackendQueryMethodsAreInternal()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Smt",
@@ -6364,7 +6372,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TriesIrBranchFactsBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6388,7 +6396,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TriesIrSimplePatternBranchAssumptionsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6416,7 +6424,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TriesIrNonNullBranchAssumptionsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6443,7 +6451,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TriesIrNotNullWhenBranchAssumptionsBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6706,7 +6714,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_DelegatesBranchAssumptionsToSharedReachabilityService()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -6719,7 +6727,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_DelegatesFormulaPathLoweringToProofService()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -6737,7 +6745,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_TriesIrHelpersBeforeLegacyTranslator()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -6783,7 +6791,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateBeforeLegacyFormulaCompatibilityMerge()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -6812,7 +6820,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -6836,7 +6844,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrConditionTruthBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6865,7 +6873,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_TranslatesConditionFormulaThroughIrBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6889,7 +6897,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrAssignedValueHelpersBeforeLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6968,7 +6976,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrNullableHasValueWithoutLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -6991,7 +6999,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrNullableTargetValueParts()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7016,7 +7024,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrNullableValuePartsWithoutLegacyFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7055,7 +7063,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrArrayDimensionLengthWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7078,7 +7086,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrArrayLengthCountAliasTerms()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7104,7 +7112,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrStringNonNullWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7127,7 +7135,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrNotNullIfNotNullWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7151,7 +7159,7 @@ namespace SharpProof.Test
         public void SymbolicReachabilityService_UsesIrAsExpressionFactsWithoutLegacyTranslatorFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
@@ -7287,7 +7295,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_CollectsInlineAssignmentBranchStateBeforeSharedReachabilityFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7380,7 +7388,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_BuildsNativePriorAssignmentStateBeforeFormulaShadow()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7408,7 +7416,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_BuildsNativeContainingBlockEntryStateInPriorAssignmentPath()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7492,7 +7500,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_BuildsNativeForInitializerStateBeforeFormulaShadow()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7553,7 +7561,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_UsesSharedIncrementOrDecrementFormulaHelper()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7602,7 +7610,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ContainsNativeCompoundAssignmentStateBuilder()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7651,7 +7659,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ContainsNativeCoalesceAssignmentStateHelpers()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7667,7 +7675,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ContainsNativeTupleStateBuilders()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7683,7 +7691,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ContainsNormalCompletionStateBuilders()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -7703,7 +7711,7 @@ namespace SharpProof.Test
         public void SymbolicProgramPointFacts_ContainsNativeDivideModuloCompoundAssignmentStateOperators()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -8307,7 +8315,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicInvariantService.cs"));
@@ -8326,7 +8334,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void AnalyzerPurityState_CarriesSymbolicPathStateBesideLegacyFormulas()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -8350,7 +8358,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void AnalyzerPathFeasibility_TriesSymbolicStateBeforeLegacyFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -8371,23 +8379,23 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void ExceptionFlowPathProofs_TrySymbolicStateBeforeLegacyFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var pathFactsSource = File.ReadAllText(Path.Combine(
+            var pathFactsSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "ExceptionFlowAnalyzer.PathFacts.cs"));
-            var exceptionSitesSource = File.ReadAllText(Path.Combine(
+            var exceptionSitesSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "ExceptionFlowAnalyzer.ExceptionSites.cs"));
-            var reachabilitySource = File.ReadAllText(Path.Combine(
+            var reachabilitySource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicReachabilityService.cs"));
-            var proofServiceSource = File.ReadAllText(Path.Combine(
+            var proofServiceSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProofService.cs"));
-            var symbolicProgramPointFactsSource = File.ReadAllText(Path.Combine(
+            var symbolicProgramPointFactsSource = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicProgramPointFacts.cs"));
@@ -8583,7 +8591,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void AnalyzerNullPathProbes_CarrySymbolicNullStateBeforeFeasibility()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -8605,7 +8613,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void AnalyzerAssignmentFacts_AreMirroredIntoSymbolicState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -8644,7 +8652,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void AnalyzerStateMerge_PreservesCommonSymbolicPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Analyzer",
                 "Engine",
@@ -8660,7 +8668,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void RuntimeHazardClassification_TriesIrProofBeforeLegacyFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
@@ -8680,7 +8688,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         public void RuntimeHazardThrowNullRefinement_UsesIrPathStateBeforeLegacyFormulaFallback()
         {
             var repositoryRoot = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(
+            var source = ReadFileCached(Path.Combine(
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "SymbolicRuntimeHazardQueryService.cs"));
@@ -8865,7 +8873,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
 
             foreach (var file in files)
             {
-                var source = File.ReadAllText(file);
+                var source = ReadFileCached(file);
                 var matchCount = CountOrdinalOccurrences(source, "CSharpConditionToFormula.");
                 foreach (var constructionNeedle in RawSmtConstructionNeedles)
                 {
@@ -8955,12 +8963,12 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         private static string ReadRuntimeHazardCandidateSources(string repositoryRoot)
         {
             return string.Concat(
-                File.ReadAllText(Path.Combine(
+                ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Symbolic",
                     "SymbolicRuntimeHazardCandidateFactory.cs")),
                 Environment.NewLine,
-                File.ReadAllText(Path.Combine(
+                ReadFileCached(Path.Combine(
                     repositoryRoot,
                     "SharpProof.Symbolic",
                     "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs")));
