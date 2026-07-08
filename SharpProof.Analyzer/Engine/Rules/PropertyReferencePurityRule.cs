@@ -635,10 +635,12 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             var receiverOperation = PurityAnalysisEngine.SkipImplicitConversions(propertyReferenceOperation.Instance) ??
                 propertyReferenceOperation.Instance;
-            var knownConstructionComparerResult = CheckKnownDictionaryConstructionComparerPurity(
+            var knownConstructionComparerResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
                 receiverOperation,
-                propertyReferenceOperation,
-                context);
+                context,
+                IsConcreteDictionaryType,
+                ComparerDispatchHelper.IsComparerOrDerivedInterface,
+                value => CheckComparerValuePurity(value, propertyReferenceOperation, context));
             if (!knownConstructionComparerResult.IsPure)
             {
                 return knownConstructionComparerResult;
@@ -681,73 +683,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckKnownDictionaryConstructionComparerPurity(
-            IOperation? receiverOperation,
-            IPropertyReferenceOperation propertyReferenceOperation,
-            PurityAnalysisContext context)
-        {
-            var unwrappedReceiver = PurityAnalysisEngine.SkipImplicitConversions(receiverOperation) ?? receiverOperation;
-            if (unwrappedReceiver is IObjectCreationOperation objectCreationOperation)
-            {
-                return CheckDictionaryObjectCreationComparerPurity(
-                    objectCreationOperation,
-                    propertyReferenceOperation,
-                    context);
-            }
-
-            if (FieldOrPropertyInitializerOperationHelper.TryGetFieldOrPropertyInitializerOperation(
-                    unwrappedReceiver,
-                    context,
-                    out var initializerOperation) &&
-                PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) is IObjectCreationOperation initializerObjectCreation)
-            {
-                return CheckDictionaryObjectCreationComparerPurity(
-                    initializerObjectCreation,
-                    propertyReferenceOperation,
-                    context);
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckDictionaryObjectCreationComparerPurity(
-            IObjectCreationOperation objectCreationOperation,
-            IPropertyReferenceOperation propertyReferenceOperation,
-            PurityAnalysisContext context)
-        {
-            if (objectCreationOperation.Type is not INamedTypeSymbol objectType ||
-                objectType.OriginalDefinition.ToDisplayString() != "System.Collections.Generic.Dictionary<TKey, TValue>")
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            foreach (var argument in objectCreationOperation.Arguments)
-            {
-                var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
-                if (value?.Type == null ||
-                    argument.Parameter?.Type is not INamedTypeSymbol parameterType ||
-                    !ComparerDispatchHelper.IsComparerOrDerivedInterface(parameterType) &&
-                    !ComparerDispatchHelper.IsComparerOrDerivedInterface(value.Type))
-                {
-                    continue;
-                }
-
-                var comparerArgumentResult = PurityAnalysisEngine.CheckSingleOperation(value, context, PurityAnalysisEngine.PurityAnalysisState.Pure);
-                if (!comparerArgumentResult.IsPure)
-                {
-                    return comparerArgumentResult;
-                }
-
-                var comparerResult = CheckComparerValuePurity(value, propertyReferenceOperation, context);
-                if (!comparerResult.IsPure)
-                {
-                    return comparerResult;
-                }
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
         private static PurityAnalysisEngine.PurityAnalysisResult CheckComparerValuePurity(
             IOperation value,
             IPropertyReferenceOperation propertyReferenceOperation,
@@ -776,6 +711,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool IsConcreteDictionaryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.Dictionary<TKey, TValue>";
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckSortedDictionaryKeyDispatchPurity(

@@ -1831,12 +1831,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var receiverOperation = PurityAnalysisEngine.SkipImplicitConversions(invocationOperation.Instance) ??
                 invocationOperation.Instance;
-            var constructionResult = CheckKnownCollectionConstructionComparerPurity(
+            var constructionResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
                 receiverOperation,
-                invocationOperation,
                 context,
                 IsConcreteHashSetType,
-                IsEqualityComparerType);
+                IsEqualityComparerType,
+                value => CheckComparerValuePurity(value, invocationOperation, context));
             if (!constructionResult.IsPure)
             {
                 return constructionResult;
@@ -1845,81 +1845,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (receiverOperation?.Type is INamedTypeSymbol receiverType)
             {
                 return CheckHashSetSubtypeConstructorComparerPurity(receiverType, invocationOperation, context);
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckKnownCollectionConstructionComparerPurity(
-            IOperation? receiverOperation,
-            IInvocationOperation invocationOperation,
-            PurityAnalysisContext context,
-            Func<ITypeSymbol?, bool> isCollectionType,
-            Func<ITypeSymbol?, bool> isComparerParameterType)
-        {
-            var unwrappedReceiver = PurityAnalysisEngine.SkipImplicitConversions(receiverOperation) ?? receiverOperation;
-            if (unwrappedReceiver is IObjectCreationOperation objectCreationOperation)
-            {
-                return CheckCollectionObjectCreationComparerPurity(
-                    objectCreationOperation,
-                    invocationOperation,
-                    context,
-                    isCollectionType,
-                    isComparerParameterType);
-            }
-
-            if (FieldOrPropertyInitializerOperationHelper.TryGetFieldOrPropertyInitializerOperation(
-                    unwrappedReceiver,
-                    context,
-                    out var initializerOperation) &&
-                PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) is IObjectCreationOperation initializerObjectCreation)
-            {
-                return CheckCollectionObjectCreationComparerPurity(
-                    initializerObjectCreation,
-                    invocationOperation,
-                    context,
-                    isCollectionType,
-                    isComparerParameterType);
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static PurityAnalysisEngine.PurityAnalysisResult CheckCollectionObjectCreationComparerPurity(
-            IObjectCreationOperation objectCreationOperation,
-            IInvocationOperation invocationOperation,
-            PurityAnalysisContext context,
-            Func<ITypeSymbol?, bool> isCollectionType,
-            Func<ITypeSymbol?, bool> isComparerParameterType)
-        {
-            if (!isCollectionType(objectCreationOperation.Type))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            foreach (var argument in objectCreationOperation.Arguments)
-            {
-                var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
-                if (value?.Type == null ||
-                    argument.Parameter?.Type is not INamedTypeSymbol parameterType ||
-                    !isComparerParameterType(parameterType) &&
-                    (value.Type is not INamedTypeSymbol namedValueType ||
-                     !ComparerDispatchHelper.IsComparerOrDerivedInterface(namedValueType)))
-                {
-                    continue;
-                }
-
-                var comparerArgumentResult = PurityAnalysisEngine.CheckSingleOperation(value, context, PurityAnalysisEngine.PurityAnalysisState.Pure);
-                if (!comparerArgumentResult.IsPure)
-                {
-                    return comparerArgumentResult;
-                }
-
-                var comparerResult = CheckComparerValuePurity(value, invocationOperation, context);
-                if (!comparerResult.IsPure)
-                {
-                    return comparerResult;
-                }
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -2024,12 +1949,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             var receiverOperation = PurityAnalysisEngine.SkipImplicitConversions(invocationOperation.Instance) ??
                 invocationOperation.Instance;
-            var constructionResult = CheckKnownCollectionConstructionComparerPurity(
+            var constructionResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
                 receiverOperation,
-                invocationOperation,
                 context,
                 IsConcreteSortedCollectionType,
-                IsComparerType);
+                IsComparerType,
+                value => CheckComparerValuePurity(value, invocationOperation, context));
             if (!constructionResult.IsPure)
             {
                 return constructionResult;

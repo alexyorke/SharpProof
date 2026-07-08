@@ -1,11 +1,94 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
     internal static class ComparerDispatchHelper
     {
+        internal static PurityAnalysisEngine.PurityAnalysisResult CheckKnownConstructionComparerPurity(
+            IOperation? receiverOperation,
+            PurityAnalysisContext context,
+            Func<ITypeSymbol?, bool> isCollectionType,
+            Func<ITypeSymbol, bool> isComparerParameterType,
+            Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
+        {
+            var unwrappedReceiver = PurityAnalysisEngine.SkipImplicitConversions(receiverOperation) ?? receiverOperation;
+            if (unwrappedReceiver is IObjectCreationOperation objectCreationOperation)
+            {
+                return CheckObjectCreationComparerPurity(
+                    objectCreationOperation,
+                    context,
+                    isCollectionType,
+                    isComparerParameterType,
+                    checkComparerValuePurity);
+            }
+
+            if (FieldOrPropertyInitializerOperationHelper.TryGetFieldOrPropertyInitializerOperation(
+                    unwrappedReceiver,
+                    context,
+                    out var initializerOperation) &&
+                PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) is IObjectCreationOperation initializerObjectCreation)
+            {
+                return CheckObjectCreationComparerPurity(
+                    initializerObjectCreation,
+                    context,
+                    isCollectionType,
+                    isComparerParameterType,
+                    checkComparerValuePurity);
+            }
+
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult CheckObjectCreationComparerPurity(
+            IObjectCreationOperation objectCreationOperation,
+            PurityAnalysisContext context,
+            Func<ITypeSymbol?, bool> isCollectionType,
+            Func<ITypeSymbol, bool> isComparerParameterType,
+            Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
+        {
+            if (!isCollectionType(objectCreationOperation.Type))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            foreach (var argument in objectCreationOperation.Arguments)
+            {
+                var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
+                if (!IsComparerArgument(value, argument.Parameter?.Type, isComparerParameterType))
+                {
+                    continue;
+                }
+
+                var comparerArgumentResult = PurityAnalysisEngine.CheckSingleOperation(value, context, PurityAnalysisEngine.PurityAnalysisState.Pure);
+                if (!comparerArgumentResult.IsPure)
+                {
+                    return comparerArgumentResult;
+                }
+
+                var comparerResult = checkComparerValuePurity(value);
+                if (!comparerResult.IsPure)
+                {
+                    return comparerResult;
+                }
+            }
+
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool IsComparerArgument(
+            IOperation? value,
+            ITypeSymbol? parameterType,
+            Func<ITypeSymbol, bool> isComparerParameterType)
+        {
+            return value?.Type != null &&
+                parameterType is INamedTypeSymbol namedParameterType &&
+                (isComparerParameterType(namedParameterType) || IsComparerOrDerivedInterface(value.Type));
+        }
+
         internal static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)
         {
             if (comparerType is not INamedTypeSymbol namedComparerType)
