@@ -49,7 +49,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (unaryOperation.OperatorMethod != null)
             {
                 var operatorMethod = unaryOperation.OperatorMethod;
-                if (IsStaticAbstractInterfaceOperator(operatorMethod))
+                if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.UserDefinedOperator))
                 {
                     PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Static abstract interface operator '{operatorMethod.Name}' has unresolved dispatch targets. Unary operation is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -75,14 +75,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Unary operation is Pure.");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        }
-
-        private static bool IsStaticAbstractInterfaceOperator(IMethodSymbol methodSymbol)
-        {
-            return methodSymbol.IsStatic &&
-                methodSymbol.IsAbstract &&
-                methodSymbol.MethodKind == MethodKind.UserDefinedOperator &&
-                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface;
         }
     }
 }

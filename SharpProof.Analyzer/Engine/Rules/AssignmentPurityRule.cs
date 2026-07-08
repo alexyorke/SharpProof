@@ -907,6 +907,16 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
+        internal static bool IsStaticAbstractInterfaceMethod(
+            IMethodSymbol methodSymbol,
+            MethodKind methodKind)
+        {
+            return methodSymbol.IsStatic &&
+                methodSymbol.IsAbstract &&
+                methodSymbol.MethodKind == methodKind &&
+                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface;
+        }
+
         internal static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,

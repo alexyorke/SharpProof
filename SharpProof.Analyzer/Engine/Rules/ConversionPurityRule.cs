@@ -66,7 +66,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
-                if (IsStaticAbstractInterfaceConversion(operatorMethod))
+                if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.Conversion))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ConversionRule] Static abstract interface conversion '{operatorMethod.Name}' has unresolved dispatch targets. Conversion is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -132,14 +132,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     returnTypeDefinition == "System.ReadOnlyMemory<T>",
                 _ => false,
             };
-        }
-
-        private static bool IsStaticAbstractInterfaceConversion(IMethodSymbol methodSymbol)
-        {
-            return methodSymbol.IsStatic &&
-                methodSymbol.IsAbstract &&
-                methodSymbol.MethodKind == MethodKind.Conversion &&
-                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface;
         }
     }
 }
