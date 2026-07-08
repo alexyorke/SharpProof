@@ -13,6 +13,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
     internal class ReturnStatementPurityRule : IPurityRule
     {
+        private delegate bool ReturnedValueMatcher<TResult>(IOperation? operation, out TResult result);
+
         public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.Return);
 
         public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
@@ -448,72 +450,96 @@ namespace SharpProof.Analyzer.Engine.Rules
             Compilation compilation,
             out IMethodSymbol factoryMethod)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedReturnedValue, compilation, out factoryMethod))
+            return TryMatchReturnedValueAlternative(
+                returnedValue,
+                PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+                IsKnownPureArrayFactory,
+                out factoryMethod);
+
+            bool IsKnownPureArrayFactory(IOperation? operation, out IMethodSymbol methodSymbol)
             {
-                return true;
+                return PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(operation, compilation, out methodSymbol);
             }
-
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
-            {
-                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-                {
-                    return IsKnownPureArrayFactoryReturn(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        compilation,
-                        out factoryMethod);
-                }
-
-                return IsKnownPureArrayFactoryReturn(conditionalOperation.WhenTrue, compilation, out factoryMethod) ||
-                    IsKnownPureArrayFactoryReturn(conditionalOperation.WhenFalse, compilation, out factoryMethod);
-            }
-
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            {
-                return IsKnownPureArrayFactoryReturn(coalesceOperation.Value, compilation, out factoryMethod) ||
-                    IsKnownPureArrayFactoryReturn(coalesceOperation.WhenNull, compilation, out factoryMethod);
-            }
-
-            factoryMethod = null!;
-            return false;
         }
 
         private static bool IsSpanToArrayReturn(
             IOperation? returnedValue,
             out IMethodSymbol methodSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-                invocationOperation.Type is IArrayTypeSymbol &&
-                invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
-                targetMethod.Name == "ToArray" &&
-                !targetMethod.IsStatic &&
-                targetMethod.ContainingType?.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>")
+            return TryMatchReturnedValueAlternative(
+                returnedValue,
+                PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+                IsSpanToArray,
+                out methodSymbol);
+
+            static bool IsSpanToArray(IOperation? operation, out IMethodSymbol methodSymbol)
             {
-                methodSymbol = targetMethod;
+                if (operation is IInvocationOperation invocationOperation &&
+                    invocationOperation.Type is IArrayTypeSymbol &&
+                    invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
+                    targetMethod.Name == "ToArray" &&
+                    !targetMethod.IsStatic &&
+                    targetMethod.ContainingType?.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>")
+                {
+                    methodSymbol = targetMethod;
+                    return true;
+                }
+
+                methodSymbol = null!;
+                return false;
+            }
+        }
+
+        private static bool TryMatchReturnedValueAlternative<TResult>(
+            IOperation? returnedValue,
+            Func<IOperation?, IOperation?> normalize,
+            ReturnedValueMatcher<TResult> match,
+            out TResult result)
+        {
+            var normalizedReturnedValue = normalize(returnedValue);
+            if (match(normalizedReturnedValue, out result))
+            {
                 return true;
             }
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            if (normalizedReturnedValue is IConditionalOperation conditionalOperation)
             {
                 if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
-                    return IsSpanToArrayReturn(
+                    return TryMatchReturnedValueAlternative(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        out methodSymbol);
+                        normalize,
+                        match,
+                        out result);
                 }
 
-                return IsSpanToArrayReturn(conditionalOperation.WhenTrue, out methodSymbol) ||
-                    IsSpanToArrayReturn(conditionalOperation.WhenFalse, out methodSymbol);
+                return TryMatchReturnedValueAlternative(
+                           conditionalOperation.WhenTrue,
+                           normalize,
+                           match,
+                           out result) ||
+                       TryMatchReturnedValueAlternative(
+                           conditionalOperation.WhenFalse,
+                           normalize,
+                           match,
+                           out result);
             }
 
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            if (normalizedReturnedValue is ICoalesceOperation coalesceOperation)
             {
-                return IsSpanToArrayReturn(coalesceOperation.Value, out methodSymbol) ||
-                    IsSpanToArrayReturn(coalesceOperation.WhenNull, out methodSymbol);
+                return TryMatchReturnedValueAlternative(
+                           coalesceOperation.Value,
+                           normalize,
+                           match,
+                           out result) ||
+                       TryMatchReturnedValueAlternative(
+                           coalesceOperation.WhenNull,
+                           normalize,
+                           match,
+                           out result);
             }
 
-            methodSymbol = null!;
+            result = default!;
             return false;
         }
 
@@ -639,29 +665,18 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax(cancellationToken))
-                .OfType<VariableDeclaratorSyntax>()
-                .FirstOrDefault();
-            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-            if (declaratorSyntax == null || initializerSyntax == null)
-            {
-                methodSymbol = null!;
-                return false;
-            }
-
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+            if (!TryGetStableLocalInitializerOperation(
                     localSymbol,
-                    returnedValue.Syntax,
-                    declaratorSyntax,
+                    returnedValue,
                     semanticModel,
-                    cancellationToken))
+                    cancellationToken,
+                    out var initializerOperation))
             {
                 methodSymbol = null!;
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
+            initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(initializerOperation);
             if (initializerOperation == null)
             {
                 methodSymbol = null!;
@@ -676,40 +691,62 @@ namespace SharpProof.Analyzer.Engine.Rules
                 out methodSymbol);
         }
 
+        private static bool TryGetStableLocalInitializerOperation(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IOperation initializerOperation)
+        {
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax(cancellationToken))
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                initializerOperation = null!;
+                return false;
+            }
+
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localSymbol,
+                    returnedValue.Syntax,
+                    declaratorSyntax,
+                    semanticModel,
+                    cancellationToken))
+            {
+                initializerOperation = null!;
+                return false;
+            }
+
+            initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken)!;
+            return initializerOperation != null;
+        }
+
 
         private static bool IsPureArrayReturningInvocationReturn(
             IOperation? returnedValue,
             out IMethodSymbol methodSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-                invocationOperation.Type is IArrayTypeSymbol)
-            {
-                methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
-                return true;
-            }
+            return TryMatchReturnedValueAlternative(
+                returnedValue,
+                PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+                IsPureArrayReturningInvocation,
+                out methodSymbol);
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            static bool IsPureArrayReturningInvocation(IOperation? operation, out IMethodSymbol methodSymbol)
             {
-                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (operation is IInvocationOperation invocationOperation &&
+                    invocationOperation.Type is IArrayTypeSymbol)
                 {
-                    return IsPureArrayReturningInvocationReturn(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        out methodSymbol);
+                    methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
+                    return true;
                 }
 
-                return IsPureArrayReturningInvocationReturn(conditionalOperation.WhenTrue, out methodSymbol) ||
-                    IsPureArrayReturningInvocationReturn(conditionalOperation.WhenFalse, out methodSymbol);
+                methodSymbol = null!;
+                return false;
             }
-
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            {
-                return IsPureArrayReturningInvocationReturn(coalesceOperation.Value, out methodSymbol) ||
-                    IsPureArrayReturningInvocationReturn(coalesceOperation.WhenNull, out methodSymbol);
-            }
-
-            methodSymbol = null!;
-            return false;
         }
 
         private enum ArrayViewKind
@@ -965,41 +1002,30 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? returnedValue,
             out IMethodSymbol methodSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
-            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-                invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
-                targetMethod.Name == "AsReadOnly" &&
-                !targetMethod.IsStatic &&
-                string.Equals(
-                    targetMethod.ContainingType?.OriginalDefinition.ToDisplayString(),
-                    "System.Collections.Generic.List<T>",
-                    StringComparison.Ordinal))
-            {
-                methodSymbol = targetMethod;
-                return true;
-            }
+            return TryMatchReturnedValueAlternative(
+                returnedValue,
+                PurityAnalysisEngine.SkipImplicitConversions,
+                IsListAsReadOnlyInvocation,
+                out methodSymbol);
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            static bool IsListAsReadOnlyInvocation(IOperation? operation, out IMethodSymbol methodSymbol)
             {
-                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (operation is IInvocationOperation invocationOperation &&
+                    invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
+                    targetMethod.Name == "AsReadOnly" &&
+                    !targetMethod.IsStatic &&
+                    string.Equals(
+                        targetMethod.ContainingType?.OriginalDefinition.ToDisplayString(),
+                        "System.Collections.Generic.List<T>",
+                        StringComparison.Ordinal))
                 {
-                    return IsListAsReadOnlyReturn(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        out methodSymbol);
+                    methodSymbol = targetMethod;
+                    return true;
                 }
 
-                return IsListAsReadOnlyReturn(conditionalOperation.WhenTrue, out methodSymbol) ||
-                    IsListAsReadOnlyReturn(conditionalOperation.WhenFalse, out methodSymbol);
+                methodSymbol = null!;
+                return false;
             }
-
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            {
-                return IsListAsReadOnlyReturn(coalesceOperation.Value, out methodSymbol) ||
-                    IsListAsReadOnlyReturn(coalesceOperation.WhenNull, out methodSymbol);
-            }
-
-            methodSymbol = null!;
-            return false;
         }
 
         private static bool TryGetViewSliceSource(
@@ -1052,24 +1078,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax(cancellationToken))
-                .OfType<VariableDeclaratorSyntax>()
-                .FirstOrDefault();
-            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-            if (declaratorSyntax == null || initializerSyntax == null)
-            {
-                sourceOperation = null!;
-                methodSymbol = null!;
-                return false;
-            }
-
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+            if (!TryGetStableLocalInitializerOperation(
                     localSymbol,
-                    returnedValue.Syntax,
-                    declaratorSyntax,
+                    returnedValue,
                     semanticModel,
-                    cancellationToken))
+                    cancellationToken,
+                    out var initializerOperation))
             {
                 sourceOperation = null!;
                 methodSymbol = null!;
@@ -1077,7 +1091,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return TryResolveReturnedArrayViewSource(
-                semanticModel.GetOperation(initializerSyntax, cancellationToken),
+                initializerOperation,
                 returnedValue,
                 semanticModel,
                 expectedKind,
@@ -1158,49 +1172,37 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out ILocalSymbol localSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedReturnedValue, currentState) is ILocalSymbol trackedLocal &&
-                (currentState.IsOwnedLocalArraySymbol(trackedLocal) ||
-                 (trackedLocal.Type is IArrayTypeSymbol &&
-                  PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(trackedLocal, currentState))))
-            {
-                localSymbol = trackedLocal;
-                return true;
-            }
+            return TryMatchReturnedValueAlternative(
+                returnedValue,
+                PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+                IsOwnedLocalArray,
+                out localSymbol);
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            bool IsOwnedLocalArray(IOperation? operation, out ILocalSymbol localSymbol)
             {
-                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (PurityAnalysisEngine.TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol trackedLocal &&
+                    (currentState.IsOwnedLocalArraySymbol(trackedLocal) ||
+                     (trackedLocal.Type is IArrayTypeSymbol &&
+                      PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(trackedLocal, currentState))))
                 {
-                    return IsOwnedLocalArrayReturn(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        currentState,
-                        out localSymbol);
+                    localSymbol = trackedLocal;
+                    return true;
                 }
 
-                return IsOwnedLocalArrayReturn(conditionalOperation.WhenTrue, currentState, out localSymbol) ||
-                    IsOwnedLocalArrayReturn(conditionalOperation.WhenFalse, currentState, out localSymbol);
-            }
-
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            {
-                return IsOwnedLocalArrayReturn(coalesceOperation.Value, currentState, out localSymbol) ||
-                    IsOwnedLocalArrayReturn(coalesceOperation.WhenNull, currentState, out localSymbol);
-            }
-
-            if (unwrappedReturnedValue is ITupleOperation tupleOperation)
-            {
-                foreach (var element in tupleOperation.Elements)
+                if (operation is ITupleOperation tupleOperation)
                 {
-                    if (IsOwnedLocalArrayReturn(element, currentState, out localSymbol))
+                    foreach (var element in tupleOperation.Elements)
                     {
-                        return true;
+                        if (IsOwnedLocalArrayReturn(element, currentState, out localSymbol))
+                        {
+                            return true;
+                        }
                     }
                 }
-            }
 
-            localSymbol = null!;
-            return false;
+                localSymbol = null!;
+                return false;
+            }
         }
 
         private static bool TryFindReturnedInitializerArrayEscape(
@@ -1638,25 +1640,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
-            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax(cancellationToken))
-                .OfType<VariableDeclaratorSyntax>()
-                .FirstOrDefault();
-            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-            if (declaratorSyntax == null || initializerSyntax == null)
-            {
-                escapeSyntax = null!;
-                escapeSymbol = null!;
-                catalogSource = string.Empty;
-                return false;
-            }
-
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+            if (!TryGetStableLocalInitializerOperation(
                     localSymbol,
-                    returnedValue.Syntax,
-                    declaratorSyntax,
+                    returnedValue,
                     semanticModel,
-                    cancellationToken))
+                    cancellationToken,
+                    out var initializerOperation))
             {
                 escapeSyntax = null!;
                 escapeSymbol = null!;
@@ -1664,7 +1653,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
+            initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
             if (initializerOperation != null &&
                 TryFindMutableCollectionReturnEscape(
                     initializerOperation,
