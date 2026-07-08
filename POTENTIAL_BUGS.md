@@ -942,27 +942,11 @@ When `branchWhenTrue` is `false`, the method returns `false` immediately without
 
 ---
 
-## 95. `GetDependentSymbols` includes loop variable, causing false-negative loop bound rejection
-
-**File:** `SharpProof.Symbolic/SymbolicComplexityService.cs:1828-1843`
-
-`GetDependentSymbols` collects ALL `IdentifierNameSyntax` symbols from the bound expression (e.g., `i + 100`). If the bound expression references the loop variable itself, it gets added to `dependentSymbols`. Then the mutation check finds the loop variable IS mutated (by the incrementor), rejecting the bound entirely. A valid `for (int i = 0; i < i + 100; i++)` gets classified as Unknown complexity.
-
----
-
 ## 96. `ProveCondition` reports misleading reason from formula proof when IR proof was the actual failure
 
 **File:** `SharpProof.Symbolic/SymbolicSourceQueryService.cs:1383-1387`
 
 When all formula checks pass but IR state proving fails, the method falls through to return `Unknown` with `formulaTruth.Info.Reason`. The reason code comes exclusively from formula-based classification, but the actual limiting factor could have been the IR state proving step. Diagnostics report e.g. `"smt_unavailable"` when the real failure was an IR-lowering gap.
-
----
-
-## 97. `TryParseLoopStep` misses reversed Add/SubtractExpression operands
-
-**File:** `SharpProof.Symbolic/SymbolicComplexityService.cs:1740-1756`
-
-When the loop step uses `i = 1 + i` (constant first, loop variable second), only `binaryExpression.Left` is checked for a reference to the loop symbol. The commutative pattern `i = 1 + i` is not recognized, causing the step direction to remain `None` and the entire for-loop bound analysis to fail.
 
 ---
 
@@ -1068,22 +1052,6 @@ If both `previousValue` and `rightValue` are symbolic variables (e.g., `x *= y` 
 **File:** `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:35-283`
 
 All public `Query*` methods accept `SmtAnalysisService smtAnalysis` but only `QueryNodeRuntimeHazards` checks for null. `QueryFileRuntimeHazards`, `QuerySourceRuntimeHazards`, and others pass `smtAnalysis` to private methods that DO guard — but the NRE happens in a private method, making stack traces point to internal code rather than the public API caller.
-
----
-
-## 111. `SyntacticFactSet` copy-constructor omits `_booleanFactInferenceDepth`
-
-**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:638-649`
-
-The copy constructor copies `_booleanEvaluationDepth` and `_conditionalBranchEvaluationDepth` but forgets `_booleanFactInferenceDepth`. When forking a `SyntacticFactSet`, the inference depth counter silently resets to 0. Each fork can recurse to `MaxBooleanFactInferenceDepth = 16` again, multiplying the intended depth limit by the number of forks.
-
----
-
-## 112. `EnumerateConditionalConditions` yields `SmtConditionalFormula.Condition` twice
-
-**File:** `SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs:255-260`
-
-Line 255 yields `conditional.Condition` explicitly, then lines 257-260 recursively enumerate it again. Although the outer `seen` HashSet deduplicates, this wasted recursion adds overhead proportional to nesting depth.
 
 ---
 

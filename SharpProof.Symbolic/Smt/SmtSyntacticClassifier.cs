@@ -645,6 +645,7 @@ namespace SharpProof.Symbolic.Smt
                 _aliases = new Dictionary<SmtFormula, SmtFormula>(source._aliases);
                 _booleanEquivalences = new Dictionary<SmtFormula, BooleanEquivalenceParent>(source._booleanEquivalences);
                 _booleanEvaluationDepth = source._booleanEvaluationDepth;
+                _booleanFactInferenceDepth = source._booleanFactInferenceDepth;
                 _conditionalBranchEvaluationDepth = source._conditionalBranchEvaluationDepth;
             }
 

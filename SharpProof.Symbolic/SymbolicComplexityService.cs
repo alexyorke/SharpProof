@@ -1746,6 +1746,15 @@ namespace SharpProof.Symbolic
                                 return true;
                             }
 
+                            if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
+                                TryGetIntegralConstant(binaryExpression.Left, semanticModel, out var leftAdd) &&
+                                leftAdd > 0 &&
+                                IsReferenceToSymbol(binaryExpression.Right, loopSymbol, semanticModel))
+                            {
+                                direction = StepDirection.Up;
+                                return true;
+                            }
+
                             if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                                 IsReferenceToSymbol(binaryExpression.Left, loopSymbol, semanticModel) &&
                                 TryGetIntegralConstant(binaryExpression.Right, semanticModel, out var rightSubtract) &&

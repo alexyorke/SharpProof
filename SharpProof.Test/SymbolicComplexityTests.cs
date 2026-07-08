@@ -56,6 +56,31 @@ public static class C
         }
 
         [Test]
+        public void ForLoopWithConstantFirstIncrement_ProducesLinearComplexity()
+        {
+            const string source = """
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i = 1 + i)
+        {
+            sum += i;
+        }
+
+        return sum;
+    }
+}
+""";
+
+            var result = QueryComplexityAtMarker(source, "return sum;");
+
+            Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Linear));
+            Assert.That(result.Complexity.Text, Is.EqualTo("O(n)"));
+        }
+
+        [Test]
         public void SequentialLinearLoops_UseAsymptoticMax()
         {
             const string source = """
