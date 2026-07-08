@@ -655,17 +655,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+            return CollectProvenRuntimeHazards(
                 methodNode,
                 semanticModel,
-                smtAnalysis,
                 cancellationToken,
-                new SymbolicRuntimeHazardQueryOptions(
-                    kinds: new[] { SymbolicRuntimeHazardKind.NegativeStackAllocLength }));
-
-            return result.Hazards.Where(static hazard =>
-                hazard.Kind == SymbolicRuntimeHazardKind.NegativeStackAllocLength &&
-                hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+                smtAnalysis,
+                SymbolicRuntimeHazardKind.NegativeStackAllocLength);
         }
 
         private static IEnumerable<SymbolicRuntimeHazard> CollectProvenCountIndexOutOfRangeHazards(
@@ -674,21 +669,17 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+            return CollectProvenRuntimeHazards(
                 methodNode,
                 semanticModel,
-                smtAnalysis,
                 cancellationToken,
-                new SymbolicRuntimeHazardQueryOptions(
-                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
-
-            return result.Hazards.Where(static hazard =>
-                hazard.Kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange &&
-                hazard.Status == SymbolicRuntimeHazardStatus.Proven &&
-                string.Equals(
-                    hazard.Category,
-                    ExceptionCategories.DefiniteCountIndexOutOfRange,
-                    StringComparison.Ordinal));
+                smtAnalysis,
+                SymbolicRuntimeHazardKind.ArgumentOutOfRange)
+                .Where(static hazard =>
+                    string.Equals(
+                        hazard.Category,
+                        ExceptionCategories.DefiniteCountIndexOutOfRange,
+                        StringComparison.Ordinal));
         }
 
         private static IEnumerable<SymbolicRuntimeHazard> CollectProvenSwitchExpressionNoMatchHazards(
@@ -697,17 +688,12 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+            return CollectProvenRuntimeHazards(
                 methodNode,
                 semanticModel,
-                smtAnalysis,
                 cancellationToken,
-                new SymbolicRuntimeHazardQueryOptions(
-                    kinds: new[] { SymbolicRuntimeHazardKind.SwitchExpressionNoMatch }));
-
-            return result.Hazards.Where(static hazard =>
-                hazard.Kind == SymbolicRuntimeHazardKind.SwitchExpressionNoMatch &&
-                hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+                smtAnalysis,
+                SymbolicRuntimeHazardKind.SwitchExpressionNoMatch);
         }
 
         private static IEnumerable<SymbolicRuntimeHazard> CollectProvenAnalyzerOnlySymbolicHazards(
@@ -716,21 +702,33 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
+            return CollectProvenRuntimeHazards(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                SymbolicRuntimeHazardKind.IndexOutOfRange,
+                SymbolicRuntimeHazardKind.NullDereference)
+                .Where(static hazard => IsAnalyzerOnlySymbolicHazardCategory(hazard.Category));
+        }
+
+        private static IEnumerable<SymbolicRuntimeHazard> CollectProvenRuntimeHazards(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis,
+            params SymbolicRuntimeHazardKind[] kinds)
+        {
             var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
                 methodNode,
                 semanticModel,
                 smtAnalysis,
                 cancellationToken,
-                new SymbolicRuntimeHazardQueryOptions(
-                    kinds: new[]
-                    {
-                        SymbolicRuntimeHazardKind.IndexOutOfRange,
-                        SymbolicRuntimeHazardKind.NullDereference,
-                    }));
+                new SymbolicRuntimeHazardQueryOptions(kinds: kinds));
 
-            return result.Hazards.Where(static hazard =>
-                hazard.Status == SymbolicRuntimeHazardStatus.Proven &&
-                IsAnalyzerOnlySymbolicHazardCategory(hazard.Category));
+            return result.Hazards.Where(hazard =>
+                kinds.Contains(hazard.Kind) &&
+                hazard.Status == SymbolicRuntimeHazardStatus.Proven);
         }
 
         private static bool IsAnalyzerOnlySymbolicHazardCategory(string category)
