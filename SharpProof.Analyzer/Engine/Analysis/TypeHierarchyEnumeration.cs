@@ -56,6 +56,19 @@ namespace SharpProof.Analyzer.Engine.Analysis
             return false;
         }
 
+        internal static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
+        {
+            foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
+            {
+                if (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, interfaceMethod.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal static bool ImplementsInterface(
             INamedTypeSymbol type,
             INamedTypeSymbol? interfaceSymbol,

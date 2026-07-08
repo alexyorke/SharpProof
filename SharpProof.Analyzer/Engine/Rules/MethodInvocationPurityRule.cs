@@ -3825,7 +3825,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     if (member is IMethodSymbol method &&
                         (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, targetMethod.OriginalDefinition) ||
                          TypeHierarchyEnumeration.OverridesTargetMethod(method, targetMethod) ||
-                         ExplicitlyImplements(method, targetMethod)))
+                         TypeHierarchyEnumeration.ExplicitlyImplements(method, targetMethod)))
                     {
                         return method;
                     }
@@ -3838,19 +3838,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return null;
-        }
-
-        private static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
-        {
-            foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
-            {
-                if (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, interfaceMethod.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsAllocationOnlyInterfaceReceiver(IOperation? invocationInstance)

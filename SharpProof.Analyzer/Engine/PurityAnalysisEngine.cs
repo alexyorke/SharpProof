@@ -10,6 +10,7 @@ using System.Collections.Immutable;
 using System;
 using System.IO;
 using System.Globalization;
+using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
@@ -4699,8 +4700,8 @@ namespace SharpProof.Analyzer.Engine
                 {
                     if (member is IMethodSymbol method &&
                         (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, originalTarget) ||
-                         OverridesTargetMethod(method, originalTarget) ||
-                         ExplicitlyImplements(method, originalTarget)))
+                         TypeHierarchyEnumeration.OverridesTargetMethod(method, originalTarget) ||
+                         TypeHierarchyEnumeration.ExplicitlyImplements(method, originalTarget)))
                     {
                         return method;
                     }
@@ -4737,7 +4738,7 @@ namespace SharpProof.Analyzer.Engine
                     .OfType<IPropertySymbol>()
                     .FirstOrDefault(property =>
                         SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, propertySymbol.OriginalDefinition) ||
-                        OverridesProperty(property, propertySymbol));
+                        DispatchedMemberResolution.OverridesProperty(property, propertySymbol));
                 if (implementation == null)
                 {
                     continue;
@@ -4780,45 +4781,6 @@ namespace SharpProof.Analyzer.Engine
             }
 
             return implementation as IMethodSymbol;
-        }
-
-        private static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
-        {
-            for (var current = property; current != null; current = current.OverriddenProperty)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool OverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
-        {
-            for (var current = method; current != null; current = current.OverriddenMethod)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
-        {
-            foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
-            {
-                if (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, interfaceMethod.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool HasMethodBody(IMethodSymbol methodSymbol)
