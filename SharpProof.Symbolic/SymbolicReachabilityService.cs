@@ -3764,7 +3764,7 @@ namespace SharpProof.Symbolic
             formula = null!;
             var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
             if (operation is IInvocationOperation invocationOperation &&
-                TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod, out var methodParameterName) &&
+                NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod, out var methodParameterName) &&
                 TryGetInvocationSourceExpression(invocationOperation, methodParameterName, out var invocationSource) &&
                 TryCreateIrNotNullIfNotNullSourceReference(
                     invocationSource,
@@ -3778,7 +3778,7 @@ namespace SharpProof.Symbolic
             }
 
             if (operation is IPropertyReferenceOperation propertyReferenceOperation &&
-                TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property, out var propertyParameterName) &&
+                NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property, out var propertyParameterName) &&
                 TryGetPropertySourceExpression(propertyReferenceOperation, propertyParameterName, out var propertySource) &&
                 TryCreateIrNotNullIfNotNullSourceReference(
                     propertySource,
@@ -3819,67 +3819,6 @@ namespace SharpProof.Symbolic
             }
 
             return true;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(IMethodSymbol methodSymbol, out string parameterName)
-        {
-            if (TryGetNotNullIfNotNullParameterName(methodSymbol.GetReturnTypeAttributes(), out parameterName))
-            {
-                return true;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(methodSymbol, methodSymbol.OriginalDefinition) &&
-                TryGetNotNullIfNotNullParameterName(methodSymbol.OriginalDefinition.GetReturnTypeAttributes(), out parameterName))
-            {
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(IPropertySymbol propertySymbol, out string parameterName)
-        {
-            if (TryGetNotNullIfNotNullParameterName(propertySymbol.GetAttributes(), out parameterName) ||
-                TryGetNotNullIfNotNullParameterName(propertySymbol.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName))
-            {
-                return true;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(propertySymbol, propertySymbol.OriginalDefinition) &&
-                (TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetAttributes(), out parameterName) ||
-                 TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName)))
-            {
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(
-            ImmutableArray<AttributeData> attributes,
-            out string parameterName)
-        {
-            foreach (var attribute in attributes)
-            {
-                if (!string.Equals(
-                        attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty),
-                        "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute",
-                        StringComparison.Ordinal) ||
-                    attribute.ConstructorArguments.Length != 1 ||
-                    attribute.ConstructorArguments[0].Value is not string candidate ||
-                    string.IsNullOrEmpty(candidate))
-                {
-                    continue;
-                }
-
-                parameterName = candidate;
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
         }
 
         private static bool TryGetInvocationSourceExpression(

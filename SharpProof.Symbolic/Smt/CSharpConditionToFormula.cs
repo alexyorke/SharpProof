@@ -18,7 +18,6 @@ namespace SharpProof.Symbolic.Smt
         private const int MaxCollectionExpressionLengthSpreads = 8;
         private const string ImplicitThisVariableName = "this";
         private const string MemberNotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
-        private const string NotNullIfNotNullAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
         private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_sourceBooleanFormulaCache = new();
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_expressionFormulaCache = new();
@@ -1276,7 +1275,7 @@ namespace SharpProof.Symbolic.Smt
             formula = null!;
             var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
             if (operation is IInvocationOperation invocationOperation &&
-                TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod, out var methodParameterName) &&
+                NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod, out var methodParameterName) &&
                 TryCreateNotNullIfNotNullInvocationSourceFormula(
                     invocationOperation,
                     methodParameterName,
@@ -1291,7 +1290,7 @@ namespace SharpProof.Symbolic.Smt
             }
 
             if (operation is IPropertyReferenceOperation propertyReferenceOperation &&
-                TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property, out var propertyParameterName) &&
+                NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property, out var propertyParameterName) &&
                 TryCreateNotNullIfNotNullPropertySourceFormula(
                     propertyReferenceOperation,
                     propertyParameterName,
@@ -1433,67 +1432,6 @@ namespace SharpProof.Symbolic.Smt
 
             formula = candidate;
             return true;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(IMethodSymbol methodSymbol, out string parameterName)
-        {
-            if (TryGetNotNullIfNotNullParameterName(methodSymbol.GetReturnTypeAttributes(), out parameterName))
-            {
-                return true;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(methodSymbol, methodSymbol.OriginalDefinition) &&
-                TryGetNotNullIfNotNullParameterName(methodSymbol.OriginalDefinition.GetReturnTypeAttributes(), out parameterName))
-            {
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(IPropertySymbol propertySymbol, out string parameterName)
-        {
-            if (TryGetNotNullIfNotNullParameterName(propertySymbol.GetAttributes(), out parameterName) ||
-                TryGetNotNullIfNotNullParameterName(propertySymbol.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName))
-            {
-                return true;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(propertySymbol, propertySymbol.OriginalDefinition) &&
-                (TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetAttributes(), out parameterName) ||
-                 TryGetNotNullIfNotNullParameterName(propertySymbol.OriginalDefinition.GetMethod?.GetReturnTypeAttributes() ?? ImmutableArray<AttributeData>.Empty, out parameterName)))
-            {
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
-        }
-
-        private static bool TryGetNotNullIfNotNullParameterName(
-            ImmutableArray<AttributeData> attributes,
-            out string parameterName)
-        {
-            foreach (var attribute in attributes)
-            {
-                if (!string.Equals(
-                        SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                        NotNullIfNotNullAttributeMetadataName,
-                        StringComparison.Ordinal) ||
-                    attribute.ConstructorArguments.Length != 1 ||
-                    attribute.ConstructorArguments[0].Value is not string candidate ||
-                    string.IsNullOrEmpty(candidate))
-                {
-                    continue;
-                }
-
-                parameterName = candidate;
-                return true;
-            }
-
-            parameterName = string.Empty;
-            return false;
         }
 
         private static bool TryGetPropertyArgumentExpression(
