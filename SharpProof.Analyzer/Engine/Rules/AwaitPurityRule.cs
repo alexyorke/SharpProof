@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using SharpProof.Analyzer.Engine;
 
 namespace SharpProof.Analyzer.Engine.Rules
@@ -70,7 +71,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return isCompletedResult;
             }
 
-            if (!IsKnownConstantTrueIsCompletedGetter(isCompletedProperty?.GetMethod, context.SemanticModel))
+            if (!IsKnownConstantTrueIsCompletedGetter(isCompletedProperty?.GetMethod, context.SemanticModel, context.CancellationToken))
             {
                 var continuationSchedulingResult = CheckAwaitContinuationSchedulingMethods(
                     awaiterType,
@@ -113,7 +114,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return isCompletedResult;
             }
 
-            if (!IsKnownConstantTrueIsCompletedGetter(awaitInfo.IsCompletedProperty?.GetMethod, context.SemanticModel))
+            if (!IsKnownConstantTrueIsCompletedGetter(awaitInfo.IsCompletedProperty?.GetMethod, context.SemanticModel, context.CancellationToken))
             {
                 var continuationSchedulingResult = CheckAwaitContinuationSchedulingMethods(
                     awaitInfo.GetAwaiterMethod?.ReturnType,
@@ -130,7 +131,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
         private static bool IsKnownConstantTrueIsCompletedGetter(
             IMethodSymbol? getter,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
             if (getter == null)
             {
@@ -139,7 +141,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in getter.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not AccessorDeclarationSyntax accessor)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not AccessorDeclarationSyntax accessor)
                 {
                     continue;
                 }
@@ -155,7 +158,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     continue;
                 }
 
-                var constant = semanticModel.GetConstantValue(expression);
+                var constant = semanticModel.GetConstantValue(expression, cancellationToken);
                 if (constant.HasValue &&
                     constant.Value is bool boolValue &&
                     boolValue)

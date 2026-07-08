@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic.Ir;
 
@@ -293,16 +294,16 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (hasTrustedGeneratedPurity)
             {
-				if (generatedPurity.IsPure)
-				{
-					return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-				}
+                if (generatedPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
 
-				if (!generatedPurity.IsPure)
-				{
-					return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-						operation.Syntax,
-						PurityAnalysisEngine.PurityEvidence.Create(
+                if (!generatedPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
                             generatedPurity.PrimaryCategory,
                             nameof(AssignmentPurityRule),
                             operation,
@@ -361,7 +362,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (IsSourceAutoPropertySetter(propertyReference.Property))
+            if (IsSourceAutoPropertySetter(propertyReference.Property, context.CancellationToken))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
@@ -377,7 +378,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
         }
 
-        private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol)
+        private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken = default)
         {
             if (propertySymbol.SetMethod == null ||
                 propertySymbol.SetMethod.IsAbstract ||
@@ -388,7 +389,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not PropertyDeclarationSyntax propertyDeclaration ||
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax propertyDeclaration ||
                     propertyDeclaration.AccessorList == null)
                 {
                     continue;
@@ -1035,8 +1037,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
             if (containingBlock == null)
             {
@@ -1052,12 +1056,13 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (assignment.SpanStart < start || assignment.SpanStart >= end)
                 {
                     continue;
                 }
 
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
                 {
                     return true;

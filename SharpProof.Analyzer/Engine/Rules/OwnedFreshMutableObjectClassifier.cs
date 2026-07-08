@@ -300,7 +300,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
             if (declaratorSyntax == null || initializerSyntax == null ||
-                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel, cancellationToken))
             {
                 objectCreationOperation = null!;
                 return false;
@@ -458,7 +458,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel, cancellationToken))
             {
                 return false;
             }

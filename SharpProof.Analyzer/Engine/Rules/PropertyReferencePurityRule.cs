@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using SharpProof.Analyzer.Engine;
 
 namespace SharpProof.Analyzer.Engine.Rules
@@ -215,7 +216,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
 
-            if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol))
+            if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol, context.CancellationToken))
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is a source auto-property getter. Treating read as pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -503,7 +504,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol)
+        private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken = default)
         {
             if (propertySymbol.GetMethod == null ||
                 propertySymbol.GetMethod.IsAbstract ||
@@ -514,7 +515,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not PropertyDeclarationSyntax propertyDeclaration ||
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax propertyDeclaration ||
                     propertyDeclaration.AccessorList == null)
                 {
                     continue;

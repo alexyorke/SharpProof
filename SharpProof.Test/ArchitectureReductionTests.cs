@@ -315,6 +315,49 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void SmallRuleHelpers_ThreadCancellationTokenThroughSourceLookups()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var assignmentSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "AssignmentPurityRule.cs"))
+                .Replace("\r\n", "\n");
+            var awaitSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "AwaitPurityRule.cs"))
+                .Replace("\r\n", "\n");
+            var propertySource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "PropertyReferencePurityRule.cs"))
+                .Replace("\r\n", "\n");
+            var classifierSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "OwnedFreshMutableObjectClassifier.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(assignmentSource, Does.Contain("IsSourceAutoPropertySetter(propertyReference.Property, context.CancellationToken)"));
+            Assert.That(assignmentSource, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax"));
+            Assert.That(assignmentSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken)"));
+            Assert.That(awaitSource, Does.Contain("IsKnownConstantTrueIsCompletedGetter(awaitInfo.IsCompletedProperty?.GetMethod, context.SemanticModel, context.CancellationToken)"));
+            Assert.That(awaitSource, Does.Contain("semanticModel.GetConstantValue(expression, cancellationToken)"));
+            Assert.That(propertySource, Does.Contain("IsSourceAutoPropertyGetter(propertySymbol, context.CancellationToken)"));
+            Assert.That(propertySource, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax"));
+            Assert.That(classifierSource, Does.Contain("HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel, cancellationToken)"));
+        }
+
+        [Test]
         public void AnalyzerOwnedArrayFlowCaptures_ProjectOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
