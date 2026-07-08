@@ -10,7 +10,6 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
-    [NonParallelizable]
     public sealed class PathSensitiveSmtInvariantTests
     {
         [Test]

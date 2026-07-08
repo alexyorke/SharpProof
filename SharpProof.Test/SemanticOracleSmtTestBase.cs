@@ -279,14 +279,27 @@ public sealed class NotNullIfNotNullIndexer
         protected static readonly Type ExecutionVisibilityType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
             .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!;
 
-        protected static readonly MethodInfo IsConditionAlwaysFalseMethod = ExecutionVisibilityType
-            .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+        private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken);
 
-        protected static readonly MethodInfo IsConditionAlwaysTrueMethod = ExecutionVisibilityType
-            .GetMethod("IsConditionAlwaysTrue", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+        private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel, CancellationToken cancellationToken);
 
-        protected static readonly MethodInfo IsInStaticallyUnreachableBranchMethod = ExecutionVisibilityType
-            .GetMethod("IsInStaticallyUnreachableBranch", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+        private static readonly ConditionPredicateDelegate IsConditionAlwaysFalseFunc =
+            (ConditionPredicateDelegate)Delegate.CreateDelegate(
+                typeof(ConditionPredicateDelegate),
+                ExecutionVisibilityType
+                    .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
+
+        private static readonly ConditionPredicateDelegate IsConditionAlwaysTrueFunc =
+            (ConditionPredicateDelegate)Delegate.CreateDelegate(
+                typeof(ConditionPredicateDelegate),
+                ExecutionVisibilityType
+                    .GetMethod("IsConditionAlwaysTrue", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
+
+        private static readonly ReachabilityPredicateDelegate IsInStaticallyUnreachableBranchFunc =
+            (ReachabilityPredicateDelegate)Delegate.CreateDelegate(
+                typeof(ReachabilityPredicateDelegate),
+                ExecutionVisibilityType
+                    .GetMethod("IsInStaticallyUnreachableBranch", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
         protected static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
         {
@@ -299,13 +312,13 @@ public sealed class NotNullIfNotNullIndexer
         protected static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")
         {
             var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            return (bool)IsConditionAlwaysFalseMethod.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+            return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None);
         }
 
         protected static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression, string extraSource = "")
         {
             var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            return (bool)IsConditionAlwaysTrueMethod.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+            return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None);
         }
 
         protected static bool IsStatementUnreachable(string source, string statementText)
@@ -319,7 +332,7 @@ public sealed class NotNullIfNotNullIndexer
                 .OfType<StatementSyntax>()
                 .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
 
-            return (bool)IsInStaticallyUnreachableBranchMethod.Invoke(null, new object?[] { statement, context.SemanticModel, CancellationToken.None })!;
+            return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None);
         }
 
         protected static bool IsExpressionUnreachable(string source, string expressionText)
@@ -335,7 +348,7 @@ public sealed class NotNullIfNotNullIndexer
                 .OrderBy(static node => node.Span.Length)
                 .First();
 
-            return (bool)IsInStaticallyUnreachableBranchMethod.Invoke(null, new object?[] { expression, context.SemanticModel, CancellationToken.None })!;
+            return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None);
         }
 
         protected static string[] CollectProgramPointFacts(string source, string statementPrefix)
@@ -402,25 +415,62 @@ public sealed class NotNullIfNotNullIndexer
 
         protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
         {
-            var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-            var configurationType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
-            var fromOptions = configurationType.GetMethod(
-                "FromOptions",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-            var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
-            var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
-            var smtOptionsType = smtOptions.GetType();
-            var queryTimeout = (TimeSpan)smtOptionsType.GetProperty("QueryTimeout")!.GetValue(smtOptions)!;
-            var methodBudget = (TimeSpan)smtOptionsType.GetProperty("MethodBudget")!.GetValue(smtOptions)!;
+            return SmtOptionsReader.Read(globalOptions);
+        }
 
-            return new SmtOptionsSnapshot(
-                smtOptionsType.GetProperty("Mode")!.GetValue(smtOptions)!.ToString()!,
-                (int)queryTimeout.TotalMilliseconds,
-                (int)methodBudget.TotalMilliseconds,
-                (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
-                (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!,
-                (bool)smtOptionsType.GetProperty("IsEnabled")!.GetValue(smtOptions)!);
+        private static class SmtOptionsReader
+        {
+            private static readonly MethodInfo FromOptionsMethod;
+            private static readonly Func<object, string> ModeGetter;
+            private static readonly Func<object, TimeSpan> QueryTimeoutGetter;
+            private static readonly Func<object, TimeSpan> MethodBudgetGetter;
+            private static readonly Func<object, int> MaxPathConditionsGetter;
+            private static readonly Func<object, int> MaxExpressionNodesGetter;
+            private static readonly Func<object, bool> IsEnabledGetter;
+
+            static SmtOptionsReader()
+            {
+                var configurationType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
+                    .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
+                FromOptionsMethod = configurationType.GetMethod(
+                    "FromOptions",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+                var smtOptionsType = configurationType.GetProperty("SmtOptions")!.PropertyType;
+                ModeGetter = CreatePropertyGetter<string>(configurationType, "SmtOptions", smtOptionsType, "Mode");
+                QueryTimeoutGetter = CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "QueryTimeout");
+                MethodBudgetGetter = CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "MethodBudget");
+                MaxPathConditionsGetter = CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxPathConditions");
+                MaxExpressionNodesGetter = CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxExpressionNodes");
+                IsEnabledGetter = CreatePropertyGetter<bool>(configurationType, "SmtOptions", smtOptionsType, "IsEnabled");
+            }
+
+            public static SmtOptionsSnapshot Read(ImmutableDictionary<string, string> globalOptions)
+            {
+                var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+                var configuration = FromOptionsMethod.Invoke(null, new object?[] { analyzerOptions })!;
+                var smtOptions = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
+                    .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!
+                    .GetProperty("SmtOptions")!.GetValue(configuration)!;
+
+                return new SmtOptionsSnapshot(
+                    ModeGetter(smtOptions),
+                    (int)QueryTimeoutGetter(smtOptions).TotalMilliseconds,
+                    (int)MethodBudgetGetter(smtOptions).TotalMilliseconds,
+                    MaxPathConditionsGetter(smtOptions),
+                    MaxExpressionNodesGetter(smtOptions),
+                    IsEnabledGetter(smtOptions));
+            }
+
+            private static Func<object, T> CreatePropertyGetter<T>(Type configurationType, string outerProperty, Type innerType, string innerProperty)
+            {
+                var outerProp = configurationType.GetProperty(outerProperty)!;
+                var innerProp = innerType.GetProperty(innerProperty)!;
+                return obj =>
+                {
+                    var smtOptions = outerProp.GetValue(obj);
+                    return (T)innerProp.GetValue(smtOptions)!;
+                };
+            }
         }
 
         protected readonly record struct SmtOptionsSnapshot(

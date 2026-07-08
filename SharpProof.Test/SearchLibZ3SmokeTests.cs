@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 namespace SharpProof.Test
 {
     [TestFixture]
-    [NonParallelizable]
     public class SearchLibZ3SmokeTests
     {
         [Test]

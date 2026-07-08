@@ -7,7 +7,6 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
 namespace SharpProof.Test
 {
     [TestFixture]
-    [NonParallelizable]
     public class SearchLibBackedPurityFlowTests
     {
         [Test]

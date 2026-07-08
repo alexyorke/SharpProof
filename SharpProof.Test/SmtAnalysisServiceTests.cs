@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
@@ -545,7 +546,7 @@ namespace SharpProof.Test
         }
 
         [Test]
-        public void Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock()
+        public async Task Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);
             var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
@@ -556,7 +557,7 @@ namespace SharpProof.Test
                 maxPathConditions: 4,
                 maxExpressionNodes: 32));
 
-            Thread.Sleep(20);
+            await Task.Delay(20);
 
             var result = service.Classify(CreateQuery(new[] { xIsZero }, xIsZero));
 
