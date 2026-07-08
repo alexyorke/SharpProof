@@ -438,116 +438,40 @@ namespace SharpProof.Analyzer.Engine
             {
                 if (this.HasPotentialImpurity != other.HasPotentialImpurity ||
                     !object.Equals(this.FirstImpureSyntaxNode, other.FirstImpureSyntaxNode) ||
-                    !this.FirstImpurityEvidence.Equals(other.FirstImpurityEvidence) ||
-                    this.DelegateTargetMap.Count != other.DelegateTargetMap.Count ||
-                    this.FlowCaptures.Count != other.FlowCaptures.Count ||
-                    this.FlowCaptureTargets.Count != other.FlowCaptureTargets.Count ||
-                    this.FlowCaptureConcreteTypes.Count != other.FlowCaptureConcreteTypes.Count ||
-                    this.FlowCaptureSymbols.Count != other.FlowCaptureSymbols.Count ||
-                    this.OwnedArrayFlowCaptures.Count != other.OwnedArrayFlowCaptures.Count ||
-                    this.OwnedLocalArraySymbols.Count != other.OwnedLocalArraySymbols.Count ||
-                    this.DefinitelyNullLocalSymbols.Count != other.DefinitelyNullLocalSymbols.Count ||
-                    this.LocalConcreteTypes.Count != other.LocalConcreteTypes.Count ||
-                    this.SmtSymbolVersions.Count != other.SmtSymbolVersions.Count ||
-                    this.PathConditions.Length != other.PathConditions.Length)
+                    !this.FirstImpurityEvidence.Equals(other.FirstImpurityEvidence))
                 {
                     return false;
                 }
 
+                return MapsEqual(this.DelegateTargetMap, other.DelegateTargetMap, static (left, right) => left.Equals(right)) &&
+                    MapsEqual(this.FlowCaptures, other.FlowCaptures, static (left, right) => PurityResultsEqual(left, right)) &&
+                    MapsEqual(this.FlowCaptureTargets, other.FlowCaptureTargets, static (left, right) => left.Equals(right)) &&
+                    MapsEqual(this.FlowCaptureConcreteTypes, other.FlowCaptureConcreteTypes, static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
+                    MapsEqual(this.FlowCaptureSymbols, other.FlowCaptureSymbols, static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
+                    this.OwnedArrayFlowCaptures.SetEquals(other.OwnedArrayFlowCaptures) &&
+                    this.OwnedLocalArraySymbols.SetEquals(other.OwnedLocalArraySymbols) &&
+                    this.DefinitelyNullLocalSymbols.SetEquals(other.DefinitelyNullLocalSymbols) &&
+                    this.PathConditions.SequenceEqual(other.PathConditions) &&
+                    SymbolicStatesEqual(this.PathState, other.PathState) &&
+                    MapsEqual(this.LocalConcreteTypes, other.LocalConcreteTypes, static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
+                    MapsEqual(this.SmtSymbolVersions, other.SmtSymbolVersions, static (left, right) => left == right);
+            }
 
-
-                foreach (var kvp in this.DelegateTargetMap)
-                {
-                    if (!other.DelegateTargetMap.TryGetValue(kvp.Key, out var otherValue) || !kvp.Value.Equals(otherValue))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var kvp in this.FlowCaptures)
-                {
-                    if (!other.FlowCaptures.TryGetValue(kvp.Key, out var otherCap) || !PurityResultsEqual(kvp.Value, otherCap))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var kvp in this.FlowCaptureTargets)
-                {
-                    if (!other.FlowCaptureTargets.TryGetValue(kvp.Key, out var otherTargets) || !kvp.Value.Equals(otherTargets))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var kvp in this.FlowCaptureConcreteTypes)
-                {
-                    if (!other.FlowCaptureConcreteTypes.TryGetValue(kvp.Key, out var otherType) ||
-                        !SymbolEqualityComparer.Default.Equals(kvp.Value, otherType))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var kvp in this.FlowCaptureSymbols)
-                {
-                    if (!other.FlowCaptureSymbols.TryGetValue(kvp.Key, out var otherSymbol) ||
-                        !SymbolEqualityComparer.Default.Equals(kvp.Value, otherSymbol))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var captureId in this.OwnedArrayFlowCaptures)
-                {
-                    if (!other.OwnedArrayFlowCaptures.Contains(captureId))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var symbol in this.OwnedLocalArraySymbols)
-                {
-                    if (!other.OwnedLocalArraySymbols.Contains(symbol))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var symbol in this.DefinitelyNullLocalSymbols)
-                {
-                    if (!other.DefinitelyNullLocalSymbols.Contains(symbol))
-                    {
-                        return false;
-                    }
-                }
-
-                for (var i = 0; i < this.PathConditions.Length; i++)
-                {
-                    if (!Equals(this.PathConditions[i], other.PathConditions[i]))
-                    {
-                        return false;
-                    }
-                }
-
-                if (!SymbolicStatesEqual(this.PathState, other.PathState))
+            private static bool MapsEqual<TKey, TValue>(
+                ImmutableDictionary<TKey, TValue> first,
+                ImmutableDictionary<TKey, TValue> second,
+                Func<TValue, TValue, bool> valuesEqual)
+                where TKey : notnull
+            {
+                if (first.Count != second.Count)
                 {
                     return false;
                 }
 
-                foreach (var kvp in this.LocalConcreteTypes)
+                foreach (var kvp in first)
                 {
-                    if (!other.LocalConcreteTypes.TryGetValue(kvp.Key, out var otherType) ||
-                        !SymbolEqualityComparer.Default.Equals(kvp.Value, otherType))
-                    {
-                        return false;
-                    }
-                }
-
-                foreach (var kvp in this.SmtSymbolVersions)
-                {
-                    if (!other.SmtSymbolVersions.TryGetValue(kvp.Key, out var otherVersion) ||
-                        kvp.Value != otherVersion)
+                    if (!second.TryGetValue(kvp.Key, out var otherValue) ||
+                        !valuesEqual(kvp.Value, otherValue))
                     {
                         return false;
                     }
