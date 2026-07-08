@@ -1119,14 +1119,6 @@ Both check `state.IsContradictory` as early exit. `ClassifyConditionTruth` retur
 
 ---
 
-## 123. `TryResolveSourceDeclaration` first `DeclaringSyntaxReference` wins over partial method body
-
-**File:** `SharpProof.Symbolic/SymbolicCapabilityService.cs:684-706`
-
-The loop returns the *first* declaration passing `IsMethodLikeDeclaration`. For partial methods, the declaration-only part (no body) appears first. Downstream `GetMethodBodyRootOperation` returns `null` → method is `UnsupportedTarget`. The implementation is never analyzed.
-
----
-
 ## 124. `GeneratedPurityCatalog` and `ExceptionSummaryCatalog` duplicate static PE-file caches
 
 **Files:** `SharpProof.Analyzer/GeneratedPurityCatalog.cs:36-42` and `ExceptionSummaryCatalog.cs:34-41`

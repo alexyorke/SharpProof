@@ -638,13 +638,13 @@ namespace SharpProof.Symbolic
                 out ImmutableArray<CapabilitySiteData> sites)
             {
                 sites = ImmutableArray<CapabilitySiteData>.Empty;
-                var originalMethod = methodSymbol.OriginalDefinition;
-                if (!IsSourceMethod(originalMethod))
+                var sourceMethod = ResolveSourceImplementation(methodSymbol.OriginalDefinition);
+                if (!IsSourceMethod(sourceMethod))
                 {
                     return false;
                 }
 
-                if (!TryResolveSourceDeclaration(originalMethod, out var declaration, out var semanticModel))
+                if (!TryResolveSourceDeclaration(sourceMethod, out var declaration, out var semanticModel))
                 {
                     sites = ImmutableArray.Create(
                         CapabilitySiteData.Unknown(
@@ -681,6 +681,13 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
+            private static IMethodSymbol ResolveSourceImplementation(IMethodSymbol methodSymbol)
+            {
+                return methodSymbol.PartialImplementationPart ??
+                    methodSymbol.PartialDefinitionPart?.PartialImplementationPart ??
+                    methodSymbol;
+            }
+
             private bool TryResolveSourceDeclaration(
                 IMethodSymbol methodSymbol,
                 out SyntaxNode declaration,
@@ -688,6 +695,8 @@ namespace SharpProof.Symbolic
             {
                 declaration = null!;
                 semanticModel = null!;
+                SyntaxNode? fallbackDeclaration = null;
+                SemanticModel? fallbackSemanticModel = null;
 
                 foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
                 {
@@ -697,8 +706,23 @@ namespace SharpProof.Symbolic
                         continue;
                     }
 
-                    declaration = syntax;
-                    semanticModel = _compilation.GetSemanticModel(syntax.SyntaxTree);
+                    var candidateSemanticModel = _compilation.GetSemanticModel(syntax.SyntaxTree);
+                    if (HasMethodBody(syntax))
+                    {
+                        declaration = syntax;
+                        semanticModel = candidateSemanticModel;
+                        return true;
+                    }
+
+                    fallbackDeclaration ??= syntax;
+                    fallbackSemanticModel ??= candidateSemanticModel;
+                }
+
+                if (fallbackDeclaration != null &&
+                    fallbackSemanticModel != null)
+                {
+                    declaration = fallbackDeclaration;
+                    semanticModel = fallbackSemanticModel;
                     return true;
                 }
 
@@ -1032,6 +1056,26 @@ namespace SharpProof.Symbolic
                 LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
                     semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
                 _ => semanticModel.GetOperation(methodNode, cancellationToken),
+            };
+        }
+
+        private static bool HasMethodBody(SyntaxNode methodNode)
+        {
+            return methodNode switch
+            {
+                MethodDeclarationSyntax methodDeclaration =>
+                    methodDeclaration.Body != null || methodDeclaration.ExpressionBody != null,
+                ConstructorDeclarationSyntax constructorDeclaration =>
+                    constructorDeclaration.Body != null || constructorDeclaration.ExpressionBody != null,
+                OperatorDeclarationSyntax operatorDeclaration =>
+                    operatorDeclaration.Body != null || operatorDeclaration.ExpressionBody != null,
+                ConversionOperatorDeclarationSyntax conversionOperatorDeclaration =>
+                    conversionOperatorDeclaration.Body != null || conversionOperatorDeclaration.ExpressionBody != null,
+                AccessorDeclarationSyntax accessorDeclaration =>
+                    accessorDeclaration.Body != null || accessorDeclaration.ExpressionBody != null,
+                LocalFunctionStatementSyntax localFunction =>
+                    localFunction.Body != null || localFunction.ExpressionBody != null,
+                _ => false,
             };
         }
 

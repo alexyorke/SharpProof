@@ -129,6 +129,36 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task AllowedCapabilities_None_PartialMethodImplementation_ReportsCallSiteViolation()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public static partial class TestClass
+{
+    static partial void Helper();
+
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public static void TestMethod()
+    {
+        {|SP0015:Helper()|};
+    }
+}
+
+public static partial class TestClass
+{
+    static partial void Helper()
+    {
+        Console.WriteLine(""hello"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AllowedCapabilities_None_OpenVirtualSourceCallee_ReportsUnknown()
         {
             var test = @"
