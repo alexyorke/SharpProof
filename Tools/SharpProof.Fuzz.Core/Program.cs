@@ -1577,12 +1577,6 @@ public sealed class FuzzCaseGenerator
         return GenerateForShapeCore(shapeId, variant, index);
     }
 
-    public FuzzCase GenerateForShape(string shapeId, int variant)
-    {
-        var index = HashCode.Combine(shapeId, variant) & int.MaxValue;
-        return GenerateForShapeCore(shapeId, variant, index);
-    }
-
     private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index)
     {
         if (!RegistryByPrimaryShape.TryGetValue(shapeId, out var entries))

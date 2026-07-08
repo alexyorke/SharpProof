@@ -65,14 +65,6 @@ public sealed record FuzzExpectation(
             ImmutableArray<string>.Empty);
     }
 
-    public FuzzExpectation RequireAnySp0010Properties(params string[] propertyNames)
-    {
-        return this with
-        {
-            RequiredAnySp0010Properties = ImmutableArray.Create(propertyNames)
-        };
-    }
-
     public FuzzExpectation RequireExceptionEdgesOnAnySp0010()
     {
         return this with

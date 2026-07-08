@@ -3556,16 +3556,6 @@ internal static class AssemblyEffectSummarizer
         return false;
     }
 
-    private static bool IsLoadLocal(OpCode opCode)
-    {
-        return opCode == OpCodes.Ldloc_0 ||
-            opCode == OpCodes.Ldloc_1 ||
-            opCode == OpCodes.Ldloc_2 ||
-            opCode == OpCodes.Ldloc_3 ||
-            opCode == OpCodes.Ldloc_S ||
-            opCode == OpCodes.Ldloc;
-    }
-
     private static string? TryGetConstructedExceptionType(string? constructorSymbol)
     {
         if (string.IsNullOrWhiteSpace(constructorSymbol))

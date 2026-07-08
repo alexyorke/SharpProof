@@ -7,23 +7,6 @@ namespace SharpProof.Analyzer
     public static class SharpProofDiagnostics
     {
 
-        public const string ImpurityDiagnosticId = "SP0001";
-        private static readonly LocalizableString ImpurityTitle = "Impure Method Assumed";
-        private static readonly LocalizableString ImpurityMessageFormat = "Method '{0}' marked with [EnforcePure] contains implementation and is assumed impure";
-        private static readonly LocalizableString ImpurityDescription = "Methods marked with [EnforcePure] must have their purity explicitly verified or annotated.";
-
-
-
-        public static readonly DiagnosticDescriptor ImpurityRule = new DiagnosticDescriptor(
-            ImpurityDiagnosticId,
-            ImpurityTitle,
-            ImpurityMessageFormat,
-            "Purity",
-            DiagnosticSeverity.Warning,
-            isEnabledByDefault: true,
-            description: ImpurityDescription);
-
-
         public const string PurityNotVerifiedId = "SP0002";
         public const string ImpurityCategoryProperty = "sharpproof.impurity.category";
         public const string ImpurityRuleProperty = "sharpproof.impurity.rule";

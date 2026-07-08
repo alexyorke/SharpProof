@@ -76,10 +76,6 @@ namespace SharpProof.Symbolic
             internal const string ArrayGetValue = "array_get_value";
             internal const string SpanSlice = "span_slice";
             internal const string RangeSlice = "range_slice";
-            internal const string StringSubstring = "string_substring";
-            internal const string StringRemove = "string_remove";
-            internal const string MemoryExtensionsAsSpan = "memory_extensions_as_span";
-            internal const string MemoryExtensionsAsMemory = "memory_extensions_as_memory";
             internal const string WithExpression = "with_expression";
             internal const string DeconstructionReceiver = "deconstruction_receiver";
             internal const string CountIndex = "count_index";
