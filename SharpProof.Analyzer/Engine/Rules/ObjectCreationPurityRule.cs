@@ -460,13 +460,5 @@ namespace SharpProof.Analyzer.Engine.Rules
                 arm.Pattern.IsKind(SyntaxKind.DiscardPattern));
         }
 
-        private static bool IsPureOwnedArrayConstructorArgument(
-            IObjectCreationOperation objectCreationOperation,
-            IArgumentOperation argument,
-            PurityAnalysisEngine.PurityAnalysisState currentState)
-        {
-            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(argument.Value, currentState);
-        }
-
     }
 }

@@ -2064,23 +2064,6 @@ namespace SharpProof.Symbolic
             }
         }
 
-        internal static bool IsBranchReachable(
-            IEnumerable<SmtFormula> pathConditions,
-            ExpressionSyntax condition,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis)
-        {
-            return TryCollectBranchConditions(
-                    pathConditions,
-                    condition,
-                    branchWhenTrue,
-                    semanticModel,
-                    cancellationToken) is { } branchConditions &&
-                IsSatisfiable(branchConditions, smtAnalysis);
-        }
-
         internal static bool IsBranchUnreachable(
             IEnumerable<SmtFormula> pathConditions,
             ExpressionSyntax condition,

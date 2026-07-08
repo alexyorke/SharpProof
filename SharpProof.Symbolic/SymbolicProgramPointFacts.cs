@@ -3262,14 +3262,6 @@ namespace SharpProof.Symbolic
             return state;
         }
 
-        internal static ImmutableArray<SmtFormula> CollectForLoopBodyInvariantFacts(
-            ForStatementSyntax forStatement,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return CollectLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken);
-        }
-
         internal static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
             StatementSyntax loopStatement,
             SemanticModel semanticModel,

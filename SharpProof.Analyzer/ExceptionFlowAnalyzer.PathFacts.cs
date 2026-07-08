@@ -2179,16 +2179,6 @@ namespace SharpProof.Analyzer
                 typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
         }
 
-        private static bool IsSymbolAssignedBeforeUse(
-            SyntaxNode branchRoot,
-            int useSpanStart,
-            ISymbol symbol,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            return IsSymbolAssignedBetween(branchRoot, branchRoot.SpanStart - 1, useSpanStart, symbol, semanticModel, cancellationToken);
-        }
-
         private static bool AnySymbolAssignedBeforeUse(
             SyntaxNode branchRoot,
             int useSpanStart,

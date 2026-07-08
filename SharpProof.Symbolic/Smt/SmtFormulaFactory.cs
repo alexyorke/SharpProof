@@ -24,11 +24,6 @@ namespace SharpProof.Symbolic.Smt
             return CreateVariable(name, SmtValueKind.Bool);
         }
 
-        internal static SmtFormula CreateFalse()
-        {
-            return new SmtBooleanConstant(false);
-        }
-
         internal static SmtFormula CreateNot(SmtFormula formula)
         {
             return new SmtUnaryFormula(SmtUnaryOperator.Not, formula);

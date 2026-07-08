@@ -276,22 +276,6 @@ namespace SharpProof.Symbolic
                 : condition.ToString() ?? string.Empty;
         }
 
-        internal static SmtFormula ConjoinPathConditions(IReadOnlyList<SmtFormula> pathConditions)
-        {
-            if (pathConditions.Count == 0)
-            {
-                return new SmtBooleanConstant(true);
-            }
-
-            var merged = pathConditions[0];
-            for (var index = 1; index < pathConditions.Count; index++)
-            {
-                merged = new SmtBinaryFormula(SmtBinaryOperator.And, merged, pathConditions[index]);
-            }
-
-            return merged;
-        }
-
         internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
         {
             return SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);

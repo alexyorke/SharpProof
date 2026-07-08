@@ -743,17 +743,6 @@ namespace SharpProof.Analyzer.Engine
                 return Copy(delegateTargetMap: newMap);
             }
 
-            public PurityAnalysisState WithoutDelegateTarget(ISymbol delegateSymbol)
-            {
-                if (!this.DelegateTargetMap.ContainsKey(delegateSymbol))
-                {
-                    return this;
-                }
-
-                var newMap = this.DelegateTargetMap.Remove(delegateSymbol);
-                return Copy(delegateTargetMap: newMap);
-            }
-
             public PurityAnalysisState WithFlowCaptureResult(CaptureId id, PurityAnalysisResult result)
             {
                 return Copy(flowCaptures: FlowCaptures.SetItem(id, result));
@@ -8254,19 +8243,6 @@ namespace SharpProof.Analyzer.Engine
             var operandTypeInfo = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken);
             var operandType = operandTypeInfo.ConvertedType ?? operandTypeInfo.Type;
             return operandType is IArrayTypeSymbol;
-        }
-
-        internal static bool IsArrayAsReadOnlyOwnedLocalArrayInvocation(
-            IInvocationOperation invocationOperation,
-            PurityAnalysisState currentState)
-        {
-            if (!IsArrayAsReadOnlyInvocation(invocationOperation))
-            {
-                return false;
-            }
-
-            var argumentValue = UnwrapArrayOwnershipPreservingConversions(invocationOperation.Arguments[0].Value);
-            return IsTrackedOwnedArrayValue(argumentValue, currentState);
         }
 
         private static bool IsArrayEmptyInvocation(IOperation? operation)

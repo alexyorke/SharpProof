@@ -508,21 +508,6 @@ namespace SharpProof.Analyzer.Engine.Rules
         }
 
 
-        private bool ImplementsIDisposable(ITypeSymbol typeSymbol, Compilation compilation)
-        {
-            INamedTypeSymbol? disposableInterface = compilation.GetTypeByMetadataName("System.IDisposable");
-            if (disposableInterface == null)
-            {
-                PurityAnalysisEngine.LogDebug($" Error: Could not find System.IDisposable in compilation.");
-                return false;
-            }
-
-
-            return typeSymbol.Equals(disposableInterface, SymbolEqualityComparer.Default) ||
-                  typeSymbol.AllInterfaces.Contains(disposableInterface, SymbolEqualityComparer.Default);
-
-        }
-
         private static bool IsAwaitUsingOperation(IOperation operation)
         {
             return operation.Syntax switch

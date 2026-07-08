@@ -82,16 +82,5 @@ namespace SharpProof.Symbolic.Smt
                 maxExpressionNodes ?? MaxExpressionNodes,
                 UseSharedResultCache);
         }
-
-        public SmtAnalysisOptions WithSharedResultCache(bool enabled = true)
-        {
-            return new SmtAnalysisOptions(
-                Mode,
-                QueryTimeout,
-                MethodBudget,
-                MaxPathConditions,
-                MaxExpressionNodes,
-                enabled);
-        }
     }
 }

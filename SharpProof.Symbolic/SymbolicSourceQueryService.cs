@@ -322,32 +322,6 @@ namespace SharpProof.Symbolic
                 smtAnalysis);
         }
 
-        public SymbolicProgramPointQueryResult AnalyzeFileAtPosition(
-            string filePath,
-            int position,
-            IEnumerable<MetadataReference>? references = null,
-            CancellationToken cancellationToken = default,
-            SmtAnalysisService? smtAnalysis = null)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                throw new ArgumentException("File path is required.", nameof(filePath));
-            }
-
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException("Source file does not exist.", filePath);
-            }
-
-            return AnalyzeSourceAtPosition(
-                File.ReadAllText(filePath),
-                Path.GetFullPath(filePath),
-                position,
-                references,
-                cancellationToken,
-                smtAnalysis);
-        }
-
         public SymbolicSourceQueryResult QuerySource(
             string sourceText,
             string filePath,

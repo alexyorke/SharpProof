@@ -156,26 +156,6 @@ namespace SharpProof.Analyzer.Engine
             return (firstImpureNode, firstImpurityEvidence);
         }
 
-        private static ImmutableArray<SmtFormula> MergePathConditions(
-            ImmutableArray<SmtFormula> first,
-            ImmutableArray<SmtFormula> second)
-        {
-            if (first.Length != second.Length)
-            {
-                return ImmutableArray<SmtFormula>.Empty;
-            }
-
-            for (var i = 0; i < first.Length; i++)
-            {
-                if (!Equals(first[i], second[i]))
-                {
-                    return ImmutableArray<SmtFormula>.Empty;
-                }
-            }
-
-            return first;
-        }
-
         private static ImmutableArray<SmtFormula> MergePathConditionsAcrossAll(
             IReadOnlyList<PurityAnalysisState> states,
             ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)

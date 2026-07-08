@@ -2302,45 +2302,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryGetComparerArgumentIndex(
-            IMethodSymbol methodSymbol,
-            out int argumentIndex)
-        {
-            return TryGetParameterIndex(methodSymbol, IsComparerType, out argumentIndex);
-        }
-
         private static bool IsComparerType(ITypeSymbol? typeSymbol)
         {
             return typeSymbol is INamedTypeSymbol namedType &&
                 namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.IComparer<T>";
-        }
-
-        private static bool TryGetEqualityComparerArgumentIndex(
-            IMethodSymbol methodSymbol,
-            out int argumentIndex)
-        {
-            return TryGetParameterIndex(methodSymbol, IsEqualityComparerType, out argumentIndex);
-        }
-
-        private static bool TryGetParameterIndex(
-            IMethodSymbol methodSymbol,
-            Func<ITypeSymbol?, bool> matchesParameterType,
-            out int argumentIndex)
-        {
-            argumentIndex = -1;
-
-            for (var i = 0; i < methodSymbol.Parameters.Length; i++)
-            {
-                if (!matchesParameterType(methodSymbol.Parameters[i].Type))
-                {
-                    continue;
-                }
-
-                argumentIndex = i;
-                return true;
-            }
-
-            return false;
         }
 
         private static bool IsEqualityComparerType(ITypeSymbol? typeSymbol)
