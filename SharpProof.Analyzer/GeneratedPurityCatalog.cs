@@ -511,19 +511,6 @@ namespace SharpProof.Analyzer
             return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
-        private static void AppendFlattenedTypeArguments(INamedTypeSymbol namedType, ImmutableArray<ITypeSymbol>.Builder builder)
-        {
-            if (namedType.ContainingType != null)
-            {
-                AppendFlattenedTypeArguments(namedType.ContainingType, builder);
-            }
-
-            foreach (var typeArgument in namedType.TypeArguments)
-            {
-                builder.Add(typeArgument);
-            }
-        }
-
         private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol, Compilation compilation)
         {
             var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
