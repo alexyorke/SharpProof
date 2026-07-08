@@ -746,42 +746,18 @@ namespace SharpProof.Analyzer.Engine.Rules
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
-                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
-                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
-                    {
-                        continue;
-                    }
-
-                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
-                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
-                    {
-                        continue;
-                    }
-
-                    if (assignmentOperation.Target is IFieldReferenceOperation fieldReference &&
-                        fieldReference.Field.IsReadOnly &&
-                        IsThisOrImplicitInstance(fieldReference.Instance))
-                    {
-                        return true;
-                    }
-
-                    if (assignmentOperation.Target is IPropertyReferenceOperation propertyReference &&
-                        (propertyReference.Property.SetMethod == null || propertyReference.Property.SetMethod.IsInitOnly) &&
-                        IsThisOrImplicitInstance(propertyReference.Instance))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
+            return RuleAnalysisHelper.ConstructorStoresParameterMatching(
+                constructor,
+                parameter,
+                semanticModel,
+                cancellationToken,
+                static target =>
+                    (target is IFieldReferenceOperation fieldReference &&
+                     fieldReference.Field.IsReadOnly &&
+                     IsThisOrImplicitInstance(fieldReference.Instance)) ||
+                    (target is IPropertyReferenceOperation propertyReference &&
+                     (propertyReference.Property.SetMethod == null || propertyReference.Property.SetMethod.IsInitOnly) &&
+                     IsThisOrImplicitInstance(propertyReference.Instance)));
         }
     }
 }

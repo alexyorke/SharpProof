@@ -1031,6 +1031,42 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
+        internal static bool ConstructorStoresParameterMatching(
+            IMethodSymbol constructor,
+            IParameterSymbol parameter,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<IOperation, bool> targetMatches)
+        {
+            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
+                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
+                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
+                    {
+                        continue;
+                    }
+
+                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
+                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
+                    {
+                        continue;
+                    }
+
+                    if (targetMatches(assignmentOperation.Target))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         internal static bool IsSemanticallyPureSpanLikeSliceInvocation(IInvocationOperation invocationOperation)
         {
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
