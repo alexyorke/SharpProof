@@ -985,7 +985,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
 
                 if (operation is IObjectCreationOperation spanConstruction &&
-                    IsSpanViewConstructor(spanConstruction.Constructor) &&
+                    IsArrayBackedViewConstructor(spanConstruction.Constructor, ArrayViewKind.Span) &&
                     spanConstruction.Arguments.Length > 0)
                 {
                     sourceOperation = spanConstruction.Arguments[0].Value;
@@ -996,7 +996,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (expectedKind == ArrayViewKind.Memory &&
                 operation is IObjectCreationOperation memoryConstruction &&
-                IsMemoryViewConstructor(memoryConstruction.Constructor) &&
+                IsArrayBackedViewConstructor(memoryConstruction.Constructor, ArrayViewKind.Memory) &&
                 memoryConstruction.Arguments.Length > 0)
             {
                 sourceOperation = memoryConstruction.Arguments[0].Value;
@@ -1112,7 +1112,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 out methodSymbol);
         }
 
-        private static bool IsMemoryViewConstructor(IMethodSymbol? methodSymbol)
+        private static bool IsArrayBackedViewConstructor(IMethodSymbol? methodSymbol, ArrayViewKind viewKind)
         {
             if (methodSymbol == null ||
                 methodSymbol.MethodKind != MethodKind.Constructor ||
@@ -1123,21 +1123,13 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            return containingType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
-        }
-
-        private static bool IsSpanViewConstructor(IMethodSymbol? methodSymbol)
-        {
-            if (methodSymbol == null ||
-                methodSymbol.MethodKind != MethodKind.Constructor ||
-                methodSymbol.ContainingType is not INamedTypeSymbol containingType ||
-                methodSymbol.Parameters.Length == 0 ||
-                methodSymbol.Parameters[0].Type is not IArrayTypeSymbol)
+            var typeDefinition = containingType.OriginalDefinition.ToDisplayString();
+            return viewKind switch
             {
-                return false;
-            }
-
-            return containingType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+                ArrayViewKind.Span => typeDefinition is "System.Span<T>" or "System.ReadOnlySpan<T>",
+                ArrayViewKind.Memory => typeDefinition is "System.Memory<T>" or "System.ReadOnlyMemory<T>",
+                _ => false,
+            };
         }
 
         private static bool TryGetArraySpanSource(

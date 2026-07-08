@@ -62,12 +62,24 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return byRefBorrowConflictResult;
             }
 
-            if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
+            if (TryCheckSystemTypeMemberPurity(
+                    invocationOperation,
+                    context,
+                    currentState,
+                    nameof(object.Equals),
+                    parameterCount: 1,
+                    out var earlyTypeEqualityResult))
             {
                 return earlyTypeEqualityResult;
             }
 
-            if (TryCheckTypeGetHashCodePurity(invocationOperation, context, currentState, out var typeHashCodeResult))
+            if (TryCheckSystemTypeMemberPurity(
+                    invocationOperation,
+                    context,
+                    currentState,
+                    nameof(object.GetHashCode),
+                    parameterCount: 0,
+                    out var typeHashCodeResult))
             {
                 return typeHashCodeResult;
             }
@@ -2303,36 +2315,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 nameof(MethodInvocationPurityRule),
                 methodSymbol,
                 catalogSource);
-        }
-
-        private static bool TryCheckTypeEqualityPurity(
-            IInvocationOperation invocationOperation,
-            PurityAnalysisContext context,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            out PurityAnalysisEngine.PurityAnalysisResult result)
-        {
-            return TryCheckSystemTypeMemberPurity(
-                invocationOperation,
-                context,
-                currentState,
-                nameof(object.Equals),
-                parameterCount: 1,
-                out result);
-        }
-
-        private static bool TryCheckTypeGetHashCodePurity(
-            IInvocationOperation invocationOperation,
-            PurityAnalysisContext context,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            out PurityAnalysisEngine.PurityAnalysisResult result)
-        {
-            return TryCheckSystemTypeMemberPurity(
-                invocationOperation,
-                context,
-                currentState,
-                nameof(object.GetHashCode),
-                parameterCount: 0,
-                out result);
         }
 
         private static bool TryCheckSystemTypeMemberPurity(
