@@ -960,7 +960,7 @@ namespace SharpProof.Symbolic.Smt
                 return true;
             }
 
-            if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+            if (!CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
             {
                 return false;
             }
@@ -1006,7 +1006,7 @@ namespace SharpProof.Symbolic.Smt
                         continue;
                     }
 
-                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    if (!CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
                     {
                         return false;
                     }
@@ -1498,7 +1498,7 @@ namespace SharpProof.Symbolic.Smt
             ICollection<SmtFormula> conditions,
             Func<ISymbol, int>? getSymbolVersion)
         {
-            if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+            if (!CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
             {
                 return;
             }
@@ -1533,7 +1533,7 @@ namespace SharpProof.Symbolic.Smt
                 var subpattern = listPattern.Patterns[patternIndex];
                 if (subpattern is SlicePatternSyntax slicePattern)
                 {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    if (CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
                     {
                         AddProjectedListPatternStructuralFacts(
                             value,
@@ -1709,7 +1709,7 @@ namespace SharpProof.Symbolic.Smt
             ListPatternSyntax listPattern,
             SmtFormula lengthFormula)
         {
-            GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
+            CSharpSyntaxFacts.GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
             return exactLength
                 ? new SmtBinaryFormula(
                     SmtBinaryOperator.Equal,
@@ -1719,35 +1719,6 @@ namespace SharpProof.Symbolic.Smt
                     SmtBinaryOperator.GreaterThanOrEqual,
                     lengthFormula,
                     new SmtIntegerConstant(minimumLength));
-        }
-
-        private static void GetListPatternLengthShape(
-            ListPatternSyntax listPattern,
-            out int minimumLength,
-            out bool exactLength)
-        {
-            minimumLength = 0;
-            exactLength = true;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                    {
-                        GetListPatternLengthShape(nestedListPattern, out var nestedMinimumLength, out var nestedExactLength);
-                        minimumLength += nestedMinimumLength;
-                        exactLength &= nestedExactLength;
-                    }
-                    else
-                    {
-                        exactLength = false;
-                    }
-
-                    continue;
-                }
-
-                minimumLength++;
-            }
         }
 
         private static bool TryGetProjectedListPatternElementPosition(
@@ -1818,7 +1789,7 @@ namespace SharpProof.Symbolic.Smt
                         continue;
                     }
 
-                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
+                    if (!CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
                         !ListPatternHasOnlySelectionNeutralElements(nestedListPattern))
                     {
                         return false;
@@ -1846,23 +1817,6 @@ namespace SharpProof.Symbolic.Smt
                 ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
                 : elementIndex.ToString(CultureInfo.InvariantCulture);
             return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
-        }
-
-        private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
-        {
-            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
-            {
-                pattern = parenthesizedPattern.Pattern;
-            }
-
-            if (pattern is ListPatternSyntax candidate)
-            {
-                listPattern = candidate;
-                return true;
-            }
-
-            listPattern = null!;
-            return false;
         }
 
         private static bool TryResolveTuplePositionalSubpatternValue(

@@ -2879,7 +2879,7 @@ namespace SharpProof.Symbolic.Smt
                 return false;
             }
 
-            GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
+            CSharpSyntaxFacts.GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
             lengthFormulaCondition = exactLength
                 ? new SmtBinaryFormula(
                     SmtBinaryOperator.Equal,
@@ -3020,35 +3020,6 @@ namespace SharpProof.Symbolic.Smt
             return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
         }
 
-        private static void GetListPatternLengthShape(
-            ListPatternSyntax listPattern,
-            out int minimumLength,
-            out bool exactLength)
-        {
-            minimumLength = 0;
-            exactLength = true;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                    {
-                        GetListPatternLengthShape(nestedListPattern, out var nestedMinimumLength, out var nestedExactLength);
-                        minimumLength += nestedMinimumLength;
-                        exactLength &= nestedExactLength;
-                    }
-                    else
-                    {
-                        exactLength = false;
-                    }
-
-                    continue;
-                }
-
-                minimumLength++;
-            }
-        }
-
         private static bool ListPatternHasOnlySelectionNeutralElements(ListPatternSyntax listPattern)
         {
             foreach (var subpattern in listPattern.Patterns)
@@ -3060,7 +3031,7 @@ namespace SharpProof.Symbolic.Smt
                         continue;
                     }
 
-                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
+                    if (!CSharpSyntaxFacts.TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
                         !ListPatternHasOnlySelectionNeutralElements(nestedListPattern))
                     {
                         return false;
@@ -3092,23 +3063,6 @@ namespace SharpProof.Symbolic.Smt
             }
 
             return pattern is DiscardPatternSyntax or VarPatternSyntax;
-        }
-
-        private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
-        {
-            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
-            {
-                pattern = parenthesizedPattern.Pattern;
-            }
-
-            if (pattern is ListPatternSyntax candidate)
-            {
-                listPattern = candidate;
-                return true;
-            }
-
-            listPattern = null!;
-            return false;
         }
 
     }
