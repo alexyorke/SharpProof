@@ -2311,27 +2311,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
-            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.Name != nameof(object.Equals) ||
-                methodSymbol.Parameters.Length != 1)
-            {
-                return false;
-            }
-
-            var systemType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Type");
-            if (systemType == null)
-            {
-                return false;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
-            {
-                return false;
-            }
-
-            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+            return TryCheckSystemTypeMemberPurity(
+                invocationOperation,
+                context,
+                currentState,
+                nameof(object.Equals),
+                parameterCount: 1,
+                out result);
         }
 
         private static bool TryCheckTypeGetHashCodePurity(
@@ -2340,22 +2326,35 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
+            return TryCheckSystemTypeMemberPurity(
+                invocationOperation,
+                context,
+                currentState,
+                nameof(object.GetHashCode),
+                parameterCount: 0,
+                out result);
+        }
+
+        private static bool TryCheckSystemTypeMemberPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            string methodName,
+            int parameterCount,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.Name != nameof(object.GetHashCode) ||
-                methodSymbol.Parameters.Length != 0)
+            if (methodSymbol.Name != methodName ||
+                methodSymbol.Parameters.Length != parameterCount)
             {
                 return false;
             }
 
             var systemType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Type");
-            if (systemType == null)
-            {
-                return false;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
+            if (systemType == null ||
+                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
             {
                 return false;
             }
