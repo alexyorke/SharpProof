@@ -493,6 +493,27 @@ namespace SharpProof.Symbolic.Smt
                 return false;
             }
 
+            return TryCreateStartOrRangeSliceLengthFormula(
+                invocationOperation,
+                sourceExpression,
+                semanticModel,
+                cancellationToken,
+                out lengthFormula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryCreateStartOrRangeSliceLengthFormula(
+            IInvocationOperation invocationOperation,
+            ExpressionSyntax sourceExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            var method = invocationOperation.TargetMethod;
             if (method.Parameters.Length == 1)
             {
                 if (invocationOperation.Arguments.Length != 1 ||
@@ -551,6 +572,7 @@ namespace SharpProof.Symbolic.Smt
             lengthFormula = resultLength;
             return true;
         }
+
 
         private static bool TryCreateStringCreationResultLengthFormula(
             ExpressionSyntax receiverExpression,
@@ -669,64 +691,14 @@ namespace SharpProof.Symbolic.Smt
 
             if (method.Name == "Substring")
             {
-                if (method.Parameters.Length == 1)
-                {
-                    if (invocationOperation.Arguments.Length != 1 ||
-                        !TryCreateBuiltInElementAccessLengthFormula(
-                            sourceExpression,
-                            semanticModel,
-                            cancellationToken,
-                            out var sourceLength,
-                            getSymbolVersion,
-                            inlineDepth) ||
-                        !TryTranslateIntInvocationArgument(
-                            invocationOperation,
-                            parameterIndex: 0,
-                            semanticModel,
-                            cancellationToken,
-                            out var start,
-                            getSymbolVersion,
-                            inlineDepth))
-                    {
-                        return false;
-                    }
-
-                    lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, start);
-                    return true;
-                }
-
-                if (method.Parameters.Length != 2 ||
-                    invocationOperation.Arguments.Length != 2 ||
-                    !TryCreateBuiltInElementAccessLengthFormula(
-                        sourceExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out _,
-                        getSymbolVersion,
-                        inlineDepth) ||
-                    !TryTranslateIntInvocationArgument(
-                        invocationOperation,
-                        parameterIndex: 0,
-                        semanticModel,
-                        cancellationToken,
-                        out _,
-                        getSymbolVersion,
-                        inlineDepth) ||
-                    !TryTranslateIntInvocationArgument(
-                        invocationOperation,
-                        parameterIndex: 1,
-                        semanticModel,
-                        cancellationToken,
-                        out var candidateLengthFormula,
-                        getSymbolVersion,
-                        inlineDepth))
-                {
-                    lengthFormula = null!;
-                    return false;
-                }
-
-                lengthFormula = candidateLengthFormula;
-                return true;
+                return TryCreateStartOrRangeSliceLengthFormula(
+                    invocationOperation,
+                    sourceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth);
             }
 
             if (method.Name == "Remove")
