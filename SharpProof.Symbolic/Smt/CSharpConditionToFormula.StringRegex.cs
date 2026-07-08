@@ -380,49 +380,14 @@ namespace SharpProof.Symbolic.Smt
             out IReadOnlyList<SmtVariableSubstitution> substitutions)
         {
             var parameters = GetLambdaParameterSymbols(lambdaExpression, semanticModel, cancellationToken).ToArray();
-            if (parameters.Length == 0 || parameters.Length != invocationOperation.Arguments.Length)
-            {
-                substitutions = Array.Empty<SmtVariableSubstitution>();
-                return false;
-            }
-
-            var builder = new List<SmtVariableSubstitution>(parameters.Length);
-            for (var index = 0; index < parameters.Length; index++)
-            {
-                var parameter = parameters[index];
-                var argument = invocationOperation.Arguments[index];
-                if (!TryGetValueKind(parameter.Type, out var parameterKind) ||
-                    argument.Value.Syntax is not ExpressionSyntax argumentExpression ||
-                    !TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
-                    argumentFormula == null ||
-                    argumentFormula.Kind != parameterKind)
-                {
-                    substitutions = Array.Empty<SmtVariableSubstitution>();
-                    return false;
-                }
-
-                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
-                builder.Add(new SmtVariableSubstitution(
-                    formalVariable.Name,
-                    formalVariable.Name + ".",
-                    GetFormulaMemberName(formalVariable) + ".",
-                    argumentFormula));
-
-                if (parameter.Type.SpecialType == SpecialType.System_String &&
-                    TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argumentStringFormula, getSymbolVersion, inlineDepth) &&
-                    argumentStringFormula != null)
-                {
-                    var formalStringVariable = new SmtVariable(formalVariable.Name + ".String", SmtValueKind.String);
-                    builder.Add(new SmtVariableSubstitution(
-                        formalStringVariable.Name,
-                        formalStringVariable.Name + ".",
-                        GetFormulaMemberName(formalStringVariable) + ".",
-                        argumentStringFormula));
-                }
-            }
-
-            substitutions = builder;
-            return true;
+            return TryCreateParameterPredicateSubstitutions(
+                parameters,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion,
+                inlineDepth,
+                out substitutions);
         }
 
         private static bool TryCreateMethodGroupPredicateSubstitutions(
@@ -434,15 +399,33 @@ namespace SharpProof.Symbolic.Smt
             int inlineDepth,
             out IReadOnlyList<SmtVariableSubstitution> substitutions)
         {
-            var parameters = methodSymbol.Parameters;
-            if (parameters.Length == 0 || parameters.Length != invocationOperation.Arguments.Length)
+            return TryCreateParameterPredicateSubstitutions(
+                methodSymbol.Parameters,
+                invocationOperation,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion,
+                inlineDepth,
+                out substitutions);
+        }
+
+        private static bool TryCreateParameterPredicateSubstitutions(
+            IReadOnlyList<IParameterSymbol> parameters,
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            out IReadOnlyList<SmtVariableSubstitution> substitutions)
+        {
+            if (parameters.Count == 0 || parameters.Count != invocationOperation.Arguments.Length)
             {
                 substitutions = Array.Empty<SmtVariableSubstitution>();
                 return false;
             }
 
-            var builder = new List<SmtVariableSubstitution>(parameters.Length);
-            for (var index = 0; index < parameters.Length; index++)
+            var builder = new List<SmtVariableSubstitution>(parameters.Count);
+            for (var index = 0; index < parameters.Count; index++)
             {
                 var parameter = parameters[index];
                 var argument = invocationOperation.Arguments[index];
