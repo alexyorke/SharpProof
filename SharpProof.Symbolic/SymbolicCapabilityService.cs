@@ -404,7 +404,7 @@ namespace SharpProof.Symbolic
 
             public CapabilitySummary Analyze(SyntaxNode declaration, SemanticModel semanticModel)
             {
-                var declaredMethodSymbol = TryGetMethodSymbol(declaration, semanticModel);
+                var declaredMethodSymbol = TryGetMethodSymbol(declaration, semanticModel, _cancellationToken);
                 if (declaredMethodSymbol != null &&
                     _methodCache.TryGetValue(declaredMethodSymbol, out var cachedSummary))
                 {
@@ -708,9 +708,12 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
-            private static IMethodSymbol? TryGetMethodSymbol(SyntaxNode declaration, SemanticModel semanticModel)
+            private static IMethodSymbol? TryGetMethodSymbol(
+                SyntaxNode declaration,
+                SemanticModel semanticModel,
+                CancellationToken cancellationToken)
             {
-                return TryGetDeclaredSymbol(declaration, semanticModel, CancellationToken.None) as IMethodSymbol;
+                return TryGetDeclaredSymbol(declaration, semanticModel, cancellationToken) as IMethodSymbol;
             }
 
             private static bool IsSourceMethod(IMethodSymbol methodSymbol)

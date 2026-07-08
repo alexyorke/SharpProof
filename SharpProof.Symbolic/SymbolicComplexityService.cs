@@ -568,7 +568,8 @@ namespace SharpProof.Symbolic
                         return ComplexityArtifacts.Unknown(
                             SymbolicComplexityUnknownReason.UnknownCallee,
                             invocationSyntax,
-                            invocationSyntax.SyntaxTree);
+                            invocationSyntax.SyntaxTree,
+                            _cancellationToken);
                     }
 
                     if (TryGetKnownMethodCost(targetMethod, out _))
@@ -582,6 +583,7 @@ namespace SharpProof.Symbolic
                             SymbolicComplexityUnknownReason.ExternalCallee,
                             invocationSyntax,
                             invocationSyntax.SyntaxTree,
+                            _cancellationToken,
                             calleeSummaries: new[]
                             {
                                 new SymbolicComplexityCalleeInfo(
@@ -618,7 +620,8 @@ namespace SharpProof.Symbolic
                         return ComplexityArtifacts.Unknown(
                             SymbolicComplexityUnknownReason.UnknownCallee,
                             invocationSyntax,
-                            invocationSyntax.SyntaxTree);
+                            invocationSyntax.SyntaxTree,
+                            _cancellationToken);
                     }
 
                     invocationCosts.Add(AnalyzeMethodCall(
@@ -736,7 +739,8 @@ namespace SharpProof.Symbolic
                         return ComplexityArtifacts.Unknown(
                             SymbolicComplexityUnknownReason.UnsupportedOperation,
                             operation.Syntax,
-                            operation.Syntax.SyntaxTree);
+                            operation.Syntax.SyntaxTree,
+                            _cancellationToken);
 
                     default:
                         return CombineSequence(operation.ChildOperations.Select(child => AnalyzeOperation(child, semanticModel, currentMethod)));
@@ -784,6 +788,7 @@ namespace SharpProof.Symbolic
                             SymbolicComplexityUnknownReason.UnsupportedLoopShape,
                             forLoopOperation.Syntax,
                             forLoopOperation.Syntax.SyntaxTree,
+                            _cancellationToken,
                             beforeCost,
                             conditionCost,
                             bottomCost,
@@ -796,7 +801,8 @@ namespace SharpProof.Symbolic
                     "ForLoop",
                     "for-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
                     forStatement,
-                    forStatement.SyntaxTree));
+                    forStatement.SyntaxTree,
+                    _cancellationToken));
                 return CombineSequence(beforeCost, multiplied);
             }
 
@@ -817,6 +823,7 @@ namespace SharpProof.Symbolic
                             SymbolicComplexityUnknownReason.UnsupportedLoopShape,
                             forEachLoopOperation.Syntax,
                             forEachLoopOperation.Syntax.SyntaxTree,
+                            _cancellationToken,
                             collectionCost,
                             bodyCost));
                 }
@@ -826,7 +833,8 @@ namespace SharpProof.Symbolic
                     "ForeachLoop",
                     "foreach bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
                     foreachSyntax,
-                    foreachSyntax.SyntaxTree));
+                    foreachSyntax.SyntaxTree,
+                    _cancellationToken));
                 return CombineSequence(collectionCost, multiplied);
             }
 
@@ -850,6 +858,7 @@ namespace SharpProof.Symbolic
                         SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
                         whileLoopOperation.Syntax,
                         whileLoopOperation.Syntax.SyntaxTree,
+                        _cancellationToken,
                         conditionCost,
                         bodyCost);
                 }
@@ -859,7 +868,8 @@ namespace SharpProof.Symbolic
                     "WhileLoop",
                     "while-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
                     whileStatement,
-                    whileStatement.SyntaxTree));
+                    whileStatement.SyntaxTree,
+                    _cancellationToken));
                 return multiplied;
             }
 
@@ -883,6 +893,7 @@ namespace SharpProof.Symbolic
                         SymbolicComplexityUnknownReason.UnsupportedWhileLoop,
                         doLoopOperation.Syntax,
                         doLoopOperation.Syntax.SyntaxTree,
+                        _cancellationToken,
                         conditionCost,
                         bodyCost);
                 }
@@ -892,7 +903,8 @@ namespace SharpProof.Symbolic
                     "DoLoop",
                     "do-loop bound " + bound.Cost.ToBigOText(currentMethod) + " from " + bound.Description,
                     doStatement,
-                    doStatement.SyntaxTree));
+                    doStatement.SyntaxTree,
+                    _cancellationToken));
                 return multiplied;
             }
 
@@ -1078,6 +1090,7 @@ namespace SharpProof.Symbolic
                         SymbolicComplexityUnknownReason.ExternalCallee,
                         syntax,
                         syntax.SyntaxTree,
+                        _cancellationToken,
                         calleeSummaries: new[]
                         {
                             new SymbolicComplexityCalleeInfo(
@@ -1095,6 +1108,7 @@ namespace SharpProof.Symbolic
                         SymbolicComplexityUnknownReason.UnknownCallee,
                         syntax,
                         syntax.SyntaxTree,
+                        _cancellationToken,
                         calleeSummaries: new[]
                         {
                             new SymbolicComplexityCalleeInfo(
@@ -1126,7 +1140,8 @@ namespace SharpProof.Symbolic
                         "Call",
                         "call to " + calleeInfo.MethodDisplayName + " contributes " + calleeInfo.ComplexityText,
                         syntax,
-                        syntax.SyntaxTree));
+                        syntax.SyntaxTree,
+                        _cancellationToken));
                 }
 
                 return ComplexityArtifacts.FromCost(
@@ -1405,12 +1420,13 @@ namespace SharpProof.Symbolic
                 string kind,
                 string description,
                 SyntaxNode node,
-                SyntaxTree syntaxTree)
+                SyntaxTree syntaxTree,
+                CancellationToken cancellationToken)
             {
                 var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
                     syntaxTree,
                     node.SpanStart,
-                    CancellationToken.None,
+                    cancellationToken,
                     validatePosition: true);
                 return new SymbolicComplexityDriverInfo(
                     kind,
@@ -1434,7 +1450,7 @@ namespace SharpProof.Symbolic
                 cost.UnknownReason);
             }
 
-            private static bool TryGetForLoopBound(
+            private bool TryGetForLoopBound(
                 ForStatementSyntax forStatement,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1473,7 +1489,7 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
-            private static bool TryGetWhileLikeBound(
+            private bool TryGetWhileLikeBound(
                 ExpressionSyntax conditionExpression,
                 StatementSyntax loopBody,
                 SemanticModel semanticModel,
@@ -1512,7 +1528,7 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
-            private static bool TryGetForeachBound(
+            private bool TryGetForeachBound(
                 SyntaxNode collectionSyntaxNode,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1535,7 +1551,7 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
-            private static bool TryGetForLoopVariable(
+            private bool TryGetForLoopVariable(
                 ForStatementSyntax forStatement,
                 SemanticModel semanticModel,
                 out ISymbol loopSymbol,
@@ -1543,7 +1559,7 @@ namespace SharpProof.Symbolic
             {
                 if (forStatement.Declaration is { Variables.Count: 1 } declaration &&
                     declaration.Variables[0].Initializer != null &&
-                    semanticModel.GetDeclaredSymbol(declaration.Variables[0]) is ISymbol declaredSymbol)
+                    semanticModel.GetDeclaredSymbol(declaration.Variables[0], _cancellationToken) is ISymbol declaredSymbol)
                 {
                     loopSymbol = declaredSymbol;
                     initializerExpression = declaration.Variables[0].Initializer!.Value;
@@ -1552,7 +1568,7 @@ namespace SharpProof.Symbolic
 
                 if (forStatement.Initializers.Count == 1 &&
                     forStatement.Initializers[0] is AssignmentExpressionSyntax assignment &&
-                    semanticModel.GetSymbolInfo(assignment.Left).Symbol is ISymbol assignedSymbol)
+                    semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol is ISymbol assignedSymbol)
                 {
                     loopSymbol = assignedSymbol;
                     initializerExpression = assignment.Right;
@@ -1564,22 +1580,26 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            private static bool TryGetLoopConditionVariable(
+            private bool TryGetLoopConditionVariable(
                 BinaryExpressionSyntax condition,
                 SemanticModel semanticModel,
                 out ISymbol symbol)
             {
-                symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left)).Symbol!;
+                symbol = semanticModel.GetSymbolInfo(
+                    CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left),
+                    _cancellationToken).Symbol!;
                 if (symbol != null)
                 {
                     return true;
                 }
 
-                symbol = semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right)).Symbol!;
+                symbol = semanticModel.GetSymbolInfo(
+                    CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right),
+                    _cancellationToken).Symbol!;
                 return symbol != null;
             }
 
-            private static bool TryParseLoopCondition(
+            private bool TryParseLoopCondition(
                 BinaryExpressionSyntax condition,
                 ISymbol loopSymbol,
                 SemanticModel semanticModel,
@@ -1596,8 +1616,8 @@ namespace SharpProof.Symbolic
 
                 var left = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left);
                 var right = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right);
-                var leftSymbol = semanticModel.GetSymbolInfo(left).Symbol;
-                var rightSymbol = semanticModel.GetSymbolInfo(right).Symbol;
+                var leftSymbol = semanticModel.GetSymbolInfo(left, _cancellationToken).Symbol;
+                var rightSymbol = semanticModel.GetSymbolInfo(right, _cancellationToken).Symbol;
 
                 ExpressionSyntax? boundExpression = null;
                 if (SymbolEquals(leftSymbol, loopSymbol))
@@ -1631,7 +1651,7 @@ namespace SharpProof.Symbolic
                 return true;
             }
 
-            private static bool TryParseForLoopStep(
+            private bool TryParseForLoopStep(
                 ForStatementSyntax forStatement,
                 ISymbol loopSymbol,
                 SemanticModel semanticModel,
@@ -1646,7 +1666,7 @@ namespace SharpProof.Symbolic
                 return TryParseLoopStep(forStatement.Incrementors[0], loopSymbol, semanticModel, out direction);
             }
 
-            private static bool TryParseLoopStep(
+            private bool TryParseLoopStep(
                 ExpressionSyntax expression,
                 ISymbol loopSymbol,
                 SemanticModel semanticModel,
@@ -1658,18 +1678,18 @@ namespace SharpProof.Symbolic
                 {
                     case PostfixUnaryExpressionSyntax postfix
                         when (postfix.IsKind(SyntaxKind.PostIncrementExpression) || postfix.IsKind(SyntaxKind.PostDecrementExpression)) &&
-                             SymbolEquals(semanticModel.GetSymbolInfo(postfix.Operand).Symbol, loopSymbol):
+                             SymbolEquals(semanticModel.GetSymbolInfo(postfix.Operand, _cancellationToken).Symbol, loopSymbol):
                         direction = postfix.IsKind(SyntaxKind.PostIncrementExpression) ? StepDirection.Up : StepDirection.Down;
                         return true;
 
                     case PrefixUnaryExpressionSyntax prefix
                         when (prefix.IsKind(SyntaxKind.PreIncrementExpression) || prefix.IsKind(SyntaxKind.PreDecrementExpression)) &&
-                             SymbolEquals(semanticModel.GetSymbolInfo(prefix.Operand).Symbol, loopSymbol):
+                             SymbolEquals(semanticModel.GetSymbolInfo(prefix.Operand, _cancellationToken).Symbol, loopSymbol):
                         direction = prefix.IsKind(SyntaxKind.PreIncrementExpression) ? StepDirection.Up : StepDirection.Down;
                         return true;
 
                     case AssignmentExpressionSyntax assignment
-                        when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left).Symbol, loopSymbol):
+                        when SymbolEquals(semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol, loopSymbol):
                         if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
                             TryGetIntegralConstant(assignment.Right, semanticModel, out var addValue) &&
                             addValue > 0)
@@ -1715,7 +1735,7 @@ namespace SharpProof.Symbolic
                 }
             }
 
-            private static bool IsSymbolMutatedInStatement(
+            private bool IsSymbolMutatedInStatement(
                 ISymbol symbol,
                 StatementSyntax statement,
                 SemanticModel semanticModel,
@@ -1758,7 +1778,7 @@ namespace SharpProof.Symbolic
                 return allowRecognizedLoopUpdates ? sawMutation : false;
             }
 
-            private static List<StepDirection> GetRecognizedLoopUpdates(
+            private List<StepDirection> GetRecognizedLoopUpdates(
                 StatementSyntax loopBody,
                 ISymbol loopSymbol,
                 SemanticModel semanticModel)
@@ -1777,14 +1797,14 @@ namespace SharpProof.Symbolic
                 return updates;
             }
 
-            private static ImmutableArray<ISymbol> GetDependentSymbols(
+            private ImmutableArray<ISymbol> GetDependentSymbols(
                 ExpressionSyntax expression,
                 SemanticModel semanticModel)
             {
                 var builder = ImmutableArray.CreateBuilder<ISymbol>();
                 foreach (var identifier in expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
                 {
-                    if (semanticModel.GetSymbolInfo(identifier).Symbol is ISymbol symbol &&
+                    if (semanticModel.GetSymbolInfo(identifier, _cancellationToken).Symbol is ISymbol symbol &&
                         builder.All(existing => !SymbolEquals(existing, symbol)))
                     {
                         builder.Add(symbol);
@@ -1794,7 +1814,7 @@ namespace SharpProof.Symbolic
                 return builder.ToImmutable();
             }
 
-            private static bool TryCreateCostFromExpression(
+            private bool TryCreateCostFromExpression(
                 ExpressionSyntax? expression,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1848,7 +1868,7 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            private static bool TryCreateScalarCost(
+            private bool TryCreateScalarCost(
                 ExpressionSyntax expression,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1862,14 +1882,14 @@ namespace SharpProof.Symbolic
                     return true;
                 }
 
-                if (semanticModel.GetSymbolInfo(expression).Symbol is IParameterSymbol parameter &&
+                if (semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol is IParameterSymbol parameter &&
                     SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, currentMethod.OriginalDefinition))
                 {
                     cost = SymbolicCostExpression.Variable("$p" + parameter.Ordinal + ":value");
                     return true;
                 }
 
-                if (semanticModel.GetSymbolInfo(expression).Symbol is ISymbol symbol)
+                if (semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol is ISymbol symbol)
                 {
                     if (SymbolEqualityComparer.Default.Equals(symbol, currentMethod.AssociatedSymbol))
                     {
@@ -1885,7 +1905,7 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            private static bool TryCreateLengthOrCountCost(
+            private bool TryCreateLengthOrCountCost(
                 ExpressionSyntax expression,
                 SemanticModel semanticModel,
                 IMethodSymbol currentMethod,
@@ -1895,7 +1915,7 @@ namespace SharpProof.Symbolic
                     (string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) ||
                      string.Equals(memberAccess.Name.Identifier.ValueText, "Count", StringComparison.Ordinal)))
                 {
-                    if (semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is IParameterSymbol parameter &&
+                    if (semanticModel.GetSymbolInfo(memberAccess.Expression, _cancellationToken).Symbol is IParameterSymbol parameter &&
                         SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, currentMethod.OriginalDefinition))
                     {
                         cost = SymbolicCostExpression.Variable("$p" + parameter.Ordinal + ":length");
@@ -1908,17 +1928,17 @@ namespace SharpProof.Symbolic
                         return true;
                     }
 
-                    if (semanticModel.GetSymbolInfo(memberAccess.Expression).Symbol is ISymbol receiverSymbol)
+                    if (semanticModel.GetSymbolInfo(memberAccess.Expression, _cancellationToken).Symbol is ISymbol receiverSymbol)
                     {
                         cost = SymbolicCostExpression.Variable("name:" + receiverSymbol.Name + "." + memberAccess.Name.Identifier.ValueText);
                         return true;
                     }
                 }
 
-                var expressionType = semanticModel.GetTypeInfo(expression).Type;
+                var expressionType = semanticModel.GetTypeInfo(expression, _cancellationToken).Type;
                 if (expressionType != null && IsKnownSizedType(expressionType))
                 {
-                    if (semanticModel.GetSymbolInfo(expression).Symbol is IParameterSymbol parameter &&
+                    if (semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol is IParameterSymbol parameter &&
                         SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol.OriginalDefinition, currentMethod.OriginalDefinition))
                     {
                         cost = SymbolicCostExpression.Variable("$p" + parameter.Ordinal + ":length");
@@ -1931,7 +1951,7 @@ namespace SharpProof.Symbolic
                         return true;
                     }
 
-                    if (semanticModel.GetSymbolInfo(expression).Symbol is ISymbol receiverSymbol)
+                    if (semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol is ISymbol receiverSymbol)
                     {
                         cost = SymbolicCostExpression.Variable("name:" + receiverSymbol.Name + ".Length");
                         return true;
@@ -1942,12 +1962,12 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            private static bool TryGetIntegralConstant(
+            private bool TryGetIntegralConstant(
                 ExpressionSyntax expression,
                 SemanticModel semanticModel,
                 out long value)
             {
-                var constant = semanticModel.GetConstantValue(expression);
+                var constant = semanticModel.GetConstantValue(expression, _cancellationToken);
                 if (!constant.HasValue)
                 {
                     value = 0;
@@ -1989,13 +2009,13 @@ namespace SharpProof.Symbolic
                 }
             }
 
-            private static bool TryGetConstantBoolean(
+            private bool TryGetConstantBoolean(
                 SyntaxNode syntaxNode,
                 SemanticModel semanticModel,
                 out bool value)
             {
                 if (syntaxNode is ExpressionSyntax expression &&
-                    semanticModel.GetConstantValue(expression) is { HasValue: true, Value: bool boolValue })
+                    semanticModel.GetConstantValue(expression, _cancellationToken) is { HasValue: true, Value: bool boolValue })
                 {
                     value = boolValue;
                     return true;
@@ -2005,13 +2025,15 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            private static bool IsReferenceToSymbol(
+            private bool IsReferenceToSymbol(
                 ExpressionSyntax expression,
                 ISymbol symbol,
                 SemanticModel semanticModel)
             {
                 return SymbolEquals(
-                    semanticModel.GetSymbolInfo(CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression)).Symbol,
+                    semanticModel.GetSymbolInfo(
+                        CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression),
+                        _cancellationToken).Symbol,
                     symbol);
             }
 
@@ -2158,15 +2180,17 @@ namespace SharpProof.Symbolic
                 SymbolicComplexityUnknownReason reason,
                 SyntaxNode syntax,
                 SyntaxTree syntaxTree,
+                CancellationToken cancellationToken,
                 params ComplexityArtifacts[] parts)
             {
-                return Unknown(reason, syntax, syntaxTree, parts.AsEnumerable(), null);
+                return Unknown(reason, syntax, syntaxTree, cancellationToken, parts.AsEnumerable(), null);
             }
 
             public static ComplexityArtifacts Unknown(
                 SymbolicComplexityUnknownReason reason,
                 SyntaxNode syntax,
                 SyntaxTree syntaxTree,
+                CancellationToken cancellationToken,
                 IEnumerable<ComplexityArtifacts>? parts = null,
                 IEnumerable<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
             {
@@ -2188,7 +2212,7 @@ namespace SharpProof.Symbolic
                     callees.AddRange(calleeSummaries);
                 }
 
-                drivers.Add(CreateUnknownDriver(reason, syntax, syntaxTree));
+                drivers.Add(CreateUnknownDriver(reason, syntax, syntaxTree, cancellationToken));
                 return FromCost(SymbolicCostExpression.Unknown(reason), drivers, reasons, callees);
             }
 
@@ -2202,12 +2226,13 @@ namespace SharpProof.Symbolic
             private static SymbolicComplexityDriverInfo CreateUnknownDriver(
                 SymbolicComplexityUnknownReason reason,
                 SyntaxNode syntax,
-                SyntaxTree syntaxTree)
+                SyntaxTree syntaxTree,
+                CancellationToken cancellationToken)
             {
                 var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
                     syntaxTree,
                     syntax.SpanStart,
-                    CancellationToken.None,
+                    cancellationToken,
                     validatePosition: true);
                 return new SymbolicComplexityDriverInfo(
                     "Unknown",

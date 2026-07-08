@@ -613,6 +613,49 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void SymbolicProductionCode_DoesNotDropCancellationTokens()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var symbolicFiles = Directory.GetFiles(
+                    Path.Combine(repositoryRoot, "SharpProof.Symbolic"),
+                    "*.cs",
+                    SearchOption.AllDirectories)
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                })
+                .ToArray();
+
+            var offenders = symbolicFiles
+                .Where(static file => file.Source.Contains("CancellationToken.None", StringComparison.Ordinal))
+                .Select(static file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
+        public void SymbolicComplexityService_ThreadsCancellationTokenThroughSemanticLookups()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Symbolic",
+                    "SymbolicComplexityService.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Contain("semanticModel.GetDeclaredSymbol(declaration.Variables[0], _cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetTypeInfo(expression, _cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetConstantValue(expression, _cancellationToken)"));
+            Assert.That(source, Does.Contain("SymbolicSourceLocation.GetLineAndColumn(\n                    syntaxTree,\n                    node.SpanStart,\n                    cancellationToken,"));
+            Assert.That(source, Does.Contain("SymbolicSourceLocation.GetLineAndColumn(\n                    syntaxTree,\n                    syntax.SpanStart,\n                    cancellationToken,"));
+        }
+
+        [Test]
         public void AnalyzerAssignmentFacts_ThreadCancellationTokenThroughSymbolicLowering()
         {
             var repositoryRoot = FindRepositoryRoot();
