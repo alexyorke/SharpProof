@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Immutable;
+using System.Threading;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -32,7 +33,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (returnOperation.ReturnedValue != null)
             {
-                var sourceReturnedValue = GetSourceReturnedValueOperation(returnOperation, context.SemanticModel) ?? returnOperation.ReturnedValue;
+                var sourceReturnedValue = GetSourceReturnedValueOperation(returnOperation, context.SemanticModel, context.CancellationToken) ?? returnOperation.ReturnedValue;
                 PurityAnalysisEngine.LogDebug($"    [ReturnRule] Checking returned value: {returnOperation.ReturnedValue.Syntax} ({returnOperation.ReturnedValue.Kind})");
                 var valueResult = PurityAnalysisEngine.CheckSingleOperation(returnOperation.ReturnedValue, context, currentState);
                 if (!valueResult.IsPure)
@@ -59,9 +60,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState);
                 }
                 else if (IsAllowedTrustedArrayReturn(
-                             sourceReturnedValue,
-                             context.SemanticModel,
-                             out var trustedArrayReturnSymbol))
+                              sourceReturnedValue,
+                              context.SemanticModel,
+                              context.CancellationToken,
+                              out var trustedArrayReturnSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value flows from trusted array-return source '{trustedArrayReturnSymbol.ToDisplayString()}'. Return statement is Pure.");
                     return valueResult;
@@ -126,7 +128,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         "escaping_closure_fresh_mutable_object_capture",
                         currentState);
                 }
-                else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
+                else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var readOnlyCollectionMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes read-only collection view over caller-owned array through '{readOnlyCollectionMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
@@ -146,7 +148,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         "returned_list_read_only_view",
                         currentState);
                 }
-                else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, out var spanMethod))
+                else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var spanMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes span view over caller-owned array through '{spanMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
@@ -156,7 +158,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         "returned_array_span_view",
                         currentState);
                 }
-                else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, out var memoryConstructor))
+                else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var memoryConstructor))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes memory view over caller-owned array through '{memoryConstructor.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
@@ -167,11 +169,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState);
                 }
                 else if (TryFindReturnedInitializerArrayEscape(
-                             returnOperation.ReturnedValue,
-                             currentState,
-                             context.SemanticModel,
-                             out var escapeSyntax,
-                             out var escapeSymbol,
+                              returnOperation.ReturnedValue,
+                              currentState,
+                              context.SemanticModel,
+                              context.CancellationToken,
+                              out var escapeSyntax,
+                              out var escapeSymbol,
                              out var catalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes mutable array through '{escapeSyntax}'. Return statement is Impure.");
@@ -183,10 +186,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState);
                 }
                 else if (TryFindReturnedInitializerMutableObjectEscape(
-                             returnOperation.ReturnedValue,
-                             context.SemanticModel,
-                             out var nestedObjectEscapeSyntax,
-                             out var nestedObjectEscapeSymbol,
+                              returnOperation.ReturnedValue,
+                              context.SemanticModel,
+                              context.CancellationToken,
+                              out var nestedObjectEscapeSyntax,
+                              out var nestedObjectEscapeSymbol,
                              out var nestedObjectCatalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes fresh mutable object through '{nestedObjectEscapeSyntax}'. Return statement is Impure.");
@@ -198,10 +202,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState);
                 }
                 else if (TryFindMutableCollectionReturnEscape(
-                             returnOperation.ReturnedValue,
-                             context.SemanticModel,
-                             out var collectionEscapeSyntax,
-                             out var collectionEscapeSymbol,
+                              returnOperation.ReturnedValue,
+                              context.SemanticModel,
+                              context.CancellationToken,
+                              out var collectionEscapeSyntax,
+                              out var collectionEscapeSymbol,
                              out var collectionCatalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable collection through '{collectionEscapeSyntax}'. Return statement is Impure.");
@@ -213,10 +218,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                         currentState);
                 }
                 else if (TryFindFreshMutableObjectReturnEscape(
-                             returnOperation.ReturnedValue,
-                             context.SemanticModel,
-                             currentState,
-                             out var objectEscapeSyntax,
+                              returnOperation.ReturnedValue,
+                              context.SemanticModel,
+                              currentState,
+                              context.CancellationToken,
+                              out var objectEscapeSyntax,
                              out var objectEscapeSymbol,
                              out var objectCatalogSource))
                 {
@@ -369,7 +375,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                     catalogSource: catalogSource));
         }
 
-        private static IOperation? GetSourceReturnedValueOperation(IReturnOperation returnOperation, SemanticModel semanticModel)
+        private static IOperation? GetSourceReturnedValueOperation(
+            IReturnOperation returnOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var expressionSyntax = returnOperation.Syntax switch
             {
@@ -380,7 +389,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             return expressionSyntax == null
                 ? returnOperation.ReturnedValue
-                : semanticModel.GetOperation(expressionSyntax) ?? returnOperation.ReturnedValue;
+                : semanticModel.GetOperation(expressionSyntax, cancellationToken) ?? returnOperation.ReturnedValue;
         }
 
         private static bool IsAwaiterFactoryReturn(
@@ -511,12 +520,14 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool IsAllowedTrustedArrayReturn(
             IOperation? returnedValue,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
             return IsAllowedTrustedArrayReturn(
                 returnedValue,
                 semanticModel,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken,
                 out methodSymbol);
         }
 
@@ -524,8 +535,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? returnedValue,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
             if (PurityAnalysisEngine.IsTrustedNonEscapingArrayFactoryOperation(
                     unwrappedReturnedValue,
@@ -554,6 +567,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     returnedValue!,
                     semanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out methodSymbol))
             {
                 return true;
@@ -567,6 +581,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
                         semanticModel,
                         visitedLocals,
+                        cancellationToken,
                         out methodSymbol);
                 }
 
@@ -574,11 +589,13 @@ namespace SharpProof.Analyzer.Engine.Rules
                         conditionalOperation.WhenTrue,
                         semanticModel,
                         visitedLocals,
+                        cancellationToken,
                         out methodSymbol) &&
                     IsAllowedTrustedArrayReturn(
                         conditionalOperation.WhenFalse,
                         semanticModel,
                         new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                        cancellationToken,
                         out _))
                 {
                     return true;
@@ -591,11 +608,13 @@ namespace SharpProof.Analyzer.Engine.Rules
                         coalesceOperation.Value,
                         semanticModel,
                         visitedLocals,
+                        cancellationToken,
                         out methodSymbol) &&
                     IsAllowedTrustedArrayReturn(
                         coalesceOperation.WhenNull,
                         semanticModel,
                         new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                        cancellationToken,
                         out _))
                 {
                     return true;
@@ -611,6 +630,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation returnedValue,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
             if (!visitedLocals.Add(localSymbol))
@@ -620,7 +640,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -636,7 +656,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation == null)
             {
                 methodSymbol = null!;
@@ -647,6 +667,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 initializerOperation,
                 semanticModel,
                 visitedLocals,
+                cancellationToken,
                 out methodSymbol);
         }
 
@@ -697,6 +718,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? returnedValue,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
             return TryGetCallerOwnedArrayViewReturn(
@@ -704,6 +726,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 currentState,
                 semanticModel,
                 ArrayViewKind.ReadOnlyCollection,
+                cancellationToken,
                 out methodSymbol);
         }
 
@@ -711,6 +734,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? returnedValue,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
             return TryGetCallerOwnedArrayViewReturn(
@@ -718,6 +742,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 currentState,
                 semanticModel,
                 ArrayViewKind.Span,
+                cancellationToken,
                 out methodSymbol);
         }
 
@@ -725,6 +750,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation? returnedValue,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out IMethodSymbol constructorSymbol)
         {
             return TryGetCallerOwnedArrayViewReturn(
@@ -732,6 +758,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 currentState,
                 semanticModel,
                 ArrayViewKind.Memory,
+                cancellationToken,
                 out constructorSymbol);
         }
 
@@ -740,8 +767,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
             ArrayViewKind expectedKind,
+            CancellationToken cancellationToken,
             out IMethodSymbol methodSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (returnedValue != null &&
                 TryResolveReturnedArrayViewSource(
                     returnedValue,
@@ -749,6 +778,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     expectedKind,
                     new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken,
                     out var sourceOperation,
                     out methodSymbol))
             {
@@ -768,9 +798,11 @@ namespace SharpProof.Analyzer.Engine.Rules
             SemanticModel semanticModel,
             ArrayViewKind expectedKind,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IOperation sourceOperation,
             out IMethodSymbol methodSymbol)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(
                 PurityAnalysisEngine.SkipImplicitConversions(candidateOperation));
             if (unwrappedOperation == null)
@@ -793,6 +825,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     expectedKind,
                     visitedLocals,
+                    cancellationToken,
                     out sourceOperation,
                     out methodSymbol);
             }
@@ -805,6 +838,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     expectedKind,
                     visitedLocals,
+                    cancellationToken,
                     out sourceOperation,
                     out methodSymbol);
             }
@@ -819,6 +853,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         semanticModel,
                         expectedKind,
                         visitedLocals,
+                        cancellationToken,
                         out sourceOperation,
                         out methodSymbol);
                 }
@@ -826,19 +861,21 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return TryResolveReturnedArrayViewSource(
                            conditionalOperation.WhenTrue,
                            returnedValue,
-                           semanticModel,
-                           expectedKind,
-                           visitedLocals,
-                           out sourceOperation,
-                           out methodSymbol) ||
+                            semanticModel,
+                            expectedKind,
+                            visitedLocals,
+                            cancellationToken,
+                            out sourceOperation,
+                            out methodSymbol) ||
                        TryResolveReturnedArrayViewSource(
                            conditionalOperation.WhenFalse,
                            returnedValue,
-                           semanticModel,
-                           expectedKind,
-                           new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                           out sourceOperation,
-                           out methodSymbol);
+                            semanticModel,
+                            expectedKind,
+                            new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                            cancellationToken,
+                            out sourceOperation,
+                            out methodSymbol);
             }
 
             if (unwrappedOperation is ICoalesceOperation coalesceOperation)
@@ -846,19 +883,21 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return TryResolveReturnedArrayViewSource(
                            coalesceOperation.Value,
                            returnedValue,
-                           semanticModel,
-                           expectedKind,
-                           visitedLocals,
-                           out sourceOperation,
-                           out methodSymbol) ||
+                            semanticModel,
+                            expectedKind,
+                            visitedLocals,
+                            cancellationToken,
+                            out sourceOperation,
+                            out methodSymbol) ||
                        TryResolveReturnedArrayViewSource(
                            coalesceOperation.WhenNull,
                            returnedValue,
-                           semanticModel,
-                           expectedKind,
-                           new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
-                           out sourceOperation,
-                           out methodSymbol);
+                            semanticModel,
+                            expectedKind,
+                            new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                            cancellationToken,
+                            out sourceOperation,
+                            out methodSymbol);
             }
 
             sourceOperation = null!;
@@ -1024,6 +1063,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             SemanticModel semanticModel,
             ArrayViewKind expectedKind,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out IOperation sourceOperation,
             out IMethodSymbol methodSymbol)
         {
@@ -1035,7 +1075,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -1054,11 +1094,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return TryResolveReturnedArrayViewSource(
-                semanticModel.GetOperation(initializerSyntax),
+                semanticModel.GetOperation(initializerSyntax, cancellationToken),
                 returnedValue,
                 semanticModel,
                 expectedKind,
                 visitedLocals,
+                cancellationToken,
                 out sourceOperation,
                 out methodSymbol);
         }
@@ -1183,12 +1224,15 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation returnedValue,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (IsOwnedLocalArrayReturn(assignment.Value, currentState, out var localSymbol))
                 {
                     escapeSyntax = assignment.Value.Syntax;
@@ -1208,7 +1252,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
             {
-                if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -1242,10 +1287,12 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool TryFindMutableCollectionReturnEscape(
             IOperation returnedValue,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
             if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
                 PurityAnalysisEngine.IsKnownMutableCollectionBoundaryType(invocationOperation.Type))
@@ -1261,6 +1308,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     localReference.Local,
                     returnedValue,
                     semanticModel,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out catalogSource))
@@ -1284,22 +1332,25 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return TryFindMutableCollectionReturnEscape(
                         selectedBranch,
                         semanticModel,
+                        cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
                         out catalogSource);
                 }
 
                 return TryFindMutableCollectionReturnEscape(
-                           conditionalOperation.WhenTrue!,
-                           semanticModel,
-                           out escapeSyntax,
+                            conditionalOperation.WhenTrue!,
+                            semanticModel,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        (conditionalOperation.WhenFalse != null &&
                         TryFindMutableCollectionReturnEscape(
-                           conditionalOperation.WhenFalse,
-                           semanticModel,
-                           out escapeSyntax,
+                            conditionalOperation.WhenFalse,
+                            semanticModel,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource));
             }
@@ -1307,15 +1358,17 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
             {
                 return TryFindMutableCollectionReturnEscape(
-                           coalesceOperation.Value,
-                           semanticModel,
-                           out escapeSyntax,
+                            coalesceOperation.Value,
+                            semanticModel,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        TryFindMutableCollectionReturnEscape(
-                           coalesceOperation.WhenNull,
-                           semanticModel,
-                           out escapeSyntax,
+                            coalesceOperation.WhenNull,
+                            semanticModel,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource);
             }
@@ -1329,16 +1382,20 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool TryFindReturnedInitializerMutableObjectEscape(
             IOperation returnedValue,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (TryFindFreshMutableObjectReturnEscape(
                     assignment.Value,
                     semanticModel,
                     currentState: null,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out _))
@@ -1350,7 +1407,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
             {
-                if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -1361,6 +1419,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         argument.Value,
                         semanticModel,
                         currentState: null,
+                        cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
                         out _))
@@ -1381,10 +1440,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation returnedValue,
             SemanticModel semanticModel,
             PurityAnalysisEngine.PurityAnalysisState? currentState,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
             if (unwrappedReturnedValue is IObjectCreationOperation objectCreationOperation &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
@@ -1399,6 +1460,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 TryFindNestedCallableFreshMutableObjectReturnEscape(
                     invocationOperation,
                     semanticModel,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out catalogSource))
@@ -1412,7 +1474,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                         localReference.Local,
                         returnedValue.Syntax,
                         semanticModel,
-                        currentState))
+                        currentState,
+                        cancellationToken))
                 {
                     escapeSyntax = returnedValue.Syntax;
                     escapeSymbol = localReference.Local;
@@ -1424,6 +1487,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         localReference.Local,
                         returnedValue,
                         semanticModel,
+                        cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
                         out catalogSource))
@@ -1436,10 +1500,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 foreach (var element in tupleOperation.Elements)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (TryFindFreshMutableObjectReturnEscape(
                             element,
                             semanticModel,
                             currentState,
+                            cancellationToken,
                             out escapeSyntax,
                             out escapeSymbol,
                             out catalogSource))
@@ -1472,24 +1538,27 @@ namespace SharpProof.Analyzer.Engine.Rules
                         selectedBranch,
                         semanticModel,
                         currentState,
+                        cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
                         out catalogSource);
                 }
 
                 return TryFindFreshMutableObjectReturnEscape(
-                           conditionalOperation.WhenTrue!,
-                           semanticModel,
-                           currentState,
-                           out escapeSyntax,
+                            conditionalOperation.WhenTrue!,
+                            semanticModel,
+                            currentState,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        (conditionalOperation.WhenFalse != null &&
                         TryFindFreshMutableObjectReturnEscape(
-                           conditionalOperation.WhenFalse,
-                           semanticModel,
-                           currentState,
-                           out escapeSyntax,
+                            conditionalOperation.WhenFalse,
+                            semanticModel,
+                            currentState,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource));
             }
@@ -1497,17 +1566,19 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
             {
                 return TryFindFreshMutableObjectReturnEscape(
-                           coalesceOperation.Value,
-                           semanticModel,
-                           currentState,
-                           out escapeSyntax,
+                            coalesceOperation.Value,
+                            semanticModel,
+                            currentState,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource) ||
                        TryFindFreshMutableObjectReturnEscape(
-                           coalesceOperation.WhenNull,
-                           semanticModel,
-                           currentState,
-                           out escapeSyntax,
+                            coalesceOperation.WhenNull,
+                            semanticModel,
+                            currentState,
+                            cancellationToken,
+                            out escapeSyntax,
                            out escapeSymbol,
                            out catalogSource);
             }
@@ -1521,6 +1592,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool TryFindNestedCallableFreshMutableObjectReturnEscape(
             IInvocationOperation invocationOperation,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
@@ -1530,11 +1602,14 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     out var returnedOperation,
                     out _,
-                    out var returnedSemanticModel) ||
+                    out var returnedSemanticModel,
+                    currentState: null,
+                    cancellationToken: cancellationToken) ||
                 !TryFindFreshMutableObjectReturnEscape(
                     returnedOperation,
                     returnedSemanticModel,
                     currentState: null,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out var nestedCatalogSource))
@@ -1555,6 +1630,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             IOperation returnedValue,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
@@ -1564,6 +1640,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 returnedValue,
                 semanticModel,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                cancellationToken,
                 out escapeSyntax,
             out escapeSymbol,
             out catalogSource);
@@ -1573,12 +1650,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             IOperation returnedValue,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -1598,11 +1676,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation != null &&
                 TryFindMutableCollectionReturnEscape(
                     initializerOperation,
                     semanticModel,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out var nestedCatalogSource))
@@ -1624,6 +1703,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation returnedValue,
             SemanticModel semanticModel,
             HashSet<ILocalSymbol> visitedLocals,
+            CancellationToken cancellationToken,
             out SyntaxNode escapeSyntax,
             out ISymbol escapeSymbol,
             out string catalogSource)
@@ -1637,7 +1717,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -1654,17 +1734,19 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
             else if (TryGetDeconstructionElementInitializer(
-                         localSymbol,
-                         returnedValue.Syntax,
-                         semanticModel,
-                         out initializerSyntax,
-                         out declarationSyntax))
+                          localSymbol,
+                          returnedValue.Syntax,
+                          semanticModel,
+                          cancellationToken,
+                          out initializerSyntax,
+                          out declarationSyntax))
             {
                 if (HasAssignmentToLocalBetweenDeclarationAndObservation(
                         localSymbol,
                         returnedValue.Syntax,
                         declarationSyntax,
-                        semanticModel))
+                        semanticModel,
+                        cancellationToken))
                 {
                     escapeSyntax = null!;
                     escapeSymbol = null!;
@@ -1680,7 +1762,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax, cancellationToken));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
@@ -1694,6 +1776,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 TryFindReturnedInitializerMutableObjectEscape(
                     initializerOperation,
                     semanticModel,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out var nestedCatalogSource))
@@ -1714,6 +1797,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     returnedValue,
                     semanticModel,
                     visitedLocals,
+                    cancellationToken,
                     out escapeSyntax,
                     out escapeSymbol,
                     out catalogSource);
@@ -1729,6 +1813,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out ExpressionSyntax initializerSyntax,
             out SyntaxNode declarationSyntax)
         {
@@ -1736,6 +1821,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     localSymbol,
                     observationSyntax,
                     semanticModel,
+                    cancellationToken,
                     out initializerSyntax,
                     out declarationSyntax))
             {
@@ -1743,14 +1829,14 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var designation = localSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<SingleVariableDesignationSyntax>()
                 .FirstOrDefault();
             if (designation == null ||
                 !TryGetDeconstructionDesignationPath(designation, out var path) ||
                 designation.FirstAncestorOrSelf<AssignmentExpressionSyntax>() is not { } assignment ||
                 !TryGetTupleElementExpression(assignment.Right, path, out initializerSyntax) ||
-                semanticModel.GetDeclaredSymbol(designation) is not ILocalSymbol declaredSymbol ||
+                semanticModel.GetDeclaredSymbol(designation, cancellationToken) is not ILocalSymbol declaredSymbol ||
                 !SymbolEqualityComparer.Default.Equals(declaredSymbol, localSymbol))
             {
                 initializerSyntax = null!;
@@ -1766,6 +1852,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out ExpressionSyntax initializerSyntax,
             out SyntaxNode declarationSyntax)
         {
@@ -1778,18 +1865,20 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             var localDeclarationStart = localSymbol.DeclaringSyntaxReferences
-                .Select(static reference => reference.GetSyntax().SpanStart)
+                .Select(reference => reference.GetSyntax(cancellationToken).SpanStart)
                 .DefaultIfEmpty(int.MinValue)
                 .Min();
 
             foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (assignment.SpanStart <= localDeclarationStart ||
                     assignment.SpanStart >= observationSyntax.SpanStart ||
                     !TryGetDeconstructionAssignmentTargetPath(
                         assignment.Left,
                         localSymbol,
                         semanticModel,
+                        cancellationToken,
                         out var path) ||
                     !TryGetTupleElementExpression(assignment.Right, path, out var candidateInitializer))
                 {
@@ -1807,6 +1896,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ExpressionSyntax target,
             ILocalSymbol localSymbol,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             out ImmutableArray<int> path)
         {
             var builder = ImmutableArray.CreateBuilder<int>();
@@ -1814,6 +1904,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     UnwrapParenthesizedExpression(target),
                     localSymbol,
                     semanticModel,
+                    cancellationToken,
                     builder))
             {
                 path = builder.ToImmutable();
@@ -1828,6 +1919,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ExpressionSyntax target,
             ILocalSymbol localSymbol,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             ImmutableArray<int>.Builder path)
         {
             target = UnwrapParenthesizedExpression(target);
@@ -1837,11 +1929,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                     declarationExpression.Designation,
                     localSymbol,
                     semanticModel,
+                    cancellationToken,
                     path);
             }
 
             if (target is IdentifierNameSyntax identifierName &&
-                semanticModel.GetSymbolInfo(identifierName).Symbol is ILocalSymbol targetLocal &&
+                semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol targetLocal &&
                 SymbolEqualityComparer.Default.Equals(targetLocal, localSymbol))
             {
                 return true;
@@ -1857,6 +1950,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             tuple.Arguments[i].Expression,
                             localSymbol,
                             semanticModel,
+                            cancellationToken,
                             path))
                     {
                         return true;
@@ -1873,10 +1967,11 @@ namespace SharpProof.Analyzer.Engine.Rules
             VariableDesignationSyntax designation,
             ILocalSymbol localSymbol,
             SemanticModel semanticModel,
+            CancellationToken cancellationToken,
             ImmutableArray<int>.Builder path)
         {
             if (designation is SingleVariableDesignationSyntax singleVariable &&
-                semanticModel.GetDeclaredSymbol(singleVariable) is ILocalSymbol declaredLocal &&
+                semanticModel.GetDeclaredSymbol(singleVariable, cancellationToken) is ILocalSymbol declaredLocal &&
                 SymbolEqualityComparer.Default.Equals(declaredLocal, localSymbol))
             {
                 return true;
@@ -1892,6 +1987,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                             parenthesized.Variables[i],
                             localSymbol,
                             semanticModel,
+                            cancellationToken,
                             path))
                     {
                         return true;
@@ -1979,7 +2075,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,
             SyntaxNode declarationSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
             if (containingBlock == null)
@@ -1996,12 +2093,13 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (assignment.SpanStart < start || assignment.SpanStart >= end)
                 {
                     continue;
                 }
 
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
                 {
                     return true;
@@ -2013,7 +2111,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
         private static bool IsConstructionWithEscapingParameters(
             IObjectCreationOperation objectCreationOperation,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             if (objectCreationOperation.Type is not INamedTypeSymbol namedType ||
                 objectCreationOperation.Constructor == null)
@@ -2023,6 +2122,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var argument in objectCreationOperation.Arguments)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var parameter = argument.Parameter;
                 if (parameter == null)
                 {
@@ -2034,7 +2134,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return true;
                 }
 
-                if (ConstructorStoresParameterInInstanceMember(objectCreationOperation.Constructor, parameter, semanticModel))
+                if (ConstructorStoresParameterInInstanceMember(objectCreationOperation.Constructor, parameter, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -2046,15 +2146,18 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool ConstructorStoresParameterInInstanceMember(
             IMethodSymbol constructor,
             IParameterSymbol parameter,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
             {
-                var constructorSyntax = syntaxReference.GetSyntax();
+                cancellationToken.ThrowIfCancellationRequested();
+                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
                 var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
                 foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                 {
-                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
                     {
                         continue;
                     }

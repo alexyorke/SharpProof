@@ -255,7 +255,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                         semanticModel,
                         out var returnedOperation,
                         out _,
-                        out var returnedSemanticModel):
+                        out var returnedSemanticModel,
+                        cancellationToken: cancellationToken):
                     return TryResolveStableObjectCreationInitializer(
                         returnedOperation,
                         observationSyntax,
@@ -330,7 +331,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     out var returnedOperation,
                     out _,
-                    out var returnedSemanticModel))
+                    out var returnedSemanticModel,
+                    cancellationToken: cancellationToken))
             {
                 return TryResolveStableObjectCreationInitializer(
                     returnedOperation,
@@ -750,7 +752,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                     semanticModel,
                     out var returnedOperation,
                     out _,
-                    out var returnedSemanticModel))
+                    out var returnedSemanticModel,
+                    cancellationToken: cancellationToken))
             {
                 return HasStableFreshMutableObjectValueInOperation(
                     returnedOperation,

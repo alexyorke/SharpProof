@@ -774,6 +774,48 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void ReturnRule_ThreadsCancellationTokenThroughEscapeScans()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var returnSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "ReturnStatementPurityRule.cs"))
+                .Replace("\r\n", "\n");
+            var engineSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "PurityAnalysisEngine.cs"))
+                .Replace("\r\n", "\n");
+            var classifierSource = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "OwnedFreshMutableObjectClassifier.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(returnSource, Does.Not.Contain("GetSyntax()"));
+            Assert.That(returnSource, Does.Not.Match(@"(?:semanticModel|constructorModel)\.GetOperation\([^,\r\n]+\)"));
+            Assert.That(returnSource, Does.Not.Match(@"semanticModel\.GetDeclaredSymbol\([^,\r\n]+\)"));
+            Assert.That(returnSource, Does.Not.Match(@"semanticModel\.GetSymbolInfo\([^,\r\n]+\)"));
+            Assert.That(returnSource, Does.Contain("GetSourceReturnedValueOperation(returnOperation, context.SemanticModel, context.CancellationToken)"));
+            Assert.That(returnSource, Does.Contain("TryFindFreshMutableObjectReturnEscape(\n                              returnOperation.ReturnedValue,\n                              context.SemanticModel,\n                              currentState,\n                              context.CancellationToken,"));
+            Assert.That(returnSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("semanticModel.GetDeclaredSymbol(designation, cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol"));
+            Assert.That(returnSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("cancellationToken: cancellationToken"));
+            Assert.That(engineSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
+            Assert.That(engineSource, Does.Contain("returnedSemanticModel.GetOperation(returnedExpressionSyntax, cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("TryGetSingleReturnedValueFromInvocation(\n                        invocationOperation,\n                        semanticModel,\n                        out var returnedOperation,\n                        out _,\n                        out var returnedSemanticModel,\n                        cancellationToken: cancellationToken)"));
+        }
+
+        [Test]
         public void ReturnRule_DelegatesReturnedClosureArrayCaptureToDelegateRule()
         {
             var repositoryRoot = FindRepositoryRoot();

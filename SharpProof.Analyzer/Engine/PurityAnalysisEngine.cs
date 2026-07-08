@@ -3488,8 +3488,10 @@ namespace SharpProof.Analyzer.Engine
             SemanticModel semanticModel,
             out IOperation returnedOperation,
             out SyntaxNode returnedExpressionSyntax,
-            out SemanticModel returnedSemanticModel)
+            out SemanticModel returnedSemanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             returnedOperation = null!;
             returnedExpressionSyntax = null!;
             returnedSemanticModel = semanticModel;
@@ -3501,7 +3503,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             var callableSyntax = methodSymbol.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .FirstOrDefault();
             if (callableSyntax == null ||
                 !TryGetSingleReturnedExpressionSyntax(callableSyntax, out returnedExpressionSyntax))
@@ -3510,7 +3512,7 @@ namespace SharpProof.Analyzer.Engine
             }
 
             returnedSemanticModel = semanticModel.Compilation.GetSemanticModel(callableSyntax.SyntaxTree);
-            var extractedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax)!);
+            var extractedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax, cancellationToken)!);
             if (extractedOperation == null)
             {
                 return false;
@@ -3535,6 +3537,7 @@ namespace SharpProof.Analyzer.Engine
             out IOperation returnedOperation,
             out SyntaxNode returnedExpressionSyntax,
             out SemanticModel returnedSemanticModel,
+            CancellationToken cancellationToken,
             PurityAnalysisState? currentState = null)
         {
             if (TryGetSingleReturnedValueFromNestedCallable(
@@ -3542,7 +3545,8 @@ namespace SharpProof.Analyzer.Engine
                     semanticModel,
                     out returnedOperation,
                     out returnedExpressionSyntax,
-                    out returnedSemanticModel))
+                    out returnedSemanticModel,
+                    cancellationToken))
             {
                 return true;
             }
@@ -3563,7 +3567,8 @@ namespace SharpProof.Analyzer.Engine
                         semanticModel,
                         out returnedOperation,
                         out returnedExpressionSyntax,
-                        out returnedSemanticModel);
+                        out returnedSemanticModel,
+                        cancellationToken);
                 }
             }
 
