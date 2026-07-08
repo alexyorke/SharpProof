@@ -2720,7 +2720,7 @@ namespace SharpProof.Symbolic.Smt
             {
                 var memberName = memberNames[index];
                 var memberSymbol = semanticModel.GetSymbolInfo(memberName, cancellationToken).Symbol;
-                if (!TryGetMemberType(memberSymbol, out memberType))
+                if (!SymbolicTypeFacts.TryGetMemberType(memberSymbol, out memberType))
                 {
                     return false;
                 }

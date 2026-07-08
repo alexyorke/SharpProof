@@ -410,5 +410,46 @@ namespace SharpProof.Symbolic
                 .FirstOrDefault(static field => !field.IsStatic)!;
             return fieldSymbol != null;
         }
+
+        public static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)
+        {
+            switch (memberSymbol)
+            {
+                case IPropertySymbol propertySymbol:
+                    type = propertySymbol.Type;
+                    return true;
+                case IFieldSymbol fieldSymbol:
+                    type = fieldSymbol.Type;
+                    return true;
+                default:
+                    type = null!;
+                    return false;
+            }
+        }
+
+        public static bool IsSupportedTupleCarrierType(ITypeSymbol type)
+        {
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType && namedType.TupleElements.Length > 0)
+            {
+                return true;
+            }
+
+            return namedType
+                .GetMembers()
+                .OfType<IFieldSymbol>()
+                .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
+        }
+
+        public static bool IsTupleElementStorageName(string name)
+        {
+            return name.Length > 4 &&
+                name.StartsWith("Item", StringComparison.Ordinal) &&
+                name.Skip(4).All(char.IsDigit);
+        }
     }
 }

@@ -445,7 +445,7 @@ namespace SharpProof.Symbolic.Smt
                 return true;
             }
 
-            if (IsSupportedTupleCarrierType(type))
+            if (SymbolicTypeFacts.IsSupportedTupleCarrierType(type))
             {
                 formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Reference);
                 return true;
@@ -2358,7 +2358,7 @@ namespace SharpProof.Symbolic.Smt
             if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
             {
                 if (semanticModel.GetSymbolInfo(memberBinding.Name, cancellationToken).Symbol is not { } memberSymbol ||
-                    !TryGetMemberType(memberSymbol, out var memberType) ||
+                    !SymbolicTypeFacts.TryGetMemberType(memberSymbol, out var memberType) ||
                     !SymbolEqualityComparer.Default.Equals(memberType, expectedType))
                 {
                     return false;
@@ -2579,7 +2579,7 @@ namespace SharpProof.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (!TryGetMemberType(memberSymbol, out var memberType))
+            if (!SymbolicTypeFacts.TryGetMemberType(memberSymbol, out var memberType))
             {
                 return false;
             }
@@ -2678,7 +2678,7 @@ namespace SharpProof.Symbolic.Smt
             if (expression is not IdentifierNameSyntax ||
                 semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not IPropertySymbol and not IFieldSymbol ||
                 semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not { IsStatic: false } memberSymbol ||
-                !TryGetMemberType(memberSymbol, out var memberType))
+                !SymbolicTypeFacts.TryGetMemberType(memberSymbol, out var memberType))
             {
                 return false;
             }
@@ -2945,7 +2945,7 @@ namespace SharpProof.Symbolic.Smt
         private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)
         {
             var tupleField = fieldSymbol.CorrespondingTupleField ?? fieldSymbol;
-            if (IsTupleElementStorageName(tupleField.Name))
+            if (SymbolicTypeFacts.IsTupleElementStorageName(tupleField.Name))
             {
                 storageName = tupleField.Name;
                 return true;
@@ -2984,7 +2984,7 @@ namespace SharpProof.Symbolic.Smt
                 }
 
                 var tupleField = element.CorrespondingTupleField ?? element;
-                if (IsTupleElementStorageName(tupleField.Name))
+                if (SymbolicTypeFacts.IsTupleElementStorageName(tupleField.Name))
                 {
                     storageName = tupleField.Name;
                     return true;
@@ -2993,13 +2993,6 @@ namespace SharpProof.Symbolic.Smt
 
             storageName = string.Empty;
             return false;
-        }
-
-        private static bool IsTupleElementStorageName(string name)
-        {
-            return name.Length > 4 &&
-                name.StartsWith("Item", StringComparison.Ordinal) &&
-                name.Skip(4).All(char.IsDigit);
         }
 
         private static bool TryCreateMemberFormula(
@@ -3090,7 +3083,7 @@ namespace SharpProof.Symbolic.Smt
 
         private static bool TryGetTupleCarrierKind(ITypeSymbol type, out SmtValueKind kind)
         {
-            if (IsSupportedTupleCarrierType(type))
+            if (SymbolicTypeFacts.IsSupportedTupleCarrierType(type))
             {
                 kind = SmtValueKind.Reference;
                 return true;
@@ -3100,43 +3093,9 @@ namespace SharpProof.Symbolic.Smt
             return false;
         }
 
-        private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
-        {
-            if (type is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            if (namedType.IsTupleType && namedType.TupleElements.Length > 0)
-            {
-                return true;
-            }
-
-            return namedType
-                .GetMembers()
-                .OfType<IFieldSymbol>()
-                .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
-        }
-
         private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
         {
             return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
-        }
-
-        private static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)
-        {
-            switch (memberSymbol)
-            {
-                case IPropertySymbol propertySymbol:
-                    type = propertySymbol.Type;
-                    return true;
-                case IFieldSymbol fieldSymbol:
-                    type = fieldSymbol.Type;
-                    return true;
-                default:
-                    type = null!;
-                    return false;
-            }
         }
 
         private static string GetVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion)

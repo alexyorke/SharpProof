@@ -3305,7 +3305,7 @@ namespace SharpProof.Symbolic.Smt
             if (expression is not IdentifierNameSyntax ||
                 semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not IPropertySymbol and not IFieldSymbol ||
                 semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not { IsStatic: false } memberSymbol ||
-                !TryGetMemberType(memberSymbol, out var memberType) ||
+                !SymbolicTypeFacts.TryGetMemberType(memberSymbol, out var memberType) ||
                 memberType.SpecialType != SpecialType.System_String)
             {
                 return false;
@@ -3827,7 +3827,7 @@ namespace SharpProof.Symbolic.Smt
 
         private static bool TryGetTupleElementIndex(string name, out int index)
         {
-            if (!IsTupleElementStorageName(name) ||
+            if (!SymbolicTypeFacts.IsTupleElementStorageName(name) ||
                 !int.TryParse(name.Substring(4), NumberStyles.None, CultureInfo.InvariantCulture, out index) ||
                 index <= 0)
             {

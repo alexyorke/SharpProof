@@ -1843,7 +1843,7 @@ namespace SharpProof.Symbolic.Smt
         private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)
         {
             var tupleField = fieldSymbol.CorrespondingTupleField ?? fieldSymbol;
-            if (IsTupleElementStorageName(tupleField.Name))
+            if (SymbolicTypeFacts.IsTupleElementStorageName(tupleField.Name))
             {
                 storageName = tupleField.Name;
                 return true;
@@ -1851,13 +1851,6 @@ namespace SharpProof.Symbolic.Smt
 
             storageName = string.Empty;
             return false;
-        }
-
-        private static bool IsTupleElementStorageName(string name)
-        {
-            return name.Length > 4 &&
-                name.StartsWith("Item", StringComparison.Ordinal) &&
-                name.Skip(4).All(char.IsDigit);
         }
 
         private static void AddReferenceNonNullFact(
@@ -1907,7 +1900,7 @@ namespace SharpProof.Symbolic.Smt
             {
                 var memberName = memberNames[index];
                 var memberSymbol = semanticModel.GetSymbolInfo(memberName, cancellationToken).Symbol;
-                if (!TryGetMemberType(memberSymbol, out memberType))
+                if (!SymbolicTypeFacts.TryGetMemberType(memberSymbol, out memberType))
                 {
                     return false;
                 }
@@ -2026,7 +2019,7 @@ namespace SharpProof.Symbolic.Smt
             }
 
             if (type.IsReferenceType ||
-                IsSupportedTupleCarrierType(type))
+                SymbolicTypeFacts.IsSupportedTupleCarrierType(type))
             {
                 kind = SmtValueKind.Reference;
                 return true;
@@ -2034,40 +2027,6 @@ namespace SharpProof.Symbolic.Smt
 
             kind = default;
             return false;
-        }
-
-        private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
-        {
-            if (type is not INamedTypeSymbol namedType)
-            {
-                return false;
-            }
-
-            if (namedType.IsTupleType && namedType.TupleElements.Length > 0)
-            {
-                return true;
-            }
-
-            return namedType
-                .GetMembers()
-                .OfType<IFieldSymbol>()
-                .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
-        }
-
-        private static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)
-        {
-            switch (memberSymbol)
-            {
-                case IPropertySymbol propertySymbol:
-                    type = propertySymbol.Type;
-                    return true;
-                case IFieldSymbol fieldSymbol:
-                    type = fieldSymbol.Type;
-                    return true;
-                default:
-                    type = null!;
-                    return false;
-            }
         }
 
         private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
