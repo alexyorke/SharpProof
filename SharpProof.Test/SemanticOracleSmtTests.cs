@@ -1572,7 +1572,7 @@ public class TestClass
         [Test]
         public void SymbolicProgramPointFacts_CollectCompletedLoopExitInvariantFacts_ReturnsForLoopExitFacts()
         {
-            var facts = CollectCompletedLoopExitFacts(
+            var facts = SemanticOracleSmtTestBase.CollectCompletedLoopExitFacts(
                 @"
 public class TestClass
 {
@@ -1595,7 +1595,7 @@ public class TestClass
         [Test]
         public void SymbolicProgramPointFacts_CollectCompletedLoopExitInvariantFacts_SuppressesLoopExitFactsWhenBreakCanExitLoop()
         {
-            var facts = CollectCompletedLoopExitFacts(
+            var facts = SemanticOracleSmtTestBase.CollectCompletedLoopExitFacts(
                 @"
 public class TestClass
 {
@@ -9573,23 +9573,6 @@ public class TestClass
             var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
-        }
-
-        private static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "CompletedLoopFactHost",
-                AnalyzerTestHost.GetMinimalFrameworkReferences());
-            var loopStatement = context.Root
-                .DescendantNodes()
-                .OfType<StatementSyntax>()
-                .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
-
-            return SymbolicProgramPointFacts
-                .CollectCompletedLoopExitInvariantFacts(loopStatement, context.SemanticModel, CancellationToken.None)
-                .Select(static fact => SymbolicFormulaDisplay.Format(fact))
-                .ToArray();
         }
 
         private static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)

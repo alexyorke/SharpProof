@@ -368,7 +368,7 @@ public sealed class NotNullIfNotNullIndexer
             return snapshot.Facts.ToArray();
         }
 
-        protected static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
+        internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
         {
             var context = AnalyzerTestHost.CreateSourceContext(
                 source,
