@@ -32,8 +32,24 @@ namespace SharpProof.Analyzer
                     context.SemanticModel.Compilation,
                     context.CancellationToken,
                     out var declaredComplexity,
-                    out var attributeLocation))
+                    out var attributeLocation,
+                    out var invalidContractReason))
             {
+                return;
+            }
+
+            if (invalidContractReason != null)
+            {
+                if (!baseline.IsSuppressed(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId, methodSymbol, context.Node.SyntaxTree))
+                {
+                    context.ReportDiagnostic(CreateUnknownDiagnostic(
+                        methodSymbol,
+                        declaredComplexity,
+                        attributeLocation,
+                        invalidContractReason,
+                        context.CancellationToken));
+                }
+
                 return;
             }
 
@@ -100,10 +116,12 @@ namespace SharpProof.Analyzer
             Compilation compilation,
             CancellationToken cancellationToken,
             out DeclaredComplexity declaredComplexity,
-            out Location? attributeLocation)
+            out Location? attributeLocation,
+            out string? invalidContractReason)
         {
             declaredComplexity = default;
             attributeLocation = null;
+            invalidContractReason = null;
 
             var attributeSymbol =
                 compilation.GetTypeByMetadataName("SharpProof.Attributes.ExpectedComplexityAttribute") ??
@@ -119,10 +137,19 @@ namespace SharpProof.Analyzer
 
                 attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 if (attribute.ConstructorArguments.Length != 1 ||
-                    attribute.ConstructorArguments[0].Value is not int intValue ||
-                    !Enum.IsDefined(typeof(DeclaredComplexityKind), intValue))
+                    attribute.ConstructorArguments[0].Value is not int intValue)
                 {
-                    declaredComplexity = new DeclaredComplexity(DeclaredComplexityKind.Linear);
+                    declaredComplexity = new DeclaredComplexity(default, "invalid");
+                    invalidContractReason = "invalid expected complexity argument";
+                    return true;
+                }
+
+                if (!Enum.IsDefined(typeof(DeclaredComplexityKind), intValue))
+                {
+                    declaredComplexity = new DeclaredComplexity(
+                        (DeclaredComplexityKind)intValue,
+                        intValue.ToString());
+                    invalidContractReason = "invalid expected complexity value '" + intValue + "'";
                     return true;
                 }
 
@@ -167,7 +194,12 @@ namespace SharpProof.Analyzer
                 return false;
             }
 
-            comparison = actualRank.CompareTo(GetRank(declared));
+            if (!TryGetRank(declared, out var declaredRank))
+            {
+                return false;
+            }
+
+            comparison = actualRank.CompareTo(declaredRank);
             return true;
         }
 
@@ -190,15 +222,23 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private static int GetRank(DeclaredComplexityKind kind)
+        private static bool TryGetRank(DeclaredComplexityKind kind, out int rank)
         {
-            return kind switch
+            switch (kind)
             {
-                DeclaredComplexityKind.Constant => 0,
-                DeclaredComplexityKind.Linear => 1,
-                DeclaredComplexityKind.Quadratic => 2,
-                _ => 1,
-            };
+                case DeclaredComplexityKind.Constant:
+                    rank = 0;
+                    return true;
+                case DeclaredComplexityKind.Linear:
+                    rank = 1;
+                    return true;
+                case DeclaredComplexityKind.Quadratic:
+                    rank = 2;
+                    return true;
+                default:
+                    rank = -1;
+                    return false;
+            }
         }
 
         private static Diagnostic CreateExceededDiagnostic(
@@ -276,15 +316,19 @@ namespace SharpProof.Analyzer
                  string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
         }
 
-        private readonly record struct DeclaredComplexity(DeclaredComplexityKind Kind)
+        private readonly record struct DeclaredComplexity(
+            DeclaredComplexityKind Kind,
+            string? TextOverride = null)
         {
-            public string Text => Kind switch
-            {
-                DeclaredComplexityKind.Constant => "O(1)",
-                DeclaredComplexityKind.Linear => "O(n)",
-                DeclaredComplexityKind.Quadratic => "O(n^2)",
-                _ => Kind.ToString(),
-            };
+            public string Text =>
+                TextOverride ??
+                Kind switch
+                {
+                    DeclaredComplexityKind.Constant => "O(1)",
+                    DeclaredComplexityKind.Linear => "O(n)",
+                    DeclaredComplexityKind.Quadratic => "O(n^2)",
+                    _ => Kind.ToString(),
+                };
         }
 
         private enum DeclaredComplexityKind

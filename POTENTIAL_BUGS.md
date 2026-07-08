@@ -1195,14 +1195,6 @@ Unlike `MethodPurityAnalyzer`, this has no `IsInMetadata` early return. `SourceT
 
 ---
 
-## 133. `MethodExpectedComplexityAnalyzer` silently defaults unknown enum values to Linear
-
-**File:** `SharpProof.Analyzer/MethodExpectedComplexityAnalyzer.cs:120-126,194-202`
-
-If the attribute receives an int outside `[0-2]`, `Enum.IsDefined` returns false and it falls back to `Linear`. A user writing `[ExpectedComplexity(99)]` gets no error. `GetRank` also has `_ => 1` (Linear) as default, doubling the silent fallback.
-
----
-
 ## 134. `GetRuntimeHazardMode` config parse — confusing value-to-mode mapping
 
 **File:** `SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs:376-383`

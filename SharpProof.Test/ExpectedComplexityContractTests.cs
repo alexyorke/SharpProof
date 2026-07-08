@@ -213,6 +213,28 @@ public static class C
         }
 
         [Test]
+        public async Task ExpectedComplexity_InvalidEnumValue_ReportsSp0022()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity((ComplexityKind)99)]
+    public static int Work(int value)
+    {
+        return value + 1;
+    }
+}";
+
+            var diagnostics = await GetComplexityDiagnosticsAsync(test);
+            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+            Assert.That(diagnostic.GetMessage(), Does.Contain("invalid").And.Contain("99"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExpectedComplexityProperty], Is.EqualTo("99"));
+        }
+
+        [Test]
         public async Task ExpectedComplexity_OnProperty_ReportsSp0023()
         {
             var test = @"
