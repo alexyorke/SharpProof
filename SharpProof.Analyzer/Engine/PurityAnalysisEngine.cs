@@ -6173,6 +6173,7 @@ namespace SharpProof.Analyzer.Engine
             return HasDisposedResourceFactForTerm(
                 term,
                 currentState,
+                observationSyntax: null,
                 new HashSet<SymbolicTerm>());
         }
 
@@ -6182,7 +6183,7 @@ namespace SharpProof.Analyzer.Engine
             SyntaxNode observationSyntax)
         {
             var term = CreateSymbolicReferenceTerm(resourceSymbol, currentState);
-            return HasDisposedResourceFactForTermBefore(
+            return HasDisposedResourceFactForTerm(
                 term,
                 currentState,
                 observationSyntax,
@@ -6553,48 +6554,7 @@ namespace SharpProof.Analyzer.Engine
         private static bool HasDisposedResourceFactForTerm(
             SymbolicTerm resourceTerm,
             PurityAnalysisState currentState,
-            HashSet<SymbolicTerm> visitedTerms)
-        {
-            if (!visitedTerms.Add(resourceTerm))
-            {
-                return false;
-            }
-
-            foreach (var fact in currentState.PathState.Facts)
-            {
-                if (!fact.Polarity ||
-                    fact.Confidence != SymbolicFactConfidence.Exact)
-                {
-                    continue;
-                }
-
-                switch (fact.Atom)
-                {
-                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal
-                        when Equals(disposal.Resource, resourceTerm):
-                        return true;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime
-                        when Equals(lifetime.Resource, resourceTerm) &&
-                             IsMergedAllPathReleaseFact(fact):
-                        return true;
-                }
-            }
-
-            foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
-            {
-                if (HasDisposedResourceFactForTerm(aliasTerm, currentState, visitedTerms))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasDisposedResourceFactForTermBefore(
-            SymbolicTerm resourceTerm,
-            PurityAnalysisState currentState,
-            SyntaxNode observationSyntax,
+            SyntaxNode? observationSyntax,
             HashSet<SymbolicTerm> visitedTerms)
         {
             if (!visitedTerms.Add(resourceTerm))
@@ -6606,26 +6566,20 @@ namespace SharpProof.Analyzer.Engine
             {
                 if (!fact.Polarity ||
                     fact.Confidence != SymbolicFactConfidence.Exact ||
-                    !IsPriorDisposalFactOnCompatiblePath(fact, observationSyntax))
+                    (observationSyntax != null && !IsPriorDisposalFactOnCompatiblePath(fact, observationSyntax)))
                 {
                     continue;
                 }
 
-                switch (fact.Atom)
+                if (IsDisposedResourceFactForTerm(fact, resourceTerm))
                 {
-                    case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal
-                        when Equals(disposal.Resource, resourceTerm):
-                        return true;
-                    case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime
-                        when Equals(lifetime.Resource, resourceTerm) &&
-                             IsMergedAllPathReleaseFact(fact):
-                        return true;
+                    return true;
                 }
             }
 
             foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
             {
-                if (HasDisposedResourceFactForTermBefore(
+                if (HasDisposedResourceFactForTerm(
                         aliasTerm,
                         currentState,
                         observationSyntax,
@@ -6636,6 +6590,24 @@ namespace SharpProof.Analyzer.Engine
             }
 
             return false;
+        }
+
+        private static bool IsDisposedResourceFactForTerm(
+            SymbolicFact fact,
+            SymbolicTerm resourceTerm)
+        {
+            switch (fact.Atom)
+            {
+                case SymbolicDisposalAtom { State: SymbolicDisposalState.Disposed } disposal
+                    when Equals(disposal.Resource, resourceTerm):
+                    return true;
+                case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Released } lifetime
+                    when Equals(lifetime.Resource, resourceTerm) &&
+                         IsMergedAllPathReleaseFact(fact):
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static bool IsPriorDisposalFactOnCompatiblePath(

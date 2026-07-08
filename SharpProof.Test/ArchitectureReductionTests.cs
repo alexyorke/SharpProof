@@ -1177,7 +1177,7 @@ namespace SharpProof.Test
             Assert.That(engineSource, Does.Contain("WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax"));
             Assert.That(engineSource, Does.Contain("statement is DoStatementSyntax doStatement"));
             Assert.That(engineSource, Does.Contain("HasDisposedResourceFactBefore("));
-            Assert.That(engineSource, Does.Contain("HasDisposedResourceFactForTermBefore("));
+            Assert.That(engineSource, Does.Contain("observationSyntax != null && !IsPriorDisposalFactOnCompatiblePath(fact, observationSyntax)"));
             Assert.That(engineSource, Does.Contain("IsPriorDisposalFactOnCompatiblePath("));
             Assert.That(engineSource, Does.Contain("IsPriorDisposalSpanOnCompatiblePath("));
             Assert.That(engineSource, Does.Contain("FirstAncestorOrSelf<SwitchSectionSyntax>()"));
