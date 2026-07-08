@@ -27,7 +27,7 @@ namespace SharpProof.Symbolic.Smt
                 return false;
             }
 
-            argumentExpression = UnwrapExpression(argumentExpression);
+            argumentExpression = CSharpSyntaxFacts.UnwrapConditionExpression(argumentExpression);
             if (argumentExpression is not BinaryExpressionSyntax remainderExpression ||
                 !remainderExpression.IsKind(SyntaxKind.ModuloExpression) ||
                 !HasSupportedIntegralType(remainderExpression.Left, semanticModel, cancellationToken) ||
@@ -68,32 +68,5 @@ namespace SharpProof.Symbolic.Smt
                 typeSymbol.TypeKind == TypeKind.Enum;
         }
 
-        private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-        {
-            while (true)
-            {
-                if (expression is ParenthesizedExpressionSyntax parenthesizedExpression)
-                {
-                    expression = parenthesizedExpression.Expression;
-                    continue;
-                }
-
-                if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                    postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-                {
-                    expression = postfixUnary.Operand;
-                    continue;
-                }
-
-                if (expression is CheckedExpressionSyntax checkedExpression &&
-                    checkedExpression.IsKind(SyntaxKind.CheckedExpression))
-                {
-                    expression = checkedExpression.Expression;
-                    continue;
-                }
-
-                return expression;
-            }
-        }
     }
 }

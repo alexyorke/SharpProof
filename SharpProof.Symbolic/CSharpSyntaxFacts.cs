@@ -127,5 +127,33 @@ namespace SharpProof.Symbolic
             listPattern = null!;
             return false;
         }
+
+        public static ExpressionSyntax UnwrapConditionExpression(ExpressionSyntax expression)
+        {
+            while (true)
+            {
+                if (expression is ParenthesizedExpressionSyntax parenthesizedExpression)
+                {
+                    expression = parenthesizedExpression.Expression;
+                    continue;
+                }
+
+                if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
+                    postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                {
+                    expression = postfixUnary.Operand;
+                    continue;
+                }
+
+                if (expression is CheckedExpressionSyntax checkedExpression &&
+                    checkedExpression.IsKind(SyntaxKind.CheckedExpression))
+                {
+                    expression = checkedExpression.Expression;
+                    continue;
+                }
+
+                return expression;
+            }
+        }
     }
 }
