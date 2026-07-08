@@ -966,6 +966,16 @@ namespace SharpProof.Symbolic
             ValidatePositive(startColumn, nameof(startColumn));
             ValidatePositive(endLine, nameof(endLine));
             ValidatePositive(endColumn, nameof(endColumn));
+            if (endLine < startLine)
+            {
+                throw new ArgumentOutOfRangeException(nameof(endLine), "End line cannot be before start line.");
+            }
+
+            if (endLine == startLine && endColumn < startColumn)
+            {
+                throw new ArgumentOutOfRangeException(nameof(endColumn), "End column cannot be before start column on the same line.");
+            }
+
             return new SymbolicQueryTarget(
                 SymbolicQueryTargetKind.LineSpan,
                 startLine: startLine,
