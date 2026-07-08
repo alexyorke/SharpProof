@@ -67,6 +67,21 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task MultipleMisplacedAttributesOnProperty_ReportEachDiagnostic()
+        {
+            var test = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0003:EnforcePure|}, {|SP0014:ZeroAllocations|}]
+    public int Value => 42;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task EnforcePureAttributeOnConversionOperator_NoPlacementDiagnostic()
         {
             var test = @"

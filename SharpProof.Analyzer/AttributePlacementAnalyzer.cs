@@ -48,7 +48,6 @@ namespace SharpProof.Analyzer
                         enforcePureAttributeLocation
                     );
                     context.ReportDiagnostic(diagnostic);
-                    return;
                 }
             }
 
@@ -62,7 +61,6 @@ namespace SharpProof.Analyzer
                         pureAttributeLocation
                     );
                     context.ReportDiagnostic(diagnostic);
-                    return;
                 }
             }
 
@@ -75,7 +73,6 @@ namespace SharpProof.Analyzer
                         SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
                         allowSynchronizationAttributeLocation);
                     context.ReportDiagnostic(diag);
-                    return;
                 }
             }
 
@@ -88,7 +85,6 @@ namespace SharpProof.Analyzer
                         SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
                         zeroAllocationsAttributeLocation);
                     context.ReportDiagnostic(diag);
-                    return;
                 }
             }
 
@@ -101,7 +97,6 @@ namespace SharpProof.Analyzer
                         SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
                         allowedCapabilitiesAttributeLocation);
                     context.ReportDiagnostic(diag);
-                    return;
                 }
             }
 
@@ -114,7 +109,6 @@ namespace SharpProof.Analyzer
                         SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
                         ensuresAttributeLocation);
                     context.ReportDiagnostic(diag);
-                    return;
                 }
             }
 
@@ -127,7 +121,6 @@ namespace SharpProof.Analyzer
                         SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
                         expectedComplexityAttributeLocation);
                     context.ReportDiagnostic(diag);
-                    return;
                 }
             }
         }
