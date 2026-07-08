@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -64,6 +65,270 @@ namespace SharpProof.Analyzer
             var name = reader.GetString(reference.Name);
             var ns = reader.GetString(reference.Namespace);
             return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+        }
+    }
+
+    internal static class SummaryMethodIdentityMap
+    {
+        internal static ImmutableDictionary<string, ActualMethodIdentity> Load(
+            string path,
+            bool normalizeSignatureTypeNames,
+            bool includeMethodAttributes)
+        {
+            using var stream = File.OpenRead(path);
+            using var peReader = new PEReader(stream);
+            if (!peReader.HasMetadata)
+            {
+                return ImmutableDictionary<string, ActualMethodIdentity>.Empty;
+            }
+
+            var metadataReader = peReader.GetMetadataReader();
+            var builder = ImmutableDictionary.CreateBuilder<string, ActualMethodIdentity>(StringComparer.Ordinal);
+            var methodBodyHashProvider = new MethodBodyHashProvider(path);
+            foreach (var handle in metadataReader.MethodDefinitions)
+            {
+                var definition = metadataReader.GetMethodDefinition(handle);
+                var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
+                var identity = new ActualMethodIdentity(
+                    token,
+                    methodBodyHashProvider,
+                    definition.RelativeVirtualAddress,
+                    includeMethodAttributes ? definition.Attributes : 0);
+                foreach (var key in GetMethodKeys(metadataReader, handle, normalizeSignatureTypeNames))
+                {
+                    builder[key] = identity;
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static IEnumerable<string> GetMethodKeys(
+            MetadataReader reader,
+            MethodDefinitionHandle handle,
+            bool normalizeSignatureTypeNames)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
+            var exactTypeName = SummaryMetadataNames.NormalizeExactTypeName(typeName);
+            var methodName = reader.GetString(definition.Name);
+            var displaySignature = DecodeMethodSignature(reader, definition, normalizeSignatureTypeNames, useGenericContext: true);
+            var positionalDisplaySignature = DecodeMethodSignature(reader, definition, normalizeSignatureTypeNames, useGenericContext: false);
+            var exactSignature = DecodeExactMethodSignature(reader, definition, normalizeSignatureTypeNames, useGenericContext: true);
+            var positionalExactSignature = DecodeExactMethodSignature(reader, definition, normalizeSignatureTypeNames, useGenericContext: false);
+            var keys = new[]
+            {
+                typeName + "." + methodName + displaySignature,
+                typeName + "." + methodName + displaySignature,
+                typeName + "." + methodName + positionalDisplaySignature,
+                exactTypeName + "." + methodName + exactSignature,
+                exactTypeName + "." + methodName + positionalExactSignature,
+                GetRoslynLikeMethodSymbol(reader, definition, typeName, displaySignature),
+            };
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var key in keys)
+            {
+                if (seen.Add(key))
+                {
+                    yield return key;
+                }
+            }
+        }
+
+        private static string DecodeMethodSignature(
+            MetadataReader reader,
+            MethodDefinition definition,
+            bool normalizeTypeNames,
+            bool useGenericContext)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(
+                    new SummarySignatureTypeNameProvider(normalizeTypeNames),
+                    useGenericContext ? CreateGenericContext(reader, definition) : null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)";
+            }
+        }
+
+        private static string DecodeExactMethodSignature(
+            MetadataReader reader,
+            MethodDefinition definition,
+            bool normalizeTypeNames,
+            bool useGenericContext)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(
+                    new SummarySignatureTypeNameProvider(normalizeTypeNames),
+                    useGenericContext ? CreateGenericContext(reader, definition) : null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
+        private static string GetRoslynLikeMethodSymbol(
+            MetadataReader reader,
+            MethodDefinition definition,
+            string typeName,
+            string displaySignature)
+        {
+            var rawMethodName = reader.GetString(definition.Name);
+            var methodName = rawMethodName;
+
+            if (string.Equals(rawMethodName, ".ctor", StringComparison.Ordinal))
+            {
+                var lastSeparator = typeName.LastIndexOfAny(new[] { '.', '+' });
+                methodName = lastSeparator >= 0 ? typeName.Substring(lastSeparator + 1) : typeName;
+            }
+            else if (rawMethodName.StartsWith("get_", StringComparison.Ordinal))
+            {
+                methodName = rawMethodName.Substring(4) + ".get";
+            }
+            else if (rawMethodName.StartsWith("set_", StringComparison.Ordinal))
+            {
+                methodName = rawMethodName.Substring(4) + ".set";
+            }
+            else
+            {
+                var genericNames = definition.GetGenericParameters()
+                    .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .ToArray();
+                if (genericNames.Length > 0)
+                {
+                    methodName += "<" + string.Join(", ", genericNames) + ">";
+                }
+            }
+
+            return typeName + "." + methodName + displaySignature;
+        }
+
+        private static GenericContext CreateGenericContext(MetadataReader reader, MethodDefinition definition)
+        {
+            var typeDefinition = reader.GetTypeDefinition(definition.GetDeclaringType());
+            var typeParameters = typeDefinition.GetGenericParameters()
+                .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
+                .ToImmutableArray();
+            var methodParameters = definition.GetGenericParameters()
+                .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
+                .ToImmutableArray();
+            return new GenericContext(typeParameters, methodParameters);
+        }
+
+        private sealed class SummarySignatureTypeNameProvider : ISignatureTypeProvider<string, object?>
+        {
+            private readonly bool _normalizeTypeNames;
+
+            public SummarySignatureTypeNameProvider(bool normalizeTypeNames)
+            {
+                _normalizeTypeNames = normalizeTypeNames;
+            }
+
+            public string GetArrayType(string elementType, ArrayShape shape)
+            {
+                var rank = Math.Max(shape.Rank, 1);
+                return elementType + "[" + new string(',', rank - 1) + "]";
+            }
+
+            public string GetByReferenceType(string elementType) => "ref " + elementType;
+
+            public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
+
+            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments)
+                => genericType + "<" + string.Join(", ", typeArguments) + ">";
+
+            public string GetGenericMethodParameter(object? genericContext, int index)
+            {
+                var context = genericContext as GenericContext;
+                return context != null && index >= 0 && index < context.MethodParameters.Length
+                    ? context.MethodParameters[index]
+                    : "!!" + index;
+            }
+
+            public string GetGenericTypeParameter(object? genericContext, int index)
+            {
+                var context = genericContext as GenericContext;
+                return context != null && index >= 0 && index < context.TypeParameters.Length
+                    ? context.TypeParameters[index]
+                    : "!" + index;
+            }
+
+            public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
+
+            public string GetPinnedType(string elementType) => elementType;
+
+            public string GetPointerType(string elementType) => elementType + "*";
+
+            public string GetPrimitiveType(PrimitiveTypeCode typeCode)
+            {
+                return typeCode switch
+                {
+                    PrimitiveTypeCode.Boolean => "bool",
+                    PrimitiveTypeCode.Byte => "byte",
+                    PrimitiveTypeCode.Char => "char",
+                    PrimitiveTypeCode.Double => "double",
+                    PrimitiveTypeCode.Int16 => "short",
+                    PrimitiveTypeCode.Int32 => "int",
+                    PrimitiveTypeCode.Int64 => "long",
+                    PrimitiveTypeCode.IntPtr => "nint",
+                    PrimitiveTypeCode.Object => "object",
+                    PrimitiveTypeCode.SByte => "sbyte",
+                    PrimitiveTypeCode.Single => "float",
+                    PrimitiveTypeCode.String => "string",
+                    PrimitiveTypeCode.TypedReference => "typedref",
+                    PrimitiveTypeCode.UInt16 => "ushort",
+                    PrimitiveTypeCode.UInt32 => "uint",
+                    PrimitiveTypeCode.UInt64 => "ulong",
+                    PrimitiveTypeCode.UIntPtr => "nuint",
+                    PrimitiveTypeCode.Void => "void",
+                    _ => typeCode.ToString(),
+                };
+            }
+
+            public string GetSZArrayType(string elementType) => elementType + "[]";
+
+            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
+                => NormalizeIfNeeded(SummaryMetadataNames.GetTypeName(metadataReader, handle));
+
+            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
+                => NormalizeIfNeeded(SummaryMetadataNames.GetTypeReferenceName(metadataReader, handle));
+
+            public string GetTypeFromSpecification(
+                MetadataReader metadataReader,
+                object? genericContext,
+                TypeSpecificationHandle handle,
+                byte rawTypeKind)
+            {
+                return metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
+            }
+
+            private string NormalizeIfNeeded(string typeName)
+            {
+                return _normalizeTypeNames
+                    ? SummaryMetadataNames.NormalizeExactTypeName(typeName)
+                    : typeName;
+            }
+        }
+
+        private sealed class GenericContext
+        {
+            public GenericContext(ImmutableArray<string> typeParameters, ImmutableArray<string> methodParameters)
+            {
+                TypeParameters = typeParameters;
+                MethodParameters = methodParameters;
+            }
+
+            public ImmutableArray<string> TypeParameters { get; }
+
+            public ImmutableArray<string> MethodParameters { get; }
         }
     }
 

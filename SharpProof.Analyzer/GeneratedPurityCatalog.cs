@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
-using System.Reflection.PortableExecutable;
 using System.Text.Json;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -556,7 +553,12 @@ namespace SharpProof.Analyzer
                 }
 
                 var path = referencePath!;
-                var methodMap = MethodIdentityCache.GetOrAdd(path, static resolvedPath => LoadMethodIdentities(resolvedPath));
+                var methodMap = MethodIdentityCache.GetOrAdd(
+                    path,
+                    static resolvedPath => SummaryMethodIdentityMap.Load(
+                        resolvedPath,
+                        normalizeSignatureTypeNames: true,
+                        includeMethodAttributes: true));
                 foreach (var key in GetSymbolKeys(methodSymbol))
                 {
                     if (methodMap.TryGetValue(key, out var identity))
@@ -582,7 +584,12 @@ namespace SharpProof.Analyzer
                 return false;
             }
 
-            var implementationMethodMap = MethodIdentityCache.GetOrAdd(assemblyPath, static path => LoadMethodIdentities(path));
+            var implementationMethodMap = MethodIdentityCache.GetOrAdd(
+                assemblyPath,
+                static path => SummaryMethodIdentityMap.Load(
+                    path,
+                    normalizeSignatureTypeNames: true,
+                    includeMethodAttributes: true));
             foreach (var key in GetSymbolKeys(methodSymbol))
             {
                 if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
@@ -606,7 +613,12 @@ namespace SharpProof.Analyzer
                 return false;
             }
 
-            var implementationMethodMap = MethodIdentityCache.GetOrAdd(assemblyPath, static path => LoadMethodIdentities(path));
+            var implementationMethodMap = MethodIdentityCache.GetOrAdd(
+                assemblyPath,
+                static path => SummaryMethodIdentityMap.Load(
+                    path,
+                    normalizeSignatureTypeNames: true,
+                    includeMethodAttributes: true));
             foreach (var key in methodKeys)
             {
                 if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
@@ -617,293 +629,6 @@ namespace SharpProof.Analyzer
             }
 
             return false;
-        }
-
-        private static ImmutableDictionary<string, ActualMethodIdentity> LoadMethodIdentities(string path)
-        {
-            using var stream = File.OpenRead(path);
-            using var peReader = new PEReader(stream);
-            if (!peReader.HasMetadata)
-            {
-                return ImmutableDictionary<string, ActualMethodIdentity>.Empty;
-            }
-
-            var metadataReader = peReader.GetMetadataReader();
-            var builder = ImmutableDictionary.CreateBuilder<string, ActualMethodIdentity>(StringComparer.Ordinal);
-            var methodBodyHashProvider = new MethodBodyHashProvider(path);
-            foreach (var handle in metadataReader.MethodDefinitions)
-            {
-                var definition = metadataReader.GetMethodDefinition(handle);
-                var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
-                var identity = new ActualMethodIdentity(
-                    token,
-                    methodBodyHashProvider,
-                    definition.RelativeVirtualAddress,
-                    definition.Attributes);
-                foreach (var key in GetMethodKeys(metadataReader, handle))
-                {
-                    builder[key] = identity;
-                }
-            }
-
-            return builder.ToImmutable();
-        }
-
-        private static IEnumerable<string> GetMethodKeys(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var raw = GetMethodSymbol(reader, handle);
-            yield return raw;
-
-            var effectSummaryKey = GetEffectSummaryLikeMethodSymbol(reader, handle);
-            if (!string.Equals(effectSummaryKey, raw, StringComparison.Ordinal))
-            {
-                yield return effectSummaryKey;
-            }
-
-            var positionalEffectSummaryKey = GetPositionalEffectSummaryLikeMethodSymbol(reader, handle);
-            if (!string.Equals(positionalEffectSummaryKey, raw, StringComparison.Ordinal) &&
-                !string.Equals(positionalEffectSummaryKey, effectSummaryKey, StringComparison.Ordinal))
-            {
-                yield return positionalEffectSummaryKey;
-            }
-
-            var exactKey = GetExactMethodKey(reader, handle);
-            if (!string.Equals(exactKey, raw, StringComparison.Ordinal) &&
-                !string.Equals(exactKey, effectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(exactKey, positionalEffectSummaryKey, StringComparison.Ordinal))
-            {
-                yield return exactKey;
-            }
-
-            var positionalExactKey = GetPositionalExactMethodKey(reader, handle);
-            if (!string.Equals(positionalExactKey, raw, StringComparison.Ordinal) &&
-                !string.Equals(positionalExactKey, effectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(positionalExactKey, positionalEffectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(positionalExactKey, exactKey, StringComparison.Ordinal))
-            {
-                yield return positionalExactKey;
-            }
-
-            var roslynDisplay = GetRoslynLikeMethodSymbol(reader, handle);
-            if (!string.Equals(roslynDisplay, raw, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, positionalEffectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, exactKey, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, positionalExactKey, StringComparison.Ordinal))
-            {
-                yield return roslynDisplay;
-            }
-        }
-
-        private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
-            var methodName = reader.GetString(definition.Name);
-            var signature = DecodeMethodSignature(reader, definition);
-            return typeName + "." + methodName + signature;
-        }
-
-        private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)";
-            }
-        }
-
-        private static string DecodePositionalMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)";
-            }
-        }
-
-        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)->?";
-            }
-        }
-
-        private static string DecodePositionalExactMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)->?";
-            }
-        }
-
-        private static string GetEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
-            return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
-        }
-
-        private static string GetPositionalEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
-            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalMethodSignature(reader, definition);
-        }
-
-        private static string GetExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType()));
-            return typeName + "." + reader.GetString(definition.Name) + DecodeExactMethodSignature(reader, definition);
-        }
-
-        private static string GetPositionalExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType()));
-            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalExactMethodSignature(reader, definition);
-        }
-
-        private static string GetRoslynLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = SummaryMetadataNames.GetTypeName(reader, definition.GetDeclaringType());
-            var rawMethodName = reader.GetString(definition.Name);
-            var methodName = rawMethodName;
-
-            if (string.Equals(rawMethodName, ".ctor", StringComparison.Ordinal))
-            {
-                var lastSeparator = typeName.LastIndexOfAny(new[] { '.', '+' });
-                methodName = lastSeparator >= 0 ? typeName.Substring(lastSeparator + 1) : typeName;
-            }
-            else if (rawMethodName.StartsWith("get_", StringComparison.Ordinal))
-            {
-                methodName = rawMethodName.Substring(4) + ".get";
-            }
-            else if (rawMethodName.StartsWith("set_", StringComparison.Ordinal))
-            {
-                methodName = rawMethodName.Substring(4) + ".set";
-            }
-            else
-            {
-                var genericNames = definition.GetGenericParameters()
-                    .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .ToArray();
-                if (genericNames.Length > 0)
-                {
-                    methodName += "<" + string.Join(", ", genericNames) + ">";
-                }
-            }
-
-            return typeName + "." + methodName + DecodeMethodSignature(reader, definition);
-        }
-
-        private static GenericContext CreateGenericContext(MetadataReader reader, MethodDefinition definition)
-        {
-            var typeDefinition = reader.GetTypeDefinition(definition.GetDeclaringType());
-            var typeParameters = typeDefinition.GetGenericParameters()
-                .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
-                .ToImmutableArray();
-            var methodParameters = definition.GetGenericParameters()
-                .Select(handle => reader.GetString(reader.GetGenericParameter(handle).Name))
-                .ToImmutableArray();
-            return new GenericContext(typeParameters, methodParameters);
-        }
-
-        private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
-        {
-            public EffectSummaryTypeNameProvider(MetadataReader reader)
-            {
-            }
-
-            public string GetArrayType(string elementType, ArrayShape shape)
-            {
-                var rank = Math.Max(shape.Rank, 1);
-                return elementType + "[" + new string(',', rank - 1) + "]";
-            }
-
-            public string GetByReferenceType(string elementType) => "ref " + elementType;
-            public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
-            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => genericType + "<" + string.Join(", ", typeArguments) + ">";
-            public string GetGenericMethodParameter(object? genericContext, int index)
-            {
-                var context = genericContext as GenericContext;
-                return context != null && index >= 0 && index < context.MethodParameters.Length
-                    ? context.MethodParameters[index]
-                    : "!!" + index;
-            }
-            public string GetGenericTypeParameter(object? genericContext, int index)
-            {
-                var context = genericContext as GenericContext;
-                return context != null && index >= 0 && index < context.TypeParameters.Length
-                    ? context.TypeParameters[index]
-                    : "!" + index;
-            }
-            public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
-            public string GetPinnedType(string elementType) => elementType;
-            public string GetPointerType(string elementType) => elementType + "*";
-            public string GetPrimitiveType(PrimitiveTypeCode typeCode) => typeCode switch
-            {
-                PrimitiveTypeCode.Boolean => "bool",
-                PrimitiveTypeCode.Byte => "byte",
-                PrimitiveTypeCode.Char => "char",
-                PrimitiveTypeCode.Double => "double",
-                PrimitiveTypeCode.Int16 => "short",
-                PrimitiveTypeCode.Int32 => "int",
-                PrimitiveTypeCode.Int64 => "long",
-                PrimitiveTypeCode.IntPtr => "nint",
-                PrimitiveTypeCode.Object => "object",
-                PrimitiveTypeCode.SByte => "sbyte",
-                PrimitiveTypeCode.Single => "float",
-                PrimitiveTypeCode.String => "string",
-                PrimitiveTypeCode.TypedReference => "typedref",
-                PrimitiveTypeCode.UInt16 => "ushort",
-                PrimitiveTypeCode.UInt32 => "uint",
-                PrimitiveTypeCode.UInt64 => "ulong",
-                PrimitiveTypeCode.UIntPtr => "nuint",
-                PrimitiveTypeCode.Void => "void",
-                _ => typeCode.ToString(),
-            };
-            public string GetSZArrayType(string elementType) => elementType + "[]";
-            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-                => SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeName(metadataReader, handle));
-            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-                => SummaryMetadataNames.NormalizeExactTypeName(SummaryMetadataNames.GetTypeReferenceName(metadataReader, handle));
-            public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
-                => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
-        }
-
-        private sealed class GenericContext
-        {
-            public GenericContext(ImmutableArray<string> typeParameters, ImmutableArray<string> methodParameters)
-            {
-                TypeParameters = typeParameters;
-                MethodParameters = methodParameters;
-            }
-
-            public ImmutableArray<string> TypeParameters { get; }
-            public ImmutableArray<string> MethodParameters { get; }
         }
 
         private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(IMethodSymbol methodSymbol, Compilation compilation)
