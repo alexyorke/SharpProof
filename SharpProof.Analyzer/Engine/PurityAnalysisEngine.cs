@@ -8548,58 +8548,28 @@ namespace SharpProof.Analyzer.Engine
 
         private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
         {
-            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-            if (targetMethod == null ||
-                targetMethod.ContainingType?.ToDisplayString() != "System.TimeOnly" ||
-                targetMethod.Name is not ("Parse" or "ParseExact"))
-            {
-                return false;
-            }
-
-            if (targetMethod.Name == "Parse" &&
-                targetMethod.Parameters.Length == 2 &&
-                invocationOperation.Arguments.Length == 2 &&
-                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type))
-            {
-                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
-            }
-
-            if (targetMethod.Name == "Parse" &&
-                targetMethod.Parameters.Length == 3 &&
-                invocationOperation.Arguments.Length == 3 &&
-                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
-                IsDateTimeStylesNone(invocationOperation.Arguments[2].Value))
-            {
-                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
-            }
-
-            if (targetMethod.Parameters.Length == 3 &&
-                invocationOperation.Arguments.Length == 3 &&
-                targetMethod.Name == "ParseExact" &&
-                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
-                IsSingleTimeOnlyInvariantFormat(invocationOperation.Arguments[1].Value))
-            {
-                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
-            }
-
-            if (targetMethod.Parameters.Length == 4 &&
-                invocationOperation.Arguments.Length == 4 &&
-                targetMethod.Name == "ParseExact" &&
-                SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
-                IsSingleTimeOnlyInvariantFormat(invocationOperation.Arguments[1].Value) &&
-                IsDateTimeStylesNone(invocationOperation.Arguments[3].Value))
-            {
-                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
-            }
-
-            return false;
+            return IsDateOrTimeOnlyInvariantCultureParseInvocation(
+                invocationOperation,
+                "System.TimeOnly",
+                IsSingleTimeOnlyInvariantFormat);
         }
 
         private static bool IsDateOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
         {
+            return IsDateOrTimeOnlyInvariantCultureParseInvocation(
+                invocationOperation,
+                "System.DateOnly",
+                IsSingleDateOnlyInvariantFormat);
+        }
+
+        private static bool IsDateOrTimeOnlyInvariantCultureParseInvocation(
+            IInvocationOperation invocationOperation,
+            string containingTypeName,
+            Func<IOperation, bool> isSingleInvariantFormat)
+        {
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
-                targetMethod.ContainingType?.ToDisplayString() != "System.DateOnly" ||
+                targetMethod.ContainingType?.ToDisplayString() != containingTypeName ||
                 targetMethod.Name is not ("Parse" or "ParseExact"))
             {
                 return false;
@@ -8626,7 +8596,7 @@ namespace SharpProof.Analyzer.Engine
                 invocationOperation.Arguments.Length == 3 &&
                 targetMethod.Name == "ParseExact" &&
                 SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
-                IsSingleDateOnlyInvariantFormat(invocationOperation.Arguments[1].Value))
+                isSingleInvariantFormat(invocationOperation.Arguments[1].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
             }
@@ -8635,7 +8605,7 @@ namespace SharpProof.Analyzer.Engine
                 invocationOperation.Arguments.Length == 4 &&
                 targetMethod.Name == "ParseExact" &&
                 SymbolicTypeFacts.IsStringOrReadOnlySpanOfCharType(targetMethod.Parameters[0].Type) &&
-                IsSingleDateOnlyInvariantFormat(invocationOperation.Arguments[1].Value) &&
+                isSingleInvariantFormat(invocationOperation.Arguments[1].Value) &&
                 IsDateTimeStylesNone(invocationOperation.Arguments[3].Value))
             {
                 return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);

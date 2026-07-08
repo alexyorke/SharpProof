@@ -46,17 +46,17 @@ namespace SharpProof.Analyzer
 
 
             var enforcePureAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "EnforcePureAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "EnforcePureAttribute");
             var pureAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "PureAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "PureAttribute");
             var pureExternalAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureExternalAttribute", "PureExternalAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "PureExternalAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureExternalAttribute", "PureExternalAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "PureExternalAttribute");
             var impureAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ImpureAttribute", "ImpureAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "ImpureAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ImpureAttribute", "ImpureAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "ImpureAttribute");
 
             if (enforcePureAttributeSymbol == null && pureAttributeSymbol == null)
             {
@@ -65,8 +65,8 @@ namespace SharpProof.Analyzer
 
 
             var allowSynchronizationAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "AllowSynchronizationAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "AllowSynchronizationAttribute");
 
             bool hasEnforcePureAttribute = (enforcePureAttributeSymbol != null && HasAttribute(methodSymbol, enforcePureAttributeSymbol))
                 || HasAttributeByName(methodSymbol, "EnforcePureAttribute");
@@ -579,20 +579,6 @@ namespace SharpProof.Analyzer
             return false;
         }
 
-        private static INamedTypeSymbol? GetAppliedAttributeSymbol(IMethodSymbol methodSymbol, string attributeTypeName)
-        {
-            foreach (var attributeData in methodSymbol.GetAttributes())
-            {
-                var attributeClass = attributeData.AttributeClass;
-                if (attributeClass != null && string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal))
-                {
-                    return attributeClass;
-                }
-            }
-
-            return null;
-        }
-
         private static bool HasAttribute(IMethodSymbol methodSymbol, INamedTypeSymbol attributeType)
         {
             foreach (var attributeData in GetMethodAndAssociatedAttributes(methodSymbol))
@@ -639,34 +625,6 @@ namespace SharpProof.Analyzer
         {
             return enforcePureAttributeSymbol ?? pureAttributeSymbol!;
         }
-
-        private static INamedTypeSymbol? ResolveAttributeSymbol(Compilation compilation, string qualifiedMetadataName, string fallbackMetadataName)
-        {
-            return compilation.GetTypeByMetadataName(qualifiedMetadataName)
-                ?? compilation.GetTypeByMetadataName(fallbackMetadataName)
-                ?? FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
-        }
-
-        private static INamedTypeSymbol? FindTypeByName(INamespaceSymbol namespaceSymbol, string typeName)
-        {
-            var directMatch = namespaceSymbol.GetTypeMembers(typeName).FirstOrDefault();
-            if (directMatch != null)
-            {
-                return directMatch;
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                var nestedMatch = FindTypeByName(nestedNamespace, typeName);
-                if (nestedMatch != null)
-                {
-                    return nestedMatch;
-                }
-            }
-
-            return null;
-        }
-
 
         private static Location? GetIdentifierLocation(SyntaxNode node)
         {

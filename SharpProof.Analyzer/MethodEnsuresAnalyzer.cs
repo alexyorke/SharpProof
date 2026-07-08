@@ -32,8 +32,8 @@ namespace SharpProof.Analyzer
             }
 
             var ensuresAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "EnsuresAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "EnsuresAttribute");
             var contracts = CollectContracts(methodSymbol, ensuresAttributeSymbol, context.CancellationToken);
             if (contracts.Length == 0)
             {
@@ -477,47 +477,6 @@ namespace SharpProof.Analyzer
                 ((expectedSymbol != null &&
                   SymbolEqualityComparer.Default.Equals(attributeClass.OriginalDefinition, expectedSymbol)) ||
                  string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
-        }
-
-        private static INamedTypeSymbol? ResolveAttributeSymbol(Compilation compilation, string qualifiedMetadataName, string fallbackMetadataName)
-        {
-            return compilation.GetTypeByMetadataName(qualifiedMetadataName)
-                ?? compilation.GetTypeByMetadataName(fallbackMetadataName)
-                ?? FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
-        }
-
-        private static INamedTypeSymbol? FindTypeByName(INamespaceSymbol namespaceSymbol, string typeName)
-        {
-            var directMatch = namespaceSymbol.GetTypeMembers(typeName).FirstOrDefault();
-            if (directMatch != null)
-            {
-                return directMatch;
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                var nestedMatch = FindTypeByName(nestedNamespace, typeName);
-                if (nestedMatch != null)
-                {
-                    return nestedMatch;
-                }
-            }
-
-            return null;
-        }
-
-        private static INamedTypeSymbol? GetAppliedAttributeSymbol(IMethodSymbol methodSymbol, string attributeTypeName)
-        {
-            foreach (var attributeData in methodSymbol.GetAttributes())
-            {
-                var attributeClass = attributeData.AttributeClass;
-                if (attributeClass != null && string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal))
-                {
-                    return attributeClass;
-                }
-            }
-
-            return null;
         }
 
         private static bool TryGetExpressionBody(SyntaxNode methodNode, out ExpressionSyntax expression)

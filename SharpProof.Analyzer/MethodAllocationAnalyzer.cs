@@ -34,8 +34,8 @@ namespace SharpProof.Analyzer
             }
 
             var zeroAllocationsAttributeSymbol =
-                ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute")
-                ?? GetAppliedAttributeSymbol(methodSymbol, "ZeroAllocationsAttribute");
+                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute")
+                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "ZeroAllocationsAttribute");
             var hasZeroAllocationsAttribute =
                 (zeroAllocationsAttributeSymbol != null && HasDirectAttribute(methodSymbol, zeroAllocationsAttributeSymbol))
                 || HasDirectAttributeByName(methodSymbol, "ZeroAllocationsAttribute");
@@ -253,47 +253,6 @@ namespace SharpProof.Analyzer
             var originalDefinition = namedType.OriginalDefinition;
             return originalDefinition.ContainingNamespace?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System" &&
                 (originalDefinition.Name == "Span" || originalDefinition.Name == "ReadOnlySpan");
-        }
-
-        private static INamedTypeSymbol? ResolveAttributeSymbol(Compilation compilation, string qualifiedMetadataName, string fallbackMetadataName)
-        {
-            return compilation.GetTypeByMetadataName(qualifiedMetadataName)
-                ?? compilation.GetTypeByMetadataName(fallbackMetadataName)
-                ?? FindTypeByName(compilation.Assembly.GlobalNamespace, fallbackMetadataName);
-        }
-
-        private static INamedTypeSymbol? FindTypeByName(INamespaceSymbol namespaceSymbol, string typeName)
-        {
-            var directMatch = namespaceSymbol.GetTypeMembers(typeName).FirstOrDefault();
-            if (directMatch != null)
-            {
-                return directMatch;
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                var nestedMatch = FindTypeByName(nestedNamespace, typeName);
-                if (nestedMatch != null)
-                {
-                    return nestedMatch;
-                }
-            }
-
-            return null;
-        }
-
-        private static INamedTypeSymbol? GetAppliedAttributeSymbol(IMethodSymbol methodSymbol, string attributeTypeName)
-        {
-            foreach (var attributeData in methodSymbol.GetAttributes())
-            {
-                var attributeClass = attributeData.AttributeClass;
-                if (attributeClass != null && string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal))
-                {
-                    return attributeClass;
-                }
-            }
-
-            return null;
         }
 
         private static bool HasDirectAttribute(IMethodSymbol methodSymbol, INamedTypeSymbol attributeType)
