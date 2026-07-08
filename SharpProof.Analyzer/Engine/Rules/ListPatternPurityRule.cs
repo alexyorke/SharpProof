@@ -22,7 +22,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var receiverType = GetKnownReceiverType(
+            var receiverType = DispatchedMemberResolution.GetKnownReceiverType(
                 matchedInputOperation,
                 currentState,
                 context.SemanticModel.Compilation,
@@ -178,7 +178,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IOperation operation,
             PurityAnalysisContext context)
         {
-            var getter = ResolveGetter(
+            var getter = DispatchedMemberResolution.ResolveGetter(
                 propertySymbol,
                 receiverType,
                 hasStableConcreteReceiver,
@@ -212,7 +212,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var targetMethod = ResolveMethod(
+            var targetMethod = DispatchedMemberResolution.ResolveMethod(
                 method,
                 receiverType,
                 hasStableConcreteReceiver,
@@ -235,97 +235,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 : result.WithCallee(targetMethod, operation.Syntax);
         }
 
-        private static IMethodSymbol? ResolveGetter(
-            IPropertySymbol propertySymbol,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            Compilation compilation)
-        {
-            if (propertySymbol.GetMethod == null)
-            {
-                return null;
-            }
-
-            if (!IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation))
-            {
-                return propertySymbol.GetMethod.OriginalDefinition;
-            }
-
-            if (receiverType == null || !hasStableConcreteReceiver)
-            {
-                return null;
-            }
-
-            if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
-            {
-                var implementation = receiverType.FindImplementationForInterfaceMember(propertySymbol) ??
-                    receiverType.FindImplementationForInterfaceMember(propertySymbol.GetMethod);
-                return implementation switch
-                {
-                    IPropertySymbol implementationProperty when implementationProperty.GetMethod != null =>
-                        implementationProperty.GetMethod.OriginalDefinition,
-                    IMethodSymbol implementationMethod => implementationMethod.OriginalDefinition,
-                    _ => null
-                };
-            }
-
-            var rootProperty = GetRootOverriddenProperty(propertySymbol);
-            for (var current = receiverType; current != null; current = current.BaseType)
-            {
-                foreach (var member in current.GetMembers(rootProperty.Name))
-                {
-                    if (member is IPropertySymbol candidate &&
-                        (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootProperty.OriginalDefinition) ||
-                         OverridesProperty(candidate, rootProperty)) &&
-                        candidate.GetMethod != null)
-                    {
-                        return candidate.GetMethod.OriginalDefinition;
-                    }
-                }
-            }
-
-            return propertySymbol.GetMethod.IsAbstract ? null : propertySymbol.GetMethod.OriginalDefinition;
-        }
-
-        private static IMethodSymbol? ResolveMethod(
-            IMethodSymbol methodSymbol,
-            INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver,
-            Compilation compilation)
-        {
-            if (!IsPotentiallyDispatchedMethod(methodSymbol, compilation))
-            {
-                return methodSymbol.OriginalDefinition;
-            }
-
-            if (receiverType == null || !hasStableConcreteReceiver)
-            {
-                return null;
-            }
-
-            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface)
-            {
-                return receiverType.FindImplementationForInterfaceMember(methodSymbol) as IMethodSymbol;
-            }
-
-            var rootMethod = GetRootOverriddenMethod(methodSymbol);
-            for (var current = receiverType; current != null; current = current.BaseType)
-            {
-                foreach (var member in current.GetMembers(rootMethod.Name))
-                {
-                    if (member is IMethodSymbol candidate &&
-                        candidate.Parameters.Length == rootMethod.Parameters.Length &&
-                        (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootMethod.OriginalDefinition) ||
-                         OverridesMethod(candidate, rootMethod)))
-                    {
-                        return candidate.OriginalDefinition;
-                    }
-                }
-            }
-
-            return methodSymbol.IsAbstract ? null : methodSymbol.OriginalDefinition;
-        }
-
         private static IOperation? GetMatchedInputOperation(IOperation operation)
         {
             for (var current = operation; current != null; current = current.Parent)
@@ -345,112 +254,5 @@ namespace SharpProof.Analyzer.Engine.Rules
                 receiverType?.SpecialType == SpecialType.System_String;
         }
 
-        private static INamedTypeSymbol? GetKnownReceiverType(
-            IOperation? instanceOperation,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            Compilation compilation,
-            out bool hasStableConcreteReceiver)
-        {
-            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType))
-            {
-                hasStableConcreteReceiver = true;
-                return concreteType;
-            }
-
-            var receiverType = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation)?.Type as INamedTypeSymbol;
-            hasStableConcreteReceiver = receiverType != null &&
-                                        (receiverType.TypeKind == TypeKind.Struct || receiverType.IsSealed);
-            return receiverType;
-        }
-
-        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
-        {
-            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                getterSymbol.IsAbstract)
-            {
-                return true;
-            }
-
-            if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
-            {
-                return false;
-            }
-
-            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
-            {
-                return canBeOverridden;
-            }
-
-            return !getterSymbol.IsSealed;
-        }
-
-        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
-        {
-            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                methodSymbol.IsAbstract)
-            {
-                return true;
-            }
-
-            if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride)
-            {
-                return false;
-            }
-
-            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
-            {
-                return canBeOverridden;
-            }
-
-            return !methodSymbol.IsSealed;
-        }
-
-        private static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
-        {
-            var current = propertySymbol;
-            while (current.OverriddenProperty != null)
-            {
-                current = current.OverriddenProperty;
-            }
-
-            return current.OriginalDefinition;
-        }
-
-        private static IMethodSymbol GetRootOverriddenMethod(IMethodSymbol methodSymbol)
-        {
-            var current = methodSymbol;
-            while (current.OverriddenMethod != null)
-            {
-                current = current.OverriddenMethod;
-            }
-
-            return current.OriginalDefinition;
-        }
-
-        private static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
-        {
-            for (var current = property; current != null; current = current.OverriddenProperty)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool OverridesMethod(IMethodSymbol method, IMethodSymbol target)
-        {
-            for (var current = method; current != null; current = current.OverriddenMethod)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }
