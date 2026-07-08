@@ -242,7 +242,7 @@ namespace SharpProof.Test
             return "Debug";
         }
 
-        private static string FindRepositoryRoot()
+        internal static string FindRepositoryRoot()
         {
             var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
             while (directory != null)

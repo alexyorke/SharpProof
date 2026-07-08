@@ -9608,7 +9608,7 @@ public class TestClass
             return snapshot.Facts.ToArray();
         }
 
-        private static int FindLine(string source, string text)
+        internal static int FindLine(string source, string text)
         {
             var lines = source.Split('\n');
             for (var index = 0; index < lines.Length; index++)

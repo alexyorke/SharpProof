@@ -485,7 +485,7 @@ public class TestClass
                 RedirectStandardError = true,
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
+            startInfo.ArgumentList.Add(EffectSummaryToolTests.GetEffectSummaryToolDllPath());
             startInfo.ArgumentList.Add("--assembly");
             startInfo.ArgumentList.Add(assemblyPath);
             startInfo.ArgumentList.Add("--output");
@@ -525,7 +525,7 @@ public class TestClass
                 RedirectStandardError = true,
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
+            startInfo.ArgumentList.Add(EffectSummaryToolTests.GetEffectSummaryToolDllPath());
             startInfo.ArgumentList.Add("--assembly");
             startInfo.ArgumentList.Add(assemblyPath);
             foreach (var symbolPrefix in symbolPrefixes)
@@ -556,48 +556,6 @@ public class TestClass
             }
 
             return await File.ReadAllTextAsync(outputPath);
-        }
-
-        private static string GetEffectSummaryToolDllPath()
-        {
-            lock (EffectSummaryToolBuildLock)
-            {
-                if (!string.IsNullOrWhiteSpace(s_effectSummaryToolDllPath) && File.Exists(s_effectSummaryToolDllPath))
-                {
-                    return s_effectSummaryToolDllPath;
-                }
-
-                var repositoryRoot = GetRepositoryRoot();
-                var projectPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary", "SharpProof.EffectSummary.csproj");
-                var dllPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary", "bin", "Debug", "net8.0", "SharpProof.EffectSummary.dll");
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "dotnet",
-                    WorkingDirectory = repositoryRoot,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                };
-                startInfo.ArgumentList.Add("build");
-                startInfo.ArgumentList.Add(projectPath);
-                startInfo.ArgumentList.Add("-m:20");
-                startInfo.ArgumentList.Add("--no-restore");
-
-                using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to build effect summary tool.");
-                var standardOutput = process.StandardOutput.ReadToEnd();
-                var standardError = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                if (process.ExitCode != 0 || !File.Exists(dllPath))
-                {
-                    throw new AssertionException(
-                        "Effect summary tool build failed." + Environment.NewLine +
-                        standardOutput + Environment.NewLine +
-                        standardError);
-                }
-
-                s_effectSummaryToolDllPath = dllPath;
-                return s_effectSummaryToolDllPath;
-            }
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()

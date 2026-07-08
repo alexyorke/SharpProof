@@ -655,7 +655,7 @@ public class TestClass
             return new SymbolicSourceQueryService().ProveConditionAtSource(
                 source,
                 "StringLengthSmtTests.cs",
-                FindLine(source, sourceLine),
+                SemanticOracleSmtTests.FindLine(source, sourceLine),
                 20,
                 condition,
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
@@ -672,18 +672,5 @@ public class TestClass
             return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
 
-        private static int FindLine(string source, string text)
-        {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (lines[index].Contains(text, StringComparison.Ordinal))
-                {
-                    return index + 1;
-                }
-            }
-
-            throw new InvalidOperationException("Text was not found in source.");
-        }
     }
 }

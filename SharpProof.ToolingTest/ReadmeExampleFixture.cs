@@ -10,7 +10,7 @@ namespace SharpProof.Test
 {
     internal static class ReadmeExampleFixture
     {
-        private static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
+        private static readonly Lazy<string> RepositoryRoot = new(SymbolicCliTestHost.FindRepositoryRoot);
 
         public static string GetRepositoryRoot()
         {
@@ -128,22 +128,6 @@ namespace SharpProof.Test
             normalized = Regex.Replace(normalized, @"Node: ([^\r\n]+?) \d+-\d+", "Node: $1 <offset-range>");
             normalized = Regex.Replace(normalized, @"\b([A-Za-z_][A-Za-z0-9_]*)#\d+\b", "$1#<version>");
             return normalized;
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new InvalidOperationException("Could not find repository root.");
         }
 
         private static string ResolvePowerShellPath()

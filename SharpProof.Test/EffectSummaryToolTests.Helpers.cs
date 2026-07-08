@@ -621,7 +621,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
         }
 
-        private static string GetEffectSummaryToolDllPath()
+        internal static string GetEffectSummaryToolDllPath()
         {
             lock (EffectSummaryToolBuildLock)
             {

@@ -23,7 +23,6 @@ namespace SharpProof.Test
     public partial class ExceptionSummaryCatalogValidationTests
     {
         private static readonly object EffectSummaryToolBuildLock = new object();
-        private static string? s_effectSummaryToolDllPath;
 
         [Test]
         public async Task Sp0010_EffectSummary_WithMatchingAssemblyIdentity_IsTrusted()
