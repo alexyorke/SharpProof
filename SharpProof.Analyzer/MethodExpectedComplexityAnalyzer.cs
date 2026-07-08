@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -29,6 +30,7 @@ namespace SharpProof.Analyzer
             if (!TryGetExpectedComplexity(
                     methodSymbol,
                     context.SemanticModel.Compilation,
+                    context.CancellationToken,
                     out var declaredComplexity,
                     out var attributeLocation))
             {
@@ -52,7 +54,8 @@ namespace SharpProof.Analyzer
                         methodSymbol,
                         declaredComplexity,
                         attributeLocation,
-                        "complexity query failed: " + ex.Message));
+                        "complexity query failed: " + ex.Message,
+                        context.CancellationToken));
                 }
 
                 return;
@@ -71,7 +74,8 @@ namespace SharpProof.Analyzer
                             methodSymbol,
                             declaredComplexity,
                             result,
-                            attributeLocation));
+                            attributeLocation,
+                            context.CancellationToken));
                     }
 
                     return;
@@ -83,7 +87,8 @@ namespace SharpProof.Analyzer
                             methodSymbol,
                             declaredComplexity,
                             attributeLocation,
-                            classification.Reason));
+                            classification.Reason,
+                            context.CancellationToken));
                     }
 
                     return;
@@ -93,6 +98,7 @@ namespace SharpProof.Analyzer
         private static bool TryGetExpectedComplexity(
             IMethodSymbol methodSymbol,
             Compilation compilation,
+            CancellationToken cancellationToken,
             out DeclaredComplexity declaredComplexity,
             out Location? attributeLocation)
         {
@@ -105,12 +111,13 @@ namespace SharpProof.Analyzer
 
             foreach (var attribute in methodSymbol.GetAttributes())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!MatchesAttribute(attribute, attributeSymbol, "ExpectedComplexityAttribute"))
                 {
                     continue;
                 }
 
-                attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+                attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 if (attribute.ConstructorArguments.Length != 1 ||
                     attribute.ConstructorArguments[0].Value is not int intValue ||
                     !Enum.IsDefined(typeof(DeclaredComplexityKind), intValue))
@@ -198,7 +205,8 @@ namespace SharpProof.Analyzer
             IMethodSymbol methodSymbol,
             DeclaredComplexity declaredComplexity,
             SymbolicComplexityResult result,
-            Location? attributeLocation)
+            Location? attributeLocation,
+            CancellationToken cancellationToken)
         {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
@@ -206,7 +214,7 @@ namespace SharpProof.Analyzer
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityExceededRule,
-                GetMethodLocation(methodSymbol),
+                GetMethodLocation(methodSymbol, cancellationToken),
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,
@@ -218,7 +226,8 @@ namespace SharpProof.Analyzer
             IMethodSymbol methodSymbol,
             DeclaredComplexity declaredComplexity,
             Location? attributeLocation,
-            string reason)
+            string reason,
+            CancellationToken cancellationToken)
         {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
@@ -226,7 +235,7 @@ namespace SharpProof.Analyzer
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
-                GetMethodLocation(methodSymbol),
+                GetMethodLocation(methodSymbol, cancellationToken),
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,
@@ -234,7 +243,7 @@ namespace SharpProof.Analyzer
                 reason);
         }
 
-        private static Location GetMethodLocation(IMethodSymbol methodSymbol)
+        private static Location GetMethodLocation(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
         {
             var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
             if (syntaxReference == null)
@@ -242,7 +251,7 @@ namespace SharpProof.Analyzer
                 return methodSymbol.Locations.First();
             }
 
-            var node = syntaxReference.GetSyntax();
+            var node = syntaxReference.GetSyntax(cancellationToken);
             return node switch
             {
                 MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),

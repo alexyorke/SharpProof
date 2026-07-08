@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -39,7 +40,7 @@ namespace SharpProof.Analyzer
 
             if (enforcePureAttributeSymbol != null)
             {
-                var enforcePureAttributeLocation = FindAttributeLocation(attributeList, enforcePureAttributeSymbol, context.SemanticModel);
+                var enforcePureAttributeLocation = FindAttributeLocation(attributeList, enforcePureAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (enforcePureAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diagnostic = Diagnostic.Create(
@@ -53,7 +54,7 @@ namespace SharpProof.Analyzer
 
             if (pureAttributeSymbol != null)
             {
-                var pureAttributeLocation = FindAttributeLocation(attributeList, pureAttributeSymbol, context.SemanticModel);
+                var pureAttributeLocation = FindAttributeLocation(attributeList, pureAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (pureAttributeLocation != null && !IsAllowedPureAttributeTarget(attributeTarget))
                 {
                     var diagnostic = Diagnostic.Create(
@@ -67,7 +68,7 @@ namespace SharpProof.Analyzer
 
             if (allowSynchronizationAttributeSymbol != null)
             {
-                var allowSynchronizationAttributeLocation = FindAttributeLocation(attributeList, allowSynchronizationAttributeSymbol, context.SemanticModel);
+                var allowSynchronizationAttributeLocation = FindAttributeLocation(attributeList, allowSynchronizationAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (allowSynchronizationAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diag = Diagnostic.Create(
@@ -80,7 +81,7 @@ namespace SharpProof.Analyzer
 
             if (zeroAllocationsAttributeSymbol != null)
             {
-                var zeroAllocationsAttributeLocation = FindAttributeLocation(attributeList, zeroAllocationsAttributeSymbol, context.SemanticModel);
+                var zeroAllocationsAttributeLocation = FindAttributeLocation(attributeList, zeroAllocationsAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (zeroAllocationsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diag = Diagnostic.Create(
@@ -93,7 +94,7 @@ namespace SharpProof.Analyzer
 
             if (allowedCapabilitiesAttributeSymbol != null)
             {
-                var allowedCapabilitiesAttributeLocation = FindAttributeLocation(attributeList, allowedCapabilitiesAttributeSymbol, context.SemanticModel);
+                var allowedCapabilitiesAttributeLocation = FindAttributeLocation(attributeList, allowedCapabilitiesAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (allowedCapabilitiesAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diag = Diagnostic.Create(
@@ -106,7 +107,7 @@ namespace SharpProof.Analyzer
 
             if (ensuresAttributeSymbol != null)
             {
-                var ensuresAttributeLocation = FindAttributeLocation(attributeList, ensuresAttributeSymbol, context.SemanticModel);
+                var ensuresAttributeLocation = FindAttributeLocation(attributeList, ensuresAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (ensuresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diag = Diagnostic.Create(
@@ -119,7 +120,7 @@ namespace SharpProof.Analyzer
 
             if (expectedComplexityAttributeSymbol != null)
             {
-                var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, expectedComplexityAttributeSymbol, context.SemanticModel);
+                var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, expectedComplexityAttributeSymbol, context.SemanticModel, context.CancellationToken);
                 if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
                 {
                     var diag = Diagnostic.Create(
@@ -131,21 +132,31 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private static Location? FindAttributeLocation(SyntaxList<AttributeListSyntax> attributeLists, INamedTypeSymbol targetAttributeSymbol, SemanticModel semanticModel)
+        private static Location? FindAttributeLocation(
+            SyntaxList<AttributeListSyntax> attributeLists,
+            INamedTypeSymbol targetAttributeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var attributeList in attributeLists)
             {
-                var location = FindAttributeLocation(attributeList, targetAttributeSymbol, semanticModel);
+                cancellationToken.ThrowIfCancellationRequested();
+                var location = FindAttributeLocation(attributeList, targetAttributeSymbol, semanticModel, cancellationToken);
                 if (location != null) return location;
             }
             return null;
         }
 
-        private static Location? FindAttributeLocation(AttributeListSyntax attributeList, INamedTypeSymbol targetAttributeSymbol, SemanticModel semanticModel)
+        private static Location? FindAttributeLocation(
+            AttributeListSyntax attributeList,
+            INamedTypeSymbol targetAttributeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             foreach (var attribute in attributeList.Attributes)
             {
-                var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+                cancellationToken.ThrowIfCancellationRequested();
+                var symbolInfo = semanticModel.GetSymbolInfo(attribute, cancellationToken);
 
                 if (symbolInfo.Symbol is IMethodSymbol attributeConstructorSymbol &&
                     SymbolEqualityComparer.Default.Equals(attributeConstructorSymbol.ContainingType, targetAttributeSymbol))
@@ -159,7 +170,7 @@ namespace SharpProof.Analyzer
                     return attribute.GetLocation();
                 }
 
-                else if (semanticModel.GetTypeInfo(attribute).Type is INamedTypeSymbol attributeType &&
+                else if (semanticModel.GetTypeInfo(attribute, cancellationToken).Type is INamedTypeSymbol attributeType &&
                        SymbolEqualityComparer.Default.Equals(attributeType, targetAttributeSymbol))
                 {
                     return attribute.GetLocation();

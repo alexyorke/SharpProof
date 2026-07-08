@@ -553,6 +553,39 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void AnalyzerRoslynLookups_ThreadCancellationToken()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var analyzerFiles = Directory.GetFiles(
+                    Path.Combine(repositoryRoot, "SharpProof.Analyzer"),
+                    "*.cs",
+                    SearchOption.AllDirectories)
+                .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+                    !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path).Replace("\r\n", "\n"),
+                })
+                .ToArray();
+            var tokenFreeRoslynLookupPatterns = new[]
+            {
+                @"GetSyntax\(\)",
+                @"GetOperation\([^,\r\n]+\)",
+                @"GetTypeInfo\([^,\r\n]+\)",
+                @"GetSymbolInfo\([^,\r\n]+\)",
+                @"GetDeclaredSymbol\([^,\r\n]+\)",
+            };
+
+            var offenders = analyzerFiles
+                .Where(file => tokenFreeRoslynLookupPatterns.Any(pattern => System.Text.RegularExpressions.Regex.IsMatch(file.Source, pattern)))
+                .Select(static file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
         public void AnalyzerAssignmentFacts_ThreadCancellationTokenThroughSymbolicLowering()
         {
             var repositoryRoot = FindRepositoryRoot();

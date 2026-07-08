@@ -5,6 +5,7 @@ using SharpProof.Analyzer.Engine.Rules;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -110,7 +111,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 // Synthesized record struct positional setters have no source body and are incorrectly
                 // classified as impure. Inside a value-type 'with' expression (fresh copy), they are trivially pure.
                 if (IsInsideValueTypeWithExpression(assignment) &&
-                    IsSynthesizedFromPrimaryConstructorParameter(propertyReference.Property))
+                    IsSynthesizedFromPrimaryConstructorParameter(propertyReference.Property, context.CancellationToken))
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
@@ -131,9 +132,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                    withOp.Type?.IsValueType == true;
         }
 
-        private static bool IsSynthesizedFromPrimaryConstructorParameter(IPropertySymbol property)
+        private static bool IsSynthesizedFromPrimaryConstructorParameter(IPropertySymbol property, CancellationToken cancellationToken)
         {
-            return property.DeclaringSyntaxReferences.Any(r => r.GetSyntax() is ParameterSyntax);
+            return property.DeclaringSyntaxReferences.Any(r => r.GetSyntax(cancellationToken) is ParameterSyntax);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyReferenceTargetPurity(

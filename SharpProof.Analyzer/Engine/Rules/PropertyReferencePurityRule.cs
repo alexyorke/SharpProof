@@ -1417,7 +1417,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            return context.SemanticModel.GetTypeInfo(forEachStatement.Expression).Type is IArrayTypeSymbol;
+            return context.SemanticModel.GetTypeInfo(forEachStatement.Expression, context.CancellationToken).Type is IArrayTypeSymbol;
         }
 
 

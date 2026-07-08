@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -33,7 +34,7 @@ namespace SharpProof.Analyzer
             var ensuresAttributeSymbol =
                 ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute")
                 ?? GetAppliedAttributeSymbol(methodSymbol, "EnsuresAttribute");
-            var contracts = CollectContracts(methodSymbol, ensuresAttributeSymbol);
+            var contracts = CollectContracts(methodSymbol, ensuresAttributeSymbol, context.CancellationToken);
             if (contracts.Length == 0)
             {
                 return;
@@ -104,7 +105,7 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                if (ReferencesUserLocal(conditionExpression, speculativeModel))
+                if (ReferencesUserLocal(conditionExpression, speculativeModel, context.CancellationToken))
                 {
                     if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
                     {
@@ -210,11 +211,13 @@ namespace SharpProof.Analyzer
 
         private static ImmutableArray<EnsuresContract> CollectContracts(
             IMethodSymbol methodSymbol,
-            INamedTypeSymbol? ensuresAttributeSymbol)
+            INamedTypeSymbol? ensuresAttributeSymbol,
+            CancellationToken cancellationToken)
         {
             var builder = ImmutableArray.CreateBuilder<EnsuresContract>();
             foreach (var attribute in methodSymbol.GetAttributes())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!MatchesAttribute(attribute, ensuresAttributeSymbol, "EnsuresAttribute"))
                 {
                     continue;
@@ -223,7 +226,7 @@ namespace SharpProof.Analyzer
                 var condition = attribute.ConstructorArguments.Length == 1
                     ? attribute.ConstructorArguments[0].Value as string
                     : null;
-                var location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+                var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
                 builder.Add(new EnsuresContract(condition ?? string.Empty, location));
             }
 
@@ -362,16 +365,18 @@ namespace SharpProof.Analyzer
 
         private static bool ReferencesUserLocal(
             ExpressionSyntax conditionExpression,
-            SemanticModel speculativeModel)
+            SemanticModel speculativeModel,
+            CancellationToken cancellationToken)
         {
             foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                var symbol = speculativeModel.GetSymbolInfo(identifier).Symbol;
+                var symbol = speculativeModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
                 if (symbol is ILocalSymbol)
                 {
                     return true;
