@@ -24,7 +24,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
             }
 
-            return PatternPurityRuleHelpers.CheckChildOperationsArePure(operation, context, currentState);
+            return ChildOperationsPurityRule.CheckChildOperationsArePure(operation, context, currentState);
         }
     }
 }

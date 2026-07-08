@@ -4960,16 +4960,24 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            return SymbolicMutationFactFactory.TryCreateCompoundAssignmentFact(
-                targetFormula,
-                previousValue,
+            if (targetFormula.Kind != SmtValueKind.Int ||
+                previousValue.Kind != SmtValueKind.Int ||
                 SmtFormulaReferenceScanner.ContainsVariablePrefix(
                     previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                rightReferencesTarget,
-                assignment.Kind(),
-                rightValue,
-                out fact);
+                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)) ||
+                rightReferencesTarget ||
+                rightValue.Kind != SmtValueKind.Int ||
+                !TryCreateCompoundAssignmentValue(
+                    assignment.Kind(),
+                    previousValue,
+                    rightValue,
+                    out var updatedValue))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
+            return true;
         }
 
         internal static bool TryCreateIncrementOrDecrementFact(
@@ -4984,14 +4992,44 @@ namespace SharpProof.Symbolic
                 return false;
             }
 
-            return SymbolicMutationFactFactory.TryCreateIncrementOrDecrementFact(
-                targetFormula,
-                previousValue,
+            if (targetFormula.Kind != SmtValueKind.Int ||
+                previousValue.Kind != SmtValueKind.Int ||
                 SmtFormulaReferenceScanner.ContainsVariablePrefix(
                     previousValue,
-                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)),
-                delta,
-                out fact);
+                    SymbolicFactFactory.GetSmtVariableName(targetSymbol)))
+            {
+                return false;
+            }
+
+            var updatedValue = delta > 0
+                ? new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, new SmtIntegerConstant(delta))
+                : new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, new SmtIntegerConstant(-delta));
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
+            return true;
+        }
+
+        private static bool TryCreateCompoundAssignmentValue(
+            SyntaxKind assignmentKind,
+            SmtFormula previousValue,
+            SmtFormula rightValue,
+            out SmtFormula updatedValue)
+        {
+            switch (assignmentKind)
+            {
+                case SyntaxKind.AddAssignmentExpression:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, rightValue);
+                    return true;
+                case SyntaxKind.SubtractAssignmentExpression:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, rightValue);
+                    return true;
+                case SyntaxKind.MultiplyAssignmentExpression
+                    when previousValue is SmtIntegerConstant || rightValue is SmtIntegerConstant:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, previousValue, rightValue);
+                    return true;
+                default:
+                    updatedValue = null!;
+                    return false;
+            }
         }
 
         internal static bool TryGetCurrentSymbolValue(

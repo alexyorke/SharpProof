@@ -21,7 +21,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 				// Assignments/References
 				new DeconstructionAssignmentPurityRule(),
 				new AssignmentPurityRule(),
-				new ExpressionStatementPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.ExpressionStatement),
 				CreateAlwaysPureRule(OperationKind.ParameterReference, "ParamRefRule", "Parameter reference"),
 				CreateAlwaysPureRule(OperationKind.LocalReference, "LocalRefRule", "LocalReference"),
 				new FieldReferencePurityRule(),
@@ -32,7 +32,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 				new AnonymousObjectCreationPurityRule(),
 				new ObjectOrCollectionInitializerPurityRule(),
 				new ArrayCreationPurityRule(),
-				new ArrayInitializerPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.ArrayInitializer),
 				new ArrayElementReferencePurityRule(),
 				new InlineArrayAccessPurityRule(),
 				new CollectionExpressionPurityRule(),
@@ -44,31 +44,31 @@ namespace SharpProof.Analyzer.Engine.Rules
 				new CoalesceOperationPurityRule(),
 				new ConditionalAccessPurityRule(),
 				new ConditionalOperationPurityRule(),
-				new RangeOperationPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.Range),
 				new ImplicitIndexerReferencePurityRule(),
 				new ConversionPurityRule(),
 				CreateAlwaysPureRule(OperationKind.DefaultValue, "DefaultValueRule", "DefaultValue operation", includeSyntaxInLog: false),
 				new InterpolatedStringPurityRule(),
 				new PropertyReferencePurityRule(),
 				CreateAlwaysPureRule(OperationKind.Literal, "LiteralRule", "Literal operation"),
-				new TuplePurityRule(),
+				CreateChildOperationsPureRule(OperationKind.Tuple),
 				CreateAlwaysPureRule(OperationKind.TypeOf, "TypeOfRule", "TypeOf operation"),
 				CreateAlwaysPureRule(OperationKind.NameOf, "NameOfRule", "NameOf operation"),
 				CreateAlwaysPureRule(OperationKind.Utf8String, "Utf8StringLiteralPurityRule", "Utf8String operation"),
 				CreateAlwaysPureRule(OperationKind.SizeOf, "SizeOfRule", "SizeOf operation"),
 				
 				// Patterns
-				new BinaryPatternPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.BinaryPattern),
 				CreateAlwaysPureRule(OperationKind.ConstantPattern, "ConstantPatternRule", "Constant pattern"),
 				CreateAlwaysPureRule(OperationKind.DeclarationPattern, "DeclarationPatternRule", "Declaration pattern"),
 				CreateAlwaysPureRule(OperationKind.DiscardPattern, "DiscardPatternRule", "Discard pattern"),
-				new NegatedPatternPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.NegatedPattern),
 				new ListPatternPurityRule(),
 				new PropertySubpatternPurityRule(),
-				new RelationalPatternPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.RelationalPattern),
 				new RecursivePatternPurityRule(),
-				new TypePatternPurityRule(),
-				new IsPatternPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.TypePattern, OperationKind.IsType),
+				CreateChildOperationsPureRule(OperationKind.IsPattern),
 				new IsNullPurityRule(),
 				new StructuralPurityRule(),
 				
@@ -103,6 +103,10 @@ namespace SharpProof.Analyzer.Engine.Rules
 				operationDescription,
 				includeSyntaxInLog));
 		}
+
+		private static IPurityRule CreateChildOperationsPureRule(params OperationKind[] operationKinds)
+		{
+			return new ChildOperationsPurityRule(operationKinds);
+		}
 	}
 }
-
