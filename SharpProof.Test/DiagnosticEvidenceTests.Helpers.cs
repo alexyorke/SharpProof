@@ -243,6 +243,40 @@ public class TestClass
             }
         }
 
+        private static void AssertSp0002Evidence(
+            Diagnostic diagnostic,
+            string? category = null,
+            string? rule = null,
+            string? catalogSource = null,
+            string? symbolContains = null,
+            string? operationKind = null)
+        {
+            if (category != null)
+            {
+                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo(category));
+            }
+
+            if (rule != null)
+            {
+                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo(rule));
+            }
+
+            if (operationKind != null)
+            {
+                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo(operationKind));
+            }
+
+            if (catalogSource != null)
+            {
+                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo(catalogSource));
+            }
+
+            if (symbolContains != null)
+            {
+                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(symbolContains));
+            }
+        }
+
         private static string CreateEffectSummaryJson(
             string assemblyPath,
             string symbol,

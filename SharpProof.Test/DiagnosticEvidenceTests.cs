@@ -108,11 +108,13 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Debug.WriteLine"));
+            AssertSp0002Evidence(
+                diagnostic,
+                "catalog_hit",
+                "MethodInvocationPurityRule",
+                "known_impure_namespace_or_type",
+                "System.Diagnostics.Debug.WriteLine",
+                operationKind: "Invocation");
         }
 
         [Test]
@@ -133,8 +135,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
+            AssertSp0002Evidence(diagnostic, catalogSource: "generated_purity_summary", symbolContains: "System.Console.WriteLine");
         }
 
         [Test]
@@ -155,8 +156,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.Clear"));
+            AssertSp0002Evidence(diagnostic, catalogSource: "generated_purity_summary", symbolContains: "System.Console.Clear");
         }
 
         [Test]
@@ -178,10 +178,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.ComponentModel.TypeDescriptor.GetConverter"));
+            AssertSp0002Evidence(diagnostic, "global_state_write", "MethodInvocationPurityRule", "generated_purity_summary", "System.ComponentModel.TypeDescriptor.GetConverter");
         }
 
         [Test]
@@ -202,10 +199,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.ComponentModel.TypeDescriptor.GetProperties"));
+            AssertSp0002Evidence(diagnostic, "global_state_write", "MethodInvocationPurityRule", "generated_purity_summary", "System.ComponentModel.TypeDescriptor.GetProperties");
         }
 
         [Test]
@@ -226,10 +220,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Activator.CreateInstance"));
+            AssertSp0002Evidence(diagnostic, "global_state_write", "MethodInvocationPurityRule", "generated_purity_summary", "System.Activator.CreateInstance");
         }
 
         [Test]
@@ -250,10 +241,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Activator.CreateInstance"));
+            AssertSp0002Evidence(diagnostic, "global_state_write", "MethodInvocationPurityRule", "generated_purity_summary", "System.Activator.CreateInstance");
         }
 
         [Test]
@@ -275,10 +263,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Activator.CreateInstanceFrom"));
+            AssertSp0002Evidence(diagnostic, "global_state_write", "MethodInvocationPurityRule", "generated_purity_summary", "System.Activator.CreateInstanceFrom");
         }
 
         [Test]
@@ -299,10 +284,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_callee"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.GC.Collect"));
+            AssertSp0002Evidence(diagnostic, "unknown_callee", "MethodInvocationPurityRule", "generated_purity_summary", "System.GC.Collect");
         }
 
         [Test]
@@ -323,10 +305,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_callee"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.GC.GetTotalMemory"));
+            AssertSp0002Evidence(diagnostic, "unknown_callee", "MethodInvocationPurityRule", "generated_purity_summary", "System.GC.GetTotalMemory");
         }
 
         [Test]
@@ -347,10 +326,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.GC.GetGeneration"));
+            AssertSp0002Evidence(diagnostic, "metadata_only_or_external", "MethodInvocationPurityRule", "generated_purity_summary", "System.GC.GetGeneration");
         }
 
         [Test]
@@ -372,9 +348,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("random_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Random.Random"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "random_semantic_rule", symbolContains: "System.Random.Random");
         }
 
         [Test]
@@ -396,9 +370,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("random_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Random.Next"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "random_semantic_rule", symbolContains: "System.Random.Next");
         }
 
         [Test]
@@ -420,9 +392,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("string_builder_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Text.StringBuilder.Append"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "string_builder_semantic_rule", symbolContains: "System.Text.StringBuilder.Append");
         }
 
         [Test]
@@ -444,9 +414,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("array_mutation_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Reverse"));
+            AssertSp0002Evidence(diagnostic, rule: "MethodInvocationPurityRule", catalogSource: "array_mutation_semantic_rule", symbolContains: "System.Array.Reverse");
         }
 
         [Test]
@@ -468,9 +436,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("array_mutation_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Sort"));
+            AssertSp0002Evidence(diagnostic, rule: "MethodInvocationPurityRule", catalogSource: "array_mutation_semantic_rule", symbolContains: "System.Array.Sort");
         }
 
         [Test]
@@ -502,10 +468,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_double_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Dispose"));
+            AssertSp0002Evidence(diagnostic, "resource_double_dispose", "MethodInvocationPurityRule", "symbolic_resource_lifetime", "PureDisposable.Dispose");
         }
 
         [Test]
@@ -544,10 +507,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_use_after_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
+            AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule", "symbolic_resource_lifetime", "PureDisposable.Use");
         }
 
         [Test]
@@ -587,10 +547,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_use_after_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
+            AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule", "symbolic_resource_lifetime", "PureDisposable.Use");
         }
 
         [Test]
@@ -628,10 +585,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_use_after_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
+            AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule", "symbolic_resource_lifetime", "PureDisposable.Use");
         }
 
         [Test]
@@ -672,10 +626,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_use_after_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("PureDisposable.Use"));
+            AssertSp0002Evidence(diagnostic, "resource_use_after_dispose", "MethodInvocationPurityRule", "symbolic_resource_lifetime", "PureDisposable.Use");
         }
 
         [Test]
@@ -705,10 +656,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("resource_missing_dispose"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("ResourceLifetimeAnalysis"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("symbolic_resource_lifetime"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("resource"));
+            AssertSp0002Evidence(diagnostic, "resource_missing_dispose", "ResourceLifetimeAnalysis", "symbolic_resource_lifetime", "resource");
         }
 
         [TestCaseSource(nameof(GetThreadingSemanticRuleCases))]
@@ -724,10 +672,7 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo(category));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo(rule));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(symbolSubstring));
+            AssertSp0002Evidence(diagnostic, category, rule, "threading_semantic_rule", symbolSubstring);
         }
 
         [Test]
@@ -749,10 +694,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("xml_linq_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Xml.Linq.XDocument.Parse"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule", "xml_linq_semantic_rule", "System.Xml.Linq.XDocument.Parse");
         }
 
         [Test]
@@ -774,10 +716,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("xml_linq_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Xml.Linq.XElement.Value"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "PropertyReferencePurityRule", "xml_linq_semantic_rule", "System.Xml.Linq.XElement.Value");
         }
 
         [Test]
@@ -799,10 +738,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("xml_linq_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Xml.Linq.XNode.Remove"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule", "xml_linq_semantic_rule", "System.Xml.Linq.XNode.Remove");
         }
 
         [Test]
@@ -824,10 +760,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.ActivitySource.ActivitySource"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "ObjectCreationPurityRule", "diagnostics_tracing_semantic_rule", "System.Diagnostics.ActivitySource.ActivitySource");
         }
 
         [Test]
@@ -850,10 +783,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Activity.Current"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "PropertyReferencePurityRule", "diagnostics_tracing_semantic_rule", "System.Diagnostics.Activity.Current");
         }
 
         [Test]
@@ -875,10 +805,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Activity.SetTag"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule", "System.Diagnostics.Activity.SetTag");
         }
 
         [Test]
@@ -900,10 +827,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Metrics.Meter.CreateCounter"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule", "System.Diagnostics.Metrics.Meter.CreateCounter");
         }
 
         [Test]
@@ -925,10 +849,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Metrics.Counter"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule", "diagnostics_tracing_semantic_rule", "System.Diagnostics.Metrics.Counter");
         }
 
         [Test]
@@ -950,10 +871,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.MemoryStream.MemoryStream"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "ObjectCreationPurityRule", "io_stream_text_semantic_rule", "System.IO.MemoryStream.MemoryStream");
         }
 
         [Test]
@@ -975,10 +893,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringReader.StringReader"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "ObjectCreationPurityRule", "io_stream_text_semantic_rule", "System.IO.StringReader.StringReader");
         }
 
         [Test]
@@ -1000,9 +915,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringReader.ReadToEnd"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "io_stream_text_semantic_rule", symbolContains: "System.IO.StringReader.ReadToEnd");
         }
 
         [Test]
@@ -1024,10 +937,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StreamReader.StreamReader"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", "ObjectCreationPurityRule", "io_stream_text_semantic_rule", "System.IO.StreamReader.StreamReader");
         }
 
         [Test]
@@ -1049,9 +959,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StreamWriter.WriteLine"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "io_stream_text_semantic_rule", symbolContains: "System.IO.StreamWriter.WriteLine");
         }
 
         [Test]
@@ -1073,9 +981,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringWriter.Write"));
+            AssertSp0002Evidence(diagnostic, "catalog_hit", catalogSource: "io_stream_text_semantic_rule", symbolContains: "System.IO.StringWriter.Write");
         }
 
         [Test]
