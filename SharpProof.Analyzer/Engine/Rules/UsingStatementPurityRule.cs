@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -136,8 +137,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var local in declaredLocals)
             {
-                var localWasReassigned = WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel);
-                var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing);
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var localWasReassigned = WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel, context.CancellationToken);
+                var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing, context.CancellationToken);
                 if (disposeReceiverType == null)
                 {
                     PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' has no resolvable Dispose receiver type. Skipping Dispose check.");
@@ -273,9 +275,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             return locals;
         }
 
-        private ITypeSymbol? ResolveDisposeReceiverType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, PurityAnalysisEngine.PurityAnalysisState currentState, bool isAwaitUsing)
+        private ITypeSymbol? ResolveDisposeReceiverType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, PurityAnalysisEngine.PurityAnalysisState currentState, bool isAwaitUsing, CancellationToken cancellationToken)
         {
-            if (!HasDeclaratorInitializer(local) &&
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!HasDeclaratorInitializer(local, cancellationToken) &&
                 currentState.LocalConcreteTypes.TryGetValue(local, out var concreteType) &&
                 FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
             {
@@ -283,7 +286,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return concreteType;
             }
 
-            var initializerType = TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel);
+            var initializerType = TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel, cancellationToken);
             if (initializerType != null && FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
             {
                 PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' Dispose receiver resolved from initializer type {initializerType.Name}.");
@@ -318,10 +321,11 @@ namespace SharpProof.Analyzer.Engine.Rules
             return current;
         }
 
-        private ITypeSymbol? TryGetStableObjectCreationInitializerType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel)
+        private ITypeSymbol? TryGetStableObjectCreationInitializerType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var declaratorSyntax = local.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
@@ -330,46 +334,50 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return null;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel))
+            if (HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel, cancellationToken))
             {
                 PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' is reassigned before using; using declared type for Dispose resolution.");
                 return null;
             }
 
-            var initializerOperation = semanticModel.GetOperation(initializerSyntax);
+            var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
             var unwrappedInitializer = UnwrapConversionsForDisposeReceiver(initializerOperation);
             return unwrappedInitializer is IObjectCreationOperation objectCreationOperation
                 ? objectCreationOperation.Type
                 : null;
         }
 
-        private static bool HasDeclaratorInitializer(ILocalSymbol local)
+        private static bool HasDeclaratorInitializer(ILocalSymbol local, CancellationToken cancellationToken)
         {
             return local.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .Any(declarator => declarator.Initializer != null);
         }
 
-        private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel)
+        private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var declaratorSyntax = local.DeclaringSyntaxReferences
-                .Select(reference => reference.GetSyntax())
+                .Select(reference => reference.GetSyntax(cancellationToken))
                 .OfType<VariableDeclaratorSyntax>()
                 .FirstOrDefault();
             return declaratorSyntax != null &&
-                HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel);
+                HasAssignmentToLocalBetweenDeclarationAndUsing(local, usingOperation, declaratorSyntax, semanticModel, cancellationToken);
         }
 
         private bool HasAssignmentToLocalBetweenDeclarationAndUsing(
             ILocalSymbol local,
             IOperation usingOperation,
             VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var rootOperation = usingOperation;
             while (rootOperation.Parent != null)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 rootOperation = rootOperation.Parent;
             }
 
@@ -377,6 +385,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             var usingStart = usingOperation.Syntax.SpanStart;
             foreach (var operation in rootOperation.DescendantsAndSelf())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (operation.Syntax.SpanStart <= declarationStart || operation.Syntax.SpanStart >= usingStart)
                 {
                     continue;
@@ -384,11 +393,11 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 switch (operation)
                 {
-                    case ISimpleAssignmentOperation assignment when IsLocalTarget(assignment.Target, local, semanticModel):
-                    case ICompoundAssignmentOperation compoundAssignment when IsLocalTarget(compoundAssignment.Target, local, semanticModel):
-                    case IIncrementOrDecrementOperation incrementOrDecrement when IsLocalTarget(incrementOrDecrement.Target, local, semanticModel):
-                    case IDeconstructionAssignmentOperation deconstructionAssignment when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, local, semanticModel):
-                    case IInvocationOperation invocationOperation when HasByRefLocalArgument(invocationOperation, local, semanticModel):
+                    case ISimpleAssignmentOperation assignment when IsLocalTarget(assignment.Target, local, semanticModel, cancellationToken):
+                    case ICompoundAssignmentOperation compoundAssignment when IsLocalTarget(compoundAssignment.Target, local, semanticModel, cancellationToken):
+                    case IIncrementOrDecrementOperation incrementOrDecrement when IsLocalTarget(incrementOrDecrement.Target, local, semanticModel, cancellationToken):
+                    case IDeconstructionAssignmentOperation deconstructionAssignment when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, local, semanticModel, cancellationToken):
+                    case IInvocationOperation invocationOperation when HasByRefLocalArgument(invocationOperation, local, semanticModel, cancellationToken):
                         return true;
                 }
             }
@@ -396,10 +405,11 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private bool ContainsLocalAssignmentTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel)
+        private bool ContainsLocalAssignmentTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
-            if (IsLocalTarget(unwrappedTarget, local, semanticModel))
+            if (IsLocalTarget(unwrappedTarget, local, semanticModel, cancellationToken))
             {
                 return true;
             }
@@ -408,7 +418,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 foreach (var element in tupleOperation.Elements)
                 {
-                    if (ContainsLocalAssignmentTarget(element, local, semanticModel))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (ContainsLocalAssignmentTarget(element, local, semanticModel, cancellationToken))
                     {
                         return true;
                     }
@@ -418,12 +429,13 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private bool HasByRefLocalArgument(IInvocationOperation invocationOperation, ILocalSymbol local, SemanticModel semanticModel)
+        private bool HasByRefLocalArgument(IInvocationOperation invocationOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
             foreach (var argument in invocationOperation.Arguments)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                    IsLocalTarget(argument.Value, local, semanticModel))
+                    IsLocalTarget(argument.Value, local, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -432,8 +444,9 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private bool IsLocalTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel)
+        private bool IsLocalTarget(IOperation? targetOperation, ILocalSymbol local, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var unwrappedTarget = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
             if (unwrappedTarget is not ILocalReferenceOperation localReferenceOperation)
             {
@@ -445,15 +458,18 @@ namespace SharpProof.Analyzer.Engine.Rules
                     localReferenceOperation.Local,
                     local,
                     semanticModel,
-                    new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+                    new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                    cancellationToken);
         }
 
         private bool IsRefLocalAliasForLocal(
             ILocalSymbol possibleAlias,
             ILocalSymbol targetLocal,
             SemanticModel semanticModel,
-            HashSet<ISymbol> visited)
+            HashSet<ISymbol> visited,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (possibleAlias.RefKind == RefKind.None || !visited.Add(possibleAlias))
             {
                 return false;
@@ -461,7 +477,8 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var syntaxReference in possibleAlias.DeclaringSyntaxReferences)
             {
-                if (syntaxReference.GetSyntax() is not VariableDeclaratorSyntax declaratorSyntax ||
+                cancellationToken.ThrowIfCancellationRequested();
+                if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
                     declaratorSyntax.Initializer?.Value == null)
                 {
                     continue;
@@ -473,7 +490,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     initializerSyntax = refExpressionSyntax.Expression;
                 }
 
-                var initializerOperation = semanticModel.GetOperation(initializerSyntax);
+                var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
                 var unwrappedInitializer = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
                 if (unwrappedInitializer is not ILocalReferenceOperation initializerLocalReference)
                 {
@@ -481,7 +498,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
 
                 if (SymbolEqualityComparer.Default.Equals(initializerLocalReference.Local, targetLocal) ||
-                    IsRefLocalAliasForLocal(initializerLocalReference.Local, targetLocal, semanticModel, visited))
+                    IsRefLocalAliasForLocal(initializerLocalReference.Local, targetLocal, semanticModel, visited, cancellationToken))
                 {
                     return true;
                 }

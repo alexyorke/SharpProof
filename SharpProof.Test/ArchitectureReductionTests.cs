@@ -404,6 +404,26 @@ namespace SharpProof.Test
         }
 
         [Test]
+        public void UsingStatementRule_ThreadsCancellationTokenThroughResourceScans()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "UsingStatementPurityRule.cs"))
+                .Replace("\r\n", "\n");
+
+            Assert.That(source, Does.Not.Contain("GetSyntax()"));
+            Assert.That(source, Does.Contain("WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel, context.CancellationToken)"));
+            Assert.That(source, Does.Contain("ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing, context.CancellationToken)"));
+            Assert.That(source, Does.Contain("reference.GetSyntax(cancellationToken)"));
+            Assert.That(source, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
+            Assert.That(source, Does.Contain("syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax"));
+        }
+
+        [Test]
         public void AnalyzerDisposableLocalAcquisition_ProjectsOwnershipFactsIntoPathState()
         {
             var repositoryRoot = FindRepositoryRoot();
