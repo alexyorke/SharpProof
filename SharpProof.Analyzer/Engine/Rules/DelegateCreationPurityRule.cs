@@ -747,7 +747,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ILocalSymbol localSymbol,
             SyntaxNode delegateCreationSyntax,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             return HasStableFreshMutableObjectInitializer(
                 localSymbol,
@@ -863,7 +863,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 });
         }
 
-        private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span, CancellationToken cancellationToken = default)
+        private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span, CancellationToken cancellationToken)
         {
             var syntaxReferences = localSymbol.DeclaringSyntaxReferences;
             return syntaxReferences.Length > 0 &&

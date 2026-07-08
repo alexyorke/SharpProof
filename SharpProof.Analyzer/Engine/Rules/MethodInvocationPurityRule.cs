@@ -4168,7 +4168,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             return operation;
         }
 
-        private static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken = default)
+        private static bool HasMethodBody(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
         {
             if (methodSymbol.DeclaringSyntaxReferences.Length == 0)
             {

@@ -56,7 +56,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
             PurityAnalysisEngine.PurityAnalysisState? currentState,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             return IsOwnedFreshMutableLocal(
                 localSymbol,
@@ -71,7 +71,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             IFieldReferenceOperation fieldReferenceOperation,
             SyntaxNode observationSyntax,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             if (!TryGetStableAssignedValue(
                     fieldReferenceOperation,

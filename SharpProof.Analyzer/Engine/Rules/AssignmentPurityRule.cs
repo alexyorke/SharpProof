@@ -378,7 +378,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                 : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
         }
 
-        private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken = default)
+        private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken)
         {
             if (propertySymbol.SetMethod == null ||
                 propertySymbol.SetMethod.IsAbstract ||
@@ -1038,7 +1038,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             SyntaxNode observationSyntax,
             VariableDeclaratorSyntax declaratorSyntax,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();

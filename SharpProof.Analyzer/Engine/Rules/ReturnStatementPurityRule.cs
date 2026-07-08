@@ -650,7 +650,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localSymbol,
+                    returnedValue.Syntax,
+                    declaratorSyntax,
+                    semanticModel,
+                    cancellationToken))
             {
                 methodSymbol = null!;
                 return false;
@@ -1086,7 +1091,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localSymbol,
+                    returnedValue.Syntax,
+                    declaratorSyntax,
+                    semanticModel,
+                    cancellationToken))
             {
                 sourceOperation = null!;
                 methodSymbol = null!;
@@ -1668,7 +1678,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localSymbol,
+                    returnedValue.Syntax,
+                    declaratorSyntax,
+                    semanticModel,
+                    cancellationToken))
             {
                 escapeSyntax = null!;
                 escapeSymbol = null!;
@@ -1725,7 +1740,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (declaratorSyntax != null && initializerSyntax != null)
             {
                 declarationSyntax = declaratorSyntax;
-                if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
+                if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                        localSymbol,
+                        returnedValue.Syntax,
+                        declaratorSyntax,
+                        semanticModel,
+                        cancellationToken))
                 {
                     escapeSyntax = null!;
                     escapeSymbol = null!;

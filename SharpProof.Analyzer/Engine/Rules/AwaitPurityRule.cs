@@ -132,7 +132,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         private static bool IsKnownConstantTrueIsCompletedGetter(
             IMethodSymbol? getter,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             if (getter == null)
             {

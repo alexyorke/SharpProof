@@ -504,7 +504,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken = default)
+        private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken)
         {
             if (propertySymbol.GetMethod == null ||
                 propertySymbol.GetMethod.IsAbstract ||
