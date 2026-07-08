@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
+using NUnit.Framework;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Test
@@ -200,6 +201,63 @@ namespace SharpProof.Test
                 SharpProofDiagnostics.PurityNotVerifiedId,
                 required: true);
             return (source, expectedSpanText!);
+        }
+
+        public static async Task<(string Source, Diagnostic? Diagnostic)> AssertOptionalSingleSp0002Async(
+            string markedSource,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool concurrentAnalysis = false)
+        {
+            var (source, expectedSpanText) = StripSp0002Markup(markedSource);
+            var diagnostics = await GetDiagnosticsAsync(
+                source,
+                frameworkReferences: frameworkReferences,
+                concurrentAnalysis: concurrentAnalysis);
+            var purityDiagnostics = diagnostics
+                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+
+            if (expectedSpanText == null)
+            {
+                Assert.That(purityDiagnostics, Is.Empty);
+                Assert.That(diagnostics, Is.Empty);
+                return (source, null);
+            }
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+
+            var diagnostic = purityDiagnostics[0];
+            AssertDiagnosticSpan(source, diagnostic, expectedSpanText);
+            return (source, diagnostic);
+        }
+
+        public static async Task<(string Source, Diagnostic Diagnostic)> AssertSingleSp0002Async(
+            string markedSource,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool concurrentAnalysis = false)
+        {
+            var (source, expectedSpanText) = StripRequiredSp0002Markup(markedSource);
+            var diagnostics = await GetDiagnosticsAsync(
+                source,
+                frameworkReferences: frameworkReferences,
+                concurrentAnalysis: concurrentAnalysis);
+            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+            AssertDiagnosticSpan(source, diagnostic, expectedSpanText);
+            return (source, diagnostic);
+        }
+
+        public static void AssertDiagnosticSpan(
+            string source,
+            Diagnostic diagnostic,
+            string expectedSpanText)
+        {
+            var actualSpanText = source.Substring(
+                diagnostic.Location.SourceSpan.Start,
+                diagnostic.Location.SourceSpan.Length);
+            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
         }
 
         private static (string Source, string? ExpectedSpanText) StripDiagnosticMarkup(

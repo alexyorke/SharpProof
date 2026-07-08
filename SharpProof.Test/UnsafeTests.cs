@@ -105,20 +105,10 @@ public class TestClass
 
         private static async Task AssertUnsafeSinglePurityDiagnosticAsync(string markedSource)
         {
-            var (source, expectedSpanText) = AnalyzerTestHost.StripSp0002Markup(markedSource);
-            Assert.That(expectedSpanText, Is.Not.Null);
-
-            var diagnostics = await GetDiagnosticsAsync(
-                source,
+            await AnalyzerTestHost.AssertSingleSp0002Async(
+                markedSource,
                 frameworkReferences: UnsafeFrameworkReferences,
                 concurrentAnalysis: true);
-            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostics, Has.Length.EqualTo(1));
-            var actualSpanText = source.Substring(
-                diagnostic.Location.SourceSpan.Start,
-                diagnostic.Location.SourceSpan.Length);
-            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
         }
     }
 }

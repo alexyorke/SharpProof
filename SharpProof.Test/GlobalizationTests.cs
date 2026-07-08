@@ -4985,30 +4985,10 @@ public class TestClass
 
         private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
         {
-            var (source, expectedSpanText) = AnalyzerTestHost.StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
+            await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
+                markedSource,
                 frameworkReferences: GlobalizationFrameworkReferences,
                 concurrentAnalysis: true);
-            var purityDiagnostics = diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-                .ToArray();
-
-            if (expectedSpanText == null)
-            {
-                Assert.That(purityDiagnostics, Is.Empty);
-                Assert.That(diagnostics, Is.Empty);
-                return;
-            }
-
-            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
-            Assert.That(diagnostics, Has.Length.EqualTo(1));
-
-            var diagnostic = purityDiagnostics[0];
-            var actualSpanText = source.Substring(
-                diagnostic.Location.SourceSpan.Start,
-                diagnostic.Location.SourceSpan.Length);
-            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
         }
     }
 }

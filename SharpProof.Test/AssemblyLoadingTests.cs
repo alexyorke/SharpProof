@@ -1643,27 +1643,7 @@ namespace TestNamespace
 
         private static async Task AssertAssemblyLoadingDiagnosticsAsync(string markedSource)
         {
-            var (source, expectedSpanText) = AnalyzerTestHost.StripSp0002Markup(markedSource);
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source);
-            var purityDiagnostics = diagnostics
-                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-                .ToArray();
-
-            if (expectedSpanText == null)
-            {
-                Assert.That(purityDiagnostics, Is.Empty);
-                Assert.That(diagnostics, Is.Empty);
-                return;
-            }
-
-            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
-            Assert.That(diagnostics, Has.Length.EqualTo(1));
-
-            var diagnostic = purityDiagnostics[0];
-            var actualSpanText = source.Substring(
-                diagnostic.Location.SourceSpan.Start,
-                diagnostic.Location.SourceSpan.Length);
-            Assert.That(actualSpanText, Is.EqualTo(expectedSpanText));
+            await AnalyzerTestHost.AssertOptionalSingleSp0002Async(markedSource);
         }
     }
 }
