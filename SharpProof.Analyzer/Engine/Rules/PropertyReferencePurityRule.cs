@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules
 {
@@ -903,36 +904,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 SpecialType.System_String;
         }
 
-        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
-        {
-            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface)
-            {
-                return true;
-            }
-
-            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
-            {
-                return canBeOverridden;
-            }
-
-            if (getterSymbol.IsAbstract)
-            {
-                return true;
-            }
-
-            if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
-            {
-                return false;
-            }
-
-            return !getterSymbol.IsSealed;
-        }
-
         private static bool IsPotentiallyDispatchedProperty(IPropertySymbol propertySymbol, Compilation compilation)
         {
             return propertySymbol.ContainingType?.TypeKind == TypeKind.Interface ||
                    propertySymbol.IsAbstract ||
-                   (propertySymbol.GetMethod != null && IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation));
+                   (propertySymbol.GetMethod != null && DispatchedMemberResolution.IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation));
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedGetterPurity(
@@ -1170,14 +1146,14 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (targetProperty.ContainingType?.TypeKind == TypeKind.Interface)
             {
-                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
                     if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
                     {
                         continue;
                     }
 
-                    if (!PropertyDispatchHelper.ImplementsInterface(type, targetProperty.ContainingType))
+                    if (!TypeHierarchyEnumeration.ImplementsInterface(type, targetProperty.ContainingType))
                     {
                         continue;
                     }
@@ -1193,20 +1169,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return targets.ToImmutableArray();
             }
 
-            var baseProperty = PropertyDispatchHelper.GetRootOverriddenProperty(targetProperty);
+            var baseProperty = DispatchedMemberResolution.GetRootOverriddenProperty(targetProperty);
             var baseType = baseProperty.ContainingType;
             if (baseType != null)
             {
-                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
-                    if (!PropertyDispatchHelper.DerivesFrom(type, baseType))
+                    if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType, includeSelf: true))
                     {
                         continue;
                     }
 
                     foreach (var property in type.GetMembers(baseProperty.Name).OfType<IPropertySymbol>())
                     {
-                        if (PropertyDispatchHelper.OverridesProperty(property, baseProperty) && property.GetMethod != null)
+                        if (DispatchedMemberResolution.OverridesProperty(property, baseProperty) && property.GetMethod != null)
                         {
                             targets.Add(property.GetMethod.OriginalDefinition);
                         }
@@ -1244,7 +1220,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         .OfType<IPropertySymbol>()
                         .FirstOrDefault(property =>
                             SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, targetProperty) ||
-                            PropertyDispatchHelper.OverridesProperty(property, targetProperty));
+                            DispatchedMemberResolution.OverridesProperty(property, targetProperty));
                     if (implementation != null)
                     {
                         break;

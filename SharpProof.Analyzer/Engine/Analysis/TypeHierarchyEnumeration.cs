@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer.Engine.Analysis
@@ -50,6 +51,42 @@ namespace SharpProof.Analyzer.Engine.Analysis
                 }
 
                 current = current.OverriddenMethod;
+            }
+
+            return false;
+        }
+
+        internal static bool ImplementsInterface(
+            INamedTypeSymbol type,
+            INamedTypeSymbol? interfaceSymbol,
+            bool includeInterfaceSelf = false)
+        {
+            if (interfaceSymbol == null)
+            {
+                return false;
+            }
+
+            if (includeInterfaceSelf &&
+                SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, interfaceSymbol.OriginalDefinition))
+            {
+                return true;
+            }
+
+            return type.AllInterfaces.Any(candidate =>
+                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
+        }
+
+        internal static bool DerivesFrom(
+            INamedTypeSymbol type,
+            INamedTypeSymbol potentialBase,
+            bool includeSelf = false)
+        {
+            for (var current = includeSelf ? type : type.BaseType; current != null; current = current.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, potentialBase.OriginalDefinition))
+                {
+                    return true;
+                }
             }
 
             return false;

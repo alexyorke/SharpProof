@@ -441,7 +441,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                 foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!ImplementsInterface(type, target.ContainingType)) continue;
+                    if (!TypeHierarchyEnumeration.ImplementsInterface(type, target.ContainingType)) continue;
                     var impl = type.FindImplementationForInterfaceMember(target) as IMethodSymbol;
                     if (impl != null)
                     {
@@ -464,7 +464,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (!DerivesFrom(type, baseType)) continue;
+                        if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType)) continue;
                         foreach (var member in type.GetMembers())
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -477,31 +477,6 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     }
                 }
             }
-        }
-
-        private static bool ImplementsInterface(INamedTypeSymbol type, INamedTypeSymbol interfaceSymbol)
-        {
-            if (interfaceSymbol == null)
-            {
-                return false;
-            }
-
-            return type.AllInterfaces.Any(
-                i => SymbolEqualityComparer.Default.Equals(
-                    i.OriginalDefinition,
-                    interfaceSymbol.OriginalDefinition));
-        }
-
-        private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol potentialBase)
-        {
-            for (var t = type.BaseType; t != null; t = t.BaseType)
-            {
-                if (SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, potentialBase.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         private static bool IsBaseReference(IOperation? operation)

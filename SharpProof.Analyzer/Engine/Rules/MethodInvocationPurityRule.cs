@@ -2245,7 +2245,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             ISet<IMethodSymbol> targets,
             CancellationToken cancellationToken)
         {
-            if (!ImplementsInterface(type, target.ContainingType))
+            if (!TypeHierarchyEnumeration.ImplementsInterface(type, target.ContainingType, includeInterfaceSelf: true))
             {
                 return;
             }
@@ -3243,7 +3243,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (knownReceiverType != null &&
                 knownReceiverType.IsSealed &&
                 (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, methodSymbol.ContainingType.OriginalDefinition) ||
-                 DerivesFrom(knownReceiverType, methodSymbol.ContainingType)))
+                 TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, methodSymbol.ContainingType)))
             {
                 return false;
             }
@@ -3269,7 +3269,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (hasExactReceiverType &&
                 knownReceiverType != null &&
                 (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, methodSymbol.ContainingType?.OriginalDefinition) ||
-                 (methodSymbol.ContainingType != null && DerivesFrom(knownReceiverType, methodSymbol.ContainingType))))
+                 (methodSymbol.ContainingType != null && TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, methodSymbol.ContainingType))))
             {
                 return false;
             }
@@ -3440,7 +3440,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     {
                         var operandType = asOperand?.Type as INamedTypeSymbol;
                         if (operandType != null &&
-                            ImplementsInterface(operandType, asTargetType))
+                            TypeHierarchyEnumeration.ImplementsInterface(operandType, asTargetType, includeInterfaceSelf: true))
                         {
                             current = asOperand;
                             continue;
@@ -3450,7 +3450,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         {
                             var constrainedType = ResolveConstrainedSealedType(typeParameter);
                             if (constrainedType != null &&
-                                ImplementsInterface(constrainedType, asTargetType))
+                                TypeHierarchyEnumeration.ImplementsInterface(constrainedType, asTargetType, includeInterfaceSelf: true))
                             {
                                 current = asOperand;
                                 continue;
@@ -3607,7 +3607,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (target.ContainingType?.TypeKind == TypeKind.Interface)
             {
-                if (knownReceiverType != null && ImplementsInterface(knownReceiverType, target.ContainingType))
+                if (knownReceiverType != null && TypeHierarchyEnumeration.ImplementsInterface(knownReceiverType, target.ContainingType, includeInterfaceSelf: true))
                 {
                     if (hasExactReceiverType)
                     {
@@ -3661,7 +3661,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         cancellationToken.ThrowIfCancellationRequested();
                         if (requiresInterfaceReceiverConstraint)
                         {
-                            if (!ImplementsInterface(type, knownReceiverType))
+                            if (!TypeHierarchyEnumeration.ImplementsInterface(type, knownReceiverType, includeInterfaceSelf: true))
                             {
                                 continue;
                             }
@@ -3669,7 +3669,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         else
                         {
                             if (!SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, knownReceiverType.OriginalDefinition) &&
-                                !DerivesFrom(type, knownReceiverType))
+                                !TypeHierarchyEnumeration.DerivesFrom(type, knownReceiverType))
                             {
                                 continue;
                             }
@@ -3708,7 +3708,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     if (hasExactReceiverType &&
                         knownReceiverType != null &&
                         (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||
-                         DerivesFrom(knownReceiverType, baseType)))
+                         TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
                     {
                         var exactReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
                         if (exactReceiverTarget != null)
@@ -3722,7 +3722,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     if (knownReceiverType != null &&
                         knownReceiverType.IsSealed &&
                         (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||
-                         DerivesFrom(knownReceiverType, baseType)))
+                         TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
                     {
                         var sealedReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
                         if (sealedReceiverTarget != null)
@@ -3736,7 +3736,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (!DerivesFrom(type, baseType))
+                        if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType))
                         {
                             continue;
                         }
@@ -3851,26 +3851,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             return false;
-        }
-
-        private static bool ImplementsInterface(INamedTypeSymbol type, INamedTypeSymbol interfaceSymbol)
-        {
-            if (interfaceSymbol == null)
-            {
-                return false;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(
-                    type.OriginalDefinition,
-                    interfaceSymbol.OriginalDefinition))
-            {
-                return true;
-            }
-
-            return type.AllInterfaces.Any(
-                i => SymbolEqualityComparer.Default.Equals(
-                    i.OriginalDefinition,
-                    interfaceSymbol.OriginalDefinition));
         }
 
         private static bool IsAllocationOnlyInterfaceReceiver(IOperation? invocationInstance)
@@ -4443,19 +4423,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
             return PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
                 PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedSource, compilation, out _);
-        }
-
-        private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol potentialBase)
-        {
-            for (var t = type.BaseType; t != null; t = t.BaseType)
-            {
-                if (SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, potentialBase.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
     }

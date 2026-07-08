@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer.Engine.Rules
@@ -426,14 +427,14 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (targetProperty.ContainingType?.TypeKind == TypeKind.Interface)
             {
-                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
                     if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
                     {
                         continue;
                     }
 
-                    if (!PropertyDispatchHelper.ImplementsInterface(type, targetProperty.ContainingType))
+                    if (!TypeHierarchyEnumeration.ImplementsInterface(type, targetProperty.ContainingType))
                     {
                         continue;
                     }
@@ -449,20 +450,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return targets.ToImmutableArray();
             }
 
-            var baseProperty = PropertyDispatchHelper.GetRootOverriddenProperty(targetProperty);
+            var baseProperty = DispatchedMemberResolution.GetRootOverriddenProperty(targetProperty);
             var baseType = baseProperty.ContainingType;
             if (baseType != null)
             {
-                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
-                    if (!PropertyDispatchHelper.DerivesFrom(type, baseType))
+                    if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType, includeSelf: true))
                     {
                         continue;
                     }
 
                     foreach (var property in type.GetMembers(baseProperty.Name).OfType<IPropertySymbol>())
                     {
-                        if (PropertyDispatchHelper.OverridesProperty(property, baseProperty) && property.SetMethod != null)
+                        if (DispatchedMemberResolution.OverridesProperty(property, baseProperty) && property.SetMethod != null)
                         {
                             targets.Add(property.SetMethod.OriginalDefinition);
                         }
@@ -497,7 +498,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                         .OfType<IPropertySymbol>()
                         .FirstOrDefault(property =>
                             SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, targetProperty) ||
-                            PropertyDispatchHelper.OverridesProperty(property, targetProperty));
+                            DispatchedMemberResolution.OverridesProperty(property, targetProperty));
                     if (implementation != null)
                     {
                         break;
@@ -898,83 +899,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             return unwrapped?.Type as INamedTypeSymbol;
         }
 
-        internal static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
-        {
-            var current = propertySymbol;
-            while (current.OverriddenProperty != null)
-            {
-                current = current.OverriddenProperty;
-            }
-
-            return current.OriginalDefinition;
-        }
-
-        internal static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
-        {
-            var current = property;
-            while (current != null)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-
-                current = current.OverriddenProperty;
-            }
-
-            return false;
-        }
-
-        internal static bool ImplementsInterface(INamedTypeSymbol type, INamedTypeSymbol interfaceSymbol)
-        {
-            return type.AllInterfaces.Any(candidate =>
-                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
-        }
-
-        internal static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol baseType)
-        {
-            for (INamedTypeSymbol? current = type; current != null; current = current.BaseType)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, baseType.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol namespaceSymbol)
-        {
-            foreach (var type in namespaceSymbol.GetTypeMembers())
-            {
-                foreach (var nested in EnumerateTypeAndNestedTypes(type))
-                {
-                    yield return nested;
-                }
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                foreach (var type in EnumerateAllNamedTypes(nestedNamespace))
-                {
-                    yield return type;
-                }
-            }
-        }
-
-        private static IEnumerable<INamedTypeSymbol> EnumerateTypeAndNestedTypes(INamedTypeSymbol typeSymbol)
-        {
-            yield return typeSymbol;
-
-            foreach (var nestedType in typeSymbol.GetTypeMembers())
-            {
-                foreach (var nested in EnumerateTypeAndNestedTypes(nestedType))
-                {
-                    yield return nested;
-                }
-            }
-        }
     }
 
     internal static class RuleAnalysisHelper
