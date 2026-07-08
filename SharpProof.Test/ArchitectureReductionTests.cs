@@ -312,12 +312,20 @@ namespace SharpProof.Test
                     "Rules",
                     "FieldReferencePurityRule.cs"))
                 .Replace("\r\n", "\n");
+            var helperSource = ReadFileCached(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "AssignmentPurityRule.cs"))
+                .Replace("\r\n", "\n");
 
             Assert.That(classifierSource, Does.Not.Contain("GetSyntax()"));
             Assert.That(classifierSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
             Assert.That(classifierSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
             Assert.That(classifierSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken)"));
-            Assert.That(classifierSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
+            Assert.That(classifierSource, Does.Contain("RuleAnalysisHelper.ConstructorStoresParameterMatching("));
+            Assert.That(helperSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
             Assert.That(classifierSource, Does.Contain("context.CancellationToken"));
             Assert.That(fieldRuleSource, Does.Contain("OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel, context.CancellationToken)"));
         }
@@ -986,6 +994,13 @@ namespace SharpProof.Test
                     "Rules",
                     "OwnedFreshMutableObjectClassifier.cs"))
                 .Replace("\r\n", "\n");
+            var helperSource = ReadFileCached(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Analyzer",
+                    "Engine",
+                    "Rules",
+                    "AssignmentPurityRule.cs"))
+                .Replace("\r\n", "\n");
 
             Assert.That(returnSource, Does.Not.Contain("GetSyntax()"));
             Assert.That(returnSource, Does.Not.Match(@"(?:semanticModel|constructorModel)\.GetOperation\([^,\r\n]+\)"));
@@ -997,7 +1012,8 @@ namespace SharpProof.Test
             Assert.That(returnSource, Does.Contain("semanticModel.GetOperation(initializerSyntax, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetDeclaredSymbol(designation, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol"));
-            Assert.That(returnSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
+            Assert.That(returnSource, Does.Contain("RuleAnalysisHelper.ConstructorStoresParameterMatching("));
+            Assert.That(helperSource, Does.Contain("constructorModel.GetOperation(assignment, cancellationToken)"));
             Assert.That(returnSource, Does.Contain("cancellationToken: cancellationToken"));
             Assert.That(engineSource, Does.Contain("reference.GetSyntax(cancellationToken)"));
             Assert.That(engineSource, Does.Contain("returnedSemanticModel.GetOperation(returnedExpressionSyntax, cancellationToken)"));

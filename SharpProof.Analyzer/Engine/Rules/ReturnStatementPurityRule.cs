@@ -2116,53 +2116,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return true;
                 }
 
-                if (ConstructorStoresParameterInInstanceMember(objectCreationOperation.Constructor, parameter, semanticModel, cancellationToken))
+                if (RuleAnalysisHelper.ConstructorStoresParameterMatching(
+                        objectCreationOperation.Constructor,
+                        parameter,
+                        semanticModel,
+                        cancellationToken,
+                        target =>
+                            target is IFieldReferenceOperation fieldReference &&
+                            IsInstanceMemberOfConstructedType(fieldReference.Field, objectCreationOperation.Constructor.ContainingType) &&
+                            IsThisOrImplicitInstance(fieldReference.Instance) ||
+                            target is IPropertyReferenceOperation propertyReference &&
+                            IsInstanceMemberOfConstructedType(propertyReference.Property, objectCreationOperation.Constructor.ContainingType) &&
+                            IsThisOrImplicitInstance(propertyReference.Instance)))
                 {
                     return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ConstructorStoresParameterInInstanceMember(
-            IMethodSymbol constructor,
-            IParameterSymbol parameter,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
-                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
-                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
-                    {
-                        continue;
-                    }
-
-                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
-                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
-                    {
-                        continue;
-                    }
-
-                    if (assignmentOperation.Target is IFieldReferenceOperation fieldReference &&
-                        IsInstanceMemberOfConstructedType(fieldReference.Field, constructor.ContainingType) &&
-                        IsThisOrImplicitInstance(fieldReference.Instance))
-                    {
-                        return true;
-                    }
-
-                    if (assignmentOperation.Target is IPropertyReferenceOperation propertyReference &&
-                        IsInstanceMemberOfConstructedType(propertyReference.Property, constructor.ContainingType) &&
-                        IsThisOrImplicitInstance(propertyReference.Instance))
-                    {
-                        return true;
-                    }
                 }
             }
 

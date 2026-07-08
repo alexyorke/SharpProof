@@ -162,7 +162,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInMember(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel, cancellationToken))
+                        RuleAnalysisHelper.ConstructorStoresParameterMatching(
+                            objectCreationOperation.Constructor,
+                            parameter,
+                            semanticModel,
+                            cancellationToken,
+                            target => IsThisInstanceMemberReference(target, fieldReferenceOperation.Field)))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -212,7 +217,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var parameter = argument.Parameter;
                     if (parameter != null &&
-                        ConstructorStoresParameterInMember(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel, cancellationToken))
+                        RuleAnalysisHelper.ConstructorStoresParameterMatching(
+                            objectCreationOperation.Constructor,
+                            parameter,
+                            semanticModel,
+                            cancellationToken,
+                            target => IsThisInstanceMemberReference(target, propertyReferenceOperation.Property)))
                     {
                         valueOperation = argument.Value;
                         return true;
@@ -347,50 +357,18 @@ namespace SharpProof.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool ConstructorStoresParameterInMember(
-            IMethodSymbol constructor,
-            IParameterSymbol parameter,
-            ISymbol memberSymbol,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+        private static bool IsThisInstanceMemberReference(IOperation operation, ISymbol memberSymbol)
         {
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
+            var (targetMember, targetInstance) = operation switch
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var constructorSyntax = syntaxReference.GetSyntax(cancellationToken);
-                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
-                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (constructorModel.GetOperation(assignment, cancellationToken) is not ISimpleAssignmentOperation assignmentOperation)
-                    {
-                        continue;
-                    }
+                IFieldReferenceOperation fieldReference => ((ISymbol?)fieldReference.Field, fieldReference.Instance),
+                IPropertyReferenceOperation propertyReference => (propertyReference.Property, propertyReference.Instance),
+                _ => (null, null)
+            };
 
-                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
-                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter))
-                    {
-                        continue;
-                    }
-
-                    var (targetMember, targetInstance) = assignmentOperation.Target switch
-                    {
-                        IFieldReferenceOperation fieldReference => ((ISymbol?)fieldReference.Field, fieldReference.Instance),
-                        IPropertyReferenceOperation propertyReference => (propertyReference.Property, propertyReference.Instance),
-                        _ => (null, null)
-                    };
-                    if (targetMember == null ||
-                        !SymbolEqualityComparer.Default.Equals(targetMember, memberSymbol) ||
-                        !IsThisOrImplicitInstance(targetInstance))
-                    {
-                        continue;
-                    }
-
-                    return true;
-                }
-            }
-
-            return false;
+            return targetMember != null &&
+                SymbolEqualityComparer.Default.Equals(targetMember, memberSymbol) &&
+                IsThisOrImplicitInstance(targetInstance);
         }
 
         private static ISymbol? GetReferencedMemberSymbol(IOperation? operation)
