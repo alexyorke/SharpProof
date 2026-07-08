@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer
@@ -192,6 +193,17 @@ namespace SharpProof.Analyzer
                             yield return new MethodCallCandidate(invocation, invokedMethod);
                         }
                     }
+
+                    if (IsSourceDispatchSlot(invocationOperation.TargetMethod) &&
+                        !TryResolveExactConcreteType(invocationOperation.Instance, knownExactLocals, out _) &&
+                        SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(invocationOperation.TargetMethod, invocationOperation) &&
+                        seen.Add(CreateDynamicDispatchCallSiteKey(invocation, invocationOperation.TargetMethod)))
+                    {
+                        yield return new MethodCallCandidate(
+                            invocation,
+                            invocationOperation.TargetMethod.OriginalDefinition,
+                            isDynamicDispatch: true);
+                    }
                 }
                 else if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod &&
                          invokedMethod.MethodKind != MethodKind.DelegateInvoke &&
@@ -234,6 +246,19 @@ namespace SharpProof.Analyzer
                             yield return new MethodCallCandidate(propertyAccess, getterMethod);
                         }
                     }
+
+                    var getter = propertyReferenceOperation.Property?.GetMethod;
+                    if (getter != null &&
+                        IsSourceDispatchSlot(getter) &&
+                        !TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals, out _) &&
+                        SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(getter, propertyReferenceOperation) &&
+                        seen.Add(CreateDynamicDispatchCallSiteKey(propertyAccess, getter)))
+                    {
+                        yield return new MethodCallCandidate(
+                            propertyAccess,
+                            getter.OriginalDefinition,
+                            isDynamicDispatch: true);
+                    }
                 }
                 else if (semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol &&
                          propertySymbol.GetMethod != null &&
@@ -257,6 +282,19 @@ namespace SharpProof.Analyzer
                         {
                             yield return new MethodCallCandidate(propertyWrite, setterMethod);
                         }
+                    }
+
+                    var setter = propertyReferenceOperation.Property?.SetMethod;
+                    if (setter != null &&
+                        IsSourceDispatchSlot(setter) &&
+                        !TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals, out _) &&
+                        SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(setter, propertyReferenceOperation) &&
+                        seen.Add(CreateDynamicDispatchCallSiteKey(propertyWrite, setter)))
+                    {
+                        yield return new MethodCallCandidate(
+                            propertyWrite,
+                            setter.OriginalDefinition,
+                            isDynamicDispatch: true);
                     }
                 }
                 else if (TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod) &&
@@ -315,6 +353,16 @@ namespace SharpProof.Analyzer
                 callSite.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 "|" +
                 method.OriginalDefinition.ToDisplayString();
+        }
+
+        private static string CreateDynamicDispatchCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
+        {
+            return CreateMethodCallSiteKey(callSite, method) + "|dynamic-dispatch";
+        }
+
+        private static bool IsSourceDispatchSlot(IMethodSymbol method)
+        {
+            return method.OriginalDefinition.DeclaringSyntaxReferences.Length != 0;
         }
 
         private static string CreateMethodCallSiteKey(MethodCallCandidate candidate)
@@ -568,11 +616,13 @@ namespace SharpProof.Analyzer
             public MethodCallCandidate(
                 SyntaxNode callSite,
                 IMethodSymbol method,
-                UsingDisposeGuard? usingDisposeGuard = null)
+                UsingDisposeGuard? usingDisposeGuard = null,
+                bool isDynamicDispatch = false)
             {
                 CallSite = callSite;
                 Method = method;
                 UsingDisposeGuard = usingDisposeGuard;
+                IsDynamicDispatch = isDynamicDispatch;
             }
 
             public SyntaxNode CallSite { get; }
@@ -580,6 +630,8 @@ namespace SharpProof.Analyzer
             public IMethodSymbol Method { get; }
 
             public UsingDisposeGuard? UsingDisposeGuard { get; }
+
+            public bool IsDynamicDispatch { get; }
         }
 
         internal sealed class UsingDisposeGuard

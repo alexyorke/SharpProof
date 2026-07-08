@@ -932,6 +932,107 @@ public class TestClass
         }
 
         [Test]
+        public async Task Sp0010_OpenVirtualMethodDispatch_ReportsUnknownException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class Worker
+{
+    public virtual void Work()
+    {
+    }
+}
+
+public sealed class ThrowingWorker : Worker
+{
+    public override void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(Worker worker)
+    {
+        worker.Work();
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
+        }
+
+        [Test]
+        public async Task Sp0011_OpenVirtualMethodDispatch_ReportsUnknownCallSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class Worker
+{
+    public virtual void Work()
+    {
+    }
+}
+
+public sealed class ThrowingWorker : Worker
+{
+    public override void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(Worker worker)
+    {
+        worker.Work();
+    }
+}");
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("worker.Work()", StringComparison.Ordinal));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty], Does.Contain("unknown=dynamic_dispatch:Worker.Work()"));
+        }
+
+        [Test]
+        public async Task Sp0010_OpenInterfaceMethodDispatch_ReportsUnknownException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public interface IService
+{
+    void Work();
+}
+
+public sealed class ThrowingService : IService
+{
+    public void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(IService service)
+    {
+        service.Work();
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
+        }
+
+        [Test]
         public async Task Sp0010_InterfacePropertyGetter_DirectExactConcreteReceiver_Propagates()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

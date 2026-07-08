@@ -29,6 +29,7 @@ namespace SharpProof.Symbolic
             internal const string Rethrow = "rethrow";
             internal const string SourceCallee = "source_callee";
             internal const string EffectSummary = "effect_summary";
+            internal const string DynamicDispatch = "dynamic_dispatch";
             internal const string DefiniteThrowNull = "definite_throw_null";
             internal const string DefiniteDivideByZero = "definite_divide_by_zero";
             internal const string DefiniteModuloByZero = "definite_modulo_by_zero";
@@ -91,6 +92,7 @@ namespace SharpProof.Symbolic
                 string.Equals(category, ExceptionCategories.Rethrow, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.SourceCallee, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.EffectSummary, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DynamicDispatch, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteDivideByZero, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteModuloByZero, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteNullDereference, System.StringComparison.Ordinal) ||

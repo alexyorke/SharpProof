@@ -134,6 +134,23 @@ namespace SharpProof.Analyzer
                 }
 
                 var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
+                if (calleeCallSite.IsDynamicDispatch)
+                {
+                    var dynamicDispatchException = new ExceptionCandidate(
+                        null,
+                        ExceptionTypes.Unknown,
+                        ExceptionCategories.DynamicDispatch,
+                        GetExceptionSourceMethodDisplay(calleeCallSite.Method.OriginalDefinition));
+                    if (!IsCaughtWithinMethod(calleeCallSite.CallSite, dynamicDispatchException.Type, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        yield return new UncaughtExceptionSiteEntry(
+                            calleeCallSite.CallSite,
+                            calleeCallSite.Method,
+                            dynamicDispatchException,
+                            calleeDisplay);
+                    }
+                }
+
                 foreach (var exception in CollectCalleeExceptions(
                              calleeCallSite.Method,
                              semanticModel.Compilation,
