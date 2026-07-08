@@ -881,6 +881,32 @@ namespace SharpProof.Analyzer.Engine.Rules
 
     internal static class RuleAnalysisHelper
     {
+        internal static bool IsFreshLocalArrayInitialization(IOperation operation)
+        {
+            IOperation? current = operation.Parent;
+
+            if (current is IConversionOperation conversionOperation)
+            {
+                current = conversionOperation.Parent;
+            }
+
+            if (current is IVariableInitializerOperation variableInitializer &&
+                variableInitializer.Parent is IVariableDeclaratorOperation variableDeclarator &&
+                variableDeclarator.Symbol.Type is IArrayTypeSymbol)
+            {
+                return true;
+            }
+
+            if (current is IAssignmentOperation assignmentOperation &&
+                assignmentOperation.Target is ILocalReferenceOperation localReference &&
+                localReference.Type is IArrayTypeSymbol)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         internal static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
             ILocalSymbol localSymbol,
             SyntaxNode observationSyntax,

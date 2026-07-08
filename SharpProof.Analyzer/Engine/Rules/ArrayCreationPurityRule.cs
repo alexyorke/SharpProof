@@ -61,7 +61,7 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return initializerResult;
                 }
 
-                if (IsFreshLocalArrayInitialization(arrayCreation))
+                if (RuleAnalysisHelper.IsFreshLocalArrayInitialization(arrayCreation))
                 {
                     LogDebug($"    [ArrCreateRule] Array creation '{arrayCreation.Syntax}' assigned to a fresh local array. Treating as PURE.");
                     return PurityAnalysisResult.Pure;
@@ -84,32 +84,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         symbol: arrayCreation.Type,
                         catalogSource: "array_creation"));
             }
-        }
-
-        private static bool IsFreshLocalArrayInitialization(IArrayCreationOperation arrayCreation)
-        {
-            IOperation? current = arrayCreation.Parent;
-
-            if (current is IConversionOperation conversionOperation)
-            {
-                current = conversionOperation.Parent;
-            }
-
-            if (current is IVariableInitializerOperation variableInitializer &&
-                variableInitializer.Parent is IVariableDeclaratorOperation variableDeclarator &&
-                variableDeclarator.Symbol.Type is IArrayTypeSymbol)
-            {
-                return true;
-            }
-
-            if (current is IAssignmentOperation assignmentOperation &&
-                assignmentOperation.Target is ILocalReferenceOperation localReference &&
-                localReference.Type is IArrayTypeSymbol)
-            {
-                return true;
-            }
-
-            return false;
         }
 
         private static bool IsTransientImmutableArrayFactoryArgument(IArrayCreationOperation arrayCreation)
