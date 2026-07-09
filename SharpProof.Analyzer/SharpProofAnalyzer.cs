@@ -142,6 +142,12 @@ namespace SharpProof.Analyzer
                 "AnalyzerConfiguration",
                 invalidConfigurationValue.Key,
                 invalidConfigurationValue.Key + ":" + invalidConfigurationValue.Value + ":" + invalidConfigurationValue.Reason);
+            properties = Configuration.ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                invalidConfigurationValue.Key,
+                "invalid",
+                invalidConfigurationValue.Reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,

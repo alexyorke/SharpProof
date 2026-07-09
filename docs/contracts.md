@@ -58,6 +58,16 @@ Known diagnostics can be managed with
 [SharpProof diagnostic baselines](baselines.md), including generation from SARIF
 or current project diagnostics, match explanations, and stale-entry pruning.
 
+SharpProof diagnostics also carry editor/tooling properties for deeper proof
+inspection. Diagnostics with a source location include
+`sharpproof.explain.file`, `sharpproof.explain.line`,
+`sharpproof.explain.column`, and `sharpproof.explain.query`, where the query is
+a ready-to-run `SharpProof.SymbolicCli explain --file ... --line ... --column ...`
+command. Contract diagnostics also include
+`sharpproof.explain.contract`; proof diagnostics include
+`sharpproof.explain.proof_status` and, when available,
+`sharpproof.explain.unknown_reason` normalized as lower snake case.
+
 ## Configuration
 
 SharpProof uses `sharpproof_*` analyzer configuration keys. SMT-related keys

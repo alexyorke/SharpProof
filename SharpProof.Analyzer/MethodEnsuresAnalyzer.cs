@@ -505,6 +505,13 @@ namespace SharpProof.Analyzer
                     proof.Proof.Status.ToString() +
                     "|" +
                     proof.Reason);
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                returnSite.Location,
+                condition,
+                proof.Proof.Status.ToString(),
+                FormatUnknownReason(proof),
+                impliedConditionText: condition);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresNotProvenRule,
@@ -533,6 +540,13 @@ namespace SharpProof.Analyzer
                 "EnsuresUnsupported",
                 condition,
                 "unsupported:" + condition + "@" + FormatLocationKey(location) + "|" + reason);
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                condition,
+                SymbolicProofStatus.Unknown.ToString(),
+                reason,
+                impliedConditionText: condition);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresUnsupportedRule,

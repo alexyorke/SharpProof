@@ -83,6 +83,12 @@ namespace SharpProof.Analyzer
                 context.Node.SyntaxTree,
                 "ExceptionSummary",
                 evidenceKey: CreateExceptionEvidenceKey("summary", queryResult.ExceptionEvidence));
+            properties = Analyzer.Configuration.ExplainDiagnosticProperties.Add(
+                properties,
+                diagnosticLocation,
+                "runtime hazards",
+                "may_throw",
+                null);
 
             var diagnostic = Diagnostic.Create(
                 SharpProofDiagnostics.ExceptionSummaryRule,
@@ -139,6 +145,12 @@ namespace SharpProof.Analyzer
                     context.Node.SyntaxTree,
                     firstEntry.Site.Kind().ToString(),
                     evidenceKey: CreateExceptionEvidenceKey(CreateExceptionSiteKey(firstEntry.Site), siteEvidence));
+                properties = Analyzer.Configuration.ExplainDiagnosticProperties.Add(
+                    properties,
+                    siteLocation,
+                    "runtime hazards",
+                    "hazard",
+                    siteEvidence.FormatCategories());
 
                 var diagnostic = Diagnostic.Create(
                     SharpProofDiagnostics.UncaughtExceptionSiteRule,

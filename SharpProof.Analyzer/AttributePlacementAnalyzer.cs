@@ -178,6 +178,13 @@ namespace SharpProof.Analyzer
                     evidenceKey);
             }
 
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                attributeName,
+                "invalid",
+                "misplaced_attribute");
+
             return Diagnostic.Create(
                 descriptor,
                 location,

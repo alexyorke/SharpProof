@@ -91,6 +91,12 @@ namespace SharpProof.Analyzer
                     context.Node.SyntaxTree,
                     "CapabilityUnknown",
                     evidenceKey: "unknown:" + result.UnknownReasons[0].ToString());
+                properties = ExplainDiagnosticProperties.Add(
+                    properties,
+                    location,
+                    "[AllowedCapabilities]",
+                    "unknown",
+                    result.UnknownReasons[0].ToString());
                 var diagnostic = Diagnostic.Create(
                     SharpProofDiagnostics.CapabilityUnknownRule,
                     location,
@@ -152,6 +158,9 @@ namespace SharpProof.Analyzer
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.CapabilityProperty, FormatCapabilities(disallowedCapabilities))
                 .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
+            var location = Location.Create(
+                methodSymbol.Locations.First().SourceTree!,
+                new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
 
             if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
             {
@@ -164,12 +173,16 @@ namespace SharpProof.Analyzer
                 syntaxTree,
                 site.OperationKind,
                 evidenceKey: CreateCapabilityEvidenceKey(site, FormatCapabilities(disallowedCapabilities)));
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                "[AllowedCapabilities]",
+                "violated",
+                null);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityViolationRule,
-                Location.Create(
-                    methodSymbol.Locations.First().SourceTree!,
-                    new TextSpan(site.SourceSpanStart, site.SourceSpanLength)),
+                location,
                 additionalLocations: null,
                 properties: properties,
                 messageArgs: new object[]
@@ -188,6 +201,9 @@ namespace SharpProof.Analyzer
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString())
                 .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
+            var location = Location.Create(
+                methodSymbol.Locations.First().SourceTree!,
+                new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
 
             if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
             {
@@ -200,12 +216,16 @@ namespace SharpProof.Analyzer
                 syntaxTree,
                 site.OperationKind,
                 evidenceKey: CreateCapabilityEvidenceKey(site, site.UnknownReason.ToString()));
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                "[AllowedCapabilities]",
+                "unknown",
+                site.UnknownReason.ToString());
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityUnknownRule,
-                Location.Create(
-                    methodSymbol.Locations.First().SourceTree!,
-                    new TextSpan(site.SourceSpanStart, site.SourceSpanLength)),
+                location,
                 additionalLocations: null,
                 properties: properties,
                 messageArgs: new object[]

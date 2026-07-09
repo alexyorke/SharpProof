@@ -12,6 +12,13 @@ namespace SharpProof.Analyzer
         public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
         public const string BaselineContractProperty = "sharpproof.baseline.contract";
         public const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
+        public const string ExplainFileProperty = "sharpproof.explain.file";
+        public const string ExplainLineProperty = "sharpproof.explain.line";
+        public const string ExplainColumnProperty = "sharpproof.explain.column";
+        public const string ExplainQueryProperty = "sharpproof.explain.query";
+        public const string ExplainContractProperty = "sharpproof.explain.contract";
+        public const string ExplainProofStatusProperty = "sharpproof.explain.proof_status";
+        public const string ExplainUnknownReasonProperty = "sharpproof.explain.unknown_reason";
 
         public const string PurityNotVerifiedId = "SP0002";
         public const string ImpurityCategoryProperty = "sharpproof.impurity.category";

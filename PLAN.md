@@ -55,10 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add richer diagnostic properties that let editors and build tools jump
-  directly from a diagnostic to the equivalent `SharpProof.SymbolicCli explain`
-  query, including target file, line, column, contract text, proof status, and
-  normalized unknown reason.
 - Make SharpProof attribute identity and stub compatibility an explicit policy:
   prefer fully qualified `SharpProof.Attributes` symbols, support intentional
   source-only stubs through documented namespaces or opt-in configuration, and

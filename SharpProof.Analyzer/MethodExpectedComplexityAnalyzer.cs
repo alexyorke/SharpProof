@@ -272,6 +272,7 @@ namespace SharpProof.Analyzer
             CancellationToken cancellationToken,
             SyntaxTree syntaxTree)
         {
+            var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
             var properties = BaselineDiagnosticProperties.Add(
                 ImmutableDictionary<string, string?>.Empty
                     .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
@@ -281,10 +282,16 @@ namespace SharpProof.Analyzer
                 "ExpectedComplexity",
                 declaredComplexity.Text,
                 "exceeded:" + declaredComplexity.Text + ":" + result.Complexity.Text);
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                declaredComplexity.Text,
+                "exceeded",
+                null);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityExceededRule,
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken),
+                location,
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,
@@ -300,6 +307,7 @@ namespace SharpProof.Analyzer
             CancellationToken cancellationToken,
             SyntaxTree syntaxTree)
         {
+            var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
             var properties = BaselineDiagnosticProperties.Add(
                 ImmutableDictionary<string, string?>.Empty
                     .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
@@ -309,10 +317,16 @@ namespace SharpProof.Analyzer
                 "ExpectedComplexity",
                 declaredComplexity.Text,
                 "unknown:" + declaredComplexity.Text + ":" + reason);
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                declaredComplexity.Text,
+                "unknown",
+                reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken),
+                location,
                 attributeLocation == null ? null : new[] { attributeLocation },
                 properties,
                 methodSymbol.Name,

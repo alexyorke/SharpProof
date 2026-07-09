@@ -96,6 +96,12 @@ namespace SharpProof.Analyzer
                         context.Node.SyntaxTree,
                         "PurityAttributeConflict",
                         evidenceKey: "conflicting_purity_attributes");
+                    properties = ExplainDiagnosticProperties.Add(
+                        properties,
+                        conflictingDiagnosticLocation,
+                        "purity attributes",
+                        "invalid",
+                        "conflicting_purity_attributes");
                     var conflicting = Diagnostic.Create(
                         SharpProofDiagnostics.ConflictingPurityAttributesRule,
                         conflictingDiagnosticLocation,
@@ -127,6 +133,12 @@ namespace SharpProof.Analyzer
                         context.Node.SyntaxTree,
                         "AllowSynchronizationContract",
                         evidenceKey: "allow_synchronization_without_purity");
+                    properties = ExplainDiagnosticProperties.Add(
+                        properties,
+                        allowSyncLocation,
+                        "[AllowSynchronization]",
+                        "invalid",
+                        "missing_purity_attribute");
                     var diag = Diagnostic.Create(
                         SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeRule,
                         allowSyncLocation,
@@ -155,6 +167,12 @@ namespace SharpProof.Analyzer
                             context.Node.SyntaxTree,
                             "AllowSynchronizationContract",
                             evidenceKey: "redundant_allow_synchronization");
+                        properties = ExplainDiagnosticProperties.Add(
+                            properties,
+                            redundantLoc,
+                            "[AllowSynchronization]",
+                            "redundant",
+                            null);
                         var redundant = Diagnostic.Create(
                             SharpProofDiagnostics.RedundantAllowSynchronizationRule,
                             redundantLoc,
@@ -206,6 +224,12 @@ namespace SharpProof.Analyzer
                         context.Node.SyntaxTree,
                         purityResult.Evidence.OperationKind,
                         evidenceKey: CreatePurityEvidenceKey(purityResult.Evidence));
+                    properties = ExplainDiagnosticProperties.Add(
+                        properties,
+                        diagnosticLocation,
+                        hasEnforcePureAttribute ? "[EnforcePure]" : "[Pure]",
+                        "not_proven",
+                        GetPurityUnknownReason(purityResult.Evidence));
                     var diagnostic = Diagnostic.Create(
                         SharpProofDiagnostics.PurityNotVerifiedRule,
                         diagnosticLocation,
@@ -298,6 +322,12 @@ namespace SharpProof.Analyzer
                             context.Node.SyntaxTree,
                             "MissingEnforcePureAttribute",
                             evidenceKey: "missing_enforce_pure");
+                        properties = ExplainDiagnosticProperties.Add(
+                            properties,
+                            diagnosticLocation,
+                            "[EnforcePure]",
+                            "suggested",
+                            null);
                         var diagnostic = Diagnostic.Create(
                             SharpProofDiagnostics.MissingEnforcePureAttributeRule,
                             diagnosticLocation,
@@ -375,6 +405,16 @@ namespace SharpProof.Analyzer
                 evidence.BclFallbackGuess +
                 "|" +
                 evidence.BclFallbackReason;
+        }
+
+        private static string? GetPurityUnknownReason(PurityAnalysisEngine.PurityEvidence evidence)
+        {
+            if (!string.IsNullOrWhiteSpace(evidence.BclFallbackReason))
+            {
+                return evidence.BclFallbackReason;
+            }
+
+            return string.IsNullOrWhiteSpace(evidence.Category) ? null : evidence.Category;
         }
 
         private static bool HasConflictingPurityAttributes(

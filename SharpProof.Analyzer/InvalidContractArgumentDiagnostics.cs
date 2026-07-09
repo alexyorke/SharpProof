@@ -30,6 +30,13 @@ namespace SharpProof.Analyzer
                     attributeName + ":" + argument + ":" + reason);
             }
 
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                argument,
+                "invalid",
+                reason);
+
             return Diagnostic.Create(
                 SharpProofDiagnostics.InvalidContractArgumentRule,
                 location,

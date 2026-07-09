@@ -89,12 +89,18 @@ namespace SharpProof.Analyzer
                     allocationSite.Symbol.ToDisplayString(AllocationSymbolDisplayFormat));
             }
 
-            return BaselineDiagnosticProperties.Add(
+            properties = BaselineDiagnosticProperties.Add(
                 properties,
                 methodSymbol,
                 syntaxTree,
                 allocationSite.Operation.Kind.ToString(),
                 evidenceKey: CreateAllocationEvidenceKey(allocationSite));
+            return ExplainDiagnosticProperties.Add(
+                properties,
+                allocationSite.Syntax.GetLocation(),
+                "[ZeroAllocations]",
+                "violated",
+                allocationSite.AllocationKind);
         }
 
         private static string CreateAllocationEvidenceKey(AllocationSite allocationSite)
