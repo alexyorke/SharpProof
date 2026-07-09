@@ -373,5 +373,357 @@ namespace N
                 .WithArguments("M");
             await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
         }
+
+        [Test]
+        public async Task SP0013_RemovesZeroAllocationsAttribute()
+        {
+            var source = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Impure]
+    [ZeroAllocations]
+    public object TestMethod()
+    {
+        return {|SP0013:new object()|};
+    }
+}
+";
+            var fixedSource = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Impure]
+    public object TestMethod()
+    {
+        return new object();
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0014_RemovesMisplacedZeroAllocationsAttribute()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0014:ZeroAllocations|}]
+    public int Value => 42;
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value => 42;
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0015_RemovesAllowedCapabilitiesAttributeForViolation()
+        {
+            var source = @"
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod()
+    {
+        {|SP0015:Console.WriteLine(""hello"")|};
+    }
+}
+";
+            var fixedSource = @"
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public void TestMethod()
+    {
+        Console.WriteLine(""hello"");
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0016_RemovesAllowedCapabilitiesAttributeForUnknown()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod(dynamic value)
+    {
+        {|SP0016:value.ToString()|};
+    }
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public void TestMethod(dynamic value)
+    {
+        value.ToString();
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0017_RemovesMisplacedAllowedCapabilitiesAttribute()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0017:AllowedCapabilities(SharpProofCapability.None)|}]
+    public int Value => 42;
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value => 42;
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0018_RemovesEnsuresAttributeForUnprovenReturn()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""result > 0"")]
+    public int Identity()
+    {
+        return {|SP0018:0|};
+    }
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Identity()
+    {
+        return 0;
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0019_RemovesEnsuresAttributeForUnsupportedCondition()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0019:Ensures(""local > 0"")|}]
+    public int Value(int input)
+    {
+        var local = input + 1;
+        return local;
+    }
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value(int input)
+    {
+        var local = input + 1;
+        return local;
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0020_RemovesMisplacedEnsuresAttribute()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0020:Ensures(""true"")|}]
+    public int Value => 42;
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value => 42;
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0021_RemovesExpectedComplexityAttributeForExceededBound()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Linear)]
+    public static int {|SP0021:Work|}(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < n; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < n; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0022_RemovesExpectedComplexityAttributeForUnknownBound()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    public static int Step(int value) => value + 1;
+
+    [ExpectedComplexity(ComplexityKind.Linear)]
+    public static int {|SP0022:Work|}(int n)
+    {
+        var i = 0;
+        while (i < n)
+        {
+            i = Step(i);
+        }
+
+        return i;
+    }
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    public static int Step(int value) => value + 1;
+    public static int Work(int n)
+    {
+        var i = 0;
+        while (i < n)
+        {
+            i = Step(i);
+        }
+
+        return i;
+    }
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
+
+        [Test]
+        public async Task SP0023_RemovesMisplacedExpectedComplexityAttribute()
+        {
+            var source = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0023:ExpectedComplexity(ComplexityKind.Constant)|}]
+    public int Value => 42;
+}
+";
+            var fixedSource = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value => 42;
+}
+";
+            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+        }
     }
 }

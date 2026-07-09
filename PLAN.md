@@ -55,14 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add code fixes for the newer diagnostics `SP0013` through `SP0023`, including
-  removing misplaced contract attributes, removing or relaxing unsupported
-  contracts, and offering safe edits for failed `[Ensures]`,
-  `[ZeroAllocations]`, `[AllowedCapabilities]`, and `[ExpectedComplexity]`
-  diagnostics.
-- Put the code-fix tests back under an active test lane, or create a dedicated
-  code-fix lane, so `SharpProofCodeFixTests.cs` and its verifier helpers are
-  not silently excluded from normal verification.
 - Add analyzer diagnostics for invalid contract arguments instead of silent
   fallback behavior, especially undefined `ExpectedComplexity` enum values,
   unknown `AllowedCapabilities` bits, empty `[Ensures]` strings, and invalid

@@ -24,7 +24,18 @@ namespace SharpProof
             SharpProofDiagnostics.ConflictingPurityAttributesId,
             SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId,
             SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId,
-            SharpProofDiagnostics.RedundantAllowSynchronizationId);
+            SharpProofDiagnostics.RedundantAllowSynchronizationId,
+            SharpProofDiagnostics.AllocationInZeroAllocationMethodId,
+            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId,
+            SharpProofDiagnostics.CapabilityViolationId,
+            SharpProofDiagnostics.CapabilityUnknownId,
+            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId,
+            SharpProofDiagnostics.EnsuresNotProvenId,
+            SharpProofDiagnostics.EnsuresUnsupportedId,
+            SharpProofDiagnostics.MisplacedEnsuresAttributeId,
+            SharpProofDiagnostics.ComplexityExceededId,
+            SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
+            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId);
 
         public override FixAllProvider? GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
@@ -132,6 +143,132 @@ namespace SharpProof
                             diagnostic);
                     }
                     break;
+
+                case SharpProofDiagnostics.AllocationInZeroAllocationMethodId:
+                    RegisterRemoveContractAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove [ZeroAllocations] attribute",
+                        IsZeroAllocationsAttribute,
+                        "SP0013");
+                    break;
+
+                case SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId:
+                    RegisterRemoveMisplacedAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove misplaced [ZeroAllocations] attribute",
+                        "SP0014");
+                    break;
+
+                case SharpProofDiagnostics.CapabilityViolationId:
+                case SharpProofDiagnostics.CapabilityUnknownId:
+                    RegisterRemoveContractAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove [AllowedCapabilities] attribute",
+                        IsAllowedCapabilitiesAttribute,
+                        diagnostic.Id);
+                    break;
+
+                case SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeId:
+                    RegisterRemoveMisplacedAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove misplaced [AllowedCapabilities] attribute",
+                        "SP0017");
+                    break;
+
+                case SharpProofDiagnostics.EnsuresNotProvenId:
+                case SharpProofDiagnostics.EnsuresUnsupportedId:
+                    RegisterRemoveContractAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove [Ensures] attribute",
+                        IsEnsuresAttribute,
+                        diagnostic.Id);
+                    break;
+
+                case SharpProofDiagnostics.MisplacedEnsuresAttributeId:
+                    RegisterRemoveMisplacedAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove misplaced [Ensures] attribute",
+                        "SP0020");
+                    break;
+
+                case SharpProofDiagnostics.ComplexityExceededId:
+                case SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId:
+                    RegisterRemoveContractAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove [ExpectedComplexity] attribute",
+                        IsExpectedComplexityAttribute,
+                        diagnostic.Id);
+                    break;
+
+                case SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId:
+                    RegisterRemoveMisplacedAttributeCodeFix(
+                        context,
+                        document,
+                        root,
+                        diagnostic,
+                        "Remove misplaced [ExpectedComplexity] attribute",
+                        "SP0023");
+                    break;
+            }
+        }
+
+        private void RegisterRemoveMisplacedAttributeCodeFix(
+            CodeFixContext context,
+            Document document,
+            SyntaxNode root,
+            Diagnostic diagnostic,
+            string title,
+            string equivalenceKeySuffix)
+        {
+            if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAttribute))
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title,
+                        c => RemoveMisplacedAttributeAsync(document, root, misplacedAttribute, c),
+                        nameof(RemoveMisplacedAttributeAsync) + equivalenceKeySuffix),
+                    diagnostic);
+            }
+        }
+
+        private void RegisterRemoveContractAttributeCodeFix(
+            CodeFixContext context,
+            Document document,
+            SyntaxNode root,
+            Diagnostic diagnostic,
+            string title,
+            System.Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            string equivalenceKeySuffix)
+        {
+            if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration))
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title,
+                        c => RemoveContractAttributeAsync(document, root, diagnostic, declaration, shouldRemoveType, c),
+                        nameof(RemoveContractAttributeAsync) + equivalenceKeySuffix),
+                    diagnostic);
             }
         }
 
@@ -261,6 +398,21 @@ namespace SharpProof
         private static bool IsAllowSynchronizationAttribute(INamedTypeSymbol? t) =>
             t != null && t.Name == "AllowSynchronizationAttribute" && t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
 
+        private static bool IsZeroAllocationsAttribute(INamedTypeSymbol? t) =>
+            IsAttributeNamed(t, "ZeroAllocationsAttribute");
+
+        private static bool IsAllowedCapabilitiesAttribute(INamedTypeSymbol? t) =>
+            IsAttributeNamed(t, "AllowedCapabilitiesAttribute");
+
+        private static bool IsEnsuresAttribute(INamedTypeSymbol? t) =>
+            IsAttributeNamed(t, "EnsuresAttribute");
+
+        private static bool IsExpectedComplexityAttribute(INamedTypeSymbol? t) =>
+            IsAttributeNamed(t, "ExpectedComplexityAttribute");
+
+        private static bool IsAttributeNamed(INamedTypeSymbol? t, string attributeTypeName) =>
+            t != null && t.Name == attributeTypeName;
+
         private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr, CancellationToken cancellationToken)
         {
             var host = GetHostForAttribute(attr);
@@ -271,6 +423,44 @@ namespace SharpProof
                 return Task.FromResult(document);
             var newRoot = root.ReplaceNode(host, newHost);
             return Task.FromResult(document.WithSyntaxRoot(newRoot));
+        }
+
+        private async Task<Document> RemoveContractAttributeAsync(
+            Document document,
+            SyntaxNode root,
+            Diagnostic diagnostic,
+            SyntaxNode declaration,
+            System.Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            CancellationToken cancellationToken)
+        {
+            var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            if (model != null)
+            {
+                foreach (var location in GetDiagnosticLocations(diagnostic))
+                {
+                    if (!location.IsInSource)
+                    {
+                        continue;
+                    }
+
+                    if (TryFindAttributeSyntax(root, location.SourceSpan, out var attribute) &&
+                        shouldRemoveType(GetAttributeClass(model, attribute)))
+                    {
+                        return await RemoveMisplacedAttributeAsync(document, root, attribute, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            return await RemoveAttributesMatchingAsync(document, root, declaration, shouldRemoveType, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static IEnumerable<Location> GetDiagnosticLocations(Diagnostic diagnostic)
+        {
+            yield return diagnostic.Location;
+            foreach (var location in diagnostic.AdditionalLocations)
+            {
+                yield return location;
+            }
         }
 
         private async Task<Document> RemoveAttributesMatchingAsync(
