@@ -75,6 +75,34 @@ namespace SharpProof.Analyzer.Configuration
             return false;
         }
 
+        public bool IsSuppressed(Diagnostic diagnostic)
+        {
+            if (_entries.IsDefaultOrEmpty)
+            {
+                return false;
+            }
+
+            if (!TryGetProperty(diagnostic.Properties, SharpProofDiagnostics.BaselineSymbolProperty, out var symbolId) ||
+                !TryGetProperty(diagnostic.Properties, SharpProofDiagnostics.BaselinePathProperty, out var sourcePath))
+            {
+                return false;
+            }
+
+            var symbolIds = GetDiagnosticSymbolIds(diagnostic.Properties, symbolId);
+            foreach (var entry in _entries)
+            {
+                foreach (var candidateSymbolId in symbolIds)
+                {
+                    if (entry.Matches(diagnostic.Id, candidateSymbolId, sourcePath, diagnostic))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         internal static ImmutableArray<string> GetSymbolIds(ISymbol symbol)
         {
             var builder = ImmutableArray.CreateBuilder<string>();
@@ -183,33 +211,64 @@ namespace SharpProof.Analyzer.Configuration
             string? id = null;
             string? symbol = null;
             string? path = null;
+            string? contractText = null;
+            string? operationKind = null;
+            string? evidenceKey = null;
+            int? line = null;
+            int? column = null;
 
             foreach (var property in element.EnumerateObject())
             {
-                if (property.Value.ValueKind != JsonValueKind.String)
+                if (property.Value.ValueKind == JsonValueKind.String)
                 {
-                    continue;
-                }
+                    var value = property.Value.GetString();
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        continue;
+                    }
 
-                var value = property.Value.GetString();
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    continue;
+                    value = value!.Trim();
+                    if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        id = value;
+                    }
+                    else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
+                    {
+                        symbol = value;
+                    }
+                    else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
+                    {
+                        path = value;
+                    }
+                    else if (string.Equals(property.Name, "contract", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(property.Name, "contractText", StringComparison.OrdinalIgnoreCase))
+                    {
+                        contractText = value;
+                    }
+                    else if (string.Equals(property.Name, "operationKind", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(property.Name, "operation_kind", StringComparison.OrdinalIgnoreCase))
+                    {
+                        operationKind = value;
+                    }
+                    else if (string.Equals(property.Name, "evidenceKey", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(property.Name, "evidence_key", StringComparison.OrdinalIgnoreCase))
+                    {
+                        evidenceKey = value;
+                    }
                 }
-
-                value = value!.Trim();
-                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
+                else if (property.Value.ValueKind == JsonValueKind.Number)
                 {
-                    id = value;
-                }
-                else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
-                {
-                    symbol = value;
-                }
-                else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
-                {
-                    path = value;
+                    if (string.Equals(property.Name, "line", StringComparison.OrdinalIgnoreCase) &&
+                        property.Value.TryGetInt32(out var parsedLine))
+                    {
+                        line = parsedLine;
+                    }
+                    else if (string.Equals(property.Name, "column", StringComparison.OrdinalIgnoreCase) &&
+                             property.Value.TryGetInt32(out var parsedColumn))
+                    {
+                        column = parsedColumn;
+                    }
                 }
             }
 
@@ -217,7 +276,16 @@ namespace SharpProof.Analyzer.Configuration
                 !string.IsNullOrWhiteSpace(symbol) &&
                 !string.IsNullOrWhiteSpace(path))
             {
-                builder.Add(new BaselineEntry(id!, symbol!, path!, baseDirectory));
+                builder.Add(new BaselineEntry(
+                    id!,
+                    symbol!,
+                    path!,
+                    baseDirectory,
+                    line,
+                    column,
+                    contractText,
+                    operationKind,
+                    evidenceKey));
             }
         }
 
@@ -234,18 +302,37 @@ namespace SharpProof.Analyzer.Configuration
 
         private readonly struct BaselineEntry
         {
-            public BaselineEntry(string diagnosticId, string symbolId, string path, string baseDirectory)
+            public BaselineEntry(
+                string diagnosticId,
+                string symbolId,
+                string path,
+                string baseDirectory,
+                int? line,
+                int? column,
+                string? contractText,
+                string? operationKind,
+                string? evidenceKey)
             {
                 DiagnosticId = diagnosticId;
                 SymbolId = symbolId;
                 Path = NormalizePath(path);
                 AbsolutePath = MakeAbsolutePath(path, baseDirectory);
+                Line = line;
+                Column = column;
+                ContractText = NormalizeOptional(contractText);
+                OperationKind = NormalizeOptional(operationKind);
+                EvidenceKey = NormalizeOptional(evidenceKey);
             }
 
             private string DiagnosticId { get; }
             private string SymbolId { get; }
             private string Path { get; }
             private string AbsolutePath { get; }
+            private int? Line { get; }
+            private int? Column { get; }
+            private string? ContractText { get; }
+            private string? OperationKind { get; }
+            private string? EvidenceKey { get; }
 
             public bool Matches(string diagnosticId, string symbolId, string sourcePath)
             {
@@ -254,12 +341,59 @@ namespace SharpProof.Analyzer.Configuration
                        MatchesPath(sourcePath);
             }
 
+            public bool Matches(
+                string diagnosticId,
+                string symbolId,
+                string sourcePath,
+                Diagnostic diagnostic)
+            {
+                return Matches(diagnosticId, symbolId, sourcePath) &&
+                       MatchesLocation(diagnostic.Location) &&
+                       MatchesOptionalProperty(ContractText, diagnostic, SharpProofDiagnostics.BaselineContractProperty) &&
+                       MatchesOptionalProperty(OperationKind, diagnostic, SharpProofDiagnostics.BaselineOperationKindProperty) &&
+                       MatchesOptionalProperty(EvidenceKey, diagnostic, SharpProofDiagnostics.BaselineEvidenceKeyProperty);
+            }
+
             private bool MatchesPath(string sourcePath)
             {
                 var normalizedSourcePath = NormalizePath(sourcePath);
                 return string.Equals(Path, normalizedSourcePath, StringComparison.OrdinalIgnoreCase) ||
                        (!string.IsNullOrWhiteSpace(AbsolutePath) &&
                         string.Equals(AbsolutePath, normalizedSourcePath, StringComparison.OrdinalIgnoreCase));
+            }
+
+            private bool MatchesLocation(Location location)
+            {
+                if (!Line.HasValue && !Column.HasValue)
+                {
+                    return true;
+                }
+
+                if (location == Location.None || !location.IsInSource)
+                {
+                    return false;
+                }
+
+                var lineSpan = location.GetLineSpan();
+                if (lineSpan.Path == null)
+                {
+                    return false;
+                }
+
+                var actualLine = lineSpan.StartLinePosition.Line + 1;
+                var actualColumn = lineSpan.StartLinePosition.Character + 1;
+                return (!Line.HasValue || Line.Value == actualLine) &&
+                       (!Column.HasValue || Column.Value == actualColumn);
+            }
+
+            private static bool MatchesOptionalProperty(
+                string? expected,
+                Diagnostic diagnostic,
+                string propertyName)
+            {
+                return string.IsNullOrWhiteSpace(expected) ||
+                       (TryGetProperty(diagnostic.Properties, propertyName, out var actual) &&
+                        string.Equals(expected, actual, StringComparison.Ordinal));
             }
 
             private static string MakeAbsolutePath(string path, string baseDirectory)
@@ -276,6 +410,48 @@ namespace SharpProof.Analyzer.Configuration
 
                 return NormalizePath(System.IO.Path.Combine(baseDirectory, path));
             }
+
+            private static string? NormalizeOptional(string? value)
+            {
+                return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+            }
+        }
+
+        private static bool TryGetProperty(
+            ImmutableDictionary<string, string?> properties,
+            string propertyName,
+            out string value)
+        {
+            if (properties.TryGetValue(propertyName, out var propertyValue) &&
+                !string.IsNullOrWhiteSpace(propertyValue))
+            {
+                value = propertyValue!.Trim();
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+
+        private static ImmutableArray<string> GetDiagnosticSymbolIds(
+            ImmutableDictionary<string, string?> properties,
+            string primarySymbolId)
+        {
+            var builder = ImmutableArray.CreateBuilder<string>();
+            builder.Add(primarySymbolId);
+            if (TryGetProperty(properties, SharpProofDiagnostics.BaselineSymbolAliasesProperty, out var aliases))
+            {
+                foreach (var alias in aliases.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var trimmed = alias.Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        builder.Add(trimmed);
+                    }
+                }
+            }
+
+            return builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
         }
     }
 }

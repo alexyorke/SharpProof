@@ -17,7 +17,10 @@ public sealed record BaselineEntry(
     [property: JsonPropertyName("path")] string Path,
     [property: JsonPropertyName("message")] string? Message = null,
     [property: JsonPropertyName("line")] int? Line = null,
-    [property: JsonPropertyName("column")] int? Column = null);
+    [property: JsonPropertyName("column")] int? Column = null,
+    [property: JsonPropertyName("contract")] string? Contract = null,
+    [property: JsonPropertyName("operationKind")] string? OperationKind = null,
+    [property: JsonPropertyName("evidenceKey")] string? EvidenceKey = null);
 
 public sealed record BaselineExplanation(
     BaselineEntry Entry,
@@ -34,6 +37,9 @@ public static class SharpProofBaseline
 {
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselinePathProperty = "sharpproof.baseline.path";
+    public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
+    public const string BaselineContractProperty = "sharpproof.baseline.contract";
+    public const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
 
     private static readonly JsonDocumentOptions JsonOptions = new()
     {
@@ -101,9 +107,6 @@ public static class SharpProofBaseline
         BaselineDocument baseline,
         BaselineDocument current)
     {
-        var currentKeys = current.Diagnostics
-            .Select(BaselineKey.FromEntry)
-            .ToImmutableHashSet();
         var currentIds = current.Diagnostics
             .Select(entry => entry.Id)
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -123,10 +126,9 @@ public static class SharpProofBaseline
         var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
         foreach (var entry in baseline.Diagnostics)
         {
-            var key = BaselineKey.FromEntry(entry);
-            if (currentKeys.Contains(key))
+            if (current.Diagnostics.Any(currentEntry => EntryMatches(entry, currentEntry)))
             {
-                explanations.Add(new BaselineExplanation(entry, true, "matched id, symbol, and path"));
+                explanations.Add(new BaselineExplanation(entry, true, GetMatchedReason(entry)));
                 continue;
             }
 
@@ -151,10 +153,50 @@ public static class SharpProofBaseline
                 continue;
             }
 
+            if (currentPathsByIdAndSymbol.ContainsKey(idAndSymbol))
+            {
+                explanations.Add(new BaselineExplanation(entry, false, "diagnostic id, symbol, and path matched but instance identity did not"));
+                continue;
+            }
+
             explanations.Add(new BaselineExplanation(entry, false, "no matching current diagnostic"));
         }
 
         return explanations.ToImmutable();
+    }
+
+    private static bool EntryMatches(BaselineEntry baselineEntry, BaselineEntry currentEntry)
+    {
+        return string.Equals(baselineEntry.Id, currentEntry.Id, StringComparison.Ordinal) &&
+               string.Equals(baselineEntry.Symbol, currentEntry.Symbol, StringComparison.Ordinal) &&
+               string.Equals(NormalizePath(baselineEntry.Path), NormalizePath(currentEntry.Path), StringComparison.OrdinalIgnoreCase) &&
+               MatchesOptional(baselineEntry.Line, currentEntry.Line) &&
+               MatchesOptional(baselineEntry.Column, currentEntry.Column) &&
+               MatchesOptional(baselineEntry.Contract, currentEntry.Contract) &&
+               MatchesOptional(baselineEntry.OperationKind, currentEntry.OperationKind) &&
+               MatchesOptional(baselineEntry.EvidenceKey, currentEntry.EvidenceKey);
+    }
+
+    private static bool MatchesOptional(int? expected, int? actual)
+    {
+        return !expected.HasValue || expected.Value == actual;
+    }
+
+    private static bool MatchesOptional(string? expected, string? actual)
+    {
+        return string.IsNullOrWhiteSpace(expected) ||
+               string.Equals(expected.Trim(), actual?.Trim(), StringComparison.Ordinal);
+    }
+
+    private static string GetMatchedReason(BaselineEntry entry)
+    {
+        return entry.Line.HasValue ||
+               entry.Column.HasValue ||
+               !string.IsNullOrWhiteSpace(entry.Contract) ||
+               !string.IsNullOrWhiteSpace(entry.OperationKind) ||
+               !string.IsNullOrWhiteSpace(entry.EvidenceKey)
+            ? "matched id, symbol, path, and instance identity"
+            : "matched id, symbol, and path";
     }
 
     public static BaselinePruneResult Prune(
@@ -235,7 +277,10 @@ public static class SharpProofBaseline
             NormalizePath(path!),
             GetMessageText(result),
             line,
-            column);
+            column,
+            GetEvidenceProperty(properties, BaselineContractProperty),
+            GetEvidenceProperty(properties, BaselineOperationKindProperty),
+            GetEvidenceProperty(properties, BaselineEvidenceKeyProperty));
     }
 
     private static void AddBaselineEntries(
@@ -276,6 +321,9 @@ public static class SharpProofBaseline
         string? symbol = null;
         string? path = null;
         string? message = null;
+        string? contract = null;
+        string? operationKind = null;
+        string? evidenceKey = null;
         int? line = null;
         int? column = null;
 
@@ -306,6 +354,21 @@ public static class SharpProofBaseline
                 {
                     message = value;
                 }
+                else if (string.Equals(property.Name, "contract", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(property.Name, "contractText", StringComparison.OrdinalIgnoreCase))
+                {
+                    contract = value;
+                }
+                else if (string.Equals(property.Name, "operationKind", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(property.Name, "operation_kind", StringComparison.OrdinalIgnoreCase))
+                {
+                    operationKind = value;
+                }
+                else if (string.Equals(property.Name, "evidenceKey", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(property.Name, "evidence_key", StringComparison.OrdinalIgnoreCase))
+                {
+                    evidenceKey = value;
+                }
             }
             else if (property.Value.ValueKind == JsonValueKind.Number)
             {
@@ -332,7 +395,10 @@ public static class SharpProofBaseline
                 NormalizePath(path!),
                 message,
                 line,
-                column));
+                column,
+                contract,
+                operationKind,
+                evidenceKey));
         }
     }
 
@@ -460,11 +526,32 @@ public static class SharpProofBaseline
         return false;
     }
 
-    private readonly record struct BaselineKey(string Id, string Symbol, string Path)
+    private readonly record struct BaselineKey(
+        string Id,
+        string Symbol,
+        string Path,
+        int? Line,
+        int? Column,
+        string? Contract,
+        string? OperationKind,
+        string? EvidenceKey)
     {
         public static BaselineKey FromEntry(BaselineEntry entry)
         {
-            return new BaselineKey(entry.Id, entry.Symbol, NormalizePath(entry.Path).ToUpperInvariant());
+            return new BaselineKey(
+                entry.Id,
+                entry.Symbol,
+                NormalizePath(entry.Path).ToUpperInvariant(),
+                entry.Line,
+                entry.Column,
+                NormalizeOptional(entry.Contract),
+                NormalizeOptional(entry.OperationKind),
+                NormalizeOptional(entry.EvidenceKey));
+        }
+
+        private static string? NormalizeOptional(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 }

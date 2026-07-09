@@ -44,11 +44,6 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            if (baseline.IsSuppressed(SharpProofDiagnostics.AllocationInZeroAllocationMethodId, methodSymbol, context.Node.SyntaxTree))
-            {
-                return;
-            }
-
             var rootOperation = MethodBodyOperationResolver.GetMethodBodyRootOperation(context.Node, context.SemanticModel, context.CancellationToken, includeConversionOperators: false);
             if (rootOperation == null)
             {
@@ -69,6 +64,11 @@ namespace SharpProof.Analyzer
                         allocationSite.Syntax.ToString(),
                         methodSymbol.Name
                     });
+                if (baseline.IsSuppressed(diagnostic))
+                {
+                    continue;
+                }
+
                 context.ReportDiagnostic(diagnostic);
             }
         }
@@ -89,7 +89,23 @@ namespace SharpProof.Analyzer
                     allocationSite.Symbol.ToDisplayString(AllocationSymbolDisplayFormat));
             }
 
-            return BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
+            return BaselineDiagnosticProperties.Add(
+                properties,
+                methodSymbol,
+                syntaxTree,
+                allocationSite.Operation.Kind.ToString(),
+                evidenceKey: CreateAllocationEvidenceKey(allocationSite));
+        }
+
+        private static string CreateAllocationEvidenceKey(AllocationSite allocationSite)
+        {
+            return allocationSite.AllocationKind +
+                "@" +
+                allocationSite.Syntax.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                allocationSite.Syntax.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                "|" +
+                (allocationSite.Symbol?.ToDisplayString(AllocationSymbolDisplayFormat) ?? string.Empty);
         }
 
         private static IEnumerable<AllocationSite> CollectAllocationSites(IOperation rootOperation)

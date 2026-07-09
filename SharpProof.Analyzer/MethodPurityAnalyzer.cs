@@ -90,11 +90,22 @@ namespace SharpProof.Analyzer
                 Location? conflictingDiagnosticLocation = GetIdentifierLocation(context.Node);
                 if (conflictingDiagnosticLocation != null)
                 {
+                    var properties = BaselineDiagnosticProperties.Add(
+                        ImmutableDictionary<string, string?>.Empty,
+                        methodSymbol,
+                        context.Node.SyntaxTree,
+                        "PurityAttributeConflict",
+                        evidenceKey: "conflicting_purity_attributes");
                     var conflicting = Diagnostic.Create(
                         SharpProofDiagnostics.ConflictingPurityAttributesRule,
                         conflictingDiagnosticLocation,
-                        methodSymbol.Name);
-                    context.ReportDiagnostic(conflicting);
+                        additionalLocations: null,
+                        properties: properties,
+                        messageArgs: new object[] { methodSymbol.Name });
+                    if (!baseline.IsSuppressed(conflicting))
+                    {
+                        context.ReportDiagnostic(conflicting);
+                    }
                 }
             }
 
@@ -110,8 +121,22 @@ namespace SharpProof.Analyzer
                 Location? allowSyncLocation = GetIdentifierLocation(context.Node);
                 if (allowSyncLocation != null)
                 {
-                    var diag = Diagnostic.Create(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeRule, allowSyncLocation, methodSymbol.Name);
-                    context.ReportDiagnostic(diag);
+                    var properties = BaselineDiagnosticProperties.Add(
+                        ImmutableDictionary<string, string?>.Empty,
+                        methodSymbol,
+                        context.Node.SyntaxTree,
+                        "AllowSynchronizationContract",
+                        evidenceKey: "allow_synchronization_without_purity");
+                    var diag = Diagnostic.Create(
+                        SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeRule,
+                        allowSyncLocation,
+                        additionalLocations: null,
+                        properties: properties,
+                        messageArgs: new object[] { methodSymbol.Name });
+                    if (!baseline.IsSuppressed(diag))
+                    {
+                        context.ReportDiagnostic(diag);
+                    }
                 }
             }
 
@@ -124,8 +149,22 @@ namespace SharpProof.Analyzer
                     Location? redundantLoc = GetIdentifierLocation(context.Node);
                     if (redundantLoc != null)
                     {
-                        var redundant = Diagnostic.Create(SharpProofDiagnostics.RedundantAllowSynchronizationRule, redundantLoc, methodSymbol.Name);
-                        context.ReportDiagnostic(redundant);
+                        var properties = BaselineDiagnosticProperties.Add(
+                            ImmutableDictionary<string, string?>.Empty,
+                            methodSymbol,
+                            context.Node.SyntaxTree,
+                            "AllowSynchronizationContract",
+                            evidenceKey: "redundant_allow_synchronization");
+                        var redundant = Diagnostic.Create(
+                            SharpProofDiagnostics.RedundantAllowSynchronizationRule,
+                            redundantLoc,
+                            additionalLocations: null,
+                            properties: properties,
+                            messageArgs: new object[] { methodSymbol.Name });
+                        if (!baseline.IsSuppressed(redundant))
+                        {
+                            context.ReportDiagnostic(redundant);
+                        }
                     }
                 }
             }
@@ -161,15 +200,12 @@ namespace SharpProof.Analyzer
 
                 if (diagnosticLocation != null)
                 {
-                    if (baseline.IsSuppressed(SharpProofDiagnostics.PurityNotVerifiedId, methodSymbol, context.Node.SyntaxTree))
-                    {
-                        return;
-                    }
-
                     var properties = BaselineDiagnosticProperties.Add(
                         purityResult.Evidence.ToDiagnosticProperties(),
                         methodSymbol,
-                        context.Node.SyntaxTree);
+                        context.Node.SyntaxTree,
+                        purityResult.Evidence.OperationKind,
+                        evidenceKey: CreatePurityEvidenceKey(purityResult.Evidence));
                     var diagnostic = Diagnostic.Create(
                         SharpProofDiagnostics.PurityNotVerifiedRule,
                         diagnosticLocation,
@@ -177,6 +213,11 @@ namespace SharpProof.Analyzer
                         properties: properties,
                         messageArgs: new object[] { methodSymbol.Name }
                     );
+                    if (baseline.IsSuppressed(diagnostic))
+                    {
+                        return;
+                    }
+
                     context.ReportDiagnostic(diagnostic);
                     if (effectiveEmitExplanations)
                     {
@@ -186,7 +227,10 @@ namespace SharpProof.Analyzer
                             additionalLocations: null,
                             properties: properties,
                             messageArgs: new object[] { methodSymbol.Name, purityResult.Evidence.ToSummary() });
-                        context.ReportDiagnostic(explanation);
+                        if (!baseline.IsSuppressed(explanation))
+                        {
+                            context.ReportDiagnostic(explanation);
+                        }
                     }
 
                     if ((effectiveEmitExplanations || effectiveReportBclFallbackGuesses) &&
@@ -203,7 +247,10 @@ namespace SharpProof.Analyzer
                                 purityResult.Evidence.BclFallbackGuess,
                                 BclPurityFallbackHeuristics.GetDisplayReason(purityResult.Evidence.BclFallbackReason)
                             });
-                        context.ReportDiagnostic(fallbackDiagnostic);
+                        if (!baseline.IsSuppressed(fallbackDiagnostic))
+                        {
+                            context.ReportDiagnostic(fallbackDiagnostic);
+                        }
                     }
 
                     PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic SP0002 for {methodSymbol.Name} at {diagnosticLocation}.");
@@ -245,15 +292,12 @@ namespace SharpProof.Analyzer
 
                     if (diagnosticLocation != null)
                     {
-                        if (baseline.IsSuppressed(SharpProofDiagnostics.MissingEnforcePureAttributeId, methodSymbol, context.Node.SyntaxTree))
-                        {
-                            return;
-                        }
-
                         var properties = BaselineDiagnosticProperties.Add(
                             ImmutableDictionary<string, string?>.Empty,
                             methodSymbol,
-                            context.Node.SyntaxTree);
+                            context.Node.SyntaxTree,
+                            "MissingEnforcePureAttribute",
+                            evidenceKey: "missing_enforce_pure");
                         var diagnostic = Diagnostic.Create(
                             SharpProofDiagnostics.MissingEnforcePureAttributeRule,
                             diagnosticLocation,
@@ -261,7 +305,10 @@ namespace SharpProof.Analyzer
                             properties: properties,
                             messageArgs: new object[] { methodSymbol.Name }
                         );
-                        context.ReportDiagnostic(diagnostic);
+                        if (!baseline.IsSuppressed(diagnostic))
+                        {
+                            context.ReportDiagnostic(diagnostic);
+                        }
                         PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic SP0004 for {methodSymbol.Name} at {diagnosticLocation}.");
                     }
                     else
@@ -309,6 +356,25 @@ namespace SharpProof.Analyzer
             }
 
             return true;
+        }
+
+        private static string CreatePurityEvidenceKey(PurityAnalysisEngine.PurityEvidence evidence)
+        {
+            return evidence.Category +
+                "|" +
+                evidence.RuleName +
+                "|" +
+                evidence.OperationKind +
+                "|" +
+                evidence.Symbol +
+                "|" +
+                evidence.CatalogSource +
+                "|" +
+                evidence.CalleeChain +
+                "|" +
+                evidence.BclFallbackGuess +
+                "|" +
+                evidence.BclFallbackReason;
         }
 
         private static bool HasConflictingPurityAttributes(

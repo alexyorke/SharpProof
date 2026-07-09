@@ -33,15 +33,16 @@ namespace SharpProof.Analyzer
 
             if (invalidContract != null)
             {
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
+                var diagnostic = InvalidContractArgumentDiagnostics.Create(
+                    "[AllowedCapabilities]",
+                    invalidContract.Argument,
+                    invalidContract.Reason,
+                    invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                    methodSymbol,
+                    context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic))
                 {
-                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                        "[AllowedCapabilities]",
-                        invalidContract.Argument,
-                        invalidContract.Reason,
-                        invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                        methodSymbol,
-                        context.Node.SyntaxTree));
+                    context.ReportDiagnostic(diagnostic);
                 }
 
                 return;
@@ -58,35 +59,39 @@ namespace SharpProof.Analyzer
             {
                 if (site.IsUnknown)
                 {
-                    if (baseline.IsSuppressed(SharpProofDiagnostics.CapabilityUnknownId, methodSymbol, context.Node.SyntaxTree))
+                    var unknownSiteDiagnostic = CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree);
+                    if (!baseline.IsSuppressed(unknownSiteDiagnostic))
                     {
-                        continue;
+                        context.ReportDiagnostic(unknownSiteDiagnostic);
                     }
 
-                    context.ReportDiagnostic(CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree));
                     continue;
                 }
 
                 var disallowedCapabilities = NormalizeCapabilities((CapabilityFlags)(long)site.Capabilities & ~allowedCapabilities);
-                if (disallowedCapabilities == CapabilityFlags.None ||
-                    baseline.IsSuppressed(SharpProofDiagnostics.CapabilityViolationId, methodSymbol, context.Node.SyntaxTree))
+                if (disallowedCapabilities == CapabilityFlags.None)
                 {
                     continue;
                 }
 
-                context.ReportDiagnostic(CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree));
+                var diagnostic = CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic))
+                {
+                    context.ReportDiagnostic(diagnostic);
+                }
             }
 
-            if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0 &&
-                !baseline.IsSuppressed(SharpProofDiagnostics.CapabilityUnknownId, methodSymbol, context.Node.SyntaxTree))
+            if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0)
             {
                 var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
                 var properties = BaselineDiagnosticProperties.Add(
                     ImmutableDictionary<string, string?>.Empty
                         .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString()),
                     methodSymbol,
-                    context.Node.SyntaxTree);
-                context.ReportDiagnostic(Diagnostic.Create(
+                    context.Node.SyntaxTree,
+                    "CapabilityUnknown",
+                    evidenceKey: "unknown:" + result.UnknownReasons[0].ToString());
+                var diagnostic = Diagnostic.Create(
                     SharpProofDiagnostics.CapabilityUnknownRule,
                     location,
                     additionalLocations: null,
@@ -96,7 +101,11 @@ namespace SharpProof.Analyzer
                         methodSymbol.Name,
                         methodSymbol.Name,
                         result.UnknownReasons[0].ToString(),
-                    }));
+                    });
+                if (!baseline.IsSuppressed(diagnostic))
+                {
+                    context.ReportDiagnostic(diagnostic);
+                }
             }
         }
 
@@ -149,7 +158,12 @@ namespace SharpProof.Analyzer
                 properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
             }
 
-            properties = BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
+            properties = BaselineDiagnosticProperties.Add(
+                properties,
+                methodSymbol,
+                syntaxTree,
+                site.OperationKind,
+                evidenceKey: CreateCapabilityEvidenceKey(site, FormatCapabilities(disallowedCapabilities)));
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityViolationRule,
@@ -180,7 +194,12 @@ namespace SharpProof.Analyzer
                 properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
             }
 
-            properties = BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
+            properties = BaselineDiagnosticProperties.Add(
+                properties,
+                methodSymbol,
+                syntaxTree,
+                site.OperationKind,
+                evidenceKey: CreateCapabilityEvidenceKey(site, site.UnknownReason.ToString()));
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityUnknownRule,
@@ -195,6 +214,21 @@ namespace SharpProof.Analyzer
                     methodSymbol.Name,
                     site.UnknownReason.ToString(),
                 });
+        }
+
+        private static string CreateCapabilityEvidenceKey(
+            SymbolicCapabilitySite site,
+            string outcome)
+        {
+            return site.OperationKind +
+                "@" +
+                site.SourceSpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                site.SourceSpanLength.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                "|" +
+                outcome +
+                "|" +
+                (site.SymbolDisplayName ?? string.Empty);
         }
 
         private static bool TryGetAllowedCapabilities(

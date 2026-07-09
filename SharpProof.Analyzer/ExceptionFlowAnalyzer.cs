@@ -19,7 +19,8 @@ namespace SharpProof.Analyzer
             SyntaxNodeAnalysisContext context,
             Analyzer.Configuration.AnalyzerConfiguration config,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            CompilationPurityService purityService)
+            CompilationPurityService purityService,
+            Analyzer.Configuration.DiagnosticBaseline baseline)
         {
             var runtimeHazardMode = Analyzer.Configuration.AnalyzerConfiguration.GetRuntimeHazardMode(
                 context.Options,
@@ -60,7 +61,7 @@ namespace SharpProof.Analyzer
 
             if (reportCheckedExceptionSites)
             {
-                AnalyzeUncaughtExceptionSites(context, queryResult.SiteEntries);
+                AnalyzeUncaughtExceptionSites(context, methodSymbol, queryResult.SiteEntries, baseline);
             }
 
             if (!reportMethodSummaries || queryResult.ExceptionEvidence.Count == 0)
@@ -76,19 +77,30 @@ namespace SharpProof.Analyzer
 
             var sortedTypes = queryResult.ExceptionEvidence.Types;
             var exceptionList = string.Join(", ", sortedTypes);
-            var properties = CreateExceptionProperties(queryResult.ExceptionEvidence);
+            var properties = Analyzer.Configuration.BaselineDiagnosticProperties.Add(
+                CreateExceptionProperties(queryResult.ExceptionEvidence),
+                methodSymbol,
+                context.Node.SyntaxTree,
+                "ExceptionSummary",
+                evidenceKey: CreateExceptionEvidenceKey("summary", queryResult.ExceptionEvidence));
 
-            context.ReportDiagnostic(Diagnostic.Create(
+            var diagnostic = Diagnostic.Create(
                 SharpProofDiagnostics.ExceptionSummaryRule,
                 diagnosticLocation,
                 additionalLocations: null,
                 properties: properties,
-                messageArgs: new object[] { methodSymbol.Name, exceptionList }));
+                messageArgs: new object[] { methodSymbol.Name, exceptionList });
+            if (!baseline.IsSuppressed(diagnostic))
+            {
+                context.ReportDiagnostic(diagnostic);
+            }
         }
 
         private static void AnalyzeUncaughtExceptionSites(
             SyntaxNodeAnalysisContext context,
-            ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries)
+            IMethodSymbol methodSymbol,
+            ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries,
+            Analyzer.Configuration.DiagnosticBaseline baseline)
         {
             foreach (var siteGroup in siteEntries.GroupBy(entry => CreateExceptionSiteKey(entry.Site), StringComparer.Ordinal))
             {
@@ -121,12 +133,23 @@ namespace SharpProof.Analyzer
                     properties = properties.Add(SharpProofDiagnostics.ExceptionSymbolProperty, exceptionSymbol);
                 }
 
-                context.ReportDiagnostic(Diagnostic.Create(
+                properties = Analyzer.Configuration.BaselineDiagnosticProperties.Add(
+                    properties,
+                    methodSymbol,
+                    context.Node.SyntaxTree,
+                    firstEntry.Site.Kind().ToString(),
+                    evidenceKey: CreateExceptionEvidenceKey(CreateExceptionSiteKey(firstEntry.Site), siteEvidence));
+
+                var diagnostic = Diagnostic.Create(
                     SharpProofDiagnostics.UncaughtExceptionSiteRule,
                     siteLocation,
                     additionalLocations: null,
                     properties: properties,
-                    messageArgs: new object[] { operationDisplay, exceptionList }));
+                    messageArgs: new object[] { operationDisplay, exceptionList });
+                if (!baseline.IsSuppressed(diagnostic))
+                {
+                    context.ReportDiagnostic(diagnostic);
+                }
             }
         }
 
@@ -144,6 +167,21 @@ namespace SharpProof.Analyzer
             }
 
             return properties;
+        }
+
+        private static string CreateExceptionEvidenceKey(
+            string scope,
+            ExceptionFlowQuery.ExceptionEvidenceSet exceptionEvidence)
+        {
+            return scope +
+                "|" +
+                string.Join(";", exceptionEvidence.Types) +
+                "|" +
+                exceptionEvidence.FormatCategories() +
+                "|" +
+                exceptionEvidence.FormatSources() +
+                "|" +
+                exceptionEvidence.FormatEdges();
         }
 
         private static string CreateExceptionSiteKey(SyntaxNode node)

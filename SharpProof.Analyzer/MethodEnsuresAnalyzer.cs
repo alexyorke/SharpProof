@@ -52,16 +52,17 @@ namespace SharpProof.Analyzer
 
             if (!SupportsReturnValuePostconditions(methodSymbol, context.Node, out var unsupportedReason))
             {
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                foreach (var contract in contracts)
                 {
-                    foreach (var contract in contracts)
+                    var diagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        contract.Location,
+                        unsupportedReason,
+                        additionalLocations: null);
+                    if (!baseline.IsSuppressed(diagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            methodSymbol,
-                            contract.Condition,
-                            contract.Location,
-                            unsupportedReason,
-                            additionalLocations: null));
+                        context.ReportDiagnostic(diagnostic);
                     }
                 }
 
@@ -83,14 +84,15 @@ namespace SharpProof.Analyzer
             {
                 if (!TryParseCondition(contract.Condition, out var conditionStatement, out var conditionExpression))
                 {
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                    var diagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        contract.Location,
+                        "condition parse failure",
+                        additionalLocations: null);
+                    if (!baseline.IsSuppressed(diagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            methodSymbol,
-                            contract.Condition,
-                            contract.Location,
-                            "condition parse failure",
-                            additionalLocations: null));
+                        context.ReportDiagnostic(diagnostic);
                     }
 
                     continue;
@@ -102,14 +104,15 @@ namespace SharpProof.Analyzer
                         conditionStatement,
                         out var speculativeModel))
                 {
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                    var diagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        contract.Location,
+                        "condition binding failure",
+                        additionalLocations: null);
+                    if (!baseline.IsSuppressed(diagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            methodSymbol,
-                            contract.Condition,
-                            contract.Location,
-                            "condition binding failure",
-                            additionalLocations: null));
+                        context.ReportDiagnostic(diagnostic);
                     }
 
                     continue;
@@ -117,14 +120,15 @@ namespace SharpProof.Analyzer
 
                 if (ReferencesUserLocal(conditionExpression, speculativeModel, context.CancellationToken))
                 {
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                    var diagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        contract.Location,
+                        "local variables are not supported in [Ensures] conditions",
+                        additionalLocations: null);
+                    if (!baseline.IsSuppressed(diagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            methodSymbol,
-                            contract.Condition,
-                            contract.Location,
-                            "local variables are not supported in [Ensures] conditions",
-                            additionalLocations: null));
+                        context.ReportDiagnostic(diagnostic);
                     }
 
                     continue;
@@ -134,14 +138,15 @@ namespace SharpProof.Analyzer
                 {
                     if (!purityService.SmtAnalysis.Options.IsEnabled)
                     {
-                        if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                        var diagnostic = CreateUnsupportedDiagnostic(
+                            methodSymbol,
+                            contract.Condition,
+                            returnSite.Location,
+                            "SMT is disabled for [Ensures] verification",
+                            additionalLocations: contract.Location == null ? null : new[] { contract.Location });
+                        if (!baseline.IsSuppressed(diagnostic))
                         {
-                            context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                                methodSymbol,
-                                contract.Condition,
-                                returnSite.Location,
-                                "SMT is disabled for [Ensures] verification",
-                                additionalLocations: contract.Location == null ? null : new[] { contract.Location }));
+                            context.ReportDiagnostic(diagnostic);
                         }
 
                         continue;
@@ -149,14 +154,15 @@ namespace SharpProof.Analyzer
 
                     if (!TryRewriteConditionForReturnSite(contract.Condition, returnSite.Expression, out var rewrittenCondition))
                     {
-                        if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                        var diagnostic = CreateUnsupportedDiagnostic(
+                            methodSymbol,
+                            contract.Condition,
+                            contract.Location,
+                            "result placeholder rewrite failed",
+                            additionalLocations: new[] { returnSite.Location });
+                        if (!baseline.IsSuppressed(diagnostic))
                         {
-                            context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                                methodSymbol,
-                                contract.Condition,
-                                contract.Location,
-                                "result placeholder rewrite failed",
-                                additionalLocations: new[] { returnSite.Location }));
+                            context.ReportDiagnostic(diagnostic);
                         }
 
                         continue;
@@ -193,27 +199,29 @@ namespace SharpProof.Analyzer
 
                     if (proof.TruthValue == SymbolicTruthValue.ProvenFalse)
                     {
-                        if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresNotProvenId, methodSymbol, context.Node.SyntaxTree))
+                        var diagnostic = CreateNotProvenDiagnostic(
+                            methodSymbol,
+                            contract.Condition,
+                            returnSite,
+                            contract.Location,
+                            proof);
+                        if (!baseline.IsSuppressed(diagnostic))
                         {
-                            context.ReportDiagnostic(CreateNotProvenDiagnostic(
-                                methodSymbol,
-                                contract.Condition,
-                                returnSite,
-                                contract.Location,
-                                proof));
+                            context.ReportDiagnostic(diagnostic);
                         }
 
                         continue;
                     }
 
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
+                    var unsupportedDiagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        returnSite.Location,
+                        FormatUnknownReason(proof),
+                        additionalLocations: contract.Location == null ? null : new[] { contract.Location });
+                    if (!baseline.IsSuppressed(unsupportedDiagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnsupportedDiagnostic(
-                            methodSymbol,
-                            contract.Condition,
-                            returnSite.Location,
-                            FormatUnknownReason(proof),
-                            additionalLocations: contract.Location == null ? null : new[] { contract.Location }));
+                        context.ReportDiagnostic(unsupportedDiagnostic);
                     }
                 }
             }
@@ -263,15 +271,16 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
+                var diagnostic = InvalidContractArgumentDiagnostics.Create(
+                    "[Ensures]",
+                    contract.Argument,
+                    contract.InvalidReason,
+                    contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                    methodSymbol,
+                    context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic))
                 {
-                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                        "[Ensures]",
-                        contract.Argument,
-                        contract.InvalidReason,
-                        contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                        methodSymbol,
-                        context.Node.SyntaxTree));
+                    context.ReportDiagnostic(diagnostic);
                 }
             }
 
@@ -483,7 +492,19 @@ namespace SharpProof.Analyzer
                     .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
                     .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proof.Proof.Status.ToString())
                     .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, proof.Reason),
-                methodSymbol);
+                methodSymbol,
+                "EnsuresReturnSite",
+                condition,
+                "not_proven:" +
+                    condition +
+                    "@" +
+                    returnSite.Expression.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                    ":" +
+                    returnSite.Expression.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                    "|" +
+                    proof.Proof.Status.ToString() +
+                    "|" +
+                    proof.Reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresNotProvenRule,
@@ -508,7 +529,10 @@ namespace SharpProof.Analyzer
                     .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
                     .Add(SharpProofDiagnostics.EnsuresUnknownReasonProperty, reason)
                     .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, reason),
-                methodSymbol);
+                methodSymbol,
+                "EnsuresUnsupported",
+                condition,
+                "unsupported:" + condition + "@" + FormatLocationKey(location) + "|" + reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresUnsupportedRule,
@@ -522,12 +546,30 @@ namespace SharpProof.Analyzer
 
         private static ImmutableDictionary<string, string?> AddBaselineProperties(
             ImmutableDictionary<string, string?> properties,
-            IMethodSymbol methodSymbol)
+            IMethodSymbol methodSymbol,
+            string operationKind,
+            string contractText,
+            string evidenceKey)
         {
             var syntaxTree = methodSymbol.Locations.FirstOrDefault(location => location.SourceTree != null)?.SourceTree;
             return syntaxTree == null
                 ? properties
-                : BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
+                : BaselineDiagnosticProperties.Add(
+                    properties,
+                    methodSymbol,
+                    syntaxTree,
+                    operationKind,
+                    contractText,
+                    evidenceKey);
+        }
+
+        private static string FormatLocationKey(Location? location)
+        {
+            return location == null
+                ? "none"
+                : location.SourceSpan.Start.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                  ":" +
+                  location.SourceSpan.End.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static string FormatUnknownReason(SymbolicConditionProofResult proof)

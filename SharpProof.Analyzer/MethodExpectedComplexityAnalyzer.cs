@@ -41,15 +41,16 @@ namespace SharpProof.Analyzer
 
             if (invalidContract != null)
             {
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
+                var diagnostic = InvalidContractArgumentDiagnostics.Create(
+                    "[ExpectedComplexity]",
+                    invalidContract.Argument,
+                    invalidContract.Reason,
+                    attributeLocation ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
+                    methodSymbol,
+                    context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic))
                 {
-                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                        "[ExpectedComplexity]",
-                        invalidContract.Argument,
-                        invalidContract.Reason,
-                        attributeLocation ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
-                        methodSymbol,
-                        context.Node.SyntaxTree));
+                    context.ReportDiagnostic(diagnostic);
                 }
 
                 return;
@@ -66,15 +67,16 @@ namespace SharpProof.Analyzer
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException)
             {
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId, methodSymbol, context.Node.SyntaxTree))
+                var diagnostic = CreateUnknownDiagnostic(
+                    methodSymbol,
+                    declaredComplexity,
+                    attributeLocation,
+                    "complexity query failed: " + ex.Message,
+                    context.CancellationToken,
+                    context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic))
                 {
-                    context.ReportDiagnostic(CreateUnknownDiagnostic(
-                        methodSymbol,
-                        declaredComplexity,
-                        attributeLocation,
-                        "complexity query failed: " + ex.Message,
-                        context.CancellationToken,
-                        context.Node.SyntaxTree));
+                    context.ReportDiagnostic(diagnostic);
                 }
 
                 return;
@@ -87,29 +89,31 @@ namespace SharpProof.Analyzer
                     return;
 
                 case ComplexityVerificationKind.Exceeded:
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.ComplexityExceededId, methodSymbol, context.Node.SyntaxTree))
+                    var exceededDiagnostic = CreateExceededDiagnostic(
+                        methodSymbol,
+                        declaredComplexity,
+                        result,
+                        attributeLocation,
+                        context.CancellationToken,
+                        context.Node.SyntaxTree);
+                    if (!baseline.IsSuppressed(exceededDiagnostic))
                     {
-                        context.ReportDiagnostic(CreateExceededDiagnostic(
-                            methodSymbol,
-                            declaredComplexity,
-                            result,
-                            attributeLocation,
-                            context.CancellationToken,
-                            context.Node.SyntaxTree));
+                        context.ReportDiagnostic(exceededDiagnostic);
                     }
 
                     return;
 
                 default:
-                    if (!baseline.IsSuppressed(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId, methodSymbol, context.Node.SyntaxTree))
+                    var unknownDiagnostic = CreateUnknownDiagnostic(
+                        methodSymbol,
+                        declaredComplexity,
+                        attributeLocation,
+                        classification.Reason,
+                        context.CancellationToken,
+                        context.Node.SyntaxTree);
+                    if (!baseline.IsSuppressed(unknownDiagnostic))
                     {
-                        context.ReportDiagnostic(CreateUnknownDiagnostic(
-                            methodSymbol,
-                            declaredComplexity,
-                            attributeLocation,
-                            classification.Reason,
-                            context.CancellationToken,
-                            context.Node.SyntaxTree));
+                        context.ReportDiagnostic(unknownDiagnostic);
                     }
 
                     return;
@@ -273,7 +277,10 @@ namespace SharpProof.Analyzer
                     .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
                     .Add(SharpProofDiagnostics.ActualComplexityProperty, result.Complexity.Text),
                 methodSymbol,
-                syntaxTree);
+                syntaxTree,
+                "ExpectedComplexity",
+                declaredComplexity.Text,
+                "exceeded:" + declaredComplexity.Text + ":" + result.Complexity.Text);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityExceededRule,
@@ -298,7 +305,10 @@ namespace SharpProof.Analyzer
                     .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
                     .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason),
                 methodSymbol,
-                syntaxTree);
+                syntaxTree,
+                "ExpectedComplexity",
+                declaredComplexity.Text,
+                "unknown:" + declaredComplexity.Text + ":" + reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,

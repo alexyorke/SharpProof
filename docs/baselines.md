@@ -30,6 +30,12 @@ dotnet run --project Tools/SharpProof.Baseline -- prune --baseline SharpProof.Ba
 ```
 
 Each generated entry includes the diagnostic id, the stable owner symbol, and
-the normalized source path. Extra message and location fields are emitted for
-review context, and the analyzer ignores those fields when applying
-suppression.
+the normalized source path. Entries can also include line, column, contract,
+operation kind, and evidence key fields. Those optional fields narrow a match,
+so suppressing one allocation site, capability site, postcondition return site,
+exception site, BCL fallback explanation, or usage diagnostic does not hide
+unrelated diagnostics in the same method.
+
+Older three-field entries still work. When an entry contains only `id`,
+`symbol`, and `path`, SharpProof treats the missing optional fields as
+wildcards.

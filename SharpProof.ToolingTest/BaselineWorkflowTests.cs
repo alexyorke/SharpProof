@@ -20,6 +20,9 @@ namespace SharpProof.ToolingTest
             Assert.That(baseline.Diagnostics[0].Message, Is.EqualTo("Method is impure"));
             Assert.That(baseline.Diagnostics[0].Line, Is.EqualTo(10));
             Assert.That(baseline.Diagnostics[0].Column, Is.EqualTo(15));
+            Assert.That(baseline.Diagnostics[0].OperationKind, Is.EqualTo("Invocation"));
+            Assert.That(baseline.Diagnostics[0].Contract, Is.EqualTo("[EnforcePure]"));
+            Assert.That(baseline.Diagnostics[0].EvidenceKey, Is.EqualTo("impure-call"));
 
             var json = SharpProofBaseline.ToJson(baseline);
             Assert.That(json, Does.Contain(@"""diagnostics"""));
@@ -89,6 +92,35 @@ namespace SharpProof.ToolingTest
             Assert.That(result.Baseline.Diagnostics[0].Symbol, Is.EqualTo("M:Sample.Impure"));
         }
 
+        [Test]
+        public void Explain_TreatsMissingOptionalIdentityAsWildcard()
+        {
+            var current = new BaselineDocument(ImmutableArray.Create(
+                Entry("SP0013", "M:Sample.Allocate", "src/Sample.cs") with
+                {
+                    Line = 12,
+                    Column = 20,
+                    OperationKind = "ObjectCreation",
+                    EvidenceKey = "object_creation@100:112"
+                }));
+            var baseline = new BaselineDocument(ImmutableArray.Create(
+                Entry("SP0013", "M:Sample.Allocate", "src/Sample.cs"),
+                Entry("SP0013", "M:Sample.Allocate", "src/Sample.cs") with
+                {
+                    Line = 15,
+                    Column = 20,
+                    OperationKind = "ObjectCreation",
+                    EvidenceKey = "object_creation@200:212"
+                }));
+
+            var explanations = SharpProofBaseline.Explain(baseline, current);
+
+            Assert.That(explanations[0].Matched, Is.True);
+            Assert.That(explanations[0].Reason, Is.EqualTo("matched id, symbol, and path"));
+            Assert.That(explanations[1].Matched, Is.False);
+            Assert.That(explanations[1].Reason, Is.EqualTo("diagnostic id, symbol, and path matched but instance identity did not"));
+        }
+
         private static BaselineEntry Entry(string id, string symbol, string path)
         {
             return new BaselineEntry(id, symbol, path);
@@ -117,7 +149,10 @@ namespace SharpProof.ToolingTest
           ],
           ""properties"": {
             ""sharpproof.baseline.symbol"": """ + symbol + @""",
-            ""sharpproof.baseline.path"": """ + path + @"""
+            ""sharpproof.baseline.path"": """ + path + @""",
+            ""sharpproof.baseline.operation_kind"": ""Invocation"",
+            ""sharpproof.baseline.contract"": ""[EnforcePure]"",
+            ""sharpproof.baseline.evidence_key"": ""impure-call""
           }
         }
       ]

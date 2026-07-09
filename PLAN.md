@@ -55,13 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Make baseline suppression instance-granular and uniformly available across
-  every public diagnostic, including exception summaries, exception sites,
-  BCL-fallback explanation diagnostics, and usage diagnostics. Baseline entries
-  should be able to match by stable symbol, path, location, contract text,
-  operation kind, and evidence key so suppressing one allocation, capability,
-  postcondition, or exception site does not hide unrelated diagnostics in the
-  same method.
 - Add richer diagnostic properties that let editors and build tools jump
   directly from a diagnostic to the equivalent `SharpProof.SymbolicCli explain`
   query, including target file, line, column, contract text, proof status, and

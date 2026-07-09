@@ -21,7 +21,13 @@ namespace SharpProof.Analyzer
 
             if (baselineSymbol != null && syntaxTree != null)
             {
-                properties = BaselineDiagnosticProperties.Add(properties, baselineSymbol, syntaxTree);
+                properties = BaselineDiagnosticProperties.Add(
+                    properties,
+                    baselineSymbol,
+                    syntaxTree,
+                    "InvalidContractArgument",
+                    argument,
+                    attributeName + ":" + argument + ":" + reason);
             }
 
             return Diagnostic.Create(

@@ -66,7 +66,11 @@ namespace SharpProof.Analyzer
                 {
                     foreach (var invalidConfigurationValue in invalidConfigurationValues)
                     {
-                        endContext.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidConfigurationValue));
+                        var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
+                        if (!baseline.IsSuppressed(diagnostic))
+                        {
+                            endContext.ReportDiagnostic(diagnostic);
+                        }
                     }
 
                     purityService.Dispose();
@@ -82,7 +86,7 @@ namespace SharpProof.Analyzer
                         MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(c, baseline);
                         MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(c, purityService, baseline);
                         MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(c, baseline);
-                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService);
+                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService, baseline);
                     }
                 },
                     SyntaxKind.AddAccessorDeclaration,
@@ -97,31 +101,47 @@ namespace SharpProof.Analyzer
                     SyntaxKind.ConversionOperatorDeclaration,
                     SyntaxKind.OperatorDeclaration,
                     SyntaxKind.LocalFunctionStatement);
-            });
 
-            context.RegisterSyntaxNodeAction(AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration, SyntaxKind.AttributeList);
-            context.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
+                startContext.RegisterSyntaxNodeAction(
+                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(c, baseline),
+                    SyntaxKind.AttributeList);
+                startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, baseline));
+            });
         }
 
-        private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context)
+        private static void AnalyzeTreeConfiguration(
+            SyntaxTreeAnalysisContext context,
+            Configuration.DiagnosticBaseline baseline)
         {
             var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
             var invalidConfigurationValues = Configuration.AnalyzerConfiguration.GetInvalidTreeConfigurationValues(options);
             var location = Location.Create(context.Tree, new TextSpan(0, 0));
             foreach (var invalidConfigurationValue in invalidConfigurationValues)
             {
-                context.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location));
+                var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location, context.Tree);
+                if (!baseline.IsSuppressed(diagnostic))
+                {
+                    context.ReportDiagnostic(diagnostic);
+                }
             }
         }
 
         private static Diagnostic CreateInvalidConfigurationDiagnostic(
             Configuration.InvalidAnalyzerConfigurationValue invalidConfigurationValue,
-            Location? location = null)
+            Location? location = null,
+            SyntaxTree? syntaxTree = null)
         {
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ConfigurationKeyProperty, invalidConfigurationValue.Key)
-                .Add(SharpProofDiagnostics.ConfigurationValueProperty, invalidConfigurationValue.Value)
-                .Add(SharpProofDiagnostics.ConfigurationInvalidReasonProperty, invalidConfigurationValue.Reason);
+            var path = syntaxTree?.FilePath ?? "<global>";
+            var properties = Configuration.BaselineDiagnosticProperties.Add(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.ConfigurationKeyProperty, invalidConfigurationValue.Key)
+                    .Add(SharpProofDiagnostics.ConfigurationValueProperty, invalidConfigurationValue.Value)
+                    .Add(SharpProofDiagnostics.ConfigurationInvalidReasonProperty, invalidConfigurationValue.Reason),
+                "<configuration>",
+                path,
+                "AnalyzerConfiguration",
+                invalidConfigurationValue.Key,
+                invalidConfigurationValue.Key + ":" + invalidConfigurationValue.Value + ":" + invalidConfigurationValue.Reason);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
