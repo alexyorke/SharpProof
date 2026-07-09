@@ -20,18 +20,19 @@ namespace SharpProof.Test
         private static readonly ImmutableArray<FamilyExpectation> ExpandedCoverageExpectations = ImmutableArray.Create(
             new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
             new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
-            new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
+            new FamilyExpectation("PureNameOf", "NameOf"),
+            new FamilyExpectation("PureInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
             new FamilyExpectation("PureDeclarationPattern", "DeclarationPattern"),
-            new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
+            new FamilyExpectation("ImpureTryCatch", "Try", "CatchClause"),
             new FamilyExpectation("PureConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
             new FamilyExpectation("PureTuple", "Tuple"),
-            new FamilyExpectation("ConservativeRecursivePattern", "RecursivePattern"),
-            new FamilyExpectation("ConservativeSpreadCollectionExpression", "Spread"),
-            new FamilyExpectation("ConservativeYieldReturn", "YieldReturn"),
-            new FamilyExpectation("ConservativeAnonymousFunction", "AnonymousFunction"),
-            new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
-            new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
-            new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
+            new FamilyExpectation("PureRecursivePattern", "RecursivePattern"),
+            new FamilyExpectation("PureSpreadCollectionExpression", "Spread"),
+            new FamilyExpectation("PureYieldReturn", "YieldReturn"),
+            new FamilyExpectation("PureAnonymousFunction", "AnonymousFunction"),
+            new FamilyExpectation("PureDelegateCreation", "DelegateCreation"),
+            new FamilyExpectation("PureNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
+            new FamilyExpectation("PureTuplePatternSwitch", "Tuple", "SwitchExpression"),
             new FamilyExpectation("ImpureUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
             new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation"),
             new FamilyExpectation("ImpureOwnershipEscapeChain", "ObjectCreation", "PropertyReference", "Return"));
@@ -66,11 +67,28 @@ namespace SharpProof.Test
             "PureTuple",
             "PureConditionalAccessCoalesce",
             "PureSwitchStatement",
-            "PureSwitchExpression");
+            "PureSwitchExpression",
+            "PureRecursivePattern",
+            "PureSpreadCollectionExpression",
+            "PureRangeSlice",
+            "PureYieldReturn",
+            "PureAnonymousFunction",
+            "PureDelegateCreation",
+            "PureInterpolatedStringHandler",
+            "PureNestedLambdaLocalFunction",
+            "PureTuplePatternSwitch");
 
         private static readonly ImmutableArray<string> PromotedImpureCoverageFamilies = ImmutableArray.Create(
             "ImpureWithExpression",
-            "ImpureUsingAwaitDelegateFlow");
+            "ImpureUsingAwaitDelegateFlow",
+            "ImpureTryCatch",
+            "ImpureUsingStatement",
+            "ImpureDeclarationExpression",
+            "ImpureTypeParameterObjectCreation",
+            "ImpureDynamicIndexerAccess",
+            "ImpureDynamicObjectCreation",
+            "ImpureInterfaceGetter",
+            "ImpureFunctionPointer");
 
         [Test]
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
@@ -257,24 +275,25 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("PureNestedOwnershipChain"));
             Assert.That(families, Does.Contain("ImpureOwnershipEscapeChain"));
             Assert.That(families, Does.Contain("PureSwitchExpression"));
-            Assert.That(families, Does.Contain("ConservativeRangeSlice"));
+            Assert.That(families, Does.Contain("PureRangeSlice"));
             Assert.That(families, Does.Contain("ImpureWithExpression"));
             Assert.That(families, Does.Contain("PureImplicitIndexerReference"));
-            Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
+            Assert.That(families, Does.Contain("PureInterpolatedStringHandler"));
             Assert.That(families, Does.Contain("ConservativeAddressOf"));
             Assert.That(families, Does.Contain("PureInlineArrayAccess"));
             Assert.That(families, Does.Contain("PureDefaultValue"));
+            Assert.That(families, Does.Contain("PureNameOf"));
             Assert.That(families, Does.Contain("PureDeclarationPattern"));
-            Assert.That(families, Does.Contain("ConservativeTryCatch"));
+            Assert.That(families, Does.Contain("ImpureTryCatch"));
             Assert.That(families, Does.Contain("PureConditionalAccessCoalesce"));
             Assert.That(families, Does.Contain("PureTuple"));
-            Assert.That(families, Does.Contain("ConservativeRecursivePattern"));
-            Assert.That(families, Does.Contain("ConservativeSpreadCollectionExpression"));
-            Assert.That(families, Does.Contain("ConservativeYieldReturn"));
-            Assert.That(families, Does.Contain("ConservativeAnonymousFunction"));
-            Assert.That(families, Does.Contain("ConservativeDelegateCreation"));
-            Assert.That(families, Does.Contain("ConservativeNestedLambdaLocalFunction"));
-            Assert.That(families, Does.Contain("ConservativeTuplePatternSwitch"));
+            Assert.That(families, Does.Contain("PureRecursivePattern"));
+            Assert.That(families, Does.Contain("PureSpreadCollectionExpression"));
+            Assert.That(families, Does.Contain("PureYieldReturn"));
+            Assert.That(families, Does.Contain("PureAnonymousFunction"));
+            Assert.That(families, Does.Contain("PureDelegateCreation"));
+            Assert.That(families, Does.Contain("PureNestedLambdaLocalFunction"));
+            Assert.That(families, Does.Contain("PureTuplePatternSwitch"));
             Assert.That(families, Does.Contain("ImpureUsingAwaitDelegateFlow"));
             Assert.That(missingShapes, Is.Empty);
         }

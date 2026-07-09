@@ -47,6 +47,7 @@ namespace SharpProof.Analyzer.Engine.Rules
 				CreateChildOperationsPureRule(OperationKind.Range),
 				new ImplicitIndexerReferencePurityRule(),
 				new ConversionPurityRule(),
+				CreateChildOperationsPureRule(OperationKind.DeclarationExpression),
 				CreateAlwaysPureRule(OperationKind.DefaultValue, "DefaultValueRule", "DefaultValue operation", includeSyntaxInLog: false),
 				new InterpolatedStringPurityRule(),
 				new PropertyReferencePurityRule(),
