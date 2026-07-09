@@ -14,8 +14,9 @@ bounded proof question into normal build diagnostics.
   are also fed into `[Ensures]`, runtime-hazard, and purity proof queries
   inside the callee.
 - `[Ensures("condition")]`: require every reachable return site to prove a
-  C#-like postcondition. Conditions can reference `result` and the annotated
-  method's parameters. Failures produce `SP0018`; unsupported conditions
+  C#-like postcondition. Conditions can reference `result`, the annotated
+  method's parameters, and current-instance fields/properties through `this`
+  or implicit member access. Failures produce `SP0018`; unsupported conditions
   produce `SP0019`.
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
   in the annotated method-like body. Violations produce `SP0013`.

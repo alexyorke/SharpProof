@@ -675,7 +675,7 @@ public class TestClass
         }
 
         [Test]
-        public void ProgramPointFacts_MemberNotNullFactDoesNotSurviveMemberReassignment()
+        public void ProgramPointFacts_MemberNotNullFactTracksNullMemberReassignment()
         {
             const string source = @"
 #nullable enable
@@ -702,7 +702,7 @@ public class TestClass
             var marker = FindMarker(source, "return Value.Length;");
             var proof = ProveAtMarker(source, marker, "Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
         }
 
         [Test]

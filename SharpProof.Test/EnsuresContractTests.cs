@@ -176,6 +176,75 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_ExplicitThisMemberState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; private set; }
+
+    [Ensures(""this.Value != null"")]
+    public int Initialize()
+    {
+        this.Value = string.Empty;
+        return 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ImplicitThisFieldState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private string? _value;
+
+    [Ensures(""_value != null"")]
+    public int Initialize()
+    {
+        _value = string.Empty;
+        return 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ThisMemberStateFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; private set; }
+
+    [Ensures(""this.Value != null"")]
+    public int Read()
+    {
+        this.Value = null;
+        return {|SP0018:1|};
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_LocalVariableReference_IsRejected()
         {
             var test = @"

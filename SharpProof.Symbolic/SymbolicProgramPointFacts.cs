@@ -4995,6 +4995,18 @@ namespace SharpProof.Symbolic
                             cancellationToken,
                             "ir.path.prior-statement");
                     }
+                    else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
+                             IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken) &&
+                             TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
+                    {
+                        AddAssignedCurrentInstanceMemberStateFacts(
+                            ref state,
+                            memberTerm,
+                            assignment.Right,
+                            semanticModel,
+                            cancellationToken,
+                            "ir.path.prior-statement");
+                    }
                 }
                 else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
                          assignedSymbol is ILocalSymbol or IParameterSymbol &&
@@ -5735,6 +5747,22 @@ namespace SharpProof.Symbolic
                     member.Name,
                     kind),
                 out formula);
+        }
+
+        private static bool TryCreateImplicitThisMemberTerm(ISymbol member, out SymbolicTerm term)
+        {
+            if (!TryGetMemberNotNullTargetType(member, out var type) ||
+                !TryGetValueKind(type, out var kind))
+            {
+                term = null!;
+                return false;
+            }
+
+            term = new SymbolicMemberTerm(
+                new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference),
+                member.Name,
+                kind);
+            return true;
         }
 
         private static void AddTopLevelDoesNotReturnIfNormalCompletionFacts(
@@ -9346,6 +9374,53 @@ namespace SharpProof.Symbolic
                 provenanceRoot);
         }
 
+        private static void AddAssignedCurrentInstanceMemberStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm targetTerm,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
+            var hasThrowGuard = TryGetThrowGuardedValue(
+                valueExpression,
+                out var throwGuardedValue,
+                out _,
+                out _,
+                out _);
+            var effectiveValueExpression = hasThrowGuard
+                ? throwGuardedValue
+                : valueExpression;
+            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var assignedValueTerm) &&
+                assignedValueTerm.Kind == targetTerm.Kind &&
+                CanCompareIrTerms(targetTerm, assignedValueTerm))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    assignedValueTerm,
+                    effectiveValueExpression,
+                    provenanceRoot + ".member.assigned-value");
+            }
+
+            AddAssignedNonNullStateFacts(
+                ref state,
+                targetTerm,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot + ".member");
+            AddAssignedReferenceBackedStateFacts(
+                ref state,
+                targetTerm,
+                effectiveValueExpression,
+                semanticModel,
+                context,
+                provenanceRoot + ".member");
+        }
+
         private static void AddAssignedIntegerRangeStateFacts(
             ref SymbolicState state,
             ISymbol assignedSymbol,
@@ -9483,8 +9558,29 @@ namespace SharpProof.Symbolic
             CancellationToken cancellationToken,
             string provenanceRoot)
         {
+            if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference))
+            {
+                return;
+            }
+
+            AddAssignedNonNullStateFacts(
+                ref state,
+                targetReference,
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
+        }
+
+        private static void AddAssignedNonNullStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm targetReference,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string provenanceRoot)
+        {
             if (!IsDefinitelyNonNullReferenceValue(valueExpression, semanticModel, cancellationToken) ||
-                !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
                 targetReference.Kind != SmtValueKind.Reference)
             {
                 return;
@@ -9507,8 +9603,29 @@ namespace SharpProof.Symbolic
             SymbolicLoweringContext context,
             string provenanceRoot)
         {
-            if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-                targetReference.Kind != SmtValueKind.Reference)
+            if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference))
+            {
+                return;
+            }
+
+            AddAssignedReferenceBackedStateFacts(
+                ref state,
+                targetReference,
+                valueExpression,
+                semanticModel,
+                context,
+                provenanceRoot);
+        }
+
+        private static void AddAssignedReferenceBackedStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm targetReference,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            SymbolicLoweringContext context,
+            string provenanceRoot)
+        {
+            if (targetReference.Kind != SmtValueKind.Reference)
             {
                 return;
             }
@@ -11691,6 +11808,15 @@ namespace SharpProof.Symbolic
 
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
             if (constantValue is { HasValue: true, Value: not null })
+            {
+                return true;
+            }
+
+            if (SymbolicIrLowerer.TryLowerTerm(
+                    expression,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken),
+                    out var loweredTerm) &&
+                loweredTerm is SymbolicStringConstantTerm)
             {
                 return true;
             }
