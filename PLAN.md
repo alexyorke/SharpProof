@@ -55,10 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Revisit the public `AttributeUsage` targets for contract attributes that are
-  currently declared with `AttributeTargets.All`: either narrow unsupported
-  placements at compile time, or document and test why analyzer diagnostics are
-  preferred over compiler rejection for each attribute.
 - Add a first-class baseline workflow: generate `SharpProof.Baseline.json` from
   current diagnostics or SARIF, explain why an entry matched, and prune entries
   that no longer suppress anything.

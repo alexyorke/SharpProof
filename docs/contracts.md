@@ -21,6 +21,30 @@ bounded proof question into normal build diagnostics.
   at or below the declared bound. Exceeded bounds produce `SP0021`; unknown
   bounds produce `SP0022`.
 
+## Attribute Placement Policy
+
+SharpProof intentionally keeps several public contract attributes declared with
+`AttributeTargets.All` even though the analyzer only gives them meaning on a
+smaller set of declarations. This lets unsupported placements compile far
+enough for SharpProof to report fixable `SP*` analyzer diagnostics, include the
+misuse in SARIF and baselines, and show the same guidance across IDE and CI
+hosts instead of relying on compiler `CS0592` rejection.
+
+The broad-usage attributes and their placement diagnostics are:
+
+| Attribute | Analyzer placement diagnostic | Notes |
+| --- | --- | --- |
+| `[EnforcePure]` | `SP0003` | Analyzer-validated so misplaced purity contracts can be removed by a code fix. |
+| `[Pure]` | `SP0003` | Property and indexer getter contracts are accepted; unsupported targets remain analyzer diagnostics. |
+| `[ZeroAllocations]` | `SP0014` | Misplaced allocation contracts stay visible as SharpProof usage errors. |
+| `[AllowedCapabilities(...)]` | `SP0017` | Capability contract placement is validated before capability reasoning runs. |
+| `[Ensures("condition")]` | `SP0020` | Postconditions are accepted only on method-like declarations. |
+| `[ExpectedComplexity(...)]` | `SP0023` | Complexity contracts are accepted only on method-like declarations. |
+
+Attributes whose supported target set is already stable and compiler-enforceable
+remain narrowed in metadata, such as `[AllowSynchronization]`,
+`[PureExternal]`, and `[Impure]`.
+
 ## Diagnostic Reference
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
