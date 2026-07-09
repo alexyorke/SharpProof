@@ -117,7 +117,7 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                if (ReferencesUserLocal(conditionExpression, speculativeModel, context.CancellationToken))
+                if (ReferencesUserLocalOrUnsupportedParameter(conditionExpression, speculativeModel, methodSymbol, context.CancellationToken))
                 {
                     var diagnostic = CreateUnsupportedDiagnostic(
                         methodSymbol,
@@ -452,9 +452,10 @@ namespace SharpProof.Analyzer
             return returnSite.Expression.SpanStart;
         }
 
-        private static bool ReferencesUserLocal(
+        private static bool ReferencesUserLocalOrUnsupportedParameter(
             ExpressionSyntax conditionExpression,
             SemanticModel speculativeModel,
+            IMethodSymbol methodSymbol,
             CancellationToken cancellationToken)
         {
             foreach (var identifier in conditionExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
@@ -470,9 +471,24 @@ namespace SharpProof.Analyzer
                 {
                     return true;
                 }
+
+                if (symbol is IParameterSymbol parameter &&
+                    !IsSupportedEnsuresParameter(parameter, methodSymbol))
+                {
+                    return true;
+                }
             }
 
             return false;
+        }
+
+        private static bool IsSupportedEnsuresParameter(
+            IParameterSymbol parameter,
+            IMethodSymbol methodSymbol)
+        {
+            return SymbolEqualityComparer.Default.Equals(
+                parameter.ContainingSymbol?.OriginalDefinition,
+                methodSymbol.OriginalDefinition);
         }
 
         private static bool TryRewriteConditionForReturnSite(

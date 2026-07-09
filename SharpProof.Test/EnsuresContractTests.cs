@@ -118,6 +118,64 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_ResultCanReferenceParameter_Proven()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""result == value"")]
+    public int Identity(int value)
+    {
+        return value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ParameterOnlyConditionCanUseRequiresAssumption_Proven()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Requires(""value > 0"")]
+    [Ensures(""value > 0"")]
+    public int Identity(int value)
+    {
+        return value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ResultComparedWithParameter_FailingReturnReportsSp0018()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""result > value"")]
+    public int Identity(int value)
+    {
+        return {|SP0018:value|};
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_LocalVariableReference_IsRejected()
         {
             var test = @"

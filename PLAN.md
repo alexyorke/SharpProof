@@ -56,8 +56,8 @@ grouped by their original feature area.
 
 #### Missing Contract Types
 - Expand `[Ensures]` beyond the current `result`-only return-site model to
-  support parameters, `this` and member state, `old(...)` values, nullable and
-  collection predicates, constructors, void methods, and `out`/`ref` parameter
+  support `this` and member state, `old(...)` values, nullable and collection
+  predicates, constructors, void methods, and `out`/`ref` parameter
   postconditions.
 
 #### Runtime Hazard Coverage
