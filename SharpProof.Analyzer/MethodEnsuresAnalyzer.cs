@@ -396,12 +396,13 @@ namespace SharpProof.Analyzer
 
             if (TryGetExpressionBody(methodNode, out var expressionBody))
             {
+                var hasResultValue = HasResultValue(methodSymbol);
                 builder.Add(new CompletionSite(
-                    HasResultValue(methodSymbol) ? expressionBody : null,
+                    hasResultValue ? expressionBody : null,
                     expressionBody.GetLocation(),
                     expressionBody,
-                    IncludeCurrentStatementCompletionFacts: false,
-                    HasResultValue(methodSymbol) ? expressionBody.ToString() : "normal completion"));
+                    IncludeCurrentStatementCompletionFacts: !hasResultValue,
+                    hasResultValue ? expressionBody.ToString() : "normal completion"));
             }
             else if (TryGetBodyBlock(methodNode, out var bodyBlock) &&
                      BodyEndPointIsReachable(bodyBlock, semanticModel))
@@ -699,6 +700,7 @@ namespace SharpProof.Analyzer
             expression = methodNode switch
             {
                 MethodDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
+                ConstructorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
                 OperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
                 ConversionOperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
                 AccessorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,

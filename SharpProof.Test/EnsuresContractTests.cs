@@ -374,6 +374,82 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_ExpressionBodiedVoidMethodMemberState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private string? _value;
+
+    [Ensures(""_value != null"")]
+    public void Run() => _value = string.Empty;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ExpressionBodiedConstructorMemberState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; }
+
+    [Ensures(""this.Value != null"")]
+    public TestClass() => Value = string.Empty;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ExpressionBodiedVoidMethodFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private string? _value;
+
+    [Ensures(""_value != null"")]
+    public void Run() => {|SP0018:_value = null|};
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ExpressionBodiedConstructorFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; }
+
+    [Ensures(""this.Value != null"")]
+    public TestClass() => {|SP0018:Value = null|};
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_VoidMethodResultReference_IsRejected()
         {
             var diagnostics = await GetDiagnosticsAsync(@"

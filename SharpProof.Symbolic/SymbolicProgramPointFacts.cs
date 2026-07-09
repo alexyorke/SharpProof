@@ -74,6 +74,11 @@ namespace SharpProof.Symbolic
                     AddCompletedBlockFacts(facts, siteBlock, semanticModel, cancellationToken);
                 }
             }
+            else if (includeCurrentStatementCompletionFacts &&
+                     site is ExpressionSyntax siteExpression)
+            {
+                AddCompletedExpressionFacts(siteExpression, semanticModel, cancellationToken, facts);
+            }
 
             return facts;
         }
@@ -196,6 +201,15 @@ namespace SharpProof.Symbolic
                         semanticModel,
                         cancellationToken);
                 }
+            }
+            else if (includeCurrentStatementCompletionFacts &&
+                     site is ExpressionSyntax siteExpression)
+            {
+                AddCompletedExpressionStateFacts(
+                    ref state,
+                    siteExpression,
+                    semanticModel,
+                    cancellationToken);
             }
 
             return state;
@@ -4935,136 +4949,12 @@ namespace SharpProof.Symbolic
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
-                if (TryHandleTupleDeconstructionDeclarationState(ref state, assignment, semanticModel, cancellationToken))
-                {
-                    return;
-                }
-
-                if (TryHandleTupleAssignmentState(ref state, assignment, semanticModel, cancellationToken))
-                {
-                    return;
-                }
-
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-                if (assignedSymbol != null)
-                {
-                    assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
-                }
-
-                SymbolicTerm? previousAssignedValueTerm = null;
-                if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                    TryGetCurrentStateSymbolValueTerm(state, assignedSymbol.OriginalDefinition, out var previousStateValueTerm))
-                {
-                    previousAssignedValueTerm = previousStateValueTerm;
-                }
-
-                var coalesceAssignmentIsKnownNoOp = assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                    (IsKnownNonNullReferenceSymbol(state, assignedSymbol.OriginalDefinition) ||
-                     IsKnownNullableHasValueSymbol(state, assignedSymbol.OriginalDefinition));
-                var coalesceAssignmentIsKnownNullableNoValue = assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                    IsKnownNullableNoValueSymbol(state, assignedSymbol.OriginalDefinition);
-                var coalesceAssignmentIsKnownNullReference = assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                    assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                    IsKnownNullReferenceSymbol(state, assignedSymbol.OriginalDefinition);
-
-                if (coalesceAssignmentIsKnownNoOp)
-                {
-                    return;
-                }
-
-                RemoveStateFactsInvalidatedByMutationTarget(
+                AddAssignmentExpressionStateFacts(
                     ref state,
-                    assignment.Left,
-                    semanticModel,
-                    cancellationToken);
-                RemoveStateFactsInvalidatedByNestedMutations(
-                    ref state,
-                    assignment.Left,
-                    semanticModel,
-                    cancellationToken);
-                RemoveStateFactsInvalidatedByNestedMutations(
-                    ref state,
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken);
-
-                if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-                    IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken))
-                {
-                    state = RemoveStateFactsReferencingImplicitThisMember(state, assignedSymbol.Name);
-                }
-
-                if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
-                {
-                    if (assignedSymbol is ILocalSymbol or IParameterSymbol)
-                    {
-                        AddAssignedValueStateFacts(
-                            ref state,
-                            assignedSymbol.OriginalDefinition,
-                            assignment.Right,
-                            semanticModel,
-                            cancellationToken,
-                            "ir.path.prior-statement");
-                    }
-                    else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-                             IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken) &&
-                             TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
-                    {
-                        AddAssignedCurrentInstanceMemberStateFacts(
-                            ref state,
-                            memberTerm,
-                            assignment.Right,
-                            semanticModel,
-                            cancellationToken,
-                            "ir.path.prior-statement");
-                    }
-                }
-                else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                         assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                         (coalesceAssignmentIsKnownNullableNoValue || coalesceAssignmentIsKnownNullReference))
-                {
-                    AddAssignedValueStateFacts(
-                        ref state,
-                        assignedSymbol.OriginalDefinition,
-                        assignment.Right,
-                        semanticModel,
-                        cancellationToken,
-                        "ir.path.prior-statement.coalesce-assignment");
-                }
-                else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
-                         previousAssignedValueTerm != null &&
-                         TryCreateCompoundAssignmentStateTerm(
-                             previousAssignedValueTerm,
-                             assignment,
-                             semanticModel,
-                             cancellationToken,
-                             assignedSymbol.OriginalDefinition,
-                             out var compoundAssignmentValueTerm) &&
-                         TryCreateSymbolTerm(assignedSymbol.OriginalDefinition, out var targetTerm) &&
-                         targetTerm.Kind == SmtValueKind.Int &&
-                         !ReferencesStateSymbol(
-                             compoundAssignmentValueTerm,
-                             SymbolicFactFactory.GetSmtVariableName(assignedSymbol.OriginalDefinition)))
-                {
-                    AddRelationPathFact(
-                        ref state,
-                        SymbolicRelationOperator.Equal,
-                        targetTerm,
-                        compoundAssignmentValueTerm,
-                        assignment,
-                        "ir.path.prior-statement.compound-assignment");
-                }
-
-                AddNormalCompletionStateFacts(
-                    ref state,
-                    assignment.Right,
+                    assignment,
                     expressionStatement,
-                    assignedSymbol is not ILocalSymbol and not IParameterSymbol,
                     semanticModel,
                     cancellationToken);
-
                 return;
             }
 
@@ -5111,6 +5001,187 @@ namespace SharpProof.Symbolic
                     completedExpressionStatement.Expression,
                     completedExpressionStatement,
                     includeThrowGuardFacts: true,
+                    semanticModel,
+                    cancellationToken);
+            }
+        }
+
+        private static void AddCompletedExpressionFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapExpression(expression);
+            AddTopLevelMemberNotNullNormalCompletionFacts(expression, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedExpressionStateFacts(
+            ref SymbolicState state,
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is AssignmentExpressionSyntax assignment)
+            {
+                AddAssignmentExpressionStateFacts(
+                    ref state,
+                    assignment,
+                    containingStatement: null,
+                    semanticModel,
+                    cancellationToken);
+                return;
+            }
+
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                expression,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelMemberNotNullNormalCompletionStateFacts(
+                ref state,
+                expression,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static void AddAssignmentExpressionStateFacts(
+            ref SymbolicState state,
+            AssignmentExpressionSyntax assignment,
+            ExpressionStatementSyntax? containingStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (TryHandleTupleDeconstructionDeclarationState(ref state, assignment, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            if (TryHandleTupleAssignmentState(ref state, assignment, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+            if (assignedSymbol != null)
+            {
+                assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
+            }
+
+            SymbolicTerm? previousAssignedValueTerm = null;
+            if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                TryGetCurrentStateSymbolValueTerm(state, assignedSymbol.OriginalDefinition, out var previousStateValueTerm))
+            {
+                previousAssignedValueTerm = previousStateValueTerm;
+            }
+
+            var coalesceAssignmentIsKnownNoOp = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                (IsKnownNonNullReferenceSymbol(state, assignedSymbol.OriginalDefinition) ||
+                 IsKnownNullableHasValueSymbol(state, assignedSymbol.OriginalDefinition));
+            var coalesceAssignmentIsKnownNullableNoValue = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                IsKnownNullableNoValueSymbol(state, assignedSymbol.OriginalDefinition);
+            var coalesceAssignmentIsKnownNullReference = assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                IsKnownNullReferenceSymbol(state, assignedSymbol.OriginalDefinition);
+
+            if (coalesceAssignmentIsKnownNoOp)
+            {
+                return;
+            }
+
+            RemoveStateFactsInvalidatedByMutationTarget(
+                ref state,
+                assignment.Left,
+                semanticModel,
+                cancellationToken);
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                assignment.Left,
+                semanticModel,
+                cancellationToken);
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                assignment.Right,
+                semanticModel,
+                cancellationToken);
+
+            if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
+                IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken))
+            {
+                state = RemoveStateFactsReferencingImplicitThisMember(state, assignedSymbol.Name);
+            }
+
+            if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+            {
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    AddAssignedValueStateFacts(
+                        ref state,
+                        assignedSymbol.OriginalDefinition,
+                        assignment.Right,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.prior-statement");
+                }
+                else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
+                         IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken) &&
+                         TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
+                {
+                    AddAssignedCurrentInstanceMemberStateFacts(
+                        ref state,
+                        memberTerm,
+                        assignment.Right,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.prior-statement");
+                }
+            }
+            else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                     assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                     (coalesceAssignmentIsKnownNullableNoValue || coalesceAssignmentIsKnownNullReference))
+            {
+                AddAssignedValueStateFacts(
+                    ref state,
+                    assignedSymbol.OriginalDefinition,
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.prior-statement.coalesce-assignment");
+            }
+            else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
+                     previousAssignedValueTerm != null &&
+                     TryCreateCompoundAssignmentStateTerm(
+                         previousAssignedValueTerm,
+                         assignment,
+                         semanticModel,
+                         cancellationToken,
+                         assignedSymbol.OriginalDefinition,
+                         out var compoundAssignmentValueTerm) &&
+                     TryCreateSymbolTerm(assignedSymbol.OriginalDefinition, out var targetTerm) &&
+                     targetTerm.Kind == SmtValueKind.Int &&
+                     !ReferencesStateSymbol(
+                         compoundAssignmentValueTerm,
+                         SymbolicFactFactory.GetSmtVariableName(assignedSymbol.OriginalDefinition)))
+            {
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    targetTerm,
+                    compoundAssignmentValueTerm,
+                    assignment,
+                    "ir.path.prior-statement.compound-assignment");
+            }
+
+            if (containingStatement != null)
+            {
+                AddNormalCompletionStateFacts(
+                    ref state,
+                    assignment.Right,
+                    containingStatement,
+                    assignedSymbol is not ILocalSymbol and not IParameterSymbol,
                     semanticModel,
                     cancellationToken);
             }
