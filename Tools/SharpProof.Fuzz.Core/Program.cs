@@ -824,6 +824,10 @@ public static class FuzzRunner
             summary.SamplerMode,
             summary.ManifestSurfaceCounts,
             summary.ManifestClassificationCounts,
+            summary.RegistryExpectationCounts,
+            summary.DefiniteRegistryFamilyCount,
+            summary.ConservativeRegistryFamilyCount,
+            summary.ConservativeRegistryFamilies,
             summary.GeneratorBackedShapeCount,
             summary.GeneratorBackedShapesWithRegistryCount,
             summary.UnobservedGeneratorBackedShapes,
@@ -2942,7 +2946,7 @@ public sealed record FuzzFinding(
 
 public sealed record FuzzRunSummary
 {
-    public string SchemaVersion { get; init; } = "1.2";
+    public string SchemaVersion { get; init; } = "1.3";
 
     public int Seed { get; init; }
 
@@ -3003,6 +3007,16 @@ public sealed record FuzzRunSummary
     public ImmutableSortedDictionary<string, int> ManifestClassificationCounts { get; init; } =
         ImmutableSortedDictionary<string, int>.Empty;
 
+    public ImmutableSortedDictionary<string, int> RegistryExpectationCounts { get; init; } =
+        ImmutableSortedDictionary<string, int>.Empty;
+
+    public int DefiniteRegistryFamilyCount { get; init; }
+
+    public int ConservativeRegistryFamilyCount { get; init; }
+
+    public ImmutableArray<string> ConservativeRegistryFamilies { get; init; } =
+        ImmutableArray<string>.Empty;
+
     public int GeneratorBackedShapeCount { get; init; }
 
     public int GeneratorBackedShapesWithRegistryCount { get; init; }
@@ -3019,6 +3033,10 @@ public sealed record FuzzRunSummary
 
 internal sealed class FuzzRunSummaryBuilder
 {
+    private const string ConservativeExpectationBucket = "conservative";
+    private const string DefinitelyImpureExpectationBucket = "definitely_impure";
+    private const string DefinitelyPureExpectationBucket = "definitely_pure";
+
     private readonly FuzzOptions _options;
     private readonly DateTimeOffset _startedUtc;
     private readonly string _samplerMode;
@@ -3156,6 +3174,12 @@ internal sealed class FuzzRunSummaryBuilder
                 group => group.Key,
                 group => group.Count(),
                 StringComparer.Ordinal);
+        var registryExpectationCounts = CreateRegistryExpectationCounts();
+        var conservativeRegistryFamilies = FuzzCaseGenerator.RegistryEntries
+            .Where(static entry => IsConservativeExpectation(entry.Expectation))
+            .Select(static entry => entry.Id)
+            .OrderBy(family => family, StringComparer.Ordinal)
+            .ToImmutableArray();
         var registryCoveredShapeIds = FuzzCaseGenerator.RegistryEntries
             .SelectMany(entry => entry.PrimaryShapeIds)
             .Distinct(StringComparer.Ordinal)
@@ -3193,12 +3217,52 @@ internal sealed class FuzzRunSummaryBuilder
             SamplerMode = _samplerMode,
             ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             ManifestClassificationCounts = manifestClassificationCounts,
+            RegistryExpectationCounts = registryExpectationCounts,
+            DefiniteRegistryFamilyCount = registryExpectationCounts[DefinitelyPureExpectationBucket] + registryExpectationCounts[DefinitelyImpureExpectationBucket],
+            ConservativeRegistryFamilyCount = conservativeRegistryFamilies.Length,
+            ConservativeRegistryFamilies = conservativeRegistryFamilies,
             GeneratorBackedShapeCount = RoslynShapeManifest.GeneratorBackedShapeIds.Length,
             GeneratorBackedShapesWithRegistryCount = registryCoveredShapeIds.Count,
             UnobservedGeneratorBackedShapes = unobservedGeneratorBackedShapes,
             PrimaryShapeCounts = _primaryShapeCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             Findings = findings
         };
+    }
+
+    private static ImmutableSortedDictionary<string, int> CreateRegistryExpectationCounts()
+    {
+        var counts = new SortedDictionary<string, int>(StringComparer.Ordinal)
+        {
+            [ConservativeExpectationBucket] = 0,
+            [DefinitelyImpureExpectationBucket] = 0,
+            [DefinitelyPureExpectationBucket] = 0
+        };
+
+        foreach (var entry in FuzzCaseGenerator.RegistryEntries)
+        {
+            Increment(counts, GetExpectationBucket(entry.Expectation));
+        }
+
+        return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
+    }
+
+    private static string GetExpectationBucket(FuzzExpectation expectation)
+    {
+        if (IsConservativeExpectation(expectation))
+        {
+            return ConservativeExpectationBucket;
+        }
+
+        return expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
+               expectation.Sp0010 is Sp0010ExpectationKind.Ignore or Sp0010ExpectationKind.MustNotEmit
+            ? DefinitelyPureExpectationBucket
+            : DefinitelyImpureExpectationBucket;
+    }
+
+    private static bool IsConservativeExpectation(FuzzExpectation expectation)
+    {
+        return expectation.Sp0002 == Sp0002ExpectationKind.MayEmitConservatively ||
+               expectation.Sp0010 == Sp0010ExpectationKind.MayEmitConservatively;
     }
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding)

@@ -54,11 +54,6 @@ grouped by their original feature area.
 
 ### High Priority Features
 
-#### Purity Rule Precision Targets
-- Add regression tests that require each conservative fuzz family to preserve
-  structured diagnostic evidence, then track how many conservative families are
-  burned down in the coverage dashboard.
-
 #### Missing Contract Types
 - Add a `[Requires("condition")]` precondition contract that can both verify
   callers and feed proven assumptions into `[Ensures]`, runtime-hazard, and

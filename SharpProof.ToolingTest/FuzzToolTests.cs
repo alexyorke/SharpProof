@@ -98,6 +98,8 @@ namespace SharpProof.Test
         {
             var outputDirectory = CreateOutputDirectory();
             var iterations = Math.Max(40, RoslynShapeManifest.GeneratorBackedShapeIds.Length + 2);
+            var conservativeFamilies = GetConservativeRegistryFamilies();
+            var expectationCounts = GetRegistryExpectationCounts();
             try
             {
                 var summary = await FuzzRunner.RunAsync(new FuzzOptions
@@ -111,12 +113,17 @@ namespace SharpProof.Test
                 });
 
                 Assert.That(summary.CasesAnalyzed, Is.EqualTo(iterations));
-                Assert.That(summary.SchemaVersion, Is.EqualTo("1.2"));
+                Assert.That(summary.SchemaVersion, Is.EqualTo("1.3"));
                 Assert.That(summary.CompilationErrorCount, Is.EqualTo(0));
                 Assert.That(summary.OperationKinds, Is.Not.Empty);
                 Assert.That(summary.SyntaxKinds, Is.Not.Empty);
                 Assert.That(summary.FamilyCounts, Is.Not.Empty);
                 Assert.That(summary.PrimaryShapeCounts, Is.Not.Empty);
+                Assert.That(summary.RegistryExpectationCounts, Is.EquivalentTo(expectationCounts));
+                Assert.That(summary.DefiniteRegistryFamilyCount, Is.EqualTo(
+                    expectationCounts["definitely_pure"] + expectationCounts["definitely_impure"]));
+                Assert.That(summary.ConservativeRegistryFamilyCount, Is.EqualTo(conservativeFamilies.Length));
+                Assert.That(summary.ConservativeRegistryFamilies, Is.EqualTo(conservativeFamilies));
                 Assert.That(summary.SamplerMode, Is.EqualTo("deterministic_shape_stratified"));
                 Assert.That(summary.ManifestSurfaceCounts.ContainsKey("OperationKind"), Is.True);
                 Assert.That(summary.ManifestSurfaceCounts.ContainsKey("SyntaxKind"), Is.True);
@@ -130,6 +137,25 @@ namespace SharpProof.Test
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.json")), Is.True);
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.partial.json")), Is.True);
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.partial.json")), Is.True);
+
+                var coverageJson = await File.ReadAllTextAsync(Path.Combine(outputDirectory, "coverage.json"));
+                using var coverageDocument = JsonDocument.Parse(coverageJson);
+                var coverageRoot = coverageDocument.RootElement;
+                Assert.That(
+                    coverageRoot.GetProperty("ConservativeRegistryFamilyCount").GetInt32(),
+                    Is.EqualTo(conservativeFamilies.Length));
+                Assert.That(
+                    coverageRoot.GetProperty("DefiniteRegistryFamilyCount").GetInt32(),
+                    Is.EqualTo(expectationCounts["definitely_pure"] + expectationCounts["definitely_impure"]));
+                Assert.That(
+                    coverageRoot.GetProperty("ConservativeRegistryFamilies")
+                        .EnumerateArray()
+                        .Select(static element => element.GetString())
+                        .ToArray(),
+                    Is.EqualTo(conservativeFamilies));
+                Assert.That(
+                    coverageRoot.GetProperty("RegistryExpectationCounts").GetProperty("conservative").GetInt32(),
+                    Is.EqualTo(conservativeFamilies.Length));
             }
             finally
             {
@@ -473,6 +499,50 @@ public class KnownImpureConsoleCase
         }
 
         [Test]
+        public async Task ConservativeCoverageFamilies_PreserveStructuredDiagnosticEvidence()
+        {
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
+
+            foreach (var family in GetConservativeRegistryFamilies())
+            {
+                var registryEntry = RegistryEntriesById[family];
+                var analysis = analyses[family];
+                var purityDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
+                    .ToArray();
+                var exceptionDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+                    .ToArray();
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, family);
+                Assert.That(
+                    analysis.Findings,
+                    Is.Empty,
+                    family + Environment.NewLine + string.Join(Environment.NewLine, analysis.DiagnosticSignatures));
+                Assert.That(
+                    purityDiagnostics.Length + exceptionDiagnostics.Length,
+                    Is.GreaterThan(0),
+                    family + " did not emit any diagnostic evidence.");
+
+                if (purityDiagnostics.Length > 0)
+                {
+                    AssertRequiredProperties(
+                        purityDiagnostics,
+                        family,
+                        registryEntry.Expectation.RequiredSp0002Properties.ToArray());
+                }
+
+                if (exceptionDiagnostics.Length > 0)
+                {
+                    AssertRequiredProperties(
+                        exceptionDiagnostics,
+                        family,
+                        registryEntry.Expectation.RequiredSp0010Properties.ToArray());
+                }
+            }
+        }
+
+        [Test]
         public async Task ExceptionCoverageFamily_DiagnosticSignatures_PreserveExceptionEdgesProperty_WhenPresent()
         {
             var analysis = (await AnalyzeCachedRegistryFamiliesAsync())["ExceptionInvokedLocalFunctionThrow"];
@@ -622,6 +692,52 @@ public class FuzzExceptionEdgesReportCase
         private static Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeCachedRegistryFamiliesAsync()
         {
             return ToolingFuzzAnalysisCache.GetRegistryEntryAnalysesAsync();
+        }
+
+        private static string[] GetConservativeRegistryFamilies()
+        {
+            return FuzzCaseGenerator.RegistryEntries
+                .Where(static entry => IsConservativeExpectation(entry.Expectation))
+                .Select(static entry => entry.Id)
+                .OrderBy(family => family, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static ImmutableSortedDictionary<string, int> GetRegistryExpectationCounts()
+        {
+            var counts = new SortedDictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["conservative"] = 0,
+                ["definitely_impure"] = 0,
+                ["definitely_pure"] = 0
+            };
+
+            foreach (var entry in FuzzCaseGenerator.RegistryEntries)
+            {
+                var bucket = GetExpectationBucket(entry.Expectation);
+                counts[bucket] = counts.TryGetValue(bucket, out var count) ? count + 1 : 1;
+            }
+
+            return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
+        }
+
+        private static string GetExpectationBucket(FuzzExpectation expectation)
+        {
+            if (IsConservativeExpectation(expectation))
+            {
+                return "conservative";
+            }
+
+            return expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
+                   expectation.Sp0010 is Sp0010ExpectationKind.Ignore or Sp0010ExpectationKind.MustNotEmit
+                ? "definitely_pure"
+                : "definitely_impure";
+        }
+
+        private static bool IsConservativeExpectation(FuzzExpectation expectation)
+        {
+            return expectation.Sp0002 == Sp0002ExpectationKind.MayEmitConservatively ||
+                   expectation.Sp0010 == Sp0010ExpectationKind.MayEmitConservatively;
         }
 
         private static string CreateOutputDirectory()
