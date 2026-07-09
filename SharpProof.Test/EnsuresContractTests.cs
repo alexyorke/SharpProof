@@ -284,7 +284,97 @@ public sealed class TestClass
         }
 
         [Test]
-        public async Task Ensures_VoidMethod_IsRejected()
+        public async Task Ensures_VoidMethodMemberState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private string? _value;
+
+    [Ensures(""_value != null"")]
+    public void Run()
+    {
+        _value = string.Empty;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_VoidMethodExplicitReturnFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private string? _value;
+
+    [Ensures(""_value != null"")]
+    public void Run()
+    {
+        _value = null;
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ConstructorMemberState_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; }
+
+    [Ensures(""this.Value != null"")]
+    public TestClass()
+    {
+        Value = string.Empty;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ConstructorExplicitReturnFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public string? Value { get; }
+
+    [Ensures(""this.Value != null"")]
+    public TestClass()
+    {
+        Value = null;
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_VoidMethodResultReference_IsRejected()
         {
             var diagnostics = await GetDiagnosticsAsync(@"
 #pragma warning disable SP0004
@@ -292,13 +382,13 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [Ensures(""true"")]
+    [Ensures(""result == null"")]
     public void Run()
     {
     }
 }");
 
-            Assert.That(SingleDiagnostic(diagnostics, SharpProofDiagnostics.EnsuresUnsupportedId).GetMessage(), Does.Contain("void-returning members"));
+            Assert.That(SingleDiagnostic(diagnostics, SharpProofDiagnostics.EnsuresUnsupportedId).GetMessage(), Does.Contain("result is not available"));
         }
 
         [Test]

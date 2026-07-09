@@ -69,6 +69,10 @@ namespace SharpProof.Symbolic
             if (site is BlockSyntax siteBlock)
             {
                 AddContainingBlockEntryFacts(siteBlock, semanticModel, cancellationToken, facts);
+                if (includeCurrentStatementCompletionFacts)
+                {
+                    AddCompletedBlockFacts(facts, siteBlock, semanticModel, cancellationToken);
+                }
             }
 
             return facts;
@@ -178,6 +182,15 @@ namespace SharpProof.Symbolic
                         semanticModel,
                         cancellationToken);
                     AddContainingBlockEntryStateFacts(
+                        ref state,
+                        siteBlock,
+                        semanticModel,
+                        cancellationToken);
+                }
+
+                if (includeCurrentStatementCompletionFacts)
+                {
+                    AddCompletedBlockStateFacts(
                         ref state,
                         siteBlock,
                         semanticModel,
@@ -5100,6 +5113,33 @@ namespace SharpProof.Symbolic
                     includeThrowGuardFacts: true,
                     semanticModel,
                     cancellationToken);
+            }
+        }
+
+        private static void AddCompletedBlockStateFacts(
+            ref SymbolicState state,
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var processedStatementCount = 0;
+            foreach (var statement in block.Statements)
+            {
+                if (processedStatementCount >= MaxScopedBlockCompletionStatements)
+                {
+                    return;
+                }
+
+                processedStatementCount++;
+                AddPriorStatementStateFacts(
+                    ref state,
+                    statement,
+                    semanticModel,
+                    cancellationToken);
+                if (StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+                {
+                    return;
+                }
             }
         }
 

@@ -48,7 +48,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            if (!SupportsReturnValuePostconditions(methodSymbol, context.Node, out var unsupportedReason))
+            if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason))
             {
                 foreach (var contract in contracts)
                 {
@@ -68,15 +68,13 @@ namespace SharpProof.Analyzer
             }
 
             var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
-            var returnSites = CollectReturnSites(context.Node, context.SemanticModel, context.CancellationToken);
-            if (returnSites.Length == 0)
+            var completionSites = CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.CancellationToken);
+            if (completionSites.Length == 0)
             {
                 return;
             }
 
             var queryService = new SymbolicQueryService();
-            var source = SymbolicSourceInput.FromSyntaxTree(context.Node.SyntaxTree, context.SemanticModel.Compilation);
-            var options = new SymbolicQueryOptions(smtAnalysis: purityService.SmtAnalysis);
             var seen = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var contract in contracts)
@@ -99,7 +97,7 @@ namespace SharpProof.Analyzer
 
                 if (!TryCreateSpeculativeConditionModel(
                         context.SemanticModel,
-                        GetSpeculativePosition(returnSites[0]),
+                        GetSpeculativePosition(completionSites[0]),
                         conditionStatement,
                         out var speculativeModel))
                 {
@@ -108,6 +106,23 @@ namespace SharpProof.Analyzer
                         contract.Condition,
                         contract.Location,
                         "condition binding failure",
+                        additionalLocations: null);
+                    if (!baseline.IsSuppressed(diagnostic))
+                    {
+                        context.ReportDiagnostic(diagnostic);
+                    }
+
+                    continue;
+                }
+
+                if (!CompletionSitesHaveResult(completionSites) &&
+                    RequiresContractHelpers.ContainsResultReference(conditionExpression))
+                {
+                    var diagnostic = CreateUnsupportedDiagnostic(
+                        methodSymbol,
+                        contract.Condition,
+                        contract.Location,
+                        "result is not available for [Ensures] on void-returning members or constructors",
                         additionalLocations: null);
                     if (!baseline.IsSuppressed(diagnostic))
                     {
@@ -133,14 +148,14 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                foreach (var returnSite in returnSites)
+                foreach (var completionSite in completionSites)
                 {
                     if (!purityService.SmtAnalysis.Options.IsEnabled)
                     {
                         var diagnostic = CreateUnsupportedDiagnostic(
                             methodSymbol,
                             contract.Condition,
-                            returnSite.Location,
+                            completionSite.Location,
                             "SMT is disabled for [Ensures] verification",
                             additionalLocations: contract.Location == null ? null : new[] { contract.Location });
                         if (!baseline.IsSuppressed(diagnostic))
@@ -151,14 +166,14 @@ namespace SharpProof.Analyzer
                         continue;
                     }
 
-                    if (!TryRewriteConditionForReturnSite(contract.Condition, returnSite.Expression, out var rewrittenCondition))
+                    if (!TryRewriteConditionForCompletionSite(contract.Condition, completionSite, out var rewrittenCondition))
                     {
                         var diagnostic = CreateUnsupportedDiagnostic(
                             methodSymbol,
                             contract.Condition,
                             contract.Location,
                             "result placeholder rewrite failed",
-                            additionalLocations: new[] { returnSite.Location });
+                            additionalLocations: new[] { completionSite.Location });
                         if (!baseline.IsSuppressed(diagnostic))
                         {
                             context.ReportDiagnostic(diagnostic);
@@ -168,15 +183,12 @@ namespace SharpProof.Analyzer
                     }
 
                     var proofCondition = RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                    var lineSpan = returnSite.QueryLocation.GetLineSpan();
-                    var line = lineSpan.StartLinePosition.Line + 1;
-                    var column = lineSpan.StartLinePosition.Character + 1;
-                    var proof = queryService.Prove(
-                        new SymbolicConditionProofRequest(
-                            source,
-                            SymbolicQueryTarget.Point(line, column),
-                            proofCondition,
-                            options),
+                    var proof = queryService.ProveAtSyntaxNode(
+                        context.SemanticModel,
+                        completionSite.QueryNode,
+                        proofCondition,
+                        purityService.SmtAnalysis,
+                        completionSite.IncludeCurrentStatementCompletionFacts,
                         context.CancellationToken);
 
                     if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
@@ -188,7 +200,7 @@ namespace SharpProof.Analyzer
                     var key = string.Join(
                         ":",
                         contract.Condition,
-                        returnSite.Expression.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        completionSite.QueryNode.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         proof.TruthValue.ToString(),
                         proof.Proof.UnknownReason.ToString(),
                         proof.Reason);
@@ -202,7 +214,7 @@ namespace SharpProof.Analyzer
                         var diagnostic = CreateNotProvenDiagnostic(
                             methodSymbol,
                             contract.Condition,
-                            returnSite,
+                            completionSite,
                             contract.Location,
                             proof);
                         if (!baseline.IsSuppressed(diagnostic))
@@ -216,7 +228,7 @@ namespace SharpProof.Analyzer
                     var unsupportedDiagnostic = CreateUnsupportedDiagnostic(
                         methodSymbol,
                         contract.Condition,
-                        returnSite.Location,
+                        completionSite.Location,
                         FormatUnknownReason(proof),
                         additionalLocations: contract.Location == null ? null : new[] { contract.Location });
                     if (!baseline.IsSuppressed(unsupportedDiagnostic))
@@ -322,24 +334,10 @@ namespace SharpProof.Analyzer
             return "<missing>";
         }
 
-        private static bool SupportsReturnValuePostconditions(
-            IMethodSymbol methodSymbol,
+        private static bool SupportsEnsuresPostconditions(
             SyntaxNode methodNode,
             out string reason)
         {
-            if (methodSymbol.MethodKind == MethodKind.Constructor ||
-                methodSymbol.MethodKind == MethodKind.StaticConstructor)
-            {
-                reason = "constructors are not supported by [Ensures] yet";
-                return false;
-            }
-
-            if (methodSymbol.ReturnsVoid)
-            {
-                reason = "void-returning members are not supported by [Ensures]";
-                return false;
-            }
-
             if (methodNode is AccessorDeclarationSyntax accessor &&
                 (accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
                  accessor.IsKind(SyntaxKind.InitAccessorDeclaration) ||
@@ -354,7 +352,8 @@ namespace SharpProof.Analyzer
             return true;
         }
 
-        private static ImmutableArray<ReturnSite> CollectReturnSites(
+        private static ImmutableArray<CompletionSite> CollectCompletionSites(
+            IMethodSymbol methodSymbol,
             SyntaxNode methodNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
@@ -362,42 +361,57 @@ namespace SharpProof.Analyzer
             var rootOperation = MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, includeConversionOperators: true);
             if (rootOperation == null)
             {
-                return ImmutableArray<ReturnSite>.Empty;
+                return ImmutableArray<CompletionSite>.Empty;
             }
 
-            var builder = ImmutableArray.CreateBuilder<ReturnSite>();
+            var builder = ImmutableArray.CreateBuilder<CompletionSite>();
             foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
             {
-                if (operation is IReturnOperation { ReturnedValue: { } returnedValue })
+                if (operation is IReturnOperation returnOperation)
                 {
                     if (IsCompilerMarkedUnreachable(operation.Syntax, semanticModel, cancellationToken))
                     {
                         continue;
                     }
 
-                    if (returnedValue.Syntax is ExpressionSyntax returnedExpression)
+                    if (returnOperation.ReturnedValue?.Syntax is ExpressionSyntax returnedExpression)
                     {
-                        builder.Add(new ReturnSite(
+                        builder.Add(new CompletionSite(
                             returnedExpression,
                             returnedExpression.GetLocation(),
-                            operation.Syntax.GetLocation(),
+                            operation.Syntax,
+                            IncludeCurrentStatementCompletionFacts: false,
                             returnedExpression.ToString()));
+                        continue;
                     }
-                }
-            }
 
-            if (builder.Count != 0)
-            {
-                return builder.ToImmutable();
+                    builder.Add(new CompletionSite(
+                        null,
+                        operation.Syntax.GetLocation(),
+                        operation.Syntax,
+                        IncludeCurrentStatementCompletionFacts: false,
+                        "return"));
+                }
             }
 
             if (TryGetExpressionBody(methodNode, out var expressionBody))
             {
-                builder.Add(new ReturnSite(
+                builder.Add(new CompletionSite(
+                    HasResultValue(methodSymbol) ? expressionBody : null,
+                    expressionBody.GetLocation(),
                     expressionBody,
-                    expressionBody.GetLocation(),
-                    expressionBody.GetLocation(),
-                    expressionBody.ToString()));
+                    IncludeCurrentStatementCompletionFacts: false,
+                    HasResultValue(methodSymbol) ? expressionBody.ToString() : "normal completion"));
+            }
+            else if (TryGetBodyBlock(methodNode, out var bodyBlock) &&
+                     BodyEndPointIsReachable(bodyBlock, semanticModel))
+            {
+                builder.Add(new CompletionSite(
+                    null,
+                    GetBodyCompletionLocation(bodyBlock),
+                    bodyBlock,
+                    IncludeCurrentStatementCompletionFacts: true,
+                    "normal completion"));
             }
 
             return builder.ToImmutable();
@@ -410,6 +424,43 @@ namespace SharpProof.Analyzer
         {
             return semanticModel.GetDiagnostics(syntax.Span, cancellationToken)
                 .Any(diagnostic => diagnostic.Id == "CS0162");
+        }
+
+        private static bool HasResultValue(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.MethodKind != MethodKind.Constructor &&
+                methodSymbol.MethodKind != MethodKind.StaticConstructor &&
+                !methodSymbol.ReturnsVoid;
+        }
+
+        private static bool TryGetBodyBlock(SyntaxNode methodNode, out BlockSyntax block)
+        {
+            block = methodNode switch
+            {
+                MethodDeclarationSyntax { Body: { } body } => body,
+                ConstructorDeclarationSyntax { Body: { } body } => body,
+                DestructorDeclarationSyntax { Body: { } body } => body,
+                OperatorDeclarationSyntax { Body: { } body } => body,
+                ConversionOperatorDeclarationSyntax { Body: { } body } => body,
+                AccessorDeclarationSyntax { Body: { } body } => body,
+                LocalFunctionStatementSyntax { Body: { } body } => body,
+                _ => null!,
+            };
+
+            return block != null;
+        }
+
+        private static bool BodyEndPointIsReachable(BlockSyntax body, SemanticModel semanticModel)
+        {
+            var controlFlow = semanticModel.AnalyzeControlFlow(body);
+            return controlFlow == null ||
+                !controlFlow.Succeeded ||
+                controlFlow.EndPointIsReachable;
+        }
+
+        private static Location GetBodyCompletionLocation(BlockSyntax body)
+        {
+            return body.CloseBraceToken.GetLocation();
         }
 
         private static bool TryParseCondition(
@@ -447,9 +498,14 @@ namespace SharpProof.Analyzer
             return false;
         }
 
-        private static int GetSpeculativePosition(ReturnSite returnSite)
+        private static int GetSpeculativePosition(CompletionSite completionSite)
         {
-            return returnSite.Expression.SpanStart;
+            return completionSite.QueryNode.SpanStart;
+        }
+
+        private static bool CompletionSitesHaveResult(ImmutableArray<CompletionSite> completionSites)
+        {
+            return completionSites.All(static site => site.ResultExpression != null);
         }
 
         private static bool ReferencesUserLocalOrUnsupportedParameter(
@@ -491,18 +547,23 @@ namespace SharpProof.Analyzer
                 methodSymbol.OriginalDefinition);
         }
 
-        private static bool TryRewriteConditionForReturnSite(
+        private static bool TryRewriteConditionForCompletionSite(
             string conditionText,
-            ExpressionSyntax returnExpression,
+            CompletionSite completionSite,
             out string rewrittenCondition)
         {
             rewrittenCondition = conditionText;
+            if (completionSite.ResultExpression == null)
+            {
+                return true;
+            }
+
             if (!TryParseCondition(conditionText, out _, out var conditionExpression))
             {
                 return false;
             }
 
-            var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)returnExpression.WithoutTrivia());
+            var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
             var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
             rewrittenCondition = rewritten.ToFullString();
             return true;
@@ -511,7 +572,7 @@ namespace SharpProof.Analyzer
         private static Diagnostic CreateNotProvenDiagnostic(
             IMethodSymbol methodSymbol,
             string condition,
-            ReturnSite returnSite,
+            CompletionSite completionSite,
             Location? contractLocation,
             SymbolicConditionProofResult proof)
         {
@@ -526,16 +587,16 @@ namespace SharpProof.Analyzer
                 "not_proven:" +
                     condition +
                     "@" +
-                    returnSite.Expression.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                    completionSite.QueryNode.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                     ":" +
-                    returnSite.Expression.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                    completionSite.QueryNode.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                     "|" +
                     proof.Proof.Status.ToString() +
                     "|" +
                     proof.Reason);
             properties = ExplainDiagnosticProperties.Add(
                 properties,
-                returnSite.Location,
+                completionSite.Location,
                 condition,
                 proof.Proof.Status.ToString(),
                 FormatUnknownReason(proof),
@@ -543,10 +604,10 @@ namespace SharpProof.Analyzer
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresNotProvenRule,
-                returnSite.Location,
+                completionSite.Location,
                 contractLocation == null ? null : new[] { contractLocation },
                 properties,
-                returnSite.DisplayText,
+                completionSite.DisplayText,
                 methodSymbol.Name,
                 condition);
         }
@@ -685,10 +746,11 @@ namespace SharpProof.Analyzer
             string Argument,
             string? InvalidReason);
 
-        private readonly record struct ReturnSite(
-            ExpressionSyntax Expression,
+        private readonly record struct CompletionSite(
+            ExpressionSyntax? ResultExpression,
             Location Location,
-            Location QueryLocation,
+            SyntaxNode QueryNode,
+            bool IncludeCurrentStatementCompletionFacts,
             string DisplayText);
     }
 }

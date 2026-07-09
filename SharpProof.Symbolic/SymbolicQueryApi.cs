@@ -111,6 +111,43 @@ namespace SharpProof.Symbolic
             }
         }
 
+        internal SymbolicConditionProofResult ProveAtSyntaxNode(
+            SemanticModel semanticModel,
+            SyntaxNode node,
+            string conditionText,
+            SmtAnalysisService smtAnalysis,
+            bool includeCurrentStatementCompletionFacts,
+            CancellationToken cancellationToken = default)
+        {
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            if (string.IsNullOrWhiteSpace(conditionText))
+            {
+                throw new ArgumentException("Condition text is required.", nameof(conditionText));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            return _sourceQueryService.ProveConditionAtSyntaxNode(
+                semanticModel,
+                node,
+                conditionText,
+                smtAnalysis,
+                includeCurrentStatementCompletionFacts,
+                cancellationToken);
+        }
+
         public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
             SymbolicRuntimeHazardRequest request,
             CancellationToken cancellationToken = default)
