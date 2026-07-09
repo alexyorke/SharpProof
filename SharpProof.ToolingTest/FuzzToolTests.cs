@@ -18,7 +18,8 @@ namespace SharpProof.Test
             FuzzCaseGenerator.RegistryEntries.ToImmutableDictionary(entry => entry.Id, StringComparer.Ordinal);
 
         private static readonly ImmutableArray<FamilyExpectation> ExpandedCoverageExpectations = ImmutableArray.Create(
-            new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
+            new FamilyExpectation("ImpureAddressOf", "AddressOf"),
+            new FamilyExpectation("ImpureEventAssignment", "EventAssignment", "EventReference"),
             new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
             new FamilyExpectation("PureNameOf", "NameOf"),
             new FamilyExpectation("PureInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
@@ -88,7 +89,9 @@ namespace SharpProof.Test
             "ImpureDynamicIndexerAccess",
             "ImpureDynamicObjectCreation",
             "ImpureInterfaceGetter",
-            "ImpureFunctionPointer");
+            "ImpureFunctionPointer",
+            "ImpureEventAssignment",
+            "ImpureAddressOf");
 
         [Test]
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
@@ -279,7 +282,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ImpureWithExpression"));
             Assert.That(families, Does.Contain("PureImplicitIndexerReference"));
             Assert.That(families, Does.Contain("PureInterpolatedStringHandler"));
-            Assert.That(families, Does.Contain("ConservativeAddressOf"));
+            Assert.That(families, Does.Contain("ImpureAddressOf"));
             Assert.That(families, Does.Contain("PureInlineArrayAccess"));
             Assert.That(families, Does.Contain("PureDefaultValue"));
             Assert.That(families, Does.Contain("PureNameOf"));
@@ -295,6 +298,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("PureNestedLambdaLocalFunction"));
             Assert.That(families, Does.Contain("PureTuplePatternSwitch"));
             Assert.That(families, Does.Contain("ImpureUsingAwaitDelegateFlow"));
+            Assert.That(families, Does.Contain("ImpureEventAssignment"));
             Assert.That(missingShapes, Is.Empty);
         }
 

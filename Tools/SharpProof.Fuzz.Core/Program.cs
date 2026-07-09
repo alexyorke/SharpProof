@@ -1306,14 +1306,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildImpureTypeParameterObjectCreation),
         new ShapeRegistryEntry(
-            "ConservativeEventAssignment",
+            "ImpureEventAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.EventAssignment)),
             ImmutableArray.Create("EventAssignment", "EventReference"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyImpure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeEventAssignment),
+            BuildImpureEventAssignment),
         new ShapeRegistryEntry(
             "PureAnonymousObjectCreation",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousObjectCreation)),
@@ -1493,14 +1493,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildPureInterpolatedStringHandler),
         new ShapeRegistryEntry(
-            "ConservativeAddressOf",
+            "ImpureAddressOf",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AddressOf)),
             ImmutableArray.Create("AddressOf"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyImpure(),
             AllowUnsafe: true,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeAddressOf),
+            BuildImpureAddressOf),
         new ShapeRegistryEntry(
             "PureInlineArrayAccess",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.InlineArrayAccess)),
@@ -2316,7 +2316,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeEventAssignment(int index, Random random, string className)
+    private static string BuildImpureEventAssignment(int index, Random random, string className)
     {
         return $$"""
 using System;
@@ -2671,7 +2671,7 @@ public class {{className}}
 """;
     }
 
-    private static string BuildConservativeAddressOf(int index, Random random, string className)
+    private static string BuildImpureAddressOf(int index, Random random, string className)
     {
         return $$"""
 using SharpProof.Attributes;

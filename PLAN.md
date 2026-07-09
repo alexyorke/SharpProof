@@ -55,9 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Purity Rule Precision Targets
-- Convert manifest-backed fuzz families from "may emit conservatively" to
-  definitely pure or definitely impure where source facts justify it, especially
-  event assignment and unsafe address-of flows.
 - Add an explicit modern C# language-surface tracking matrix across analyzer,
   symbolic IR, runtime hazards, capability, allocation, complexity, and
   `[Ensures]` behavior for C# 12 through C# 14 features such as primary
