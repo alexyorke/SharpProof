@@ -21,6 +21,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.NUnit" Version="1.1.2" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.NUnit" Version="1.1.2" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.CodeDom" Version="10.0.9" PrivateAssets="all" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
@@ -30,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
   </ItemGroup>
@@ -42,9 +44,6 @@
     <Compile Remove="AnalyzerPackagingTests.cs" />
     <Compile Remove="ImpactedTestSelectionJsonSession.cs" />
     <Compile Remove="ImpactedTestSelectionScriptTests.cs" />
-    <Compile Remove="SharpProofCodeFixTests.cs" />
-    <Compile Remove="Verifiers\CSharpCodeFixVerifier`2.cs" />
-    <Compile Remove="Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
   </ItemGroup>
 
 </Project>
