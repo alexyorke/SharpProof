@@ -22,7 +22,10 @@ bounded proof question into normal build diagnostics.
   Supported postcondition predicates include nullable `HasValue`/`Value`,
   array `Length`, and exact `List<T>.Count` facts from parameterless list
   constructions and collection initializers when the symbolic state can prove
-  them.
+  them. Conditions can use `old(...)` to snapshot supported parameter
+  expressions and current-instance member reads at method entry; simple
+  self-referential `ref` parameter updates can be proven against those
+  snapshots when the symbolic state preserves the entry relation.
   Failures produce `SP0018`; unsupported conditions produce `SP0019`.
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
   in the annotated method-like body. Violations produce `SP0013`.

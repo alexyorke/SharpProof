@@ -54,10 +54,6 @@ grouped by their original feature area.
 
 ### High Priority Features
 
-#### Missing Contract Types
-- Expand `[Ensures]` beyond the current return-site model to support
-  `old(...)` value snapshots.
-
 #### Runtime Hazard Coverage
 - Track and burn down the remaining runtime-hazard `.formula-fallback`
   provenances until each one is either an IR exception-precondition fact or a

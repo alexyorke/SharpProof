@@ -168,6 +168,13 @@ namespace SharpProof.Symbolic.Ir
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax customInvocation &&
+                context.InvocationTermLowerer != null &&
+                context.InvocationTermLowerer(customInvocation, context, out term))
+            {
+                return true;
+            }
+
             if (expression is InvocationExpressionSyntax invocation &&
                 TryLowerKnownApiInvocationTerm(invocation, context, out term))
             {

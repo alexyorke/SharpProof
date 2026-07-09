@@ -87,13 +87,15 @@ namespace SharpProof.Symbolic
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            bool includeCurrentStatementCompletionFacts = false)
+            bool includeCurrentStatementCompletionFacts = false,
+            SymbolicState? initialState = null)
         {
             var state = CollectPriorAssignmentStateNative(
                 site,
                 semanticModel,
                 cancellationToken,
-                includeCurrentStatementCompletionFacts);
+                includeCurrentStatementCompletionFacts,
+                initialState);
             AddFormulaPathConditions(
                 ref state,
                 CollectPriorAssignmentFacts(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts),
@@ -106,9 +108,10 @@ namespace SharpProof.Symbolic
             SyntaxNode site,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            bool includeCurrentStatementCompletionFacts)
+            bool includeCurrentStatementCompletionFacts,
+            SymbolicState? initialState)
         {
-            var state = new SymbolicState();
+            var state = initialState ?? new SymbolicState();
             foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
             {
                 if (IsLoopBodyBlock(containingBlock.Block))

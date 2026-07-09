@@ -404,6 +404,85 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_OldParameterValue_Proven()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""result == old(value) + 1"")]
+    public int Increment(int value)
+    {
+        return value + 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_OldRefParameterMutation_Proven()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value == old(value) + 1"")]
+    public void Increment(ref int value)
+    {
+        value = value + 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_OldRefParameterMutationFailure_ReportsSp0018()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value == old(value) + 1"")]
+    public void Increment(ref int value)
+    {
+        value = value + 2;
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_OldCurrentInstanceMemberValue_Proven()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    private int _value;
+
+    [Ensures(""result == old(_value)"")]
+    public int Get()
+    {
+        return _value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_ExplicitThisMemberState_Proven()
         {
             var test = @"

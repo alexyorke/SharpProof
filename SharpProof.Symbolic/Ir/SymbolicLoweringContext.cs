@@ -1,22 +1,30 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic.Ir
 {
+    internal delegate bool SymbolicInvocationTermLowerer(
+        InvocationExpressionSyntax invocation,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term);
+
     internal sealed class SymbolicLoweringContext
     {
         public SymbolicLoweringContext(
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             Func<ISymbol, int>? getSymbolVersion = null,
-            SmtAnalysisService? smtAnalysis = null)
+            SmtAnalysisService? smtAnalysis = null,
+            SymbolicInvocationTermLowerer? invocationTermLowerer = null)
         {
             SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
             Compilation = semanticModel.Compilation;
             CancellationToken = cancellationToken;
             GetSymbolVersion = getSymbolVersion;
             SmtAnalysis = smtAnalysis;
+            InvocationTermLowerer = invocationTermLowerer;
         }
 
         public SemanticModel SemanticModel { get; }
@@ -28,6 +36,8 @@ namespace SharpProof.Symbolic.Ir
         public Func<ISymbol, int>? GetSymbolVersion { get; }
 
         public SmtAnalysisService? SmtAnalysis { get; }
+
+        public SymbolicInvocationTermLowerer? InvocationTermLowerer { get; }
 
         public string GetVariableName(ISymbol symbol)
         {

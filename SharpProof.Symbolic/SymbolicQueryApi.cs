@@ -5,6 +5,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic
@@ -143,6 +144,57 @@ namespace SharpProof.Symbolic
                 semanticModel,
                 node,
                 conditionText,
+                smtAnalysis,
+                includeCurrentStatementCompletionFacts,
+                cancellationToken);
+        }
+
+        internal SymbolicConditionProofResult ProveAtSyntaxNode(
+            SemanticModel semanticModel,
+            SyntaxNode node,
+            string conditionText,
+            SymbolicCondition symbolicCondition,
+            SymbolicState initialState,
+            SmtAnalysisService smtAnalysis,
+            bool includeCurrentStatementCompletionFacts,
+            CancellationToken cancellationToken = default)
+        {
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            if (string.IsNullOrWhiteSpace(conditionText))
+            {
+                throw new ArgumentException("Condition text is required.", nameof(conditionText));
+            }
+
+            if (symbolicCondition == null)
+            {
+                throw new ArgumentNullException(nameof(symbolicCondition));
+            }
+
+            if (initialState == null)
+            {
+                throw new ArgumentNullException(nameof(initialState));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            return _sourceQueryService.ProveConditionAtSyntaxNode(
+                semanticModel,
+                node,
+                conditionText,
+                symbolicCondition,
+                initialState,
                 smtAnalysis,
                 includeCurrentStatementCompletionFacts,
                 cancellationToken);

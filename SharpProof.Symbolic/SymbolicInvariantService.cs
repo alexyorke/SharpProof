@@ -33,7 +33,8 @@ namespace SharpProof.Symbolic
             SemanticModel semanticModel,
             SmtAnalysisService? smtAnalysis = null,
             CancellationToken cancellationToken = default,
-            bool includeCurrentStatementCompletionFacts = false)
+            bool includeCurrentStatementCompletionFacts = false,
+            SymbolicState? initialState = null)
         {
             IReadOnlyList<SmtFormula> formulas = CollectInvariantsAt(
                 site,
@@ -50,7 +51,8 @@ namespace SharpProof.Symbolic
                     site,
                     semanticModel,
                     cancellationToken,
-                    includeCurrentStatementCompletionFacts));
+                    includeCurrentStatementCompletionFacts,
+                    initialState));
             formulas = MergeEncodedStatePathConditions(formulas, pathState);
             return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis, site);
         }

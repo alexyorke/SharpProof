@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer
 {
@@ -166,7 +167,11 @@ namespace SharpProof.Analyzer
                         continue;
                     }
 
-                    if (!TryRewriteConditionForCompletionSite(contract.Condition, completionSite, out var rewrittenCondition))
+                    if (!TryRewriteConditionForCompletionSite(
+                            contract.Condition,
+                            completionSite,
+                            out var rewrittenCondition,
+                            out _))
                     {
                         var diagnostic = CreateUnsupportedDiagnostic(
                             methodSymbol,
@@ -183,13 +188,36 @@ namespace SharpProof.Analyzer
                     }
 
                     var proofCondition = RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                    var proof = queryService.ProveAtSyntaxNode(
-                        context.SemanticModel,
-                        completionSite.QueryNode,
-                        proofCondition,
-                        purityService.SmtAnalysis,
-                        completionSite.IncludeCurrentStatementCompletionFacts,
-                        context.CancellationToken);
+                    var proof = TryCreateOldAwareProofCondition(
+                            proofCondition,
+                            methodSymbol,
+                            context.SemanticModel,
+                            completionSite,
+                            context.CancellationToken,
+                            out var symbolicCondition,
+                            out var initialState,
+                            out var oldFailureReason)
+                        ? queryService.ProveAtSyntaxNode(
+                            context.SemanticModel,
+                            completionSite.QueryNode,
+                            proofCondition,
+                            symbolicCondition,
+                            initialState,
+                            purityService.SmtAnalysis,
+                            completionSite.IncludeCurrentStatementCompletionFacts,
+                            context.CancellationToken)
+                        : oldFailureReason == null
+                            ? queryService.ProveAtSyntaxNode(
+                                context.SemanticModel,
+                                completionSite.QueryNode,
+                                proofCondition,
+                                purityService.SmtAnalysis,
+                                completionSite.IncludeCurrentStatementCompletionFacts,
+                                context.CancellationToken)
+                            : new SymbolicConditionProofResult(
+                                proofCondition,
+                                SymbolicTruthValue.Unknown,
+                                oldFailureReason);
 
                     if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                         proof.TruthValue == SymbolicTruthValue.Unreachable)
@@ -551,23 +579,98 @@ namespace SharpProof.Analyzer
         private static bool TryRewriteConditionForCompletionSite(
             string conditionText,
             CompletionSite completionSite,
-            out string rewrittenCondition)
+            out string rewrittenCondition,
+            out ExpressionSyntax rewrittenExpression)
         {
             rewrittenCondition = conditionText;
-            if (completionSite.ResultExpression == null)
-            {
-                return true;
-            }
-
+            rewrittenExpression = null!;
             if (!TryParseCondition(conditionText, out _, out var conditionExpression))
             {
                 return false;
             }
 
+            if (completionSite.ResultExpression == null)
+            {
+                rewrittenExpression = conditionExpression;
+                return true;
+            }
+
             var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
             var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
             rewrittenCondition = rewritten.ToFullString();
+            rewrittenExpression = rewritten;
             return true;
+        }
+
+        private static bool TryCreateOldAwareProofCondition(
+            string proofCondition,
+            IMethodSymbol methodSymbol,
+            SemanticModel semanticModel,
+            CompletionSite completionSite,
+            CancellationToken cancellationToken,
+            out SymbolicCondition symbolicCondition,
+            out SymbolicState initialState,
+            out string? failureReason)
+        {
+            symbolicCondition = null!;
+            initialState = new SymbolicState();
+            failureReason = null;
+
+            if (!TryParseCondition(proofCondition, out var proofStatement, out var proofExpression))
+            {
+                failureReason = "condition parse failure";
+                return false;
+            }
+
+            if (!ContainsOldValueInvocation(proofExpression))
+            {
+                return false;
+            }
+
+            if (!TryCreateSpeculativeConditionModel(
+                    semanticModel,
+                    GetSpeculativePosition(completionSite),
+                    proofStatement,
+                    out var speculativeModel))
+            {
+                failureReason = "condition binding failure";
+                return false;
+            }
+
+            var snapshots = new OldValueSnapshotBuilder(speculativeModel, methodSymbol, cancellationToken);
+            var loweringContext = new SymbolicLoweringContext(
+                speculativeModel,
+                cancellationToken,
+                invocationTermLowerer: snapshots.TryLowerInvocationTerm);
+            if (!SymbolicIrLowerer.TryLowerCondition(proofExpression, loweringContext, out symbolicCondition))
+            {
+                failureReason = snapshots.FailureReason ??
+                    "old(...) expression is not supported by the current bounded proof engine";
+                return false;
+            }
+
+            if (!snapshots.HasSnapshots)
+            {
+                failureReason = "old(...) expression is not supported by the current bounded proof engine";
+                return false;
+            }
+
+            initialState = snapshots.CreateInitialState();
+            return true;
+        }
+
+        private static bool ContainsOldValueInvocation(ExpressionSyntax expression)
+        {
+            return expression
+                .DescendantNodesAndSelf()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(IsOldValueInvocation);
+        }
+
+        private static bool IsOldValueInvocation(InvocationExpressionSyntax invocation)
+        {
+            return invocation.Expression is IdentifierNameSyntax identifier &&
+                string.Equals(identifier.Identifier.ValueText, "old", StringComparison.Ordinal);
         }
 
         private static Diagnostic CreateNotProvenDiagnostic(
@@ -739,6 +842,100 @@ namespace SharpProof.Analyzer
                 }
 
                 return _replacement.WithTriviaFrom(node);
+            }
+        }
+
+        private sealed class OldValueSnapshotBuilder
+        {
+            private readonly SemanticModel _semanticModel;
+            private readonly IMethodSymbol _methodSymbol;
+            private readonly CancellationToken _cancellationToken;
+            private readonly Dictionary<string, SymbolicTerm> _snapshotTerms = new(StringComparer.Ordinal);
+            private readonly List<SymbolicFact> _snapshotFacts = new();
+            private int _nextSnapshotId;
+
+            public OldValueSnapshotBuilder(
+                SemanticModel semanticModel,
+                IMethodSymbol methodSymbol,
+                CancellationToken cancellationToken)
+            {
+                _semanticModel = semanticModel;
+                _methodSymbol = methodSymbol;
+                _cancellationToken = cancellationToken;
+            }
+
+            public string? FailureReason { get; private set; }
+
+            public bool HasSnapshots => _snapshotFacts.Count != 0;
+
+            public bool TryLowerInvocationTerm(
+                InvocationExpressionSyntax invocation,
+                SymbolicLoweringContext context,
+                out SymbolicTerm term)
+            {
+                term = null!;
+                if (!IsOldValueInvocation(invocation))
+                {
+                    return false;
+                }
+
+                if (invocation.ArgumentList.Arguments.Count != 1)
+                {
+                    FailureReason = "old(...) requires exactly one argument";
+                    return false;
+                }
+
+                var argument = invocation.ArgumentList.Arguments[0].Expression;
+                if (ContainsOldValueInvocation(argument))
+                {
+                    FailureReason = "nested old(...) expressions are not supported";
+                    return false;
+                }
+
+                if (RequiresContractHelpers.ContainsResultReference(argument))
+                {
+                    FailureReason = "result is not available inside old(...)";
+                    return false;
+                }
+
+                if (ReferencesUserLocalOrUnsupportedParameter(
+                        argument,
+                        _semanticModel,
+                        _methodSymbol,
+                        _cancellationToken))
+                {
+                    FailureReason = "local variables are not supported inside old(...)";
+                    return false;
+                }
+
+                var key = argument.WithoutTrivia().ToString();
+                if (_snapshotTerms.TryGetValue(key, out term))
+                {
+                    return true;
+                }
+
+                var entryContext = new SymbolicLoweringContext(_semanticModel, _cancellationToken);
+                if (!SymbolicIrLowerer.TryLowerTerm(argument, entryContext, out var entryTerm))
+                {
+                    FailureReason = "old(...) expression is not supported by the current bounded proof engine";
+                    return false;
+                }
+
+                term = new SymbolicVariableTerm(
+                    "__sp_old_" + _nextSnapshotId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    entryTerm.Kind);
+                _nextSnapshotId++;
+                _snapshotTerms.Add(key, term);
+                _snapshotFacts.Add(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, term, entryTerm),
+                    invocation,
+                    "ir.path.ensures-old-snapshot"));
+                return true;
+            }
+
+            public SymbolicState CreateInitialState()
+            {
+                return new SymbolicState(facts: _snapshotFacts);
             }
         }
 

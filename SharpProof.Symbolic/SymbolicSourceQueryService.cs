@@ -1200,6 +1200,62 @@ namespace SharpProof.Symbolic
                 cancellationToken);
         }
 
+        internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
+            SemanticModel semanticModel,
+            SyntaxNode node,
+            string conditionText,
+            SymbolicCondition symbolicCondition,
+            SymbolicState initialState,
+            SmtAnalysisService smtAnalysis,
+            bool includeCurrentStatementCompletionFacts,
+            CancellationToken cancellationToken = default)
+        {
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            if (string.IsNullOrWhiteSpace(conditionText))
+            {
+                throw new ArgumentException("Condition text is required.", nameof(conditionText));
+            }
+
+            if (symbolicCondition == null)
+            {
+                throw new ArgumentNullException(nameof(symbolicCondition));
+            }
+
+            if (initialState == null)
+            {
+                throw new ArgumentNullException(nameof(initialState));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            var query = AnalyzeProgramPointNode(
+                semanticModel,
+                node.SpanStart,
+                node,
+                smtAnalysis: null,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts,
+                initialState);
+            return ProveCondition(
+                query.Node,
+                query.Analysis,
+                conditionText,
+                symbolicCondition,
+                smtAnalysis);
+        }
+
         private ProgramPointQueryContext AnalyzeProgramPoint(
             SyntaxTree syntaxTree,
             Compilation compilation,
@@ -1240,7 +1296,8 @@ namespace SharpProof.Symbolic
             SyntaxNode node,
             SmtAnalysisService? smtAnalysis,
             CancellationToken cancellationToken,
-            bool includeCurrentStatementCompletionFacts = false)
+            bool includeCurrentStatementCompletionFacts = false,
+            SymbolicState? initialState = null)
         {
             var analysis = node is ForStatementSyntax forStatement
                 ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
@@ -1249,7 +1306,8 @@ namespace SharpProof.Symbolic
                     semanticModel,
                     smtAnalysis,
                     cancellationToken,
-                    includeCurrentStatementCompletionFacts);
+                    includeCurrentStatementCompletionFacts,
+                    initialState);
 
             return new ProgramPointQueryContext(semanticModel, position, node, analysis);
         }
@@ -1480,6 +1538,98 @@ namespace SharpProof.Symbolic
 
             proofResult = null!;
             return false;
+        }
+
+        private static SymbolicConditionProofResult ProveCondition(
+            SyntaxNode sourceNode,
+            SymbolicProgramPointAnalysis analysis,
+            string conditionText,
+            SymbolicCondition symbolicCondition,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (analysis.Reachability == SymbolicReachability.Unreachable)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unreachable,
+                    analysis.ReachabilityReason);
+            }
+
+            if (!SymbolicProofService.TryEncodeConditionWithPathState(
+                    symbolicCondition,
+                    analysis.PathState,
+                    sourceNode,
+                    out var conditionFormula))
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    "condition_not_supported");
+            }
+
+            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
+                analysis.PathConditions,
+                conditionFormula,
+                sourceNode,
+                smtAnalysis,
+                "source.query.condition",
+                "source-query-condition");
+            if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unreachable,
+                    formulaTruth.Info.Reason,
+                    conditionFormula);
+            }
+
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenTrue,
+                    formulaTruth.Info.Reason,
+                    conditionFormula);
+            }
+
+            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenFalse,
+                    formulaTruth.Info.Reason,
+                    conditionFormula);
+            }
+
+            if (analysis.Reachability == SymbolicReachability.NotChecked)
+            {
+                var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
+                    analysis.PathState,
+                    analysis.PathConditions,
+                    smtAnalysis);
+                if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
+                {
+                    return new SymbolicConditionProofResult(
+                        conditionText,
+                        SymbolicTruthValue.Unreachable,
+                        reachabilityProof.Info.Reason,
+                        conditionFormula);
+                }
+            }
+
+            return TryProveConditionWithIrState(
+                analysis.PathState,
+                symbolicCondition,
+                conditionText,
+                conditionFormula,
+                smtAnalysis,
+                out var irProofResult)
+                ? irProofResult
+                : new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    formulaTruth.Info.Reason,
+                    conditionFormula);
         }
 
         private static SymbolicConditionProofResult CreateConditionProofResult(
