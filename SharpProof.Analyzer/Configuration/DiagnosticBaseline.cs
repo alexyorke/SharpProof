@@ -75,7 +75,7 @@ namespace SharpProof.Analyzer.Configuration
             return false;
         }
 
-        private static ImmutableArray<string> GetSymbolIds(ISymbol symbol)
+        internal static ImmutableArray<string> GetSymbolIds(ISymbol symbol)
         {
             var builder = ImmutableArray.CreateBuilder<string>();
             var documentationId = DocumentationCommentId.CreateDeclarationId(symbol.OriginalDefinition);
@@ -88,12 +88,44 @@ namespace SharpProof.Analyzer.Configuration
 
             if (symbol is IMethodSymbol methodSymbol && methodSymbol.ContainingType != null)
             {
-                var containingType = methodSymbol.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-                var methodName = methodSymbol.MetadataName == ".ctor" ? "#ctor" : methodSymbol.MetadataName;
-                builder.Add("M:" + containingType + "." + methodName);
+                builder.Add(GetCompactMethodId(methodSymbol));
             }
 
             return builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
+        }
+
+        internal static string GetPreferredSymbolId(ISymbol symbol)
+        {
+            if (symbol is IMethodSymbol methodSymbol && methodSymbol.ContainingType != null)
+            {
+                return GetCompactMethodId(methodSymbol);
+            }
+
+            var documentationId = DocumentationCommentId.CreateDeclarationId(symbol.OriginalDefinition);
+            if (!string.IsNullOrWhiteSpace(documentationId))
+            {
+                return documentationId!;
+            }
+
+            return symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        }
+
+        internal static string NormalizePath(string path)
+        {
+            var normalized = path.Replace('\\', '/').Trim();
+            while (normalized.StartsWith("./", StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(2);
+            }
+
+            return normalized;
+        }
+
+        private static string GetCompactMethodId(IMethodSymbol methodSymbol)
+        {
+            var containingType = methodSymbol.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            var methodName = methodSymbol.MetadataName == ".ctor" ? "#ctor" : methodSymbol.MetadataName;
+            return "M:" + containingType + "." + methodName;
         }
 
         private static ImmutableArray<BaselineEntry> ParseEntries(string json, string baselinePath)
@@ -198,17 +230,6 @@ namespace SharpProof.Analyzer.Configuration
 
             var directory = System.IO.Path.GetDirectoryName(baselinePath);
             return string.IsNullOrWhiteSpace(directory) ? string.Empty : NormalizePath(directory!);
-        }
-
-        private static string NormalizePath(string path)
-        {
-            var normalized = path.Replace('\\', '/').Trim();
-            while (normalized.StartsWith("./", StringComparison.Ordinal))
-            {
-                normalized = normalized.Substring(2);
-            }
-
-            return normalized;
         }
 
         private readonly struct BaselineEntry

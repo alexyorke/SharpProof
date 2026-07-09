@@ -54,6 +54,10 @@ least one code-plus-output example for every public analyzer diagnostic from
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.
 
+Known diagnostics can be managed with
+[SharpProof diagnostic baselines](baselines.md), including generation from SARIF
+or current project diagnostics, match explanations, and stale-entry pruning.
+
 ## Configuration
 
 SharpProof uses `sharpproof_*` analyzer configuration keys. SMT-related keys

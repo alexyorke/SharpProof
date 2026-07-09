@@ -5,6 +5,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer
@@ -46,7 +47,9 @@ namespace SharpProof.Analyzer
                         "[ExpectedComplexity]",
                         invalidContract.Argument,
                         invalidContract.Reason,
-                        attributeLocation ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken)));
+                        attributeLocation ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
+                        methodSymbol,
+                        context.Node.SyntaxTree));
                 }
 
                 return;
@@ -70,7 +73,8 @@ namespace SharpProof.Analyzer
                         declaredComplexity,
                         attributeLocation,
                         "complexity query failed: " + ex.Message,
-                        context.CancellationToken));
+                        context.CancellationToken,
+                        context.Node.SyntaxTree));
                 }
 
                 return;
@@ -90,7 +94,8 @@ namespace SharpProof.Analyzer
                             declaredComplexity,
                             result,
                             attributeLocation,
-                            context.CancellationToken));
+                            context.CancellationToken,
+                            context.Node.SyntaxTree));
                     }
 
                     return;
@@ -103,7 +108,8 @@ namespace SharpProof.Analyzer
                             declaredComplexity,
                             attributeLocation,
                             classification.Reason,
-                            context.CancellationToken));
+                            context.CancellationToken,
+                            context.Node.SyntaxTree));
                     }
 
                     return;
@@ -259,11 +265,15 @@ namespace SharpProof.Analyzer
             DeclaredComplexity declaredComplexity,
             SymbolicComplexityResult result,
             Location? attributeLocation,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            SyntaxTree syntaxTree)
         {
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
-                .Add(SharpProofDiagnostics.ActualComplexityProperty, result.Complexity.Text);
+            var properties = BaselineDiagnosticProperties.Add(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
+                    .Add(SharpProofDiagnostics.ActualComplexityProperty, result.Complexity.Text),
+                methodSymbol,
+                syntaxTree);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityExceededRule,
@@ -280,11 +290,15 @@ namespace SharpProof.Analyzer
             DeclaredComplexity declaredComplexity,
             Location? attributeLocation,
             string reason,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            SyntaxTree syntaxTree)
         {
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
-                .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason);
+            var properties = BaselineDiagnosticProperties.Add(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
+                    .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason),
+                methodSymbol,
+                syntaxTree);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,

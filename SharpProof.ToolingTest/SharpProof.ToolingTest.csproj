@@ -26,6 +26,7 @@
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
+    <ProjectReference Include="..\Tools\SharpProof.Baseline.Core\SharpProof.Baseline.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.CorpusReport.Core\SharpProof.CorpusReport.Core.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
   </ItemGroup>

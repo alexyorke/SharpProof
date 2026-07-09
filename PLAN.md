@@ -55,9 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add a first-class baseline workflow: generate `SharpProof.Baseline.json` from
-  current diagnostics or SARIF, explain why an entry matched, and prune entries
-  that no longer suppress anything.
 - Make baseline suppression instance-granular and uniformly available across
   every public diagnostic, including exception summaries, exception sites,
   BCL-fallback explanation diagnostics, and usage diagnostics. Baseline entries

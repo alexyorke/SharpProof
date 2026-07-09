@@ -6,6 +6,8 @@ namespace SharpProof.Analyzer
 
     public static class SharpProofDiagnostics
     {
+        public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
+        public const string BaselinePathProperty = "sharpproof.baseline.path";
 
         public const string PurityNotVerifiedId = "SP0002";
         public const string ImpurityCategoryProperty = "sharpproof.impurity.category";

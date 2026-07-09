@@ -1,0 +1,35 @@
+# SharpProof Diagnostic Baselines
+
+SharpProof can suppress known analyzer diagnostics through an additional file
+named `SharpProof.Baseline.json`. The baseline workflow tool creates and
+maintains that file from current diagnostics.
+
+Generate a baseline from a SARIF log:
+
+```powershell
+dotnet run --project Tools/SharpProof.Baseline -- generate --output SharpProof.Baseline.json artifacts/sharpproof.sarif
+```
+
+Generate a baseline directly from a project or solution by letting the tool run
+`dotnet build` with a temporary SARIF error log:
+
+```powershell
+dotnet run --project Tools/SharpProof.Baseline -- generate --output SharpProof.Baseline.json SharpProof.sln
+```
+
+Explain which baseline entries still match current diagnostics:
+
+```powershell
+dotnet run --project Tools/SharpProof.Baseline -- explain --baseline SharpProof.Baseline.json artifacts/current.sarif
+```
+
+Prune entries that no longer match current diagnostics:
+
+```powershell
+dotnet run --project Tools/SharpProof.Baseline -- prune --baseline SharpProof.Baseline.json --output SharpProof.Baseline.json artifacts/current.sarif
+```
+
+Each generated entry includes the diagnostic id, the stable owner symbol, and
+the normalized source path. Extra message and location fields are emitted for
+review context, and the analyzer ignores those fields when applying
+suppression.

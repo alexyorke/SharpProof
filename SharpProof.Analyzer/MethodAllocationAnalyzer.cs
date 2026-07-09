@@ -58,7 +58,7 @@ namespace SharpProof.Analyzer
             foreach (var allocationSite in CollectAllocationSites(rootOperation))
             {
                 var location = allocationSite.Syntax.GetLocation();
-                var properties = CreateAllocationProperties(allocationSite);
+                var properties = CreateAllocationProperties(allocationSite, methodSymbol, context.Node.SyntaxTree);
                 var diagnostic = Diagnostic.Create(
                     SharpProofDiagnostics.AllocationInZeroAllocationMethodRule,
                     location,
@@ -73,7 +73,10 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private static ImmutableDictionary<string, string?> CreateAllocationProperties(AllocationSite allocationSite)
+        private static ImmutableDictionary<string, string?> CreateAllocationProperties(
+            AllocationSite allocationSite,
+            IMethodSymbol methodSymbol,
+            SyntaxTree syntaxTree)
         {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.AllocationKindProperty, allocationSite.AllocationKind)
@@ -86,7 +89,7 @@ namespace SharpProof.Analyzer
                     allocationSite.Symbol.ToDisplayString(AllocationSymbolDisplayFormat));
             }
 
-            return properties;
+            return BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
         }
 
         private static IEnumerable<AllocationSite> CollectAllocationSites(IOperation rootOperation)

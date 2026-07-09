@@ -166,7 +166,10 @@ namespace SharpProof.Analyzer
                         return;
                     }
 
-                    var properties = purityResult.Evidence.ToDiagnosticProperties();
+                    var properties = BaselineDiagnosticProperties.Add(
+                        purityResult.Evidence.ToDiagnosticProperties(),
+                        methodSymbol,
+                        context.Node.SyntaxTree);
                     var diagnostic = Diagnostic.Create(
                         SharpProofDiagnostics.PurityNotVerifiedRule,
                         diagnosticLocation,
@@ -247,10 +250,16 @@ namespace SharpProof.Analyzer
                             return;
                         }
 
+                        var properties = BaselineDiagnosticProperties.Add(
+                            ImmutableDictionary<string, string?>.Empty,
+                            methodSymbol,
+                            context.Node.SyntaxTree);
                         var diagnostic = Diagnostic.Create(
                             SharpProofDiagnostics.MissingEnforcePureAttributeRule,
                             diagnosticLocation,
-                            methodSymbol.Name
+                            additionalLocations: null,
+                            properties: properties,
+                            messageArgs: new object[] { methodSymbol.Name }
                         );
                         context.ReportDiagnostic(diagnostic);
                         PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic SP0004 for {methodSymbol.Name} at {diagnosticLocation}.");

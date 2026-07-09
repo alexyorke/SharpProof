@@ -39,7 +39,9 @@ namespace SharpProof.Analyzer
                         "[AllowedCapabilities]",
                         invalidContract.Argument,
                         invalidContract.Reason,
-                        invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                        invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                        methodSymbol,
+                        context.Node.SyntaxTree));
                 }
 
                 return;
@@ -61,7 +63,7 @@ namespace SharpProof.Analyzer
                         continue;
                     }
 
-                    context.ReportDiagnostic(CreateUnknownDiagnostic(methodSymbol, site));
+                    context.ReportDiagnostic(CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree));
                     continue;
                 }
 
@@ -72,15 +74,18 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                context.ReportDiagnostic(CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities));
+                context.ReportDiagnostic(CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree));
             }
 
             if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0 &&
                 !baseline.IsSuppressed(SharpProofDiagnostics.CapabilityUnknownId, methodSymbol, context.Node.SyntaxTree))
             {
                 var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-                var properties = ImmutableDictionary<string, string?>.Empty
-                    .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString());
+                var properties = BaselineDiagnosticProperties.Add(
+                    ImmutableDictionary<string, string?>.Empty
+                        .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString()),
+                    methodSymbol,
+                    context.Node.SyntaxTree);
                 context.ReportDiagnostic(Diagnostic.Create(
                     SharpProofDiagnostics.CapabilityUnknownRule,
                     location,
@@ -132,7 +137,8 @@ namespace SharpProof.Analyzer
         private static Diagnostic CreateViolationDiagnostic(
             IMethodSymbol methodSymbol,
             SymbolicCapabilitySite site,
-            CapabilityFlags disallowedCapabilities)
+            CapabilityFlags disallowedCapabilities,
+            SyntaxTree syntaxTree)
         {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.CapabilityProperty, FormatCapabilities(disallowedCapabilities))
@@ -142,6 +148,8 @@ namespace SharpProof.Analyzer
             {
                 properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
             }
+
+            properties = BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityViolationRule,
@@ -160,7 +168,8 @@ namespace SharpProof.Analyzer
 
         private static Diagnostic CreateUnknownDiagnostic(
             IMethodSymbol methodSymbol,
-            SymbolicCapabilitySite site)
+            SymbolicCapabilitySite site,
+            SyntaxTree syntaxTree)
         {
             var properties = ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString())
@@ -170,6 +179,8 @@ namespace SharpProof.Analyzer
             {
                 properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
             }
+
+            properties = BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityUnknownRule,

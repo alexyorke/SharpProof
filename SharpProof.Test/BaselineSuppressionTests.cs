@@ -178,6 +178,41 @@ public class TestClass
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
+        [Test]
+        public async Task BaselineMetadata_IsEmittedForGeneratedBaselineEntries()
+        {
+            var impureDiagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void Impure()
+    {
+        Console.WriteLine(""impure"");
+    }
+}", "{}");
+            var impure = AnalyzerTestHost.SingleDiagnostic(
+                impureDiagnostics,
+                SharpProofDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(impure.Properties[SharpProofDiagnostics.BaselineSymbolProperty], Is.EqualTo("M:TestClass.Impure"));
+            Assert.That(impure.Properties[SharpProofDiagnostics.BaselinePathProperty], Is.EqualTo("src/ProductionCode.cs"));
+
+            var missingAttributeDiagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int Pure() => 1;
+}", "{}");
+            var missingAttribute = AnalyzerTestHost.SingleDiagnostic(
+                missingAttributeDiagnostics,
+                SharpProofDiagnostics.MissingEnforcePureAttributeId);
+
+            Assert.That(missingAttribute.Properties[SharpProofDiagnostics.BaselineSymbolProperty], Is.EqualTo("M:TestClass.Pure"));
+            Assert.That(missingAttribute.Properties[SharpProofDiagnostics.BaselinePathProperty], Is.EqualTo("src/ProductionCode.cs"));
+        }
+
         private static string Baseline(string id, string symbol, string path)
         {
             return @"{

@@ -269,7 +269,9 @@ namespace SharpProof.Analyzer
                         "[Ensures]",
                         contract.Argument,
                         contract.InvalidReason,
-                        contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                        contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                        methodSymbol,
+                        context.Node.SyntaxTree));
                 }
             }
 
@@ -476,10 +478,12 @@ namespace SharpProof.Analyzer
             Location? contractLocation,
             SymbolicConditionProofResult proof)
         {
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proof.Proof.Status.ToString())
-                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, proof.Reason);
+            var properties = AddBaselineProperties(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
+                    .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proof.Proof.Status.ToString())
+                    .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, proof.Reason),
+                methodSymbol);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresNotProvenRule,
@@ -498,11 +502,13 @@ namespace SharpProof.Analyzer
             string reason,
             IEnumerable<Location>? additionalLocations)
         {
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
-                .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
-                .Add(SharpProofDiagnostics.EnsuresUnknownReasonProperty, reason)
-                .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, reason);
+            var properties = AddBaselineProperties(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
+                    .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
+                    .Add(SharpProofDiagnostics.EnsuresUnknownReasonProperty, reason)
+                    .Add(SharpProofDiagnostics.EnsuresFailureReasonProperty, reason),
+                methodSymbol);
 
             return Diagnostic.Create(
                 SharpProofDiagnostics.EnsuresUnsupportedRule,
@@ -512,6 +518,16 @@ namespace SharpProof.Analyzer
                 condition,
                 methodSymbol.Name,
                 reason);
+        }
+
+        private static ImmutableDictionary<string, string?> AddBaselineProperties(
+            ImmutableDictionary<string, string?> properties,
+            IMethodSymbol methodSymbol)
+        {
+            var syntaxTree = methodSymbol.Locations.FirstOrDefault(location => location.SourceTree != null)?.SourceTree;
+            return syntaxTree == null
+                ? properties
+                : BaselineDiagnosticProperties.Add(properties, methodSymbol, syntaxTree);
         }
 
         private static string FormatUnknownReason(SymbolicConditionProofResult proof)

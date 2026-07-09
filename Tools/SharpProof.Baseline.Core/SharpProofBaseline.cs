@@ -1,0 +1,470 @@
+using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace SharpProof.Tools.Baseline;
+
+public sealed record BaselineDocument(
+    [property: JsonPropertyName("diagnostics")] ImmutableArray<BaselineEntry> Diagnostics)
+{
+    [JsonPropertyName("version")]
+    public int Version { get; init; } = 1;
+}
+
+public sealed record BaselineEntry(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("symbol")] string Symbol,
+    [property: JsonPropertyName("path")] string Path,
+    [property: JsonPropertyName("message")] string? Message = null,
+    [property: JsonPropertyName("line")] int? Line = null,
+    [property: JsonPropertyName("column")] int? Column = null);
+
+public sealed record BaselineExplanation(
+    BaselineEntry Entry,
+    bool Matched,
+    string Reason);
+
+public sealed record BaselinePruneResult(
+    BaselineDocument Baseline,
+    int Kept,
+    int Pruned,
+    ImmutableArray<BaselineExplanation> Explanations);
+
+public static class SharpProofBaseline
+{
+    public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
+    public const string BaselinePathProperty = "sharpproof.baseline.path";
+
+    private static readonly JsonDocumentOptions JsonOptions = new()
+    {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip
+    };
+
+    private static readonly JsonSerializerOptions OutputJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = true
+    };
+
+    public static BaselineDocument GenerateFromSarifJson(string sarifJson)
+    {
+        ArgumentNullException.ThrowIfNull(sarifJson);
+
+        var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
+        using var document = JsonDocument.Parse(sarifJson, JsonOptions);
+        if (!document.RootElement.TryGetProperty("runs", out var runs) ||
+            runs.ValueKind != JsonValueKind.Array)
+        {
+            return new BaselineDocument(ImmutableArray<BaselineEntry>.Empty);
+        }
+
+        foreach (var run in runs.EnumerateArray())
+        {
+            if (!run.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var result in results.EnumerateArray())
+            {
+                var entry = TryCreateEntry(result);
+                if (entry != null)
+                {
+                    entries.Add(entry);
+                }
+            }
+        }
+
+        return new BaselineDocument(Deduplicate(entries));
+    }
+
+    public static BaselineDocument ParseBaselineJson(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+
+        var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
+        using var document = JsonDocument.Parse(json, JsonOptions);
+        AddBaselineEntries(document.RootElement, entries);
+        return new BaselineDocument(Deduplicate(entries));
+    }
+
+    public static BaselineDocument Merge(IEnumerable<BaselineDocument> documents)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+
+        return new BaselineDocument(Deduplicate(documents.SelectMany(document => document.Diagnostics)));
+    }
+
+    public static ImmutableArray<BaselineExplanation> Explain(
+        BaselineDocument baseline,
+        BaselineDocument current)
+    {
+        var currentKeys = current.Diagnostics
+            .Select(BaselineKey.FromEntry)
+            .ToImmutableHashSet();
+        var currentIds = current.Diagnostics
+            .Select(entry => entry.Id)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var currentSymbolsById = current.Diagnostics
+            .GroupBy(entry => entry.Id, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(entry => entry.Symbol).ToImmutableHashSet(StringComparer.Ordinal),
+                StringComparer.Ordinal);
+        var currentPathsByIdAndSymbol = current.Diagnostics
+            .GroupBy(entry => entry.Id + "\0" + entry.Symbol, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(entry => NormalizePath(entry.Path)).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+                StringComparer.Ordinal);
+
+        var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
+        foreach (var entry in baseline.Diagnostics)
+        {
+            var key = BaselineKey.FromEntry(entry);
+            if (currentKeys.Contains(key))
+            {
+                explanations.Add(new BaselineExplanation(entry, true, "matched id, symbol, and path"));
+                continue;
+            }
+
+            if (!currentIds.Contains(entry.Id))
+            {
+                explanations.Add(new BaselineExplanation(entry, false, "no current diagnostic with id '" + entry.Id + "'"));
+                continue;
+            }
+
+            if (!currentSymbolsById.TryGetValue(entry.Id, out var symbols) ||
+                !symbols.Contains(entry.Symbol))
+            {
+                explanations.Add(new BaselineExplanation(entry, false, "diagnostic id matched but symbol did not"));
+                continue;
+            }
+
+            var idAndSymbol = entry.Id + "\0" + entry.Symbol;
+            if (currentPathsByIdAndSymbol.TryGetValue(idAndSymbol, out var paths) &&
+                !paths.Contains(NormalizePath(entry.Path)))
+            {
+                explanations.Add(new BaselineExplanation(entry, false, "diagnostic id and symbol matched but path did not"));
+                continue;
+            }
+
+            explanations.Add(new BaselineExplanation(entry, false, "no matching current diagnostic"));
+        }
+
+        return explanations.ToImmutable();
+    }
+
+    public static BaselinePruneResult Prune(
+        BaselineDocument baseline,
+        BaselineDocument current)
+    {
+        var explanations = Explain(baseline, current);
+        var kept = explanations
+            .Where(explanation => explanation.Matched)
+            .Select(explanation => explanation.Entry)
+            .ToImmutableArray();
+
+        return new BaselinePruneResult(
+            new BaselineDocument(kept),
+            kept.Length,
+            baseline.Diagnostics.Length - kept.Length,
+            explanations);
+    }
+
+    public static string ToJson(BaselineDocument baseline)
+    {
+        return JsonSerializer.Serialize(baseline, OutputJsonOptions) + Environment.NewLine;
+    }
+
+    public static string NormalizePath(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        var trimmed = path.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            trimmed = uri.IsFile ? uri.LocalPath : uri.ToString();
+        }
+        else if (trimmed.Contains('%', StringComparison.Ordinal))
+        {
+            trimmed = Uri.UnescapeDataString(trimmed);
+        }
+
+        var normalized = trimmed.Replace('\\', '/');
+        while (normalized.StartsWith("./", StringComparison.Ordinal))
+        {
+            normalized = normalized.Substring(2);
+        }
+
+        return normalized;
+    }
+
+    private static BaselineEntry? TryCreateEntry(JsonElement result)
+    {
+        var id = GetStringProperty(result, "ruleId") ?? GetNestedRuleId(result);
+        if (id == null || !id.StartsWith("SP", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (!result.TryGetProperty("properties", out var properties) ||
+            properties.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var symbol = GetEvidenceProperty(properties, BaselineSymbolProperty);
+        if (string.IsNullOrWhiteSpace(symbol))
+        {
+            return null;
+        }
+
+        var path = GetEvidenceProperty(properties, BaselinePathProperty) ?? GetResultPath(result);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        var (line, column) = GetResultLocation(result);
+        return new BaselineEntry(
+            id,
+            symbol!,
+            NormalizePath(path!),
+            GetMessageText(result),
+            line,
+            column);
+    }
+
+    private static void AddBaselineEntries(
+        JsonElement element,
+        ImmutableArray<BaselineEntry>.Builder entries)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                AddBaselineEntries(item, entries);
+            }
+
+            return;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        TryAddBaselineEntry(element, entries);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Array ||
+                property.Value.ValueKind == JsonValueKind.Object)
+            {
+                AddBaselineEntries(property.Value, entries);
+            }
+        }
+    }
+
+    private static void TryAddBaselineEntry(
+        JsonElement element,
+        ImmutableArray<BaselineEntry>.Builder entries)
+    {
+        string? id = null;
+        string? symbol = null;
+        string? path = null;
+        string? message = null;
+        int? line = null;
+        int? column = null;
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.String)
+            {
+                var value = property.Value.GetString()?.Trim();
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
+                {
+                    id = value;
+                }
+                else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
+                {
+                    symbol = value;
+                }
+                else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
+                {
+                    path = value;
+                }
+                else if (string.Equals(property.Name, "message", StringComparison.OrdinalIgnoreCase))
+                {
+                    message = value;
+                }
+            }
+            else if (property.Value.ValueKind == JsonValueKind.Number)
+            {
+                if (string.Equals(property.Name, "line", StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.TryGetInt32(out var parsedLine))
+                {
+                    line = parsedLine;
+                }
+                else if (string.Equals(property.Name, "column", StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.TryGetInt32(out var parsedColumn))
+                {
+                    column = parsedColumn;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(id) &&
+            !string.IsNullOrWhiteSpace(symbol) &&
+            !string.IsNullOrWhiteSpace(path))
+        {
+            entries.Add(new BaselineEntry(
+                id!,
+                symbol!,
+                NormalizePath(path!),
+                message,
+                line,
+                column));
+        }
+    }
+
+    private static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries)
+    {
+        var seen = new HashSet<BaselineKey>();
+        var result = ImmutableArray.CreateBuilder<BaselineEntry>();
+        foreach (var entry in entries.OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Id, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Symbol, StringComparer.Ordinal))
+        {
+            if (seen.Add(BaselineKey.FromEntry(entry)))
+            {
+                result.Add(entry with { Path = NormalizePath(entry.Path) });
+            }
+        }
+
+        return result.ToImmutable();
+    }
+
+    private static string? GetNestedRuleId(JsonElement result)
+    {
+        return result.TryGetProperty("rule", out var rule) &&
+               rule.ValueKind == JsonValueKind.Object
+            ? GetStringProperty(rule, "id")
+            : null;
+    }
+
+    private static string? GetEvidenceProperty(JsonElement properties, string propertyName)
+    {
+        var value = GetStringProperty(properties, propertyName);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value.Trim();
+        }
+
+        if (properties.TryGetProperty("customProperties", out var customProperties) &&
+            customProperties.ValueKind == JsonValueKind.Object)
+        {
+            value = GetStringProperty(customProperties, propertyName);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetStringProperty(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static string? GetMessageText(JsonElement result)
+    {
+        return result.TryGetProperty("message", out var message) &&
+               message.ValueKind == JsonValueKind.Object
+            ? GetStringProperty(message, "text")
+            : null;
+    }
+
+    private static string? GetResultPath(JsonElement result)
+    {
+        if (!TryGetFirstPhysicalLocation(result, out var physicalLocation))
+        {
+            return null;
+        }
+
+        if (!physicalLocation.TryGetProperty("artifactLocation", out var artifactLocation) ||
+            artifactLocation.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return GetStringProperty(artifactLocation, "uri");
+    }
+
+    private static (int? Line, int? Column) GetResultLocation(JsonElement result)
+    {
+        if (!TryGetFirstPhysicalLocation(result, out var physicalLocation) ||
+            !physicalLocation.TryGetProperty("region", out var region) ||
+            region.ValueKind != JsonValueKind.Object)
+        {
+            return (null, null);
+        }
+
+        int? line = region.TryGetProperty("startLine", out var startLine) &&
+                    startLine.ValueKind == JsonValueKind.Number &&
+                    startLine.TryGetInt32(out var parsedLine)
+            ? parsedLine
+            : null;
+        int? column = region.TryGetProperty("startColumn", out var startColumn) &&
+                      startColumn.ValueKind == JsonValueKind.Number &&
+                      startColumn.TryGetInt32(out var parsedColumn)
+            ? parsedColumn
+            : null;
+
+        return (line, column);
+    }
+
+    private static bool TryGetFirstPhysicalLocation(
+        JsonElement result,
+        out JsonElement physicalLocation)
+    {
+        physicalLocation = default;
+        if (!result.TryGetProperty("locations", out var locations) ||
+            locations.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var location in locations.EnumerateArray())
+        {
+            if (location.ValueKind == JsonValueKind.Object &&
+                location.TryGetProperty("physicalLocation", out physicalLocation) &&
+                physicalLocation.ValueKind == JsonValueKind.Object)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private readonly record struct BaselineKey(string Id, string Symbol, string Path)
+    {
+        public static BaselineKey FromEntry(BaselineEntry entry)
+        {
+            return new BaselineKey(entry.Id, entry.Symbol, NormalizePath(entry.Path).ToUpperInvariant());
+        }
+    }
+}
