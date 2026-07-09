@@ -57,6 +57,39 @@ public class TestClass
         }
 
         [Test]
+        public async Task GlobalOnlyPerTreeConfigurationValue_ReportsScopeDiagnostic()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+@"public class TestClass
+{
+}",
+                ImmutableDictionary<string, string>.Empty,
+                treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "deep"));
+
+            var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty], Is.EqualTo("sharpproof_smt_mode"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationValueProperty], Is.EqualTo("deep"));
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+                Does.Contain("compilation-global"));
+        }
+
+        [Test]
+        public async Task GlobalOnlyConfigurationValueMirroredInTreeOptions_DoesNotReportScopeDiagnostic()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+@"public class TestClass
+{
+}",
+                ImmutableDictionary<string, string>.Empty.Add("sharpproof_attribute_stub_namespaces", "<global>"),
+                treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_attribute_stub_namespaces", "<global>"));
+
+            Assert.That(
+                diagnostics.Select(diagnostic => diagnostic.Id),
+                Has.None.EqualTo(SharpProofDiagnostics.InvalidAnalyzerConfigurationId));
+        }
+
+        [Test]
         public async Task Sp0004_LegacyBooleanFalse_SuppressesMissingPuritySuggestions()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

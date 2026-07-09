@@ -54,17 +54,6 @@ grouped by their original feature area.
 
 ### High Priority Features
 
-#### Analyzer Contract Ergonomics
-- Make analyzer option scope explicit and consistent: document and test which
-  `sharpproof_*` keys are compilation-global versus per-tree `.editorconfig`
-  overrides, then decide whether purity overrides, purity profile, SMT budgets,
-  and effect-summary loading need per-tree behavior or a diagnostic explaining
-  why they are global-only.
-- Centralize analyzer option metadata in one registry used by parsers, docs,
-  profiles, diagnostics, and impacted-test selection, and add a conformance
-  test that no live `sharpproof_*` option is consumed only as an ad hoc string
-  literal.
-
 #### Purity Rule Precision Targets
 - Convert manifest-backed fuzz families from "may emit conservatively" to
   definitely pure or definitely impure where source facts justify it, especially

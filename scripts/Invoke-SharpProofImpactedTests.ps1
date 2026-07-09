@@ -856,7 +856,7 @@ function Add-PathMappedTests
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Shared build/runtime support change' $before $Set
             break
         }
-        '^SharpProof\.Analyzer/Configuration/(AnalyzerConfiguration|ConfigKeys)\.cs$' {
+        '^SharpProof\.Analyzer/Configuration/(AnalyzerConfiguration|AnalyzerConfigurationOptionRegistry|ConfigKeys)\.cs$' {
             Add-TestClasses $Set @('DiagnosticEvidenceTests', 'SemanticOracleSmtTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard configuration change' $before $Set
             break

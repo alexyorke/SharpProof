@@ -541,48 +541,111 @@ namespace SharpProof.Analyzer.Configuration
         {
             var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
 
-            ValidateBool(builder, TryGetOption, ConfigKeys.EnableDebugLogging);
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePure);
-            ValidateMissingPuritySuggestionScope(builder, TryGetOption);
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated);
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeTests);
-            ValidateNonNegativeInt(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureMinComplexity);
-            ValidateBool(builder, TryGetOption, ConfigKeys.EmitExplanations);
-            ValidateBool(builder, TryGetOption, ConfigKeys.ReportBclFallbackGuesses);
-            ValidateRuntimeHazardMode(builder, TryGetOption);
-            ValidateBool(builder, TryGetOption, ConfigKeys.ReportExceptions);
-            ValidateBool(builder, TryGetOption, ConfigKeys.CheckedExceptions);
-            ValidateBool(builder, TryGetOption, ConfigKeys.EnableEffectSummaryJson);
-            ValidatePurityProfile(builder, TryGetOption);
-            ValidateSmtMode(builder, TryGetOption);
-            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtTimeoutMs);
-            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMethodBudgetMs);
-            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMaxPathConditions);
-            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMaxExpressionNodes);
+            foreach (var option in AnalyzerConfigurationOptionRegistry.GlobalOptions)
+            {
+                ValidateOption(builder, TryGetOption, option);
+            }
 
             return builder.ToImmutable();
 
             bool TryGetOption(string key, out string value) => TryGetGlobalOption(options, key, out value);
         }
 
-        internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(AnalyzerConfigOptions options)
+        internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
+            AnalyzerConfigOptions options,
+            AnalyzerConfigOptions? globalOptions = null)
         {
             var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
 
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePure);
-            ValidateMissingPuritySuggestionScope(builder, TryGetOption);
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated);
-            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeTests);
-            ValidateNonNegativeInt(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureMinComplexity);
-            ValidateBool(builder, TryGetOption, ConfigKeys.EmitExplanations);
-            ValidateBool(builder, TryGetOption, ConfigKeys.ReportBclFallbackGuesses);
-            ValidateRuntimeHazardMode(builder, TryGetOption);
-            ValidateBool(builder, TryGetOption, ConfigKeys.ReportExceptions);
-            ValidateBool(builder, TryGetOption, ConfigKeys.CheckedExceptions);
+            foreach (var option in AnalyzerConfigurationOptionRegistry.TreeOptions)
+            {
+                ValidateOption(builder, TryGetOption, option);
+            }
+
+            foreach (var option in AnalyzerConfigurationOptionRegistry.GlobalOnlyOptions)
+            {
+                ValidateGlobalOnlyTreeOption(builder, TryGetOption, globalOptions, option);
+            }
 
             return builder.ToImmutable();
 
             bool TryGetOption(string key, out string value) => TryGetAnalyzerConfigOption(options, key, out value);
+        }
+
+        private static void ValidateOption(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption,
+            AnalyzerConfigurationOption option)
+        {
+            switch (option.ValueKind)
+            {
+                case AnalyzerConfigurationValueKind.Bool:
+                    ValidateBool(builder, tryGetOption, option.Key);
+                    return;
+                case AnalyzerConfigurationValueKind.StringList:
+                    return;
+                case AnalyzerConfigurationValueKind.NonNegativeInteger:
+                    ValidateNonNegativeInt(builder, tryGetOption, option.Key);
+                    return;
+                case AnalyzerConfigurationValueKind.PositiveInteger:
+                    ValidatePositiveInt(builder, tryGetOption, option.Key);
+                    return;
+                case AnalyzerConfigurationValueKind.PurityProfile:
+                    ValidatePurityProfile(builder, tryGetOption);
+                    return;
+                case AnalyzerConfigurationValueKind.MissingPuritySuggestionScope:
+                    ValidateMissingPuritySuggestionScope(builder, tryGetOption);
+                    return;
+                case AnalyzerConfigurationValueKind.RuntimeHazardMode:
+                    ValidateRuntimeHazardMode(builder, tryGetOption);
+                    return;
+                case AnalyzerConfigurationValueKind.SmtMode:
+                    ValidateSmtMode(builder, tryGetOption);
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        private static void ValidateGlobalOnlyTreeOption(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption,
+            AnalyzerConfigOptions? globalOptions,
+            AnalyzerConfigurationOption option)
+        {
+            if (tryGetOption(option.Key, out var value))
+            {
+                if (TryGetMatchingGlobalOption(globalOptions, option.Key, value))
+                {
+                    return;
+                }
+
+                AddInvalidConfigurationValue(
+                    builder,
+                    option.Key,
+                    value,
+                    "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property");
+            }
+        }
+
+        private static bool TryGetMatchingGlobalOption(
+            AnalyzerConfigOptions? globalOptions,
+            string key,
+            string treeValue)
+        {
+            if (globalOptions == null)
+            {
+                return false;
+            }
+
+            if (globalOptions.TryGetValue(key, out var globalValue) &&
+                string.Equals(globalValue, treeValue, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return globalOptions.TryGetValue("build_property." + key, out globalValue) &&
+                   string.Equals(globalValue, treeValue, StringComparison.Ordinal);
         }
 
         private static void ValidateBool(

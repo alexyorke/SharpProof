@@ -116,7 +116,9 @@ namespace SharpProof.Analyzer
             Configuration.DiagnosticBaseline baseline)
         {
             var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
-            var invalidConfigurationValues = Configuration.AnalyzerConfiguration.GetInvalidTreeConfigurationValues(options);
+            var invalidConfigurationValues = Configuration.AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+                options,
+                context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
             var location = Location.Create(context.Tree, new TextSpan(0, 0));
             foreach (var invalidConfigurationValue in invalidConfigurationValues)
             {

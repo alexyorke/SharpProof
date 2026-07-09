@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -108,6 +109,53 @@ public sealed class TestClass
         }
 
         [Test]
+        public void AnalyzerConfigurationOptionRegistry_CoversEveryConfigKey()
+        {
+            var configKeys = GetConfigKeys();
+            var registeredKeys = GetRegisteredOptionKeys();
+
+            Assert.That(registeredKeys, Is.EquivalentTo(configKeys));
+        }
+
+        [Test]
+        public void AnalyzerConfigurationOptionRegistry_IsReflectedInContractsDocumentation()
+        {
+            var contractsDoc = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "contracts.md"));
+            var missingKeys = GetRegisteredOptionKeys()
+                .Where(key => !contractsDoc.Contains(key, StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(missingKeys, Is.Empty);
+        }
+
+        [Test]
+        public void AnalyzerConfigurationOptions_AreNotConsumedAsAdHocStringLiterals()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
+            var allowedFiles = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
+                "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
+                "SharpProof.Analyzer/SharpProofDiagnostics.cs",
+            };
+
+            var offenders = Directory
+                .EnumerateFiles(analyzerDirectory, "*.cs", SearchOption.AllDirectories)
+                .Select(path => new
+                {
+                    Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                    Source = File.ReadAllText(path),
+                })
+                .Where(file => !allowedFiles.Contains(file.Path) &&
+                               file.Source.Contains("sharpproof_", StringComparison.Ordinal))
+                .Select(file => file.Path)
+                .ToArray();
+
+            Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
         public void SmtNumericConfiguration_ParsesSignedOverridesWithInvariantCulture()
         {
             var originalCulture = CultureInfo.CurrentCulture;
@@ -155,6 +203,51 @@ public sealed class TestClass
                 (int)methodBudget.TotalMilliseconds,
                 (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
                 (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!);
+        }
+
+        private static string[] GetConfigKeys()
+        {
+            var configKeysType = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.ConfigKeys", throwOnError: true)!;
+            return configKeysType
+                .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                .Where(field => field.IsLiteral &&
+                                field.FieldType == typeof(string) &&
+                                field.GetRawConstantValue() is string value &&
+                                value.StartsWith("sharpproof_", StringComparison.Ordinal))
+                .Select(field => (string)field.GetRawConstantValue()!)
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static string[] GetRegisteredOptionKeys()
+        {
+            var registryType = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfigurationOptionRegistry", throwOnError: true)!;
+            var options = (System.Collections.IEnumerable)registryType
+                .GetProperty("All", BindingFlags.Public | BindingFlags.Static)!
+                .GetValue(null)!;
+            return options
+                .Cast<object>()
+                .Select(option => (string)option.GetType().GetProperty("Key")!.GetValue(option)!)
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "PLAN.md")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new InvalidOperationException("Could not find repository root.");
         }
 
         private readonly record struct SmtOptionsSnapshot(
