@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using SharpProof.Analyzer;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine.Analysis
@@ -16,12 +17,13 @@ namespace SharpProof.Analyzer.Engine.Analysis
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             Func<SyntaxTree, SemanticModel> getSemanticModel,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var results = new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default);
-            var engine = new PurityAnalysisEngine(smtAnalysis);
+            var engine = new PurityAnalysisEngine(smtAnalysis, attributePolicy);
             var worklist = new Queue<IMethodSymbol>();
             var reverse = new Dictionary<IMethodSymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
 

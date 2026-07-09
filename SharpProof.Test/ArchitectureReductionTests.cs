@@ -2909,9 +2909,10 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("0.1.0-preview.1"));
             Assert.That(readme, Does.Contain("SP0013"));
             Assert.That(readme, Does.Contain("SP0002"));
-            Assert.That(readme, Does.Contain("SP0025"));
+            Assert.That(readme, Does.Contain("SP0029"));
             Assert.That(readme, Does.Contain("[ZeroAllocations]"));
             Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
+            Assert.That(readme, Does.Contain("[Requires(...)]"));
             Assert.That(readme, Does.Contain("--capabilities"));
             Assert.That(readme, Does.Contain("--complexity"));
             Assert.That(readme, Does.Contain("--runtime-hazards"));
@@ -2965,8 +2966,8 @@ namespace SharpProof.Test
             Assert.That(complexityDoc, Does.Contain("--complexity"));
             Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
             Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
-            Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0026`"));
-            Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0026"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0029`"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0029"));
             Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));

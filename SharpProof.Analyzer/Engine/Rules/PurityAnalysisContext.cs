@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine.Rules;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace SharpProof.Analyzer.Engine.Rules
         public ImmutableList<IPurityRule> PurityRules { get; }
         public CompilationPurityService? PurityService { get; }
         public SmtAnalysisService SmtAnalysis { get; }
+        public SharpProofAttributeIdentityPolicy AttributePolicy { get; }
 
         public PurityAnalysisContext(
             SemanticModel semanticModel,
@@ -34,7 +36,8 @@ namespace SharpProof.Analyzer.Engine.Rules
             ImmutableList<IPurityRule> purityRules,
             CancellationToken cancellationToken,
             CompilationPurityService? purityService,
-            SmtAnalysisService? smtAnalysis = null)
+            SmtAnalysisService? smtAnalysis = null,
+            SharpProofAttributeIdentityPolicy? attributePolicy = null)
         {
             SemanticModel = semanticModel;
             EnforcePureAttributeSymbol = enforcePureAttributeSymbol;
@@ -48,6 +51,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityService = purityService;
             SmtAnalysis = smtAnalysis ?? purityService?.SmtAnalysis ??
                 throw new ArgumentNullException(nameof(smtAnalysis), "Purity analysis requires a compilation-scoped SMT service.");
+            AttributePolicy = attributePolicy ?? purityService?.AttributePolicy ?? RequiresContractHelpers.OfficialAttributePolicy;
         }
     }
 }

@@ -31,6 +31,7 @@ namespace SharpProof.Analyzer.Engine
             HashSet<IMethodSymbol> visited,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CancellationToken cancellationToken,
             CompilationPurityService? purityService = null)
         {
@@ -320,6 +321,7 @@ namespace SharpProof.Analyzer.Engine
                             methodSymbol,
                             purityCache,
                             activeSmtAnalysis,
+                            attributePolicy,
                             purityService,
                             cancellationToken);
                     }
@@ -335,6 +337,7 @@ namespace SharpProof.Analyzer.Engine
                             methodSymbol,
                             purityCache,
                             activeSmtAnalysis,
+                            attributePolicy,
                             purityService,
                             cancellationToken,
                             out mergedDelegateTargetsFromCfg,
@@ -367,7 +370,8 @@ namespace SharpProof.Analyzer.Engine
                             _purityRules,
                             cancellationToken,
                             purityService,
-                            activeSmtAnalysis);
+                            activeSmtAnalysis,
+                            attributePolicy);
 
 
                         LogDebug($"{indent}  Post-CFG: Checking ReturnOperations (with merged delegate map from CFG)...");
@@ -508,7 +512,7 @@ namespace SharpProof.Analyzer.Engine
                         {
                             foreach (var catchClause in tryOp.Catches)
                             {
-                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService, cancellationToken);
+                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, attributePolicy, purityService, cancellationToken);
                                 if (!catchResult.IsPure)
                                 {
                                     result = catchResult;
@@ -517,7 +521,7 @@ namespace SharpProof.Analyzer.Engine
                             }
                             if (tryOp.Finally != null)
                             {
-                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, purityService, cancellationToken);
+                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis, attributePolicy, purityService, cancellationToken);
                                 if (!finallyResult.IsPure)
                                 {
                                     result = finallyResult;
@@ -696,7 +700,8 @@ namespace SharpProof.Analyzer.Engine
                                     _purityRules,
                                     cancellationToken,
                                     purityService,
-                                    activeSmtAnalysis);
+                                    activeSmtAnalysis,
+                                    attributePolicy);
                                 var operatorPurity = GetCalleePurity(operatorMethod, contextForOp);
 
                                 if (!operatorPurity.IsPure)

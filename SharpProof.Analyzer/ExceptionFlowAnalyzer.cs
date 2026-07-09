@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,12 +16,25 @@ namespace SharpProof.Analyzer
 {
     internal static partial class ExceptionFlowAnalyzer
     {
+        private static readonly AsyncLocal<SharpProofAttributeIdentityPolicy?> CurrentAttributePolicy = new();
+
+        internal static SharpProofAttributeIdentityPolicy ActiveAttributePolicy =>
+            CurrentAttributePolicy.Value ?? RequiresContractHelpers.OfficialAttributePolicy;
+
+        internal static IDisposable UseAttributePolicy(SharpProofAttributeIdentityPolicy attributePolicy)
+        {
+            var previous = CurrentAttributePolicy.Value;
+            CurrentAttributePolicy.Value = attributePolicy ?? RequiresContractHelpers.OfficialAttributePolicy;
+            return new AttributePolicyScope(previous);
+        }
+
         public static void AnalyzeSymbolForExceptions(
             SyntaxNodeAnalysisContext context,
             Analyzer.Configuration.AnalyzerConfiguration config,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             CompilationPurityService purityService,
-            Analyzer.Configuration.DiagnosticBaseline baseline)
+            Analyzer.Configuration.DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             var runtimeHazardMode = Analyzer.Configuration.AnalyzerConfiguration.GetRuntimeHazardMode(
                 context.Options,
@@ -51,13 +65,18 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            var queryResult = ExceptionFlowQuery.AnalyzeMethod(
-                context.Node,
-                context.SemanticModel,
-                context.CancellationToken,
-                methodSymbol,
-                exceptionSummaryCatalog,
-                purityService.SmtAnalysis);
+            ExceptionFlowQuery.MethodExceptionQueryResult queryResult;
+            using (UseAttributePolicy(attributePolicy))
+            {
+                queryResult = ExceptionFlowQuery.AnalyzeMethod(
+                    context.Node,
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    methodSymbol,
+                    exceptionSummaryCatalog,
+                    purityService.SmtAnalysis,
+                    attributePolicy);
+            }
 
             if (reportCheckedExceptionSites)
             {
@@ -99,6 +118,21 @@ namespace SharpProof.Analyzer
             if (!baseline.IsSuppressed(diagnostic))
             {
                 context.ReportDiagnostic(diagnostic);
+            }
+        }
+
+        private sealed class AttributePolicyScope : IDisposable
+        {
+            private readonly SharpProofAttributeIdentityPolicy? _previous;
+
+            public AttributePolicyScope(SharpProofAttributeIdentityPolicy? previous)
+            {
+                _previous = previous;
+            }
+
+            public void Dispose()
+            {
+                CurrentAttributePolicy.Value = _previous;
             }
         }
 

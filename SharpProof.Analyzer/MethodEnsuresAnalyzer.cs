@@ -67,6 +67,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
+            var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
             var returnSites = CollectReturnSites(context.Node, context.SemanticModel, context.CancellationToken);
             if (returnSites.Length == 0)
             {
@@ -166,6 +167,7 @@ namespace SharpProof.Analyzer
                         continue;
                     }
 
+                    var proofCondition = RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
                     var lineSpan = returnSite.QueryLocation.GetLineSpan();
                     var line = lineSpan.StartLinePosition.Line + 1;
                     var column = lineSpan.StartLinePosition.Character + 1;
@@ -173,7 +175,7 @@ namespace SharpProof.Analyzer
                         new SymbolicConditionProofRequest(
                             source,
                             SymbolicQueryTarget.Point(line, column),
-                            rewrittenCondition,
+                            proofCondition,
                             options),
                         context.CancellationToken);
 
@@ -252,6 +254,18 @@ namespace SharpProof.Analyzer
             }
 
             return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<RequiresContract> CollectRequiresAssumptions(
+            IMethodSymbol methodSymbol,
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            CancellationToken cancellationToken)
+        {
+            return RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
+                .Where(contract =>
+                    RequiresContractHelpers.TryParseCondition(contract.Condition, out _, out var conditionExpression) &&
+                    !RequiresContractHelpers.ContainsResultReference(conditionExpression))
+                .ToImmutableArray();
         }
 
         private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(

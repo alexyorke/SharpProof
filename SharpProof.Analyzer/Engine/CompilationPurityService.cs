@@ -13,15 +13,26 @@ namespace SharpProof.Analyzer.Engine
         private readonly object _fixedPointLock = new();
 
         public CompilationPurityService(Compilation compilation)
-            : this(compilation, SmtAnalysisOptions.Default)
+            : this(compilation, SmtAnalysisOptions.Default, RequiresContractHelpers.OfficialAttributePolicy)
         {
         }
 
         public CompilationPurityService(Compilation compilation, SmtAnalysisOptions smtOptions)
+            : this(compilation, smtOptions, RequiresContractHelpers.OfficialAttributePolicy)
+        {
+        }
+
+        public CompilationPurityService(
+            Compilation compilation,
+            SmtAnalysisOptions smtOptions,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             _compilation = compilation;
+            AttributePolicy = attributePolicy ?? throw new System.ArgumentNullException(nameof(attributePolicy));
             SmtAnalysis = new SmtAnalysisService(smtOptions);
         }
+
+        public SharpProofAttributeIdentityPolicy AttributePolicy { get; }
 
         public SmtAnalysisService SmtAnalysis { get; }
 
@@ -78,6 +89,7 @@ namespace SharpProof.Analyzer.Engine
                     enforcePureAttributeSymbol,
                     allowSynchronizationAttributeSymbol,
                     SmtAnalysis,
+                    AttributePolicy,
                     GetSemanticModel,
                     cancellationToken);
             }

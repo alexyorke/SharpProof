@@ -55,9 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Missing Contract Types
-- Add a `[Requires("condition")]` precondition contract that can both verify
-  callers and feed proven assumptions into `[Ensures]`, runtime-hazard, and
-  purity queries inside the callee.
 - Add an exception contract surface such as `[Throws]`, `[DoesNotThrow]`, or
   `[AllowedExceptions]` on top of the existing `SP0010` and `SP0011` exception
   evidence so users can enforce exception behavior instead of only reporting

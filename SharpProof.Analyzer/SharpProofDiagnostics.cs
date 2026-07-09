@@ -323,6 +323,53 @@ namespace SharpProof.Analyzer
             isEnabledByDefault: true,
             description: UnrecognizedAttributeIdentityDescription);
 
+        public const string RequiresNotProvenId = "SP0027";
+        public const string RequiresConditionProperty = "sharpproof.requires.condition";
+        public const string RequiresProofStatusProperty = "sharpproof.requires.proof_status";
+        public const string RequiresUnknownReasonProperty = "sharpproof.requires.unknown_reason";
+        public const string RequiresFailureReasonProperty = "sharpproof.requires.failure_reason";
+        public const string RequiresCalleeProperty = "sharpproof.requires.callee";
+        private static readonly LocalizableString RequiresNotProvenTitle = "Precondition Not Proven";
+        private static readonly LocalizableString RequiresNotProvenMessageFormat = "Call to '{0}' does not prove precondition '{1}'";
+        private static readonly LocalizableString RequiresNotProvenDescription = "Reports calls whose current path facts contradict a declared [Requires] precondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence.";
+
+        public static readonly DiagnosticDescriptor RequiresNotProvenRule = new DiagnosticDescriptor(
+            id: RequiresNotProvenId,
+            title: RequiresNotProvenTitle,
+            messageFormat: RequiresNotProvenMessageFormat,
+            category: "Contracts",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: RequiresNotProvenDescription);
+
+        public const string RequiresUnsupportedId = "SP0028";
+        private static readonly LocalizableString RequiresUnsupportedTitle = "Precondition Could Not Be Verified";
+        private static readonly LocalizableString RequiresUnsupportedMessageFormat = "Precondition '{1}' for '{0}' could not be verified: {2}";
+        private static readonly LocalizableString RequiresUnsupportedDescription = "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
+
+        public static readonly DiagnosticDescriptor RequiresUnsupportedRule = new DiagnosticDescriptor(
+            id: RequiresUnsupportedId,
+            title: RequiresUnsupportedTitle,
+            messageFormat: RequiresUnsupportedMessageFormat,
+            category: "Contracts",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: RequiresUnsupportedDescription);
+
+        public const string MisplacedRequiresAttributeId = "SP0029";
+        private static readonly LocalizableString MisplacedRequiresAttributeTitle = "Misplaced [Requires] Attribute";
+        private static readonly LocalizableString MisplacedRequiresAttributeMessageFormat = "The [Requires] attribute can only be applied to method-like declarations";
+        private static readonly LocalizableString MisplacedRequiresAttributeDescription = "[Requires] configures symbolic precondition analysis for a method-like declaration and should not be used on non-method declarations.";
+
+        public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = new DiagnosticDescriptor(
+            id: MisplacedRequiresAttributeId,
+            title: MisplacedRequiresAttributeTitle,
+            messageFormat: MisplacedRequiresAttributeMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: MisplacedRequiresAttributeDescription);
+
 
         public const string MisplacedAttributeId = "SP0003";
         private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";

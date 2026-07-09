@@ -1,0 +1,1 @@
+SP0028 Warning docs/readme-examples/sp0028-requires-unsupported/input.cs:6:6 Precondition 'result > 0' for 'Calculator.Identity(int)' could not be verified: result placeholder is not supported in [Requires] conditions

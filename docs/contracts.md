@@ -8,6 +8,11 @@ bounded proof question into normal build diagnostics.
 - `[EnforcePure]` / `[Pure]`: require a method-like member to be proven pure.
   Violations produce `SP0002`; pure-looking members without a contract can
   produce `SP0004`.
+- `[Requires("condition")]`: require callers to prove a C#-like precondition
+  before invoking the method-like member. Failed call-site proofs produce
+  `SP0027`; unsupported preconditions produce `SP0028`. Valid preconditions
+  are also fed into `[Ensures]`, runtime-hazard, and purity proof queries
+  inside the callee.
 - `[Ensures("condition")]`: require every reachable return site to prove a
   C#-like postcondition. Failures produce `SP0018`; unsupported conditions
   produce `SP0019`.
@@ -38,6 +43,7 @@ The broad-usage attributes and their placement diagnostics are:
 | `[Pure]` | `SP0003` | Property and indexer getter contracts are accepted; unsupported targets remain analyzer diagnostics. |
 | `[ZeroAllocations]` | `SP0014` | Misplaced allocation contracts stay visible as SharpProof usage errors. |
 | `[AllowedCapabilities(...)]` | `SP0017` | Capability contract placement is validated before capability reasoning runs. |
+| `[Requires("condition")]` | `SP0029` | Preconditions are accepted only on method-like declarations. |
 | `[Ensures("condition")]` | `SP0020` | Postconditions are accepted only on method-like declarations. |
 | `[ExpectedComplexity(...)]` | `SP0023` | Complexity contracts are accepted only on method-like declarations. |
 
@@ -61,8 +67,9 @@ build_property.sharpproof_attribute_stub_namespaces = My.Contracts;Other.Contrac
 
 Use `<global>` in that list only when a project deliberately declares global
 namespace stubs. Attributes with SharpProof contract names such as
-`EnforcePureAttribute`, `EnsuresAttribute`, or `ZeroAllocationsAttribute` from
-unaccepted namespaces are ignored as contracts and reported as `SP0026`.
+`EnforcePureAttribute`, `EnsuresAttribute`, `RequiresAttribute`, or
+`ZeroAllocationsAttribute` from unaccepted namespaces are ignored as contracts
+and reported as `SP0026`.
 Recognized external purity annotations such as
 `JetBrains.Annotations.PureAttribute` and
 `System.Diagnostics.Contracts.PureAttribute` remain boundary evidence rather
@@ -72,7 +79,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0026`.
+`SP0002` through `SP0029`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.

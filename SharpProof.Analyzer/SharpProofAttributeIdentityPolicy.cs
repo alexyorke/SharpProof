@@ -22,6 +22,7 @@ namespace SharpProof.Analyzer
                 "ImpureAttribute",
                 "PureAttribute",
                 "PureExternalAttribute",
+                "RequiresAttribute",
                 "ZeroAllocationsAttribute");
 
         private readonly ImmutableHashSet<string> _acceptedNamespaces;

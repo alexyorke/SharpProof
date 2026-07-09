@@ -58,6 +58,7 @@ namespace SharpProof.Analyzer.Engine
                 visited,
                 purityCache,
                 _smtAnalysis,
+                _attributePolicy,
                 cancellationToken,
                 _purityService
             );

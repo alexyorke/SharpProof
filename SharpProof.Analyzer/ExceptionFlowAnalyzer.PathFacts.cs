@@ -135,6 +135,7 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken)
         {
             var pathConditions = new List<SmtFormula>();
+            AddMethodEntryRequiresPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
             AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
             AddSharedAncestorPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
 
@@ -162,6 +163,68 @@ namespace SharpProof.Analyzer
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions;
+        }
+
+        private static void AddMethodEntryRequiresPathConditions(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> pathConditions)
+        {
+            var methodNode = useNode
+                .AncestorsAndSelf()
+                .FirstOrDefault(IsMethodLikeDeclaration);
+            if (methodNode == null ||
+                semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
+            {
+                return;
+            }
+
+            var contracts = RequiresContractHelpers.ValidContracts(
+                methodSymbol,
+                ActiveAttributePolicy,
+                cancellationToken);
+            if (contracts.Length == 0)
+            {
+                return;
+            }
+
+            var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
+            foreach (var contract in contracts)
+            {
+                if (!RequiresContractHelpers.TryCreateConditionFormula(
+                        semanticModel,
+                        position,
+                        contract.Condition,
+                        cancellationToken,
+                        out var conditionExpression,
+                        out var conditionSemanticModel,
+                        out var formula,
+                        out _) ||
+                    RequiresContractHelpers.ContainsResultReference(conditionExpression))
+                {
+                    continue;
+                }
+
+                var referencedSymbols = CollectLocalAndParameterSymbols(conditionExpression, conditionSemanticModel, cancellationToken);
+                if (referencedSymbols.Count != 0 &&
+                    AnySymbolAssignedBeforeUse(methodNode, useNode.SpanStart, referencedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                pathConditions.Add(formula);
+            }
+        }
+
+        private static bool IsMethodLikeDeclaration(SyntaxNode node)
+        {
+            return node is MethodDeclarationSyntax ||
+                   node is AccessorDeclarationSyntax ||
+                   node is ConstructorDeclarationSyntax ||
+                   node is ConversionOperatorDeclarationSyntax ||
+                   node is OperatorDeclarationSyntax ||
+                   node is LocalFunctionStatementSyntax;
         }
 
         internal static bool IsExceptionPathReachable(

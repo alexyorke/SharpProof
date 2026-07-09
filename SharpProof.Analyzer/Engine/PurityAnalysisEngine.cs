@@ -25,16 +25,24 @@ namespace SharpProof.Analyzer.Engine
     {
         private readonly CompilationPurityService? _purityService;
         private readonly SmtAnalysisService _smtAnalysis;
+        private readonly SharpProofAttributeIdentityPolicy _attributePolicy;
 
         public PurityAnalysisEngine(CompilationPurityService purityService)
         {
             _purityService = purityService ?? throw new ArgumentNullException(nameof(purityService));
             _smtAnalysis = purityService.SmtAnalysis;
+            _attributePolicy = purityService.AttributePolicy;
         }
 
         internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis)
+            : this(smtAnalysis, RequiresContractHelpers.OfficialAttributePolicy)
+        {
+        }
+
+        internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis, SharpProofAttributeIdentityPolicy attributePolicy)
         {
             _smtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
+            _attributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
         }
 
 

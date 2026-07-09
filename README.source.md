@@ -1,9 +1,10 @@
 # SharpProof - Symbolic C# Contracts Backed By Bounded Proof
 
 SharpProof is a beta Roslyn analyzer for enforceable C# contracts. You add
-attributes such as `[EnforcePure]`, `[Ensures]`, `[ZeroAllocations]`,
-`[AllowedCapabilities]`, or `[ExpectedComplexity]`; the analyzer reports build
-diagnostics; the CLI and .NET API let you inspect the bounded proof evidence.
+attributes such as `[EnforcePure]`, `[Requires]`, `[Ensures]`,
+`[ZeroAllocations]`, `[AllowedCapabilities]`, or `[ExpectedComplexity]`; the
+analyzer reports build diagnostics; the CLI and .NET API let you inspect the
+bounded proof evidence.
 
 ## Preview Status
 
@@ -38,6 +39,7 @@ Write contracts -> build gets diagnostics -> inspect proof/evidence -> query dee
 The analyzer answers contract questions during normal builds:
 
 - can this method be proven pure?
+- do calls satisfy declared `[Requires("...")]` preconditions?
 - which direct allocation sites violate `[ZeroAllocations]`?
 - which capability categories does this method use?
 - does every return satisfy `[Ensures("...")]`?
@@ -137,9 +139,9 @@ JSON automation.
 
 - Analyzer contracts:
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
-  `[AllowedCapabilities(...)]`, `[Ensures(...)]`,
+  `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[ExpectedComplexity(...)]`, and related diagnostics from `SP0002` through
-  `SP0025`.
+  `SP0029`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.

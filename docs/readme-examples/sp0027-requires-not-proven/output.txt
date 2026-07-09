@@ -1,0 +1,1 @@
+SP0027 Warning docs/readme-examples/sp0027-requires-not-proven/input.cs:11:16 Call to 'Calculator.Identity(int)' does not prove precondition 'value > 0'

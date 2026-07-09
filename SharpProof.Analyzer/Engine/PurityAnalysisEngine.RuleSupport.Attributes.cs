@@ -114,6 +114,7 @@ namespace SharpProof.Analyzer.Engine
                     context.VisitedMethods,
                     context.PurityCache,
                     context.SmtAnalysis,
+                    context.AttributePolicy,
                     context.CancellationToken,
                     context.PurityService);
             }

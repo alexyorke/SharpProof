@@ -33,6 +33,7 @@ namespace SharpProof.Analyzer.Engine
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CompilationPurityService? purityService,
             CancellationToken cancellationToken,
             out ImmutableDictionary<ISymbol, PotentialTargets> mergedDelegateTargetsFromBlocks,
@@ -81,7 +82,12 @@ namespace SharpProof.Analyzer.Engine
                 var entryBlock = cfg.Blocks.First();
 
                 LogDebug($"  [CFG] Adding Entry Block #{entryBlock.Ordinal} to worklist.");
-                blockStates[entryBlock] = PurityAnalysisState.Pure;
+                blockStates[entryBlock] = CreateInitialRequiresState(
+                    containingMethodSymbol,
+                    bodyNode,
+                    semanticModel,
+                    attributePolicy,
+                    cancellationToken);
                 worklist.Enqueue(entryBlock);
                 inQueue.Add(entryBlock);
             }
@@ -126,6 +132,7 @@ namespace SharpProof.Analyzer.Engine
                     containingMethodSymbol,
                     purityCache,
                     smtAnalysis,
+                    attributePolicy,
                     purityService,
                     cancellationToken);
 
@@ -210,6 +217,7 @@ namespace SharpProof.Analyzer.Engine
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CompilationPurityService? purityService,
             CancellationToken cancellationToken)
         {
@@ -243,7 +251,8 @@ namespace SharpProof.Analyzer.Engine
                 _purityRules,
                 cancellationToken,
                 purityService,
-                smtAnalysis);
+                smtAnalysis,
+                attributePolicy);
 
 
             var currentStateInBlock = stateBefore;
@@ -396,6 +405,7 @@ namespace SharpProof.Analyzer.Engine
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
             SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CompilationPurityService? purityService,
             CancellationToken cancellationToken)
         {
@@ -412,9 +422,15 @@ namespace SharpProof.Analyzer.Engine
                 _purityRules,
                 cancellationToken,
                 purityService,
-                smtAnalysis);
+                smtAnalysis,
+                attributePolicy);
 
-            var currentState = PurityAnalysisState.Pure;
+            var currentState = CreateInitialRequiresState(
+                containingMethodSymbol,
+                rootOperation.Syntax,
+                semanticModel,
+                attributePolicy,
+                cancellationToken);
             var visitedOperations = new HashSet<IOperation>();
             foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
             {

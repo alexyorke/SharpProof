@@ -273,5 +273,38 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0027-requires-not-proven",
+    "DiagnosticId": "SP0027",
+    "Title": "SP0027 - Precondition not proven",
+    "Summary": "Calls to methods with `[Requires]` must prove the declared precondition at the call site.",
+    "SourcePath": "docs/readme-examples/sp0027-requires-not-proven/input.cs",
+    "OutputPath": "docs/readme-examples/sp0027-requires-not-proven/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0028-requires-unsupported",
+    "DiagnosticId": "SP0028",
+    "Title": "SP0028 - Precondition could not be verified",
+    "Summary": "Unsupported `[Requires]` conditions remain conservative and report why verification stopped.",
+    "SourcePath": "docs/readme-examples/sp0028-requires-unsupported/input.cs",
+    "OutputPath": "docs/readme-examples/sp0028-requires-unsupported/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0029-misplaced-requires",
+    "DiagnosticId": "SP0029",
+    "Title": "SP0029 - Misplaced [Requires]",
+    "Summary": "Preconditions are restricted to method-like declarations.",
+    "SourcePath": "docs/readme-examples/sp0029-misplaced-requires/input.cs",
+    "OutputPath": "docs/readme-examples/sp0029-misplaced-requires/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

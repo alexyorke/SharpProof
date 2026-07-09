@@ -23,7 +23,8 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             HashSet<IMethodSymbol> visitedMethods,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             var originalDefinition = invokedMethod.OriginalDefinition;
             if (!visitedMethods.Add(originalDefinition))
@@ -49,7 +50,8 @@ namespace SharpProof.Analyzer
                     invokedMethod,
                     exceptionSummaryCatalog,
                     visitedMethods,
-                    smtAnalysis);
+                    smtAnalysis,
+                    attributePolicy);
 
                 var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
                 return result.ExceptionEvidence.EnumerateEntries()
@@ -83,9 +85,10 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             HashSet<IMethodSymbol> visitedMethods,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
-            foreach (var exception in CollectSourceCalleeExceptions(invokedMethod, compilation, cancellationToken, exceptionSummaryCatalog, visitedMethods, smtAnalysis))
+            foreach (var exception in CollectSourceCalleeExceptions(invokedMethod, compilation, cancellationToken, exceptionSummaryCatalog, visitedMethods, smtAnalysis, attributePolicy))
             {
                 yield return exception;
             }

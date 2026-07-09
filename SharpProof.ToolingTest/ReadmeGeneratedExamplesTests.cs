@@ -219,6 +219,27 @@ namespace System.Experimental
             await VerifyAnalyzerExampleAsync("sp0026-unrecognized-attribute-identity");
         }
 
+        [ReadmeExample("sp0027-requires-not-proven")]
+        [Test]
+        public async Task Sp0027_RequiresNotProvenExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0027-requires-not-proven");
+        }
+
+        [ReadmeExample("sp0028-requires-unsupported")]
+        [Test]
+        public async Task Sp0028_RequiresUnsupportedExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0028-requires-unsupported");
+        }
+
+        [ReadmeExample("sp0029-misplaced-requires")]
+        [Test]
+        public async Task Sp0029_MisplacedRequiresExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0029-misplaced-requires");
+        }
+
         [ReadmeExample("capabilities-console")]
         [Test]
         public async Task CapabilitiesCliExample_MatchesSnapshot()

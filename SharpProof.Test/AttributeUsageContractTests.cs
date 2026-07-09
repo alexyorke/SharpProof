@@ -17,6 +17,7 @@ namespace SharpProof.Test
             new(typeof(EnsuresAttribute), "[Ensures(\"condition\")]", SharpProofDiagnostics.MisplacedEnsuresAttributeId),
             new(typeof(ExpectedComplexityAttribute), "[ExpectedComplexity(...)]", SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId),
             new(typeof(PureAttribute), "[Pure]", SharpProofDiagnostics.MisplacedAttributeId),
+            new(typeof(RequiresAttribute), "[Requires(\"condition\")]", SharpProofDiagnostics.MisplacedRequiresAttributeId),
             new(typeof(ZeroAllocationsAttribute), "[ZeroAllocations]", SharpProofDiagnostics.MisplacedZeroAllocationsAttributeId),
         };
 
@@ -40,7 +41,8 @@ namespace SharpProof.Test
                 Assert.That(usage, Is.Not.Null, $"{attributeType.FullName} is missing AttributeUsageAttribute.");
                 Assert.That(usage!.Inherited, Is.False, $"{attributeType.FullName} should not be inherited.");
 
-                if (attributeType == typeof(EnsuresAttribute))
+                if (attributeType == typeof(EnsuresAttribute) ||
+                    attributeType == typeof(RequiresAttribute))
                 {
                     Assert.That(usage.AllowMultiple, Is.True, $"{attributeType.FullName} should remain multi-use.");
                 }

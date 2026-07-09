@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0026`.
+from `SP0002` through `SP0029`.
 
 ### SP0002 - Purity not verified
 
@@ -724,4 +724,84 @@ Expected analyzer diagnostics:
 
 ```text
 SP0026 Warning docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs:13:6 Attribute 'EnforcePureAttribute' looks like a SharpProof contract, but type 'ExternalContracts.EnforcePureAttribute' is not in an accepted SharpProof attribute namespace
+```
+
+### SP0027 - Precondition not proven
+
+Calls to methods with `[Requires]` must prove the declared precondition at the call site.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0027_RequiresNotProvenExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0027-requires-not-proven/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class Calculator
+{
+    [Requires("value > 0")]
+    public static int Identity(int value) => value;
+
+    public static int Demo()
+    {
+        return Identity(0);
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0027 Warning docs/readme-examples/sp0027-requires-not-proven/input.cs:11:16 Call to 'Calculator.Identity(int)' does not prove precondition 'value > 0'
+```
+
+### SP0028 - Precondition could not be verified
+
+Unsupported `[Requires]` conditions remain conservative and report why verification stopped.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0028_RequiresUnsupportedExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0028-requires-unsupported/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class Calculator
+{
+    [Requires("result > 0")]
+    public static int Identity(int value) => value;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0028 Warning docs/readme-examples/sp0028-requires-unsupported/input.cs:6:6 Precondition 'result > 0' for 'Calculator.Identity(int)' could not be verified: result placeholder is not supported in [Requires] conditions
+```
+
+### SP0029 - Misplaced [Requires]
+
+Preconditions are restricted to method-like declarations.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0029_MisplacedRequiresExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0029-misplaced-requires/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class Calculator
+{
+    [Requires("true")]
+    public int Value => 42;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0029 Error docs/readme-examples/sp0029-misplaced-requires/input.cs:6:6 The [Requires] attribute can only be applied to method-like declarations
 ```

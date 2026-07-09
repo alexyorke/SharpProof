@@ -95,6 +95,18 @@ namespace SharpProof.Analyzer
                 ReportIfNotSuppressed(context, baseline, diag);
             }
 
+            var requiresAttributeLocation = FindAttributeLocation(attributeList, "RequiresAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (requiresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+            {
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedRequiresAttributeRule,
+                    requiresAttributeLocation,
+                    "Requires",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
+            }
+
             var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, "ExpectedComplexityAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
             if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {

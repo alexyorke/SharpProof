@@ -28,21 +28,26 @@ namespace SharpProof.Analyzer
             System.Threading.CancellationToken cancellationToken,
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
             {
                 methodSymbol.OriginalDefinition
             };
 
-            return AnalyzeMethod(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                exceptionSummaryCatalog,
-                visitedMethods,
-                smtAnalysis);
+            using (ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy))
+            {
+                return AnalyzeMethod(
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    methodSymbol,
+                    exceptionSummaryCatalog,
+                    visitedMethods,
+                    smtAnalysis,
+                    attributePolicy);
+            }
         }
 
         private static MethodExceptionQueryResult AnalyzeMethod(
@@ -52,7 +57,8 @@ namespace SharpProof.Analyzer
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             HashSet<IMethodSymbol> visitedMethods,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             var siteEntries = CollectUncaughtExceptionSiteEntries(
                     methodNode,
@@ -61,7 +67,8 @@ namespace SharpProof.Analyzer
                     methodSymbol,
                     exceptionSummaryCatalog,
                     visitedMethods,
-                    smtAnalysis)
+                    smtAnalysis,
+                    attributePolicy)
                 .ToImmutableArray();
 
             var exceptionEvidence = new ExceptionEvidenceSet();

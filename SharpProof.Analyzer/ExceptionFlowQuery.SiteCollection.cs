@@ -24,7 +24,8 @@ namespace SharpProof.Analyzer
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             HashSet<IMethodSymbol> visitedMethods,
-            SmtAnalysisService smtAnalysis)
+            SmtAnalysisService smtAnalysis,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             foreach (var throwNode in ExceptionFlowAnalyzer.GetThrowNodes(methodNode))
             {
@@ -101,7 +102,8 @@ namespace SharpProof.Analyzer
                              cancellationToken,
                              exceptionSummaryCatalog,
                              visitedMethods,
-                             smtAnalysis))
+                             smtAnalysis,
+                             attributePolicy))
                 {
                     if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken, smtAnalysis))
                     {
