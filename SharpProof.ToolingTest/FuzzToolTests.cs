@@ -32,7 +32,7 @@ namespace SharpProof.Test
             new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
             new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
             new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
-            new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
+            new FamilyExpectation("ImpureUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
             new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation"),
             new FamilyExpectation("ImpureOwnershipEscapeChain", "ObjectCreation", "PropertyReference", "Return"));
 
@@ -67,6 +67,10 @@ namespace SharpProof.Test
             "PureConditionalAccessCoalesce",
             "PureSwitchStatement",
             "PureSwitchExpression");
+
+        private static readonly ImmutableArray<string> PromotedImpureCoverageFamilies = ImmutableArray.Create(
+            "ImpureWithExpression",
+            "ImpureUsingAwaitDelegateFlow");
 
         [Test]
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
@@ -254,7 +258,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ImpureOwnershipEscapeChain"));
             Assert.That(families, Does.Contain("PureSwitchExpression"));
             Assert.That(families, Does.Contain("ConservativeRangeSlice"));
-            Assert.That(families, Does.Contain("ConservativeWithExpression"));
+            Assert.That(families, Does.Contain("ImpureWithExpression"));
             Assert.That(families, Does.Contain("PureImplicitIndexerReference"));
             Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
             Assert.That(families, Does.Contain("ConservativeAddressOf"));
@@ -271,7 +275,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ConservativeDelegateCreation"));
             Assert.That(families, Does.Contain("ConservativeNestedLambdaLocalFunction"));
             Assert.That(families, Does.Contain("ConservativeTuplePatternSwitch"));
-            Assert.That(families, Does.Contain("ConservativeUsingAwaitDelegateFlow"));
+            Assert.That(families, Does.Contain("ImpureUsingAwaitDelegateFlow"));
             Assert.That(missingShapes, Is.Empty);
         }
 
@@ -337,6 +341,24 @@ public class KnownImpureConsoleCase
             Assert.That(
                 analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
                 Is.True);
+        }
+
+        [Test]
+        public async Task PromotedImpureCoverageFamilies_EmitSp0002()
+        {
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
+
+            foreach (var family in PromotedImpureCoverageFamilies)
+            {
+                var analysis = analyses[family];
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, family);
+                Assert.That(analysis.Findings, Is.Empty, family);
+                Assert.That(
+                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                    Is.True,
+                    family);
+            }
         }
 
         [Test]

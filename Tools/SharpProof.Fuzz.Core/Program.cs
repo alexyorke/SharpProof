@@ -1434,14 +1434,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeYieldReturn),
         new ShapeRegistryEntry(
-            "ConservativeWithExpression",
+            "ImpureWithExpression",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.With)),
             ImmutableArray.Create("With"),
             ImmutableArray.Create("WithExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyImpure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeWithExpression),
+            BuildImpureWithExpression),
         new ShapeRegistryEntry(
             "ConservativeAnonymousFunction",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction)),
@@ -1533,17 +1533,17 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeTuplePatternSwitch),
         new ShapeRegistryEntry(
-            "ConservativeUsingAwaitDelegateFlow",
+            "ImpureUsingAwaitDelegateFlow",
             ImmutableArray.Create(
                 RoslynShapeManifest.OperationShapeId(OperationKind.UsingDeclaration),
                 RoslynShapeManifest.OperationShapeId(OperationKind.Await),
                 RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction)),
             ImmutableArray.Create("UsingDeclaration", "Await", "AnonymousFunction"),
             ImmutableArray.Create("LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyImpure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeUsingAwaitDelegateFlow));
+            BuildImpureUsingAwaitDelegateFlow));
 
     private static readonly ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>> RegistryByPrimaryShape =
         Registry
@@ -2545,7 +2545,7 @@ public class {{className}}
 """;
     }
 
-    private static string BuildConservativeWithExpression(int index, Random random, string className)
+    private static string BuildImpureWithExpression(int index, Random random, string className)
     {
         return $$"""
 using System;
@@ -2750,7 +2750,7 @@ public unsafe class {{className}}
             """);
     }
 
-    private static string BuildConservativeUsingAwaitDelegateFlow(int index, Random random, string className)
+    private static string BuildImpureUsingAwaitDelegateFlow(int index, Random random, string className)
     {
         return $$"""
 using System;
