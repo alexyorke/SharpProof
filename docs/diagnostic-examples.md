@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0029`.
+from `SP0002` through `SP0031`.
 
 ### SP0002 - Purity not verified
 
@@ -804,4 +804,58 @@ Expected analyzer diagnostics:
 
 ```text
 SP0029 Error docs/readme-examples/sp0029-misplaced-requires/input.cs:6:6 The [Requires] attribute can only be applied to method-like declarations
+```
+
+### SP0030 - Exception contract violation
+
+Exception contracts reject escaping exceptions that are not allowed by `[DoesNotThrow]` or `[AllowedExceptions]`.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0030_ExceptionContractViolationExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0030-exception-contract-violation/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class Worker
+{
+    [DoesNotThrow]
+    public void Run()
+    {
+        throw new InvalidOperationException();
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0030 Warning docs/readme-examples/sp0030-exception-contract-violation/input.cs:10:9 Method 'Run' is marked [DoesNotThrow], but operation 'throw new InvalidOperationException();' can throw disallowed exceptions: System.InvalidOperationException
+```
+
+### SP0031 - Misplaced exception contract
+
+Exception contracts are restricted to method-like declarations.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0031_MisplacedExceptionContractExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0031-misplaced-exception-contract/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class Worker
+{
+    [DoesNotThrow]
+    public int Value => 42;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations
 ```

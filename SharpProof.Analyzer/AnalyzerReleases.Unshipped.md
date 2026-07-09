@@ -13,3 +13,5 @@ here after the preview release is cut.
 | SP0027 | Contracts | Warning | Reports calls that do not prove a callee `[Requires]` precondition. |
 | SP0028 | Contracts | Warning | Reports `[Requires]` preconditions that could not be parsed, lowered, or proven within the supported bounded proof surface. |
 | SP0029 | Usage | Error | Reports `[Requires]` attributes applied to non-method-like declarations. |
+| SP0030 | ExceptionFlow | Warning | Reports escaping exceptions that violate `[DoesNotThrow]` or `[AllowedExceptions]` contracts. |
+| SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` attributes applied to non-method-like declarations. |

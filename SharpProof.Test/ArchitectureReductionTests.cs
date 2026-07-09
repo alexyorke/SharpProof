@@ -2888,10 +2888,13 @@ namespace SharpProof.Test
             Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("SharpProof contract attributes for bounded symbolic C# analysis"));
             Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("ZeroAllocationsAttribute"));
             Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("AllowedCapabilitiesAttribute"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("DoesNotThrowAttribute"));
+            Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("AllowedExceptionsAttribute"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SharpProof"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("Capabilities"));
             Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("ZeroAllocations"));
+            Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("Exceptions"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value, Is.EqualTo("SharpProof"));
             Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value, Does.Contain("SharpProof bounded symbolic C# analysis"));
             Assert.That(readme, Does.Contain("SharpProof"));
@@ -2909,10 +2912,12 @@ namespace SharpProof.Test
             Assert.That(readme, Does.Contain("0.1.0-preview.1"));
             Assert.That(readme, Does.Contain("SP0013"));
             Assert.That(readme, Does.Contain("SP0002"));
-            Assert.That(readme, Does.Contain("SP0029"));
+            Assert.That(readme, Does.Contain("SP0031"));
             Assert.That(readme, Does.Contain("[ZeroAllocations]"));
             Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
             Assert.That(readme, Does.Contain("[Requires(...)]"));
+            Assert.That(readme, Does.Contain("[DoesNotThrow]"));
+            Assert.That(readme, Does.Contain("[AllowedExceptions(...)]"));
             Assert.That(readme, Does.Contain("--capabilities"));
             Assert.That(readme, Does.Contain("--complexity"));
             Assert.That(readme, Does.Contain("--runtime-hazards"));
@@ -2966,8 +2971,8 @@ namespace SharpProof.Test
             Assert.That(complexityDoc, Does.Contain("--complexity"));
             Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
             Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
-            Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0029`"));
-            Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0029"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0031`"));
+            Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0031"));
             Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));

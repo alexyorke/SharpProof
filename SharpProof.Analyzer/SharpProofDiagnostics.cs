@@ -278,7 +278,7 @@ namespace SharpProof.Analyzer
         public const string ContractInvalidReasonProperty = "sharpproof.contract.invalid_reason";
         private static readonly LocalizableString InvalidContractArgumentTitle = "Invalid SharpProof Contract Argument";
         private static readonly LocalizableString InvalidContractArgumentMessageFormat = "SharpProof contract '{0}' has invalid argument '{1}': {2}";
-        private static readonly LocalizableString InvalidContractArgumentDescription = "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, and unknown [AllowedCapabilities] bits.";
+        private static readonly LocalizableString InvalidContractArgumentDescription = "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.";
 
         public static readonly DiagnosticDescriptor InvalidContractArgumentRule = new DiagnosticDescriptor(
             id: InvalidContractArgumentId,
@@ -369,6 +369,37 @@ namespace SharpProof.Analyzer
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true,
             description: MisplacedRequiresAttributeDescription);
+
+        public const string ExceptionContractViolationId = "SP0030";
+        public const string ExceptionContractAttributeProperty = "sharpproof.exception_contract.attribute";
+        public const string ExceptionContractAllowedTypesProperty = "sharpproof.exception_contract.allowed_types";
+        public const string ExceptionContractDisallowedTypesProperty = "sharpproof.exception_contract.disallowed_types";
+        private static readonly LocalizableString ExceptionContractViolationTitle = "Exception Contract Violated";
+        private static readonly LocalizableString ExceptionContractViolationMessageFormat = "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}";
+        private static readonly LocalizableString ExceptionContractViolationDescription = "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
+
+        public static readonly DiagnosticDescriptor ExceptionContractViolationRule = new DiagnosticDescriptor(
+            id: ExceptionContractViolationId,
+            title: ExceptionContractViolationTitle,
+            messageFormat: ExceptionContractViolationMessageFormat,
+            category: "ExceptionFlow",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: ExceptionContractViolationDescription);
+
+        public const string MisplacedExceptionContractAttributeId = "SP0031";
+        private static readonly LocalizableString MisplacedExceptionContractAttributeTitle = "Misplaced Exception Contract Attribute";
+        private static readonly LocalizableString MisplacedExceptionContractAttributeMessageFormat = "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations";
+        private static readonly LocalizableString MisplacedExceptionContractAttributeDescription = "[DoesNotThrow] and [AllowedExceptions] configure symbolic exception-contract analysis for method-like declarations and should not be used on non-method declarations.";
+
+        public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = new DiagnosticDescriptor(
+            id: MisplacedExceptionContractAttributeId,
+            title: MisplacedExceptionContractAttributeTitle,
+            messageFormat: MisplacedExceptionContractAttributeMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: MisplacedExceptionContractAttributeDescription);
 
 
         public const string MisplacedAttributeId = "SP0003";

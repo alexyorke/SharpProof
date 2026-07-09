@@ -55,10 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Missing Contract Types
-- Add an exception contract surface such as `[Throws]`, `[DoesNotThrow]`, or
-  `[AllowedExceptions]` on top of the existing `SP0010` and `SP0011` exception
-  evidence so users can enforce exception behavior instead of only reporting
-  it.
 - Expand `[Ensures]` beyond the current `result`-only return-site model to
   support parameters, `this` and member state, `old(...)` values, nullable and
   collection predicates, constructors, void methods, and `out`/`ref` parameter

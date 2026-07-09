@@ -107,6 +107,30 @@ namespace SharpProof.Analyzer
                 ReportIfNotSuppressed(context, baseline, diag);
             }
 
+            var doesNotThrowAttributeLocation = FindAttributeLocation(attributeList, "DoesNotThrowAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (doesNotThrowAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+            {
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                    doesNotThrowAttributeLocation,
+                    "DoesNotThrow",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
+            }
+
+            var allowedExceptionsAttributeLocation = FindAttributeLocation(attributeList, "AllowedExceptionsAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (allowedExceptionsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+            {
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                    allowedExceptionsAttributeLocation,
+                    "AllowedExceptions",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
+            }
+
             var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, "ExpectedComplexityAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
             if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {

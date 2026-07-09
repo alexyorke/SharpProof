@@ -43,7 +43,9 @@ namespace SharpProof.Analyzer
                                   SharpProofDiagnostics.UnrecognizedAttributeIdentityRule,
                                   SharpProofDiagnostics.RequiresNotProvenRule,
                                   SharpProofDiagnostics.RequiresUnsupportedRule,
-                                  SharpProofDiagnostics.MisplacedRequiresAttributeRule);
+                                  SharpProofDiagnostics.MisplacedRequiresAttributeRule,
+                                  SharpProofDiagnostics.ExceptionContractViolationRule,
+                                  SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
 
         public override void Initialize(AnalysisContext context)
         {

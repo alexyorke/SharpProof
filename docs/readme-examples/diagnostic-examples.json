@@ -306,5 +306,27 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0030-exception-contract-violation",
+    "DiagnosticId": "SP0030",
+    "Title": "SP0030 - Exception contract violation",
+    "Summary": "Exception contracts reject escaping exceptions that are not allowed by `[DoesNotThrow]` or `[AllowedExceptions]`.",
+    "SourcePath": "docs/readme-examples/sp0030-exception-contract-violation/input.cs",
+    "OutputPath": "docs/readme-examples/sp0030-exception-contract-violation/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0031-misplaced-exception-contract",
+    "DiagnosticId": "SP0031",
+    "Title": "SP0031 - Misplaced exception contract",
+    "Summary": "Exception contracts are restricted to method-like declarations.",
+    "SourcePath": "docs/readme-examples/sp0031-misplaced-exception-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0031-misplaced-exception-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

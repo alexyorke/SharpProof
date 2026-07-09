@@ -15,7 +15,9 @@ namespace SharpProof.Analyzer
             ImmutableHashSet.Create(
                 StringComparer.Ordinal,
                 "AllowedCapabilitiesAttribute",
+                "AllowedExceptionsAttribute",
                 "AllowSynchronizationAttribute",
+                "DoesNotThrowAttribute",
                 "EnforcePureAttribute",
                 "EnsuresAttribute",
                 "ExpectedComplexityAttribute",

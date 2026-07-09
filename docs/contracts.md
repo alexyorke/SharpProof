@@ -22,6 +22,11 @@ bounded proof question into normal build diagnostics.
   as `IO`, `Console`, `FileRead`, `FileWrite`, `Network`, `Process`,
   `Environment`, `Reflection`, and `NativeInterop`. Violations produce
   `SP0015`; unverifiable operations produce `SP0016`.
+- `[DoesNotThrow]`: require that no exception escapes the annotated method-like
+  body. Escaping exceptions produce `SP0030`.
+- `[AllowedExceptions(...)]`: allow only the listed exception types, including
+  derived exception types, to escape the annotated method-like body. Disallowed
+  escaping exceptions produce `SP0030`.
 - `[ExpectedComplexity(...)]`: require the best proven method complexity to be
   at or below the declared bound. Exceeded bounds produce `SP0021`; unknown
   bounds produce `SP0022`.
@@ -45,6 +50,8 @@ The broad-usage attributes and their placement diagnostics are:
 | `[AllowedCapabilities(...)]` | `SP0017` | Capability contract placement is validated before capability reasoning runs. |
 | `[Requires("condition")]` | `SP0029` | Preconditions are accepted only on method-like declarations. |
 | `[Ensures("condition")]` | `SP0020` | Postconditions are accepted only on method-like declarations. |
+| `[DoesNotThrow]` | `SP0031` | Exception contracts are accepted only on method-like declarations. |
+| `[AllowedExceptions(...)]` | `SP0031` | Exception contracts are accepted only on method-like declarations. |
 | `[ExpectedComplexity(...)]` | `SP0023` | Complexity contracts are accepted only on method-like declarations. |
 
 Attributes whose supported target set is already stable and compiler-enforceable
@@ -67,7 +74,8 @@ build_property.sharpproof_attribute_stub_namespaces = My.Contracts;Other.Contrac
 
 Use `<global>` in that list only when a project deliberately declares global
 namespace stubs. Attributes with SharpProof contract names such as
-`EnforcePureAttribute`, `EnsuresAttribute`, `RequiresAttribute`, or
+`EnforcePureAttribute`, `EnsuresAttribute`, `RequiresAttribute`,
+`DoesNotThrowAttribute`, `AllowedExceptionsAttribute`, or
 `ZeroAllocationsAttribute` from unaccepted namespaces are ignored as contracts
 and reported as `SP0026`.
 Recognized external purity annotations such as
@@ -79,7 +87,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0029`.
+`SP0002` through `SP0031`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.

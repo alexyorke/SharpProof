@@ -50,10 +50,6 @@ namespace SharpProof.Analyzer
                 context.Node.SyntaxTree,
                 config.CheckedExceptions) ||
                 Analyzer.Configuration.AnalyzerConfiguration.RuntimeHazardReportsSites(runtimeHazardMode);
-            if (!reportMethodSummaries && !reportCheckedExceptionSites)
-            {
-                return;
-            }
 
             if (!(context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is IMethodSymbol methodSymbol))
             {
@@ -65,17 +61,34 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            ExceptionFlowQuery.MethodExceptionQueryResult queryResult;
-            using (UseAttributePolicy(attributePolicy))
+            var exceptionContracts = CollectExceptionContracts(methodSymbol, context.SemanticModel, attributePolicy, context.CancellationToken);
+            var hasValidExceptionContracts = exceptionContracts.Any(static contract => contract.InvalidReason == null);
+            if (!reportMethodSummaries && !reportCheckedExceptionSites && exceptionContracts.Length == 0)
             {
-                queryResult = ExceptionFlowQuery.AnalyzeMethod(
-                    context.Node,
-                    context.SemanticModel,
-                    context.CancellationToken,
-                    methodSymbol,
-                    exceptionSummaryCatalog,
-                    purityService.SmtAnalysis,
-                    attributePolicy);
+                return;
+            }
+
+            ExceptionFlowQuery.MethodExceptionQueryResult? queryResult = null;
+            if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
+            {
+                using (UseAttributePolicy(attributePolicy))
+                {
+                    queryResult = ExceptionFlowQuery.AnalyzeMethod(
+                        context.Node,
+                        context.SemanticModel,
+                        context.CancellationToken,
+                        methodSymbol,
+                        exceptionSummaryCatalog,
+                        purityService.SmtAnalysis,
+                        attributePolicy);
+                }
+            }
+
+            AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
+
+            if (queryResult == null)
+            {
+                return;
             }
 
             if (reportCheckedExceptionSites)

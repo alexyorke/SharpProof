@@ -240,6 +240,20 @@ namespace System.Experimental
             await VerifyAnalyzerExampleAsync("sp0029-misplaced-requires");
         }
 
+        [ReadmeExample("sp0030-exception-contract-violation")]
+        [Test]
+        public async Task Sp0030_ExceptionContractViolationExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0030-exception-contract-violation");
+        }
+
+        [ReadmeExample("sp0031-misplaced-exception-contract")]
+        [Test]
+        public async Task Sp0031_MisplacedExceptionContractExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0031-misplaced-exception-contract");
+        }
+
         [ReadmeExample("capabilities-console")]
         [Test]
         public async Task CapabilitiesCliExample_MatchesSnapshot()
@@ -330,7 +344,7 @@ namespace System.Experimental
                 .Cast<string>()
                 .ToHashSet(StringComparer.Ordinal);
 
-            var expectedIds = Enumerable.Range(2, 24)
+            var expectedIds = Enumerable.Range(2, 30)
                 .Select(index => "SP" + index.ToString("0000"))
                 .ToHashSet(StringComparer.Ordinal);
 
