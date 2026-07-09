@@ -564,9 +564,9 @@ namespace SearchLib.Smt
             private const int MaxCharacterClassRangeCount = 512;
             private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
             private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options), CharacterRange[]> RegexCharacterRangeCache = new();
-            private static readonly Lazy<CharacterRange[]> DecimalDigitRanges = new(() => CreateRegexCharacterRanges((@"\d", RegexOptions.None)));
-            private static readonly Lazy<CharacterRange[]> WhitespaceRanges = new(() => CreateRegexCharacterRanges((@"\s", RegexOptions.None)));
-            private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRanges((@"\w", RegexOptions.None)));
+            private static readonly Lazy<CharacterRange[]> DecimalDigitRanges = new(() => CreateRegexCharacterRangesOrEmpty((@"\d", RegexOptions.None)));
+            private static readonly Lazy<CharacterRange[]> WhitespaceRanges = new(() => CreateRegexCharacterRangesOrEmpty((@"\s", RegexOptions.None)));
+            private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRangesOrEmpty((@"\w", RegexOptions.None)));
             private readonly Context _context;
             private readonly string _pattern;
             private bool _isExact = true;
@@ -2060,6 +2060,26 @@ namespace SearchLib.Smt
                 }
 
                 return ranges.ToArray();
+            }
+
+            private static CharacterRange[] CreateRegexCharacterRangesOrEmpty((string Pattern, RegexOptions Options) key)
+            {
+                try
+                {
+                    return CreateRegexCharacterRanges(key);
+                }
+                catch (ArgumentException)
+                {
+                    return Array.Empty<CharacterRange>();
+                }
+                catch (InvalidOperationException)
+                {
+                    return Array.Empty<CharacterRange>();
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    return Array.Empty<CharacterRange>();
+                }
             }
 
             private static CharacterRange[] MergeRanges(IEnumerable<CharacterRange> ranges)

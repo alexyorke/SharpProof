@@ -349,6 +349,54 @@ public class TestClass
         }
 
         [Test]
+        public void CompilationPurityService_CachesSemanticModelsDuringFixedPointBuild()
+        {
+            var callerTree = CSharpSyntaxTree.ParseText(@"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Caller() => Helper.Shared();
+}");
+            var helperTree = CSharpSyntaxTree.ParseText(@"
+public static class Helper
+{
+    public static int Shared() => 42;
+}");
+            var compilation = CSharpCompilation.Create(
+                "SemanticModelCacheTest",
+                new[] { callerTree, helperTree },
+                new[]
+                {
+                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                    MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)
+                },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(callerTree);
+            var enforcePureAttributeSymbol = compilation.GetTypeByMetadataName(typeof(EnforcePureAttribute).FullName!)!;
+            var testClass = compilation.GetTypeByMetadataName("TestClass")!;
+            var caller = testClass.GetMembers("Caller").OfType<IMethodSymbol>().Single();
+
+            var serviceType = typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.Engine.CompilationPurityService", throwOnError: true)!;
+            var service = Activator.CreateInstance(
+                serviceType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { compilation },
+                culture: null);
+            var semanticModelCacheField = serviceType.GetField("_semanticModelCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var getPurityMethod = serviceType.GetMethod("GetPurity", BindingFlags.Instance | BindingFlags.Public)!;
+
+            Assert.That(GetCount(semanticModelCacheField.GetValue(service)!), Is.EqualTo(0));
+
+            var result = getPurityMethod.Invoke(service, new object?[] { caller, semanticModel, enforcePureAttributeSymbol, null, CancellationToken.None });
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(GetCount(semanticModelCacheField.GetValue(service)!), Is.EqualTo(2));
+        }
+
+        [Test]
         public async Task SharedImpureCallee_ReusedAcrossManyCallers_ReportsAllCallers()
         {
             var test = @"

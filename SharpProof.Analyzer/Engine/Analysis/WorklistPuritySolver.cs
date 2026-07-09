@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -15,6 +16,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             SmtAnalysisService smtAnalysis,
+            Func<SyntaxTree, SemanticModel> getSemanticModel,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -54,7 +56,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                     continue;
                 }
                 var syntaxRef = method.DeclaringSyntaxReferences[0];
-                var model = compilation.GetSemanticModel(syntaxRef.SyntaxTree);
+                var model = getSemanticModel(syntaxRef.SyntaxTree);
                 var purity = engine.IsConsideredPure(
                     method,
                     model,

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -174,6 +175,10 @@ namespace SharpProof.Symbolic.Smt
             catch (InvalidOperationException)
             {
                 return Unknown("smt_encoding_failure");
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return Unknown("smt_timeout");
             }
             catch (Exception ex) when (IsZ3OrEncodingFailure(ex))
             {

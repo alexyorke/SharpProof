@@ -9,6 +9,7 @@ namespace SharpProof.Analyzer.Engine
     internal sealed class CompilationPurityService : System.IDisposable
     {
         private readonly ConcurrentDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> _purityCache = new(SymbolEqualityComparer.Default);
+        private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> _semanticModelCache = new();
         private readonly object _fixedPointLock = new();
 
         public CompilationPurityService(Compilation compilation)
@@ -70,15 +71,21 @@ namespace SharpProof.Analyzer.Engine
                     return;
                 }
 
-                _callGraph ??= CallGraphBuilder.Build(_compilation, cancellationToken);
+                _callGraph ??= CallGraphBuilder.Build(_compilation, GetSemanticModel, cancellationToken);
                 _fixedPoint = WorklistPuritySolver.Solve(
                     _callGraph,
                     _compilation,
                     enforcePureAttributeSymbol,
                     allowSynchronizationAttributeSymbol,
                     SmtAnalysis,
+                    GetSemanticModel,
                     cancellationToken);
             }
+        }
+
+        private SemanticModel GetSemanticModel(SyntaxTree syntaxTree)
+        {
+            return _semanticModelCache.GetOrAdd(syntaxTree, tree => _compilation.GetSemanticModel(tree));
         }
 
         private System.Collections.Immutable.ImmutableDictionary<IMethodSymbol, System.Collections.Immutable.ImmutableHashSet<IMethodSymbol>>? _callGraph;

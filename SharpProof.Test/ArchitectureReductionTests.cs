@@ -22,7 +22,149 @@ namespace SharpProof.Test
 
         private static string ReadFileCached(string path)
         {
-            return s_fileContentCache.GetOrAdd(path, File.ReadAllText);
+            return s_fileContentCache.GetOrAdd(path, static key =>
+            {
+                var fileName = Path.GetFileName(key);
+                if (string.Equals(fileName, "PurityAnalysisEngine.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "ExecutionVisibility.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "MethodInvocationPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "AssignmentPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "ReturnStatementPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "ExceptionFlowAnalyzer.ExceptionSites.cs", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, "ExceptionFlowQuery.cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    var directory = Path.GetDirectoryName(key) ?? throw new InvalidOperationException($"{fileName} path has no directory.");
+                    var partialPattern = Path.GetFileNameWithoutExtension(fileName) + "*.cs";
+                    if (string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pathFactsFiles = new[]
+                        {
+                            "ExceptionFlowAnalyzer.PathFacts.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.Branches.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.Symbols.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.Finally.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.NormalCompletion.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.AssignmentInvalidation.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.ExpressionFacts.cs",
+                            "ExceptionFlowAnalyzer.PathFacts.MutationTracking.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            pathFactsFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    if (string.Equals(fileName, "ExecutionVisibility.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var executionVisibilityFiles = new[]
+                        {
+                            "ExecutionVisibility.cs",
+                            "ExecutionVisibility.Descendants.cs",
+                            "ExecutionVisibility.EvaluationPathFacts.cs",
+                            "ExecutionVisibility.SharedFacts.cs",
+                            "ExecutionVisibility.SwitchStatements.cs",
+                            "ExecutionVisibility.SwitchExpressions.cs",
+                            "ExecutionVisibility.ConditionTruth.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            executionVisibilityFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    if (string.Equals(fileName, "AssignmentPurityRule.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var assignmentRuleFiles = new[]
+                        {
+                            "AssignmentPurityRule.cs",
+                            "AssignmentPurityRule.CompoundAssignments.cs",
+                            "AssignmentPurityRule.PropertySetters.cs",
+                            "AssignmentPurityRule.TargetPurity.cs",
+                            "PropertyDispatchHelper.cs",
+                            "RuleAnalysisHelper.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            assignmentRuleFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    if (string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var propertyRuleFiles = new[]
+                        {
+                            "PropertyReferencePurityRule.cs",
+                            "PropertyReferencePurityRule.Arguments.cs",
+                            "PropertyReferencePurityRule.SpecialCases.cs",
+                            "PropertyReferencePurityRule.DictionaryDispatch.cs",
+                            "PropertyReferencePurityRule.GetterDispatch.cs",
+                            "PropertyReferencePurityRule.MetadataGetters.cs",
+                            "PropertyReferencePurityRule.GetterTargets.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            propertyRuleFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    if (string.Equals(fileName, "ExceptionFlowAnalyzer.ExceptionSites.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var exceptionSiteFiles = new[]
+                        {
+                            "ExceptionFlowAnalyzer.ExceptionSites.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.NullFacts.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.CheckedOverflow.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.CastsAndStores.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.NullableAccess.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs",
+                            "ExceptionFlowAnalyzer.ExceptionSites.TypeFacts.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            exceptionSiteFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    if (string.Equals(fileName, "ExceptionFlowQuery.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var exceptionQueryFiles = new[]
+                        {
+                            "ExceptionFlowQuery.cs",
+                            "ExceptionFlowQuery.SiteCollection.cs",
+                            "ExceptionFlowQuery.RuntimeHazards.cs",
+                            "ExceptionFlowQuery.Callees.cs",
+                            "ExceptionFlowQuery.Catches.cs",
+                            "ExceptionFlowQuery.Models.cs",
+                        };
+                        return string.Join(
+                            Environment.NewLine,
+                            exceptionQueryFiles
+                                .Select(partialFile => Path.Combine(directory, partialFile))
+                                .Where(File.Exists)
+                                .Select(File.ReadAllText));
+                    }
+
+                    return string.Join(
+                        Environment.NewLine,
+                        Directory.GetFiles(directory, partialPattern)
+                            .OrderBy(static partialPath => partialPath, StringComparer.OrdinalIgnoreCase)
+                            .Select(File.ReadAllText));
+                }
+
+                return File.ReadAllText(key);
+            });
         }
         [Test]
         public void AnalyzerReachability_DoesNotOpenCodeBranchProofQueries()
@@ -1342,6 +1484,32 @@ namespace SharpProof.Test
                 .ToArray();
 
             Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
+        public void SearchLib_RegexTranslationTimeoutsFallbackConservatively()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var solverSource = ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SearchLib",
+                "SmtSolver.cs"));
+            var encoderSource = ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SearchLib",
+                "Z3FormulaEncoder.cs"));
+            var smtAnalysisSource = ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Symbolic",
+                "Smt",
+                "SmtAnalysisService.cs"));
+
+            Assert.That(solverSource, Does.Contain("ex is RegexMatchTimeoutException"));
+            Assert.That(encoderSource, Does.Contain("CreateRegexCharacterRangesOrEmpty"));
+            Assert.That(encoderSource, Does.Contain("catch (RegexMatchTimeoutException)"));
+            Assert.That(encoderSource, Does.Contain("return Array.Empty<CharacterRange>();"));
+            Assert.That(smtAnalysisSource, Does.Contain("catch (RegexMatchTimeoutException)"));
+            Assert.That(smtAnalysisSource, Does.Contain("return Unknown(\"smt_timeout\");"));
         }
 
         [Test]
@@ -2666,9 +2834,11 @@ namespace SharpProof.Test
             Assert.That(modules.Select(static module => module.Name), Does.Contain("SearchLib"));
             Assert.That(otherModule == null || otherModule.Lines < 100, Is.True, "Unexpected production code growth fell into the catch-all 'Other' bucket.");
             Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicProgramPointFacts.cs"));
-            Assert.That(largestFiles, Does.Contain("SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs"));
+            Assert.That(
+                largestFiles.Any(static path => path.StartsWith("SharpProof.Analyzer/Engine/PurityAnalysisEngine", StringComparison.Ordinal)),
+                Is.False);
             Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicSourceQueryService.cs"));
-            Assert.That(largestFiles, Does.Contain("SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs"));
+            Assert.That(largestFiles, Does.Not.Contain("SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs"));
             Assert.That(largestFiles, Does.Contain("Tools/SharpProof.EffectSummary/Program.cs"));
         }
 

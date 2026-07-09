@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer.Engine.Analysis
@@ -28,12 +29,52 @@ namespace SharpProof.Analyzer.Engine.Analysis
             }
         }
 
+        internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(
+            INamespaceSymbol root,
+            CancellationToken cancellationToken)
+        {
+            foreach (var member in root.GetMembers())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (member is INamespaceSymbol ns)
+                {
+                    foreach (var inner in EnumerateAllNamedTypes(ns, cancellationToken))
+                    {
+                        yield return inner;
+                    }
+                }
+                else if (member is INamedTypeSymbol type)
+                {
+                    yield return type;
+                    foreach (var nested in EnumerateNestedTypes(type, cancellationToken))
+                    {
+                        yield return nested;
+                    }
+                }
+            }
+        }
+
         internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(INamedTypeSymbol type)
         {
             foreach (var member in type.GetTypeMembers())
             {
                 yield return member;
                 foreach (var nested in EnumerateNestedTypes(member))
+                {
+                    yield return nested;
+                }
+            }
+        }
+
+        internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(
+            INamedTypeSymbol type,
+            CancellationToken cancellationToken)
+        {
+            foreach (var member in type.GetTypeMembers())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return member;
+                foreach (var nested in EnumerateNestedTypes(member, cancellationToken))
                 {
                     yield return nested;
                 }

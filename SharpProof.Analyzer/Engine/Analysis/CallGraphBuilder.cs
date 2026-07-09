@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -14,13 +15,25 @@ namespace SharpProof.Analyzer.Engine.Analysis
             Compilation compilation,
             CancellationToken cancellationToken)
         {
+            return Build(compilation, tree => compilation.GetSemanticModel(tree), cancellationToken);
+        }
+
+        public static ImmutableDictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>> Build(
+            Compilation compilation,
+            Func<SyntaxTree, SemanticModel> getSemanticModel,
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var edges = new Dictionary<IMethodSymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
+            var allNamedTypes = TypeHierarchyEnumeration
+                .EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace, cancellationToken)
+                .ToImmutableArray();
+            var dispatchTargetCache = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(SymbolEqualityComparer.Default);
 
             foreach (var tree in compilation.SyntaxTrees)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var model = compilation.GetSemanticModel(tree);
+                var model = getSemanticModel(tree);
                 var root = tree.GetRoot(cancellationToken);
                 var operations = root.DescendantNodes().Select(n => model.GetOperation(n, cancellationToken)).OfType<IMethodBodyOperation>();
                 foreach (var body in operations)
@@ -52,7 +65,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                             var isBaseReference = IsBaseReference(inv.Instance);
                             if (!isBaseReference)
                             {
-                                foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation, cancellationToken))
+                                foreach (var impl in GetPotentialTargetsForVirtualOrInterfaceCall(target, allNamedTypes, dispatchTargetCache, cancellationToken))
                                 {
                                     callees.Add(impl);
                                 }
@@ -364,7 +377,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
             foreach (var tree in compilation.SyntaxTrees)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var model = compilation.GetSemanticModel(tree);
+                var model = getSemanticModel(tree);
                 var root = tree.GetRoot(cancellationToken);
                 var methods = root.DescendantNodes().Select(n => model.GetDeclaredSymbol(n, cancellationToken)).OfType<IMethodSymbol>();
                 foreach (var method in methods)
@@ -403,7 +416,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                                 var isBaseReference = IsBaseReference(inv.Instance);
                                 if (!isBaseReference)
                                 {
-                                    foreach (var impl in ResolvePotentialTargetsForVirtualOrInterfaceCall(target, compilation, cancellationToken))
+                                    foreach (var impl in GetPotentialTargetsForVirtualOrInterfaceCall(target, allNamedTypes, dispatchTargetCache, cancellationToken))
                                     {
                                         callerSetBuilder.Add(impl);
                                     }
@@ -430,15 +443,33 @@ namespace SharpProof.Analyzer.Engine.Analysis
             };
         }
 
+        private static ImmutableArray<IMethodSymbol> GetPotentialTargetsForVirtualOrInterfaceCall(
+            IMethodSymbol target,
+            ImmutableArray<INamedTypeSymbol> allNamedTypes,
+            Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>> dispatchTargetCache,
+            CancellationToken cancellationToken)
+        {
+            var targetDefinition = target.OriginalDefinition;
+            if (dispatchTargetCache.TryGetValue(targetDefinition, out var cachedTargets))
+            {
+                return cachedTargets;
+            }
+
+            var targets = ResolvePotentialTargetsForVirtualOrInterfaceCall(targetDefinition, allNamedTypes, cancellationToken)
+                .ToImmutableArray();
+            dispatchTargetCache[targetDefinition] = targets;
+            return targets;
+        }
+
         private static IEnumerable<IMethodSymbol> ResolvePotentialTargetsForVirtualOrInterfaceCall(
             IMethodSymbol target,
-            Compilation compilation,
+            ImmutableArray<INamedTypeSymbol> allNamedTypes,
             CancellationToken cancellationToken)
         {
             // Interface dispatch: include implementations in types that implement the interface
             if (target.ContainingType?.TypeKind == TypeKind.Interface)
             {
-                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
+                foreach (var type in allNamedTypes)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!TypeHierarchyEnumeration.ImplementsInterface(type, target.ContainingType)) continue;
@@ -461,7 +492,7 @@ namespace SharpProof.Analyzer.Engine.Analysis
                 var baseType = target.ContainingType;
                 if (baseType != null)
                 {
-                    foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
+                    foreach (var type in allNamedTypes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType)) continue;

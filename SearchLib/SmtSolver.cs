@@ -204,6 +204,7 @@ namespace SearchLib.Smt
                 ex is Z3Exception ||
                 ex is ArgumentException ||
                 ex is InvalidCastException ||
+                ex is RegexMatchTimeoutException ||
                 ex is ArithmeticException;
         }
 
