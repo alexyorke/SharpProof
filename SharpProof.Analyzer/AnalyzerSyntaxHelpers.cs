@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -8,18 +7,6 @@ namespace SharpProof.Analyzer
 {
     internal static class AnalyzerSyntaxHelpers
     {
-        internal static bool MatchesAttribute(
-            AttributeData attribute,
-            INamedTypeSymbol? expectedSymbol,
-            string attributeTypeName)
-        {
-            var attributeClass = attribute.AttributeClass;
-            return attributeClass != null &&
-                ((expectedSymbol != null &&
-                  SymbolEqualityComparer.Default.Equals(attributeClass.OriginalDefinition, expectedSymbol)) ||
-                 string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal));
-        }
-
         internal static Location GetCallableDeclarationLocation(SyntaxNode node)
         {
             return node switch

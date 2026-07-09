@@ -16,7 +16,8 @@ namespace SharpProof.Analyzer
 
         internal static void AnalyzeSymbolForExpectedComplexity(
             SyntaxNodeAnalysisContext context,
-            Configuration.DiagnosticBaseline baseline)
+            Configuration.DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol methodSymbol)
             {
@@ -30,7 +31,7 @@ namespace SharpProof.Analyzer
 
             if (!TryGetExpectedComplexity(
                     methodSymbol,
-                    context.SemanticModel.Compilation,
+                    attributePolicy,
                     context.CancellationToken,
                     out var declaredComplexity,
                     out var attributeLocation,
@@ -122,7 +123,7 @@ namespace SharpProof.Analyzer
 
         private static bool TryGetExpectedComplexity(
             IMethodSymbol methodSymbol,
-            Compilation compilation,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CancellationToken cancellationToken,
             out DeclaredComplexity declaredComplexity,
             out Location? attributeLocation,
@@ -132,14 +133,10 @@ namespace SharpProof.Analyzer
             attributeLocation = null;
             invalidContract = null;
 
-            var attributeSymbol =
-                compilation.GetTypeByMetadataName("SharpProof.Attributes.ExpectedComplexityAttribute") ??
-                compilation.GetTypeByMetadataName("ExpectedComplexityAttribute");
-
             foreach (var attribute in methodSymbol.GetAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, attributeSymbol, "ExpectedComplexityAttribute"))
+                if (!attributePolicy.IsAccepted(attribute, "ExpectedComplexityAttribute"))
                 {
                     continue;
                 }

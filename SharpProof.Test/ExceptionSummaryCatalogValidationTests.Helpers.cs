@@ -305,6 +305,13 @@ public class TestClass
                     "true");
             }
 
+            if (!analyzerGlobalOptions.ContainsKey("sharpproof_attribute_stub_namespaces"))
+            {
+                analyzerGlobalOptions = analyzerGlobalOptions.Add(
+                    "sharpproof_attribute_stub_namespaces",
+                    "<global>");
+            }
+
             var analyzerOptions = new AnalyzerOptions(
                 effectSummaryFiles
                     .Select(file => (AdditionalText)new InMemoryAdditionalText(file.Path, file.Text))

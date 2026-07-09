@@ -33,7 +33,7 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            if (HasDirectAttributeNamed(symbol, "PureExternalAttribute", "SharpProof.Attributes.PureExternalAttribute"))
+            if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute"))
             {
                 return true;
             }
@@ -43,13 +43,13 @@ namespace SharpProof.Analyzer.Engine
                 return true;
             }
 
-            if (HasDirectAttributeNamed(symbol, "ImpureAttribute", "SharpProof.Attributes.ImpureAttribute") ||
-                HasAssemblyAttributeNamed(symbol, "ImpureAttribute", "SharpProof.Attributes.ImpureAttribute"))
+            if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute") ||
+                HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute"))
             {
                 return false;
             }
 
-            return HasAssemblyAttributeNamed(symbol, "PureExternalAttribute", "SharpProof.Attributes.PureExternalAttribute");
+            return HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute");
         }
 
         internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
@@ -76,17 +76,17 @@ namespace SharpProof.Analyzer.Engine
                 return false;
             }
 
-            if (HasDirectAttributeNamed(symbol, "ImpureAttribute", "SharpProof.Attributes.ImpureAttribute"))
+            if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute"))
             {
                 return true;
             }
 
-            if (HasDirectAttributeNamed(symbol, "PureExternalAttribute", "SharpProof.Attributes.PureExternalAttribute"))
+            if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute"))
             {
                 return false;
             }
 
-            return HasAssemblyAttributeNamed(symbol, "ImpureAttribute", "SharpProof.Attributes.ImpureAttribute");
+            return HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute");
         }
 
 

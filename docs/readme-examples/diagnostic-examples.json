@@ -262,5 +262,16 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0026-unrecognized-attribute-identity",
+    "DiagnosticId": "SP0026",
+    "Title": "SP0026 - Unrecognized attribute identity",
+    "Summary": "SharpProof-looking attribute names from unaccepted namespaces are reported and ignored as contracts.",
+    "SourcePath": "docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs",
+    "OutputPath": "docs/readme-examples/sp0026-unrecognized-attribute-identity/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

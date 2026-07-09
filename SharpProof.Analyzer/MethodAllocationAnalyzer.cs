@@ -21,7 +21,8 @@ namespace SharpProof.Analyzer
 
         internal static void AnalyzeSymbolForZeroAllocations(
             SyntaxNodeAnalysisContext context,
-            DiagnosticBaseline baseline)
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol methodSymbol)
             {
@@ -33,12 +34,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            var zeroAllocationsAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "ZeroAllocationsAttribute");
-            var hasZeroAllocationsAttribute =
-                (zeroAllocationsAttributeSymbol != null && HasDirectAttribute(methodSymbol, zeroAllocationsAttributeSymbol))
-                || HasDirectAttributeByName(methodSymbol, "ZeroAllocationsAttribute");
+            var hasZeroAllocationsAttribute = attributePolicy.HasAttribute(methodSymbol, "ZeroAllocationsAttribute");
             if (!hasZeroAllocationsAttribute)
             {
                 return;
@@ -278,34 +274,6 @@ namespace SharpProof.Analyzer
             var originalDefinition = namedType.OriginalDefinition;
             return originalDefinition.ContainingNamespace?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System" &&
                 (originalDefinition.Name == "Span" || originalDefinition.Name == "ReadOnlySpan");
-        }
-
-        private static bool HasDirectAttribute(IMethodSymbol methodSymbol, INamedTypeSymbol attributeType)
-        {
-            foreach (var attributeData in methodSymbol.GetAttributes())
-            {
-                var attributeClass = attributeData.AttributeClass?.OriginalDefinition;
-                if (SymbolEqualityComparer.Default.Equals(attributeClass, attributeType))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasDirectAttributeByName(IMethodSymbol methodSymbol, string attributeTypeName)
-        {
-            foreach (var attributeData in methodSymbol.GetAttributes())
-            {
-                var attributeClass = attributeData.AttributeClass;
-                if (attributeClass != null && string.Equals(attributeClass.Name, attributeTypeName, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private readonly record struct AllocationSite(

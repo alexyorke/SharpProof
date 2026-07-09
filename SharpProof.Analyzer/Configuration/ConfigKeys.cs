@@ -7,6 +7,7 @@ namespace SharpProof.Analyzer.Configuration
         public const string KnownPureMethods = "sharpproof_known_pure_methods";
         public const string KnownImpureNamespaces = "sharpproof_known_impure_namespaces";
         public const string KnownImpureTypes = "sharpproof_known_impure_types";
+        public const string AttributeStubNamespaces = "sharpproof_attribute_stub_namespaces";
         public const string PurityProfile = "sharpproof_purity_profile";
         public const string EnableDebugLogging = "sharpproof_enable_debug_logging";
 

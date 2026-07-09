@@ -19,7 +19,8 @@ namespace SharpProof.Analyzer
         internal static void AnalyzeSymbolForEnsures(
             SyntaxNodeAnalysisContext context,
             CompilationPurityService purityService,
-            DiagnosticBaseline baseline)
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol methodSymbol)
             {
@@ -31,10 +32,7 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            var ensuresAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "EnsuresAttribute");
-            var contracts = CollectContracts(methodSymbol, ensuresAttributeSymbol, context.CancellationToken);
+            var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
             if (contracts.Length == 0)
             {
                 return;
@@ -229,14 +227,14 @@ namespace SharpProof.Analyzer
 
         private static ImmutableArray<EnsuresContract> CollectContracts(
             IMethodSymbol methodSymbol,
-            INamedTypeSymbol? ensuresAttributeSymbol,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             CancellationToken cancellationToken)
         {
             var builder = ImmutableArray.CreateBuilder<EnsuresContract>();
             foreach (var attribute in methodSymbol.GetAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, ensuresAttributeSymbol, "EnsuresAttribute"))
+                if (!attributePolicy.IsAccepted(attribute, "EnsuresAttribute"))
                 {
                     continue;
                 }

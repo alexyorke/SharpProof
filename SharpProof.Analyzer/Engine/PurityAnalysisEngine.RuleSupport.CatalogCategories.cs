@@ -84,28 +84,26 @@ namespace SharpProof.Analyzer.Engine
                     StringComparison.Ordinal)
             );
         }
-        private static bool HasDirectAttributeNamed(ISymbol symbol, string attributeName, string fullyQualifiedMetadataName)
+        private static bool HasDirectAttributeNamed(ISymbol symbol, string fullyQualifiedMetadataName)
         {
             if (symbol == null)
             {
                 return false;
             }
 
-            var fullyQualifiedName = "global::" + fullyQualifiedMetadataName;
             return GetAttributesIncludingAssociatedSymbol(symbol).Any(ad =>
-                    IsAttributeNamed(ad, attributeName, fullyQualifiedMetadataName, fullyQualifiedName));
+                    IsAttributeMetadataName(ad, fullyQualifiedMetadataName));
         }
 
-        private static bool HasAssemblyAttributeNamed(ISymbol symbol, string attributeName, string fullyQualifiedMetadataName)
+        private static bool HasAssemblyAttributeNamed(ISymbol symbol, string fullyQualifiedMetadataName)
         {
             if (symbol == null)
             {
                 return false;
             }
 
-            var fullyQualifiedName = "global::" + fullyQualifiedMetadataName;
             return symbol.ContainingAssembly?.GetAttributes().Any(ad =>
-                IsAttributeNamed(ad, attributeName, fullyQualifiedMetadataName, fullyQualifiedName)) == true;
+                IsAttributeMetadataName(ad, fullyQualifiedMetadataName)) == true;
         }
 
         private static bool HasRecognizedExternalPureAttribute(ISymbol symbol)
@@ -118,18 +116,6 @@ namespace SharpProof.Analyzer.Engine
             return GetAttributesIncludingAssociatedSymbol(symbol).Any(ad =>
                 IsAttributeMetadataName(ad, "JetBrains.Annotations.PureAttribute") ||
                 IsAttributeMetadataName(ad, "System.Diagnostics.Contracts.PureAttribute"));
-        }
-
-        private static bool IsAttributeNamed(
-            AttributeData attributeData,
-            string attributeName,
-            string fullyQualifiedMetadataName,
-            string fullyQualifiedName)
-        {
-            return
-                string.Equals(attributeData.AttributeClass?.Name, attributeName, StringComparison.Ordinal) ||
-                string.Equals(attributeData.AttributeClass?.ToDisplayString(), fullyQualifiedMetadataName, StringComparison.Ordinal) ||
-                string.Equals(attributeData.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), fullyQualifiedName, StringComparison.Ordinal);
         }
 
         private static bool IsAttributeMetadataName(AttributeData attributeData, string fullyQualifiedMetadataName)

@@ -14,6 +14,7 @@ namespace SharpProof.Analyzer.Configuration
         public ImmutableHashSet<string> ExtraKnownPureMethods { get; }
         public ImmutableHashSet<string> ExtraKnownImpureNamespaces { get; }
         public ImmutableHashSet<string> ExtraKnownImpureTypes { get; }
+        public ImmutableHashSet<string> AttributeStubNamespaces { get; }
         public bool EnableDebugLogging { get; }
         public bool SuggestMissingEnforcePure { get; }
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
@@ -32,6 +33,7 @@ namespace SharpProof.Analyzer.Configuration
             ImmutableHashSet<string> extraPureMethods,
             ImmutableHashSet<string> extraImpureNamespaces,
             ImmutableHashSet<string> extraImpureTypes,
+            ImmutableHashSet<string> attributeStubNamespaces,
             bool enableDebugLogging,
             bool suggestMissingEnforcePure,
             MissingPuritySuggestionOptions missingPuritySuggestions,
@@ -49,6 +51,7 @@ namespace SharpProof.Analyzer.Configuration
             ExtraKnownPureMethods = extraPureMethods;
             ExtraKnownImpureNamespaces = extraImpureNamespaces;
             ExtraKnownImpureTypes = extraImpureTypes;
+            AttributeStubNamespaces = attributeStubNamespaces;
             EnableDebugLogging = enableDebugLogging;
             SuggestMissingEnforcePure = suggestMissingEnforcePure;
             MissingPuritySuggestions = missingPuritySuggestions;
@@ -69,6 +72,7 @@ namespace SharpProof.Analyzer.Configuration
             var pureMethods = GetValues(options, ConfigKeys.KnownPureMethods);
             var impureNamespaces = GetValues(options, ConfigKeys.KnownImpureNamespaces);
             var impureTypes = GetValues(options, ConfigKeys.KnownImpureTypes);
+            var attributeStubNamespaces = GetValues(options, ConfigKeys.AttributeStubNamespaces);
             var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
             bool debug = GetBool(options, ConfigKeys.EnableDebugLogging);
             bool suggestMissing = GetBoolOrDefaultTrue(options, ConfigKeys.SuggestMissingEnforcePure);
@@ -90,6 +94,7 @@ namespace SharpProof.Analyzer.Configuration
                 pureMethods,
                 impureNamespaces,
                 impureTypes,
+                attributeStubNamespaces,
                 debug,
                 suggestMissing,
                 missingPuritySuggestions,
@@ -513,6 +518,12 @@ namespace SharpProof.Analyzer.Configuration
             {
                 var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
                 if (global.TryGetValue(key, out var found) && !string.IsNullOrWhiteSpace(found))
+                {
+                    value = found;
+                    return true;
+                }
+
+                if (global.TryGetValue("build_property." + key, out found) && !string.IsNullOrWhiteSpace(found))
                 {
                     value = found;
                     return true;

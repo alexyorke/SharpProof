@@ -212,6 +212,13 @@ namespace System.Experimental
                 ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "turbo"));
         }
 
+        [ReadmeExample("sp0026-unrecognized-attribute-identity")]
+        [Test]
+        public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0026-unrecognized-attribute-identity");
+        }
+
         [ReadmeExample("capabilities-console")]
         [Test]
         public async Task CapabilitiesCliExample_MatchesSnapshot()

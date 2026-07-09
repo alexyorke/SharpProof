@@ -45,11 +45,34 @@ Attributes whose supported target set is already stable and compiler-enforceable
 remain narrowed in metadata, such as `[AllowSynchronization]`,
 `[PureExternal]`, and `[Impure]`.
 
+## Attribute Identity
+
+SharpProof contract analyzers accept attributes from `SharpProof.Attributes` by
+default. This includes the package-provided attributes and source-only stubs
+declared in the same namespace for projects that cannot reference the package
+directly.
+
+Projects that intentionally keep source-only contract stubs in another
+namespace can opt in with:
+
+```ini
+build_property.sharpproof_attribute_stub_namespaces = My.Contracts;Other.Contracts
+```
+
+Use `<global>` in that list only when a project deliberately declares global
+namespace stubs. Attributes with SharpProof contract names such as
+`EnforcePureAttribute`, `EnsuresAttribute`, or `ZeroAllocationsAttribute` from
+unaccepted namespaces are ignored as contracts and reported as `SP0026`.
+Recognized external purity annotations such as
+`JetBrains.Annotations.PureAttribute` and
+`System.Diagnostics.Contracts.PureAttribute` remain boundary evidence rather
+than SharpProof contract attributes.
+
 ## Diagnostic Reference
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0025`.
+`SP0002` through `SP0026`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.

@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0025`.
+from `SP0002` through `SP0026`.
 
 ### SP0002 - Purity not verified
 
@@ -689,4 +689,39 @@ Expected analyzer diagnostics:
 
 ```text
 SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, default, deep, aggressive, or a boolean value
+```
+
+### SP0026 - Unrecognized attribute identity
+
+SharpProof-looking attribute names from unaccepted namespaces are reported and ignored as contracts.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs`):
+
+```csharp
+using System;
+
+namespace ExternalContracts
+{
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class EnforcePureAttribute : Attribute
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [ExternalContracts.EnforcePure]
+    public void NotSharpProof()
+    {
+        Console.WriteLine("not analyzed as a SharpProof contract");
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0026 Warning docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs:13:6 Attribute 'EnforcePureAttribute' looks like a SharpProof contract, but type 'ExternalContracts.EnforcePureAttribute' is not in an accepted SharpProof attribute namespace
 ```

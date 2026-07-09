@@ -33,10 +33,12 @@ namespace SharpProof.Test
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.AnalyzerReference);
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.PureAttributeReference);
+            test.TestState.AnalyzerConfigFiles.Add((
+                "/.globalconfig",
+                "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n"));
 
             test.ExpectedDiagnostics.AddRange(expected);
             return test.RunAsync(CancellationToken.None);
         }
     }
 }
-

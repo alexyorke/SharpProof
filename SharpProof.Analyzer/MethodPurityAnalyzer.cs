@@ -21,7 +21,8 @@ namespace SharpProof.Analyzer
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
             bool reportBclFallbackGuesses,
-            DiagnosticBaseline baseline)
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
 
             ISymbol? declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
@@ -46,17 +47,11 @@ namespace SharpProof.Analyzer
 
 
             var enforcePureAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "EnforcePureAttribute");
+                attributePolicy.GetAppliedAttributeSymbol(methodSymbol, "EnforcePureAttribute") ??
+                attributePolicy.ResolveAttributeSymbol(context.SemanticModel.Compilation, "EnforcePureAttribute");
             var pureAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "PureAttribute");
-            var pureExternalAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureExternalAttribute", "PureExternalAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "PureExternalAttribute");
-            var impureAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ImpureAttribute", "ImpureAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "ImpureAttribute");
+                attributePolicy.GetAppliedAttributeSymbol(methodSymbol, "PureAttribute") ??
+                attributePolicy.ResolveAttributeSymbol(context.SemanticModel.Compilation, "PureAttribute");
 
             if (enforcePureAttributeSymbol == null && pureAttributeSymbol == null)
             {
@@ -65,17 +60,13 @@ namespace SharpProof.Analyzer
 
 
             var allowSynchronizationAttributeSymbol =
-                AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute")
-                ?? AttributeSymbolResolution.GetAppliedAttributeSymbol(methodSymbol, "AllowSynchronizationAttribute");
+                attributePolicy.GetAppliedAttributeSymbol(methodSymbol, "AllowSynchronizationAttribute") ??
+                attributePolicy.ResolveAttributeSymbol(context.SemanticModel.Compilation, "AllowSynchronizationAttribute");
 
-            bool hasEnforcePureAttribute = (enforcePureAttributeSymbol != null && HasAttribute(methodSymbol, enforcePureAttributeSymbol))
-                || HasAttributeByName(methodSymbol, "EnforcePureAttribute");
-            bool hasPureAttribute = (pureAttributeSymbol != null && HasAttribute(methodSymbol, pureAttributeSymbol))
-                || HasAttributeByName(methodSymbol, "PureAttribute");
-            bool hasDirectPureExternalAttribute = (pureExternalAttributeSymbol != null && HasAttribute(methodSymbol, pureExternalAttributeSymbol))
-                || HasAttributeByName(methodSymbol, "PureExternalAttribute");
-            bool hasDirectImpureAttribute = (impureAttributeSymbol != null && HasAttribute(methodSymbol, impureAttributeSymbol))
-                || HasAttributeByName(methodSymbol, "ImpureAttribute");
+            bool hasEnforcePureAttribute = attributePolicy.HasAttribute(methodSymbol, "EnforcePureAttribute");
+            bool hasPureAttribute = attributePolicy.HasAttribute(methodSymbol, "PureAttribute");
+            bool hasDirectPureExternalAttribute = attributePolicy.HasAttribute(methodSymbol, "PureExternalAttribute");
+            bool hasDirectImpureAttribute = attributePolicy.HasAttribute(methodSymbol, "ImpureAttribute");
             bool hasPureExternalAttribute = hasDirectPureExternalAttribute
                 || PurityAnalysisEngine.HasPureExternalAttribute(methodSymbol);
             bool hasImpureAttribute = hasDirectImpureAttribute
@@ -118,8 +109,7 @@ namespace SharpProof.Analyzer
 
             bool hasPurityEnforcementAttribute = hasEnforcePureAttribute || hasPureAttribute || hasPureExternalAttribute || HasPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol);
             bool hasAllowSynchronization =
-                (allowSynchronizationAttributeSymbol != null && HasAttribute(methodSymbol, allowSynchronizationAttributeSymbol))
-                || HasAttributeByName(methodSymbol, "AllowSynchronizationAttribute");
+                attributePolicy.HasAttribute(methodSymbol, "AllowSynchronizationAttribute");
 
             // Report if [AllowSynchronization] is present without [EnforcePure]/[Pure]
             if (hasAllowSynchronization && !hasPurityEnforcementAttribute)
@@ -691,19 +681,6 @@ namespace SharpProof.Analyzer
                 }
             }
 
-            return false;
-        }
-
-        private static bool HasAttribute(IMethodSymbol methodSymbol, INamedTypeSymbol attributeType)
-        {
-            foreach (var attributeData in GetMethodAndAssociatedAttributes(methodSymbol))
-            {
-                var attributeClass = attributeData.AttributeClass?.OriginalDefinition;
-                if (SymbolEqualityComparer.Default.Equals(attributeClass, attributeType))
-                {
-                    return true;
-                }
-            }
             return false;
         }
 

@@ -306,6 +306,23 @@ namespace SharpProof.Analyzer
             isEnabledByDefault: true,
             description: InvalidAnalyzerConfigurationDescription);
 
+        public const string UnrecognizedAttributeIdentityId = "SP0026";
+        public const string AttributeIdentityNameProperty = "sharpproof.attribute_identity.name";
+        public const string AttributeIdentityNamespaceProperty = "sharpproof.attribute_identity.namespace";
+        public const string AttributeIdentityAcceptedNamespacesProperty = "sharpproof.attribute_identity.accepted_namespaces";
+        private static readonly LocalizableString UnrecognizedAttributeIdentityTitle = "Unrecognized SharpProof Attribute Identity";
+        private static readonly LocalizableString UnrecognizedAttributeIdentityMessageFormat = "Attribute '{0}' looks like a SharpProof contract, but type '{1}' is not in an accepted SharpProof attribute namespace";
+        private static readonly LocalizableString UnrecognizedAttributeIdentityDescription = "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.";
+
+        public static readonly DiagnosticDescriptor UnrecognizedAttributeIdentityRule = new DiagnosticDescriptor(
+            id: UnrecognizedAttributeIdentityId,
+            title: UnrecognizedAttributeIdentityTitle,
+            messageFormat: UnrecognizedAttributeIdentityMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: UnrecognizedAttributeIdentityDescription);
+
 
         public const string MisplacedAttributeId = "SP0003";
         private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";

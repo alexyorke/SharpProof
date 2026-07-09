@@ -55,11 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Make SharpProof attribute identity and stub compatibility an explicit policy:
-  prefer fully qualified `SharpProof.Attributes` symbols, support intentional
-  source-only stubs through documented namespaces or opt-in configuration, and
-  report ambiguous or unrelated simple-name matches instead of silently treating
-  any `EnforcePureAttribute`-style type as a SharpProof contract.
 - Make analyzer option scope explicit and consistent: document and test which
   `sharpproof_*` keys are compilation-global versus per-tree `.editorconfig`
   overrides, then decide whether purity overrides, purity profile, SMT budgets,

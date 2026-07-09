@@ -12,137 +12,124 @@ namespace SharpProof.Analyzer
     {
         internal static void AnalyzeNonMethodDeclaration(
             SyntaxNodeAnalysisContext context,
-            DiagnosticBaseline baseline)
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
-            var enforcePureAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnforcePureAttribute", "EnforcePureAttribute");
-            var pureAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.PureAttribute", "PureAttribute");
-            var allowSynchronizationAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowSynchronizationAttribute", "AllowSynchronizationAttribute");
-            var zeroAllocationsAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ZeroAllocationsAttribute", "ZeroAllocationsAttribute");
-            var allowedCapabilitiesAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.AllowedCapabilitiesAttribute", "AllowedCapabilitiesAttribute");
-            var ensuresAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.EnsuresAttribute", "EnsuresAttribute");
-            var expectedComplexityAttributeSymbol = AttributeSymbolResolution.ResolveAttributeSymbol(context.SemanticModel.Compilation, "SharpProof.Attributes.ExpectedComplexityAttribute", "ExpectedComplexityAttribute");
-
-            if (enforcePureAttributeSymbol == null &&
-                pureAttributeSymbol == null &&
-                allowSynchronizationAttributeSymbol == null &&
-                zeroAllocationsAttributeSymbol == null &&
-                allowedCapabilitiesAttributeSymbol == null &&
-                ensuresAttributeSymbol == null &&
-                expectedComplexityAttributeSymbol == null)
-            {
-                return;
-            }
-
             if (context.Node is not AttributeListSyntax attributeList)
             {
                 return;
             }
 
+            ReportUnrecognizedAttributeIdentities(context, baseline, attributePolicy, attributeList);
             var attributeTarget = attributeList.Parent;
 
-            if (enforcePureAttributeSymbol != null)
+            var enforcePureAttributeLocation = FindAttributeLocation(attributeList, "EnforcePureAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (enforcePureAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var enforcePureAttributeLocation = FindAttributeLocation(attributeList, enforcePureAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (enforcePureAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-                {
-                    var diagnostic = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedAttributeRule,
-                        enforcePureAttributeLocation,
-                        "EnforcePure",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diagnostic);
-                }
+                var diagnostic = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedAttributeRule,
+                    enforcePureAttributeLocation,
+                    "EnforcePure",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diagnostic);
             }
 
-            if (pureAttributeSymbol != null)
+            var pureAttributeLocation = FindAttributeLocation(attributeList, "PureAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (pureAttributeLocation != null && !IsAllowedPureAttributeTarget(attributeTarget))
             {
-                var pureAttributeLocation = FindAttributeLocation(attributeList, pureAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (pureAttributeLocation != null && !IsAllowedPureAttributeTarget(attributeTarget))
-                {
-                    var diagnostic = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedAttributeRule,
-                        pureAttributeLocation,
-                        "Pure",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diagnostic);
-                }
+                var diagnostic = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedAttributeRule,
+                    pureAttributeLocation,
+                    "Pure",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diagnostic);
             }
 
-            if (allowSynchronizationAttributeSymbol != null)
+            var allowSynchronizationAttributeLocation = FindAttributeLocation(attributeList, "AllowSynchronizationAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (allowSynchronizationAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var allowSynchronizationAttributeLocation = FindAttributeLocation(attributeList, allowSynchronizationAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (allowSynchronizationAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-                {
-                    var diag = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
-                        allowSynchronizationAttributeLocation,
-                        "AllowSynchronization",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diag);
-                }
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
+                    allowSynchronizationAttributeLocation,
+                    "AllowSynchronization",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
             }
 
-            if (zeroAllocationsAttributeSymbol != null)
+            var zeroAllocationsAttributeLocation = FindAttributeLocation(attributeList, "ZeroAllocationsAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (zeroAllocationsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var zeroAllocationsAttributeLocation = FindAttributeLocation(attributeList, zeroAllocationsAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (zeroAllocationsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-                {
-                    var diag = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
-                        zeroAllocationsAttributeLocation,
-                        "ZeroAllocations",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diag);
-                }
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
+                    zeroAllocationsAttributeLocation,
+                    "ZeroAllocations",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
             }
 
-            if (allowedCapabilitiesAttributeSymbol != null)
+            var allowedCapabilitiesAttributeLocation = FindAttributeLocation(attributeList, "AllowedCapabilitiesAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (allowedCapabilitiesAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var allowedCapabilitiesAttributeLocation = FindAttributeLocation(attributeList, allowedCapabilitiesAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (allowedCapabilitiesAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-                {
-                    var diag = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
-                        allowedCapabilitiesAttributeLocation,
-                        "AllowedCapabilities",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diag);
-                }
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
+                    allowedCapabilitiesAttributeLocation,
+                    "AllowedCapabilities",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
             }
 
-            if (ensuresAttributeSymbol != null)
+            var ensuresAttributeLocation = FindAttributeLocation(attributeList, "EnsuresAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (ensuresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var ensuresAttributeLocation = FindAttributeLocation(attributeList, ensuresAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (ensuresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-                {
-                    var diag = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
-                        ensuresAttributeLocation,
-                        "Ensures",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diag);
-                }
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
+                    ensuresAttributeLocation,
+                    "Ensures",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
             }
 
-            if (expectedComplexityAttributeSymbol != null)
+            var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, "ExpectedComplexityAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
+            if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
             {
-                var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, expectedComplexityAttributeSymbol, context.SemanticModel, context.CancellationToken);
-                if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+                var diag = CreateMisplacedAttributeDiagnostic(
+                    SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
+                    expectedComplexityAttributeLocation,
+                    "ExpectedComplexity",
+                    attributeTarget,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diag);
+            }
+        }
+
+        private static void ReportUnrecognizedAttributeIdentities(
+            SyntaxNodeAnalysisContext context,
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            AttributeListSyntax attributeList)
+        {
+            foreach (var attribute in attributeList.Attributes)
+            {
+                var attributeClass = GetAttributeClass(attribute, context.SemanticModel, context.CancellationToken);
+                if (attributeClass == null ||
+                    !attributePolicy.IsUnrecognizedSharpProofLikeAttribute(attributeClass))
                 {
-                    var diag = CreateMisplacedAttributeDiagnostic(
-                        SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
-                        expectedComplexityAttributeLocation,
-                        "ExpectedComplexity",
-                        attributeTarget,
-                        context);
-                    ReportIfNotSuppressed(context, baseline, diag);
+                    continue;
                 }
+
+                var location = attribute.Name.GetLocation();
+                var diagnostic = CreateUnrecognizedAttributeIdentityDiagnostic(
+                    attributeClass,
+                    location,
+                    attributePolicy,
+                    context);
+                ReportIfNotSuppressed(context, baseline, diagnostic);
             }
         }
 
@@ -192,6 +179,45 @@ namespace SharpProof.Analyzer
                 properties: properties);
         }
 
+        private static Diagnostic CreateUnrecognizedAttributeIdentityDiagnostic(
+            INamedTypeSymbol attributeClass,
+            Location location,
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            SyntaxNodeAnalysisContext context)
+        {
+            var attributeName = attributeClass.Name;
+            var displayName = SharpProofAttributeIdentityPolicy.GetDisplayName(attributeClass);
+            var namespaceName = SharpProofAttributeIdentityPolicy.GetNamespaceName(attributeClass);
+            var evidenceKey = "unrecognized_attribute_identity:" + displayName;
+            var properties = BaselineDiagnosticProperties.Add(
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(SharpProofDiagnostics.AttributeIdentityNameProperty, attributeName)
+                    .Add(SharpProofDiagnostics.AttributeIdentityNamespaceProperty, namespaceName.Length == 0 ? SharpProofAttributeIdentityPolicy.GlobalNamespaceToken : namespaceName)
+                    .Add(SharpProofDiagnostics.AttributeIdentityAcceptedNamespacesProperty, attributePolicy.AcceptedNamespacesDisplay),
+                displayName,
+                context.Node.SyntaxTree.FilePath ?? string.Empty,
+                "AttributeIdentity",
+                attributeName,
+                evidenceKey);
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                attributeName,
+                "ignored",
+                "unrecognized_attribute_identity");
+
+            return Diagnostic.Create(
+                SharpProofDiagnostics.UnrecognizedAttributeIdentityRule,
+                location,
+                additionalLocations: null,
+                properties: properties,
+                messageArgs: new object[]
+                {
+                    attributeName,
+                    displayName,
+                });
+        }
+
         private static void ReportIfNotSuppressed(
             SyntaxNodeAnalysisContext context,
             DiagnosticBaseline baseline,
@@ -205,34 +231,40 @@ namespace SharpProof.Analyzer
 
         private static Location? FindAttributeLocation(
             AttributeListSyntax attributeList,
-            INamedTypeSymbol targetAttributeSymbol,
+            string attributeTypeName,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
             foreach (var attribute in attributeList.Attributes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var symbolInfo = semanticModel.GetSymbolInfo(attribute, cancellationToken);
-
-                if (symbolInfo.Symbol is IMethodSymbol attributeConstructorSymbol &&
-                    SymbolEqualityComparer.Default.Equals(attributeConstructorSymbol.ContainingType, targetAttributeSymbol))
-                {
-                    return attribute.GetLocation();
-                }
-
-                else if (symbolInfo.Symbol is INamedTypeSymbol directAttributeSymbol &&
-                         SymbolEqualityComparer.Default.Equals(directAttributeSymbol, targetAttributeSymbol))
-                {
-                    return attribute.GetLocation();
-                }
-
-                else if (semanticModel.GetTypeInfo(attribute, cancellationToken).Type is INamedTypeSymbol attributeType &&
-                       SymbolEqualityComparer.Default.Equals(attributeType, targetAttributeSymbol))
+                var attributeClass = GetAttributeClass(attribute, semanticModel, cancellationToken);
+                if (attributePolicy.IsAccepted(attributeClass, attributeTypeName))
                 {
                     return attribute.GetLocation();
                 }
             }
             return null;
+        }
+
+        private static INamedTypeSymbol? GetAttributeClass(
+            AttributeSyntax attribute,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbolInfo = semanticModel.GetSymbolInfo(attribute, cancellationToken);
+            if (symbolInfo.Symbol is IMethodSymbol attributeConstructorSymbol)
+            {
+                return attributeConstructorSymbol.ContainingType;
+            }
+
+            if (symbolInfo.Symbol is INamedTypeSymbol directAttributeSymbol)
+            {
+                return directAttributeSymbol;
+            }
+
+            return semanticModel.GetTypeInfo(attribute, cancellationToken).Type as INamedTypeSymbol;
         }
 
         private static bool IsAllowedPurityTarget(SyntaxNode? node)

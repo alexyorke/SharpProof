@@ -39,7 +39,8 @@ namespace SharpProof.Analyzer
                                   SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
                                   SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
                                   SharpProofDiagnostics.InvalidContractArgumentRule,
-                                  SharpProofDiagnostics.InvalidAnalyzerConfigurationRule);
+                                  SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
+                                  SharpProofDiagnostics.UnrecognizedAttributeIdentityRule);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -49,6 +50,7 @@ namespace SharpProof.Analyzer
             context.RegisterCompilationStartAction(startContext =>
             {
                 var config = Configuration.AnalyzerConfiguration.FromOptions(startContext.Options);
+                var attributePolicy = SharpProofAttributeIdentityPolicy.Create(config.AttributeStubNamespaces);
                 var purityService = new Engine.CompilationPurityService(startContext.Compilation, config.SmtOptions);
                 var invalidConfigurationValues = config.InvalidConfigurationValues;
                 var missingPuritySuggestions = config.MissingPuritySuggestions;
@@ -81,11 +83,11 @@ namespace SharpProof.Analyzer
                     using (generatedPurityCatalog == null ? null : GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
-                        MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, reportBclFallbackGuesses, baseline);
-                        MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(c, baseline);
-                        MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(c, baseline);
-                        MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(c, purityService, baseline);
-                        MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(c, baseline);
+                        MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, reportBclFallbackGuesses, baseline, attributePolicy);
+                        MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(c, baseline, attributePolicy);
+                        MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(c, baseline, attributePolicy);
+                        MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(c, purityService, baseline, attributePolicy);
+                        MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(c, baseline, attributePolicy);
                         ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService, baseline);
                     }
                 },
@@ -103,7 +105,7 @@ namespace SharpProof.Analyzer
                     SyntaxKind.LocalFunctionStatement);
 
                 startContext.RegisterSyntaxNodeAction(
-                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(c, baseline),
+                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(c, baseline, attributePolicy),
                     SyntaxKind.AttributeList);
                 startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, baseline));
             });

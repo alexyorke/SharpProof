@@ -14,7 +14,8 @@ namespace SharpProof.Analyzer
     {
         internal static void AnalyzeSymbolForCapabilities(
             SyntaxNodeAnalysisContext context,
-            DiagnosticBaseline baseline)
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy)
         {
             if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol methodSymbol)
             {
@@ -23,7 +24,7 @@ namespace SharpProof.Analyzer
 
             if (!TryGetAllowedCapabilities(
                     methodSymbol,
-                    context.SemanticModel.Compilation,
+                    attributePolicy,
                     context.CancellationToken,
                     out var allowedCapabilities,
                     out var invalidContract))
@@ -253,20 +254,17 @@ namespace SharpProof.Analyzer
 
         private static bool TryGetAllowedCapabilities(
             IMethodSymbol methodSymbol,
-            Compilation compilation,
+            SharpProofAttributeIdentityPolicy attributePolicy,
             System.Threading.CancellationToken cancellationToken,
             out CapabilityFlags capabilities,
             out InvalidContractArgument? invalidContract)
         {
             capabilities = CapabilityFlags.None;
             invalidContract = null;
-            var attributeSymbol =
-                compilation.GetTypeByMetadataName("SharpProof.Attributes.AllowedCapabilitiesAttribute") ??
-                compilation.GetTypeByMetadataName("AllowedCapabilitiesAttribute");
 
             foreach (var attribute in methodSymbol.GetAttributes())
             {
-                if (!AnalyzerSyntaxHelpers.MatchesAttribute(attribute, attributeSymbol, "AllowedCapabilitiesAttribute"))
+                if (!attributePolicy.IsAccepted(attribute, "AllowedCapabilitiesAttribute"))
                 {
                     continue;
                 }

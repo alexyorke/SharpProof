@@ -204,60 +204,6 @@ public sealed class TestClass
         }
 
         [Test]
-        public async Task SP0002_RemovesNameMatchedPureAttributeFromAnyNamespace()
-        {
-            var source = @"
-using System;
-
-namespace External
-{
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class PureAttribute : Attribute
-    {
-    }
-}
-
-public static class TestClass
-{
-    [External.Pure]
-    public static int Bad()
-    {
-        System.Console.WriteLine(1);
-        return 0;
-    }
-}
-";
-            var fixedSource = @"
-using System;
-
-namespace External
-{
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class PureAttribute : Attribute
-    {
-    }
-}
-
-public static class TestClass
-{
-    public static int Bad()
-    {
-        System.Console.WriteLine(1);
-        return 0;
-    }
-}
-";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(15, 23, 15, 26)
-                .WithArguments("Bad");
-            await VerifyCF.VerifyCodeFixAsync(
-                source,
-                expected,
-                fixedSource,
-                codeActionEquivalenceKey: "RemoveAttributesMatchingAsyncSP0002");
-        }
-
-        [Test]
         public async Task SP0003_RemovesMisplacedEnforcePureOnClass()
         {
             var source = @"

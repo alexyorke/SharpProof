@@ -1,0 +1,216 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+
+namespace SharpProof.Analyzer
+{
+    internal sealed class SharpProofAttributeIdentityPolicy
+    {
+        internal const string OfficialNamespace = "SharpProof.Attributes";
+        internal const string GlobalNamespaceToken = "<global>";
+
+        private static readonly ImmutableHashSet<string> SharpProofAttributeNames =
+            ImmutableHashSet.Create(
+                StringComparer.Ordinal,
+                "AllowedCapabilitiesAttribute",
+                "AllowSynchronizationAttribute",
+                "EnforcePureAttribute",
+                "EnsuresAttribute",
+                "ExpectedComplexityAttribute",
+                "ImpureAttribute",
+                "PureAttribute",
+                "PureExternalAttribute",
+                "ZeroAllocationsAttribute");
+
+        private readonly ImmutableHashSet<string> _acceptedNamespaces;
+
+        private SharpProofAttributeIdentityPolicy(ImmutableHashSet<string> acceptedNamespaces)
+        {
+            _acceptedNamespaces = acceptedNamespaces;
+        }
+
+        internal string AcceptedNamespacesDisplay =>
+            string.Join(
+                ";",
+                _acceptedNamespaces
+                    .Select(static value => value.Length == 0 ? GlobalNamespaceToken : value)
+                    .OrderBy(static value => value, StringComparer.Ordinal));
+
+        internal static SharpProofAttributeIdentityPolicy Create(ImmutableHashSet<string> configuredStubNamespaces)
+        {
+            var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            builder.Add(OfficialNamespace);
+            foreach (var configuredNamespace in configuredStubNamespaces)
+            {
+                var normalized = NormalizeConfiguredNamespace(configuredNamespace);
+                if (normalized != null)
+                {
+                    builder.Add(normalized);
+                }
+            }
+
+            return new SharpProofAttributeIdentityPolicy(builder.ToImmutable());
+        }
+
+        internal INamedTypeSymbol? ResolveAttributeSymbol(
+            Compilation compilation,
+            string attributeTypeName)
+        {
+            var official = compilation.GetTypeByMetadataName(OfficialNamespace + "." + attributeTypeName);
+            if (official != null)
+            {
+                return official;
+            }
+
+            foreach (var namespaceName in _acceptedNamespaces.OrderBy(static value => value, StringComparer.Ordinal))
+            {
+                if (string.Equals(namespaceName, OfficialNamespace, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var metadataName = namespaceName.Length == 0
+                    ? attributeTypeName
+                    : namespaceName + "." + attributeTypeName;
+                var symbol = compilation.GetTypeByMetadataName(metadataName);
+                if (symbol != null)
+                {
+                    return symbol;
+                }
+            }
+
+            return null;
+        }
+
+        internal bool HasAttribute(
+            ISymbol symbol,
+            string attributeTypeName)
+        {
+            return GetAcceptedAttributes(symbol, attributeTypeName).Any();
+        }
+
+        internal INamedTypeSymbol? GetAppliedAttributeSymbol(
+            ISymbol symbol,
+            string attributeTypeName)
+        {
+            return GetAcceptedAttributes(symbol, attributeTypeName)
+                .Select(static attribute => attribute.AttributeClass?.OriginalDefinition)
+                .FirstOrDefault(static attributeClass => attributeClass != null);
+        }
+
+        internal IEnumerable<AttributeData> GetAcceptedAttributes(
+            ISymbol symbol,
+            string attributeTypeName)
+        {
+            foreach (var attribute in GetAttributesIncludingAssociatedSymbol(symbol))
+            {
+                if (IsAccepted(attribute, attributeTypeName))
+                {
+                    yield return attribute;
+                }
+            }
+        }
+
+        internal bool IsAccepted(
+            AttributeData attribute,
+            string attributeTypeName)
+        {
+            return IsAccepted(attribute.AttributeClass, attributeTypeName);
+        }
+
+        internal bool IsAccepted(
+            INamedTypeSymbol? attributeClass,
+            string attributeTypeName)
+        {
+            var originalDefinition = attributeClass?.OriginalDefinition;
+            if (originalDefinition == null ||
+                !string.Equals(originalDefinition.Name, attributeTypeName, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return _acceptedNamespaces.Contains(GetNamespaceName(originalDefinition));
+        }
+
+        internal bool IsUnrecognizedSharpProofLikeAttribute(
+            AttributeData attribute)
+        {
+            return IsUnrecognizedSharpProofLikeAttribute(attribute.AttributeClass);
+        }
+
+        internal bool IsUnrecognizedSharpProofLikeAttribute(
+            INamedTypeSymbol? attributeClass)
+        {
+            attributeClass = attributeClass?.OriginalDefinition;
+            if (attributeClass == null ||
+                !SharpProofAttributeNames.Contains(attributeClass.Name))
+            {
+                return false;
+            }
+
+            if (IsRecognizedExternalPureAttribute(attributeClass))
+            {
+                return false;
+            }
+
+            return !IsAccepted(attributeClass, attributeClass.Name);
+        }
+
+        internal static bool IsRecognizedExternalPureAttribute(INamedTypeSymbol attributeClass)
+        {
+            return string.Equals(attributeClass.Name, "PureAttribute", StringComparison.Ordinal) &&
+                (string.Equals(GetNamespaceName(attributeClass), "JetBrains.Annotations", StringComparison.Ordinal) ||
+                 string.Equals(GetNamespaceName(attributeClass), "System.Diagnostics.Contracts", StringComparison.Ordinal));
+        }
+
+        internal static string GetDisplayName(INamedTypeSymbol attributeClass)
+        {
+            var display = attributeClass.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return string.IsNullOrWhiteSpace(display)
+                ? attributeClass.Name
+                : display;
+        }
+
+        internal static string GetNamespaceName(INamedTypeSymbol attributeClass)
+        {
+            var namespaceName = attributeClass.ContainingNamespace?.IsGlobalNamespace == true
+                ? string.Empty
+                : attributeClass.ContainingNamespace?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return namespaceName ?? string.Empty;
+        }
+
+        private static IEnumerable<AttributeData> GetAttributesIncludingAssociatedSymbol(ISymbol symbol)
+        {
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                yield return attribute;
+            }
+
+            if (symbol is IMethodSymbol { AssociatedSymbol: { } associatedSymbol })
+            {
+                foreach (var attribute in associatedSymbol.GetAttributes())
+                {
+                    yield return attribute;
+                }
+            }
+        }
+
+        private static string? NormalizeConfiguredNamespace(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (string.Equals(trimmed, GlobalNamespaceToken, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return trimmed.Trim('.');
+        }
+    }
+}
