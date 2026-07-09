@@ -17,9 +17,9 @@ bounded proof question into normal build diagnostics.
   C#-like postcondition, including return sites and block-bodied
   void/constructor fall-through and expression-bodied void/constructor
   completions. Conditions can reference `result` for value-returning members,
-  the annotated member's parameters, and current-instance fields/properties
-  through `this` or implicit member access. Failures produce `SP0018`;
-  unsupported conditions produce `SP0019`.
+  the annotated member's parameters including `out` and `ref` parameters, and
+  current-instance fields/properties through `this` or implicit member access.
+  Failures produce `SP0018`; unsupported conditions produce `SP0019`.
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
   in the annotated method-like body. Violations produce `SP0013`.
 - `[AllowedCapabilities(...)]`: restrict proven side-effect capabilities such

@@ -176,6 +176,89 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_OutParameterAssignedValue_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public bool TryGet(out string? value)
+    {
+        value = string.Empty;
+        return true;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_OutParameterAssignedNullFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public bool TryGet(out string? value)
+    {
+        value = null;
+        return {|SP0018:false|};
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_RefParameterAssignedValue_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public void Normalize(ref string? value)
+    {
+        value = string.Empty;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_RefParameterAssignedNullFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public void Normalize(ref string? value)
+    {
+        value = null;
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_ExplicitThisMemberState_Proven()
         {
             var test = @"
