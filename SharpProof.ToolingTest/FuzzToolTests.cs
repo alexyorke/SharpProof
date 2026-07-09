@@ -21,10 +21,10 @@ namespace SharpProof.Test
             new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
             new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
             new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
-            new FamilyExpectation("ConservativeDeclarationPattern", "DeclarationPattern"),
+            new FamilyExpectation("PureDeclarationPattern", "DeclarationPattern"),
             new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
-            new FamilyExpectation("ConservativeConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
-            new FamilyExpectation("ConservativeTuple", "Tuple"),
+            new FamilyExpectation("PureConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
+            new FamilyExpectation("PureTuple", "Tuple"),
             new FamilyExpectation("ConservativeRecursivePattern", "RecursivePattern"),
             new FamilyExpectation("ConservativeSpreadCollectionExpression", "Spread"),
             new FamilyExpectation("ConservativeYieldReturn", "YieldReturn"),
@@ -51,6 +51,22 @@ namespace SharpProof.Test
             (Family: "ExceptionDeadBranchThrow", ExpectSp0002: false, ExpectSp0010: false),
             (Family: "ExceptionGuardedSafeDivideByZeroExcluded", ExpectSp0002: false, ExpectSp0010: false),
             (Family: "ExceptionGuardedNullDereferenceExcluded", ExpectSp0002: false, ExpectSp0010: false));
+
+        private static readonly ImmutableArray<string> PromotedPureCoverageFamilies = ImmutableArray.Create(
+            "PureIsTypeCheck",
+            "PureNegatedPattern",
+            "PureCompoundAssignment",
+            "PureDeconstructionAssignment",
+            "PureIncrement",
+            "PureDecrement",
+            "PureDeclarationPattern",
+            "PureDefaultValue",
+            "PureSizeOf",
+            "PureTypeOf",
+            "PureTuple",
+            "PureConditionalAccessCoalesce",
+            "PureSwitchStatement",
+            "PureSwitchExpression");
 
         [Test]
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
@@ -236,17 +252,18 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("PureArrayCreation"));
             Assert.That(families, Does.Contain("PureNestedOwnershipChain"));
             Assert.That(families, Does.Contain("ImpureOwnershipEscapeChain"));
-            Assert.That(families, Does.Contain("ConservativeSwitchExpression"));
+            Assert.That(families, Does.Contain("PureSwitchExpression"));
             Assert.That(families, Does.Contain("ConservativeRangeSlice"));
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
             Assert.That(families, Does.Contain("PureImplicitIndexerReference"));
             Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
             Assert.That(families, Does.Contain("ConservativeAddressOf"));
             Assert.That(families, Does.Contain("PureInlineArrayAccess"));
-            Assert.That(families, Does.Contain("ConservativeDeclarationPattern"));
+            Assert.That(families, Does.Contain("PureDefaultValue"));
+            Assert.That(families, Does.Contain("PureDeclarationPattern"));
             Assert.That(families, Does.Contain("ConservativeTryCatch"));
-            Assert.That(families, Does.Contain("ConservativeConditionalAccessCoalesce"));
-            Assert.That(families, Does.Contain("ConservativeTuple"));
+            Assert.That(families, Does.Contain("PureConditionalAccessCoalesce"));
+            Assert.That(families, Does.Contain("PureTuple"));
             Assert.That(families, Does.Contain("ConservativeRecursivePattern"));
             Assert.That(families, Does.Contain("ConservativeSpreadCollectionExpression"));
             Assert.That(families, Does.Contain("ConservativeYieldReturn"));
@@ -290,6 +307,24 @@ public class KnownImpureConsoleCase
             Assert.That(
                 analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
                 Is.False);
+        }
+
+        [Test]
+        public async Task PromotedPureCoverageFamilies_RemainDiagnosticFree()
+        {
+            var analyses = await AnalyzeCachedRegistryFamiliesAsync();
+
+            foreach (var family in PromotedPureCoverageFamilies)
+            {
+                var analysis = analyses[family];
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, family);
+                Assert.That(analysis.Findings, Is.Empty, family);
+                Assert.That(
+                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+                    Is.False,
+                    family);
+            }
         }
 
         [Test]

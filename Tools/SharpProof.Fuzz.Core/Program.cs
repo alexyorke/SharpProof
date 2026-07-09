@@ -1187,43 +1187,43 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeTryCatch),
         new ShapeRegistryEntry(
-            "ConservativeConditionalAccessCoalesce",
+            "PureConditionalAccessCoalesce",
             ImmutableArray.Create(
                 RoslynShapeManifest.OperationShapeId(OperationKind.ConditionalAccess),
                 RoslynShapeManifest.OperationShapeId(OperationKind.Coalesce)),
             ImmutableArray.Create("ConditionalAccess", "Coalesce"),
             ImmutableArray.Create("ConditionalAccessExpression", "CoalesceExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeConditionalAccessCoalesce),
+            BuildPureConditionalAccessCoalesce),
         new ShapeRegistryEntry(
-            "ConservativeIsTypeCheck",
+            "PureIsTypeCheck",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.IsType)),
             ImmutableArray.Create("IsType"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeIsTypeCheck),
+            BuildPureIsTypeCheck),
         new ShapeRegistryEntry(
-            "ConservativeNegatedPattern",
+            "PureNegatedPattern",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.NegatedPattern)),
             ImmutableArray.Create("NegatedPattern"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeNegatedPattern),
+            BuildPureNegatedPattern),
         new ShapeRegistryEntry(
-            "ConservativeSwitchStatement",
+            "PureSwitchStatement",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Switch)),
             ImmutableArray.Create("Switch", "SwitchCase"),
             ImmutableArray.Create("SwitchStatement"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeSwitchStatement),
+            BuildPureSwitchStatement),
         new ShapeRegistryEntry(
             "ConservativeUsingStatement",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Using)),
@@ -1234,14 +1234,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeUsingStatement),
         new ShapeRegistryEntry(
-            "ConservativeCompoundAssignment",
+            "PureCompoundAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CompoundAssignment)),
             ImmutableArray.Create("CompoundAssignment"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeCompoundAssignment),
+            BuildPureCompoundAssignment),
         new ShapeRegistryEntry(
             "PureCoalesceAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CoalesceAssignment)),
@@ -1252,32 +1252,32 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildPureCoalesceAssignment),
         new ShapeRegistryEntry(
-            "ConservativeDeconstructionAssignment",
+            "PureDeconstructionAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeconstructionAssignment)),
             ImmutableArray.Create("DeconstructionAssignment"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeDeconstructionAssignment),
+            BuildPureDeconstructionAssignment),
         new ShapeRegistryEntry(
-            "ConservativeIncrement",
+            "PureIncrement",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Increment)),
             ImmutableArray.Create("Increment"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeIncrement),
+            BuildPureIncrement),
         new ShapeRegistryEntry(
-            "ConservativeDecrement",
+            "PureDecrement",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Decrement)),
             ImmutableArray.Create("Decrement"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeDecrement),
+            BuildPureDecrement),
         new ShapeRegistryEntry(
             "ConservativeDeclarationExpression",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeclarationExpression)),
@@ -1288,14 +1288,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildConservativeDeclarationExpression),
         new ShapeRegistryEntry(
-            "ConservativeDeclarationPattern",
+            "PureDeclarationPattern",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeclarationPattern)),
             ImmutableArray.Create("DeclarationPattern"),
             ImmutableArray.Create("DeclarationPattern"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeDeclarationPattern),
+            BuildPureDeclarationPattern),
         new ShapeRegistryEntry(
             "ConservativeTypeParameterObjectCreation",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.TypeParameterObjectCreation)),
@@ -1324,32 +1324,32 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildPureAnonymousObjectCreation),
         new ShapeRegistryEntry(
-            "ConservativeDefaultValue",
+            "PureDefaultValue",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DefaultValue)),
             ImmutableArray.Create("DefaultValue"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeDefaultValue),
+            BuildPureDefaultValue),
         new ShapeRegistryEntry(
-            "ConservativeSizeOf",
+            "PureSizeOf",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.SizeOf)),
             ImmutableArray.Create("SizeOf"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeSizeOf),
+            BuildPureSizeOf),
         new ShapeRegistryEntry(
-            "ConservativeTypeOf",
+            "PureTypeOf",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.TypeOf)),
             ImmutableArray.Create("TypeOf"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeTypeOf),
+            BuildPureTypeOf),
         new ShapeRegistryEntry(
             "ConservativeDynamicIndexerAccess",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DynamicIndexerAccess)),
@@ -1369,14 +1369,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeDynamicObjectCreation),
         new ShapeRegistryEntry(
-            "ConservativeTuple",
+            "PureTuple",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
             ImmutableArray.Create("Tuple"),
             ImmutableArray.Create("TupleExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeTuple),
+            BuildPureTuple),
         new ShapeRegistryEntry(
             "ConservativeInterfaceGetter",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
@@ -1407,14 +1407,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeSpreadCollectionExpression),
         new ShapeRegistryEntry(
-            "ConservativeSwitchExpression",
+            "PureSwitchExpression",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.SwitchExpression)),
             ImmutableArray.Create("SwitchExpression"),
             ImmutableArray.Create("SwitchExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeSwitchExpression),
+            BuildPureSwitchExpression),
         new ShapeRegistryEntry(
             "ConservativeRangeSlice",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Range)),
@@ -2116,7 +2116,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeConditionalAccessCoalesce(int index, Random random, string className)
+    private static string BuildPureConditionalAccessCoalesce(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2129,7 +2129,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeIsTypeCheck(int index, Random random, string className)
+    private static string BuildPureIsTypeCheck(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2142,7 +2142,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeNegatedPattern(int index, Random random, string className)
+    private static string BuildPureNegatedPattern(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2155,7 +2155,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeSwitchStatement(int index, Random random, string className)
+    private static string BuildPureSwitchStatement(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2193,7 +2193,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeCompoundAssignment(int index, Random random, string className)
+    private static string BuildPureCompoundAssignment(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2222,7 +2222,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeDeconstructionAssignment(int index, Random random, string className)
+    private static string BuildPureDeconstructionAssignment(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2238,7 +2238,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeIncrement(int index, Random random, string className)
+    private static string BuildPureIncrement(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2253,7 +2253,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeDecrement(int index, Random random, string className)
+    private static string BuildPureDecrement(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2281,7 +2281,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeDeclarationPattern(int index, Random random, string className)
+    private static string BuildPureDeclarationPattern(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2349,7 +2349,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeDefaultValue(int index, Random random, string className)
+    private static string BuildPureDefaultValue(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2362,7 +2362,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeSizeOf(int index, Random random, string className)
+    private static string BuildPureSizeOf(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2375,7 +2375,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeTypeOf(int index, Random random, string className)
+    private static string BuildPureTypeOf(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2425,7 +2425,7 @@ public class {{className}}
 """;
     }
 
-    private static string BuildConservativeTuple(int index, Random random, string className)
+    private static string BuildPureTuple(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2496,7 +2496,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeSwitchExpression(int index, Random random, string className)
+    private static string BuildPureSwitchExpression(int index, Random random, string className)
     {
         return BuildClass(
             className,
