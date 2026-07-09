@@ -196,6 +196,22 @@ namespace System.Experimental
             await VerifyAnalyzerExampleAsync("sp0023-misplaced-expected-complexity");
         }
 
+        [ReadmeExample("sp0024-invalid-contract-argument")]
+        [Test]
+        public async Task Sp0024_InvalidContractArgumentExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync("sp0024-invalid-contract-argument");
+        }
+
+        [ReadmeExample("sp0025-invalid-analyzer-configuration")]
+        [Test]
+        public async Task Sp0025_InvalidAnalyzerConfigurationExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync(
+                "sp0025-invalid-analyzer-configuration",
+                ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "turbo"));
+        }
+
         [ReadmeExample("capabilities-console")]
         [Test]
         public async Task CapabilitiesCliExample_MatchesSnapshot()
@@ -286,7 +302,7 @@ namespace System.Experimental
                 .Cast<string>()
                 .ToHashSet(StringComparer.Ordinal);
 
-            var expectedIds = Enumerable.Range(2, 22)
+            var expectedIds = Enumerable.Range(2, 24)
                 .Select(index => "SP" + index.ToString("0000"))
                 .ToHashSet(StringComparer.Ordinal);
 

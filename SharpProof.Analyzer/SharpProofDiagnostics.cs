@@ -259,6 +259,40 @@ namespace SharpProof.Analyzer
             isEnabledByDefault: true,
             description: MisplacedExpectedComplexityAttributeDescription);
 
+        public const string InvalidContractArgumentId = "SP0024";
+        public const string ContractAttributeProperty = "sharpproof.contract.attribute";
+        public const string ContractArgumentProperty = "sharpproof.contract.argument";
+        public const string ContractInvalidReasonProperty = "sharpproof.contract.invalid_reason";
+        private static readonly LocalizableString InvalidContractArgumentTitle = "Invalid SharpProof Contract Argument";
+        private static readonly LocalizableString InvalidContractArgumentMessageFormat = "SharpProof contract '{0}' has invalid argument '{1}': {2}";
+        private static readonly LocalizableString InvalidContractArgumentDescription = "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, and unknown [AllowedCapabilities] bits.";
+
+        public static readonly DiagnosticDescriptor InvalidContractArgumentRule = new DiagnosticDescriptor(
+            id: InvalidContractArgumentId,
+            title: InvalidContractArgumentTitle,
+            messageFormat: InvalidContractArgumentMessageFormat,
+            category: "Usage",
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: InvalidContractArgumentDescription);
+
+        public const string InvalidAnalyzerConfigurationId = "SP0025";
+        public const string ConfigurationKeyProperty = "sharpproof.config.key";
+        public const string ConfigurationValueProperty = "sharpproof.config.value";
+        public const string ConfigurationInvalidReasonProperty = "sharpproof.config.invalid_reason";
+        private static readonly LocalizableString InvalidAnalyzerConfigurationTitle = "Invalid SharpProof Analyzer Configuration";
+        private static readonly LocalizableString InvalidAnalyzerConfigurationMessageFormat = "SharpProof analyzer option '{0}' has invalid value '{1}': {2}";
+        private static readonly LocalizableString InvalidAnalyzerConfigurationDescription = "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.";
+
+        public static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = new DiagnosticDescriptor(
+            id: InvalidAnalyzerConfigurationId,
+            title: InvalidAnalyzerConfigurationTitle,
+            messageFormat: InvalidAnalyzerConfigurationMessageFormat,
+            category: "Configuration",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: InvalidAnalyzerConfigurationDescription);
+
 
         public const string MisplacedAttributeId = "SP0003";
         private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";

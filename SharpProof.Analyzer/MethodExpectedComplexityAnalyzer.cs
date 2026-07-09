@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Symbolic;
 
@@ -32,21 +33,20 @@ namespace SharpProof.Analyzer
                     context.CancellationToken,
                     out var declaredComplexity,
                     out var attributeLocation,
-                    out var invalidContractReason))
+                    out var invalidContract))
             {
                 return;
             }
 
-            if (invalidContractReason != null)
+            if (invalidContract != null)
             {
-                if (!baseline.IsSuppressed(SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId, methodSymbol, context.Node.SyntaxTree))
+                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
                 {
-                    context.ReportDiagnostic(CreateUnknownDiagnostic(
-                        methodSymbol,
-                        declaredComplexity,
-                        attributeLocation,
-                        invalidContractReason,
-                        context.CancellationToken));
+                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                        "[ExpectedComplexity]",
+                        invalidContract.Argument,
+                        invalidContract.Reason,
+                        attributeLocation ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken)));
                 }
 
                 return;
@@ -116,11 +116,11 @@ namespace SharpProof.Analyzer
             CancellationToken cancellationToken,
             out DeclaredComplexity declaredComplexity,
             out Location? attributeLocation,
-            out string? invalidContractReason)
+            out InvalidContractArgument? invalidContract)
         {
             declaredComplexity = default;
             attributeLocation = null;
-            invalidContractReason = null;
+            invalidContract = null;
 
             var attributeSymbol =
                 compilation.GetTypeByMetadataName("SharpProof.Attributes.ExpectedComplexityAttribute") ??
@@ -139,7 +139,9 @@ namespace SharpProof.Analyzer
                     attribute.ConstructorArguments[0].Value is not int intValue)
                 {
                     declaredComplexity = new DeclaredComplexity(default, "invalid");
-                    invalidContractReason = "invalid expected complexity argument";
+                    invalidContract = new InvalidContractArgument(
+                        GetAttributeArgumentText(attribute, cancellationToken),
+                        "expected a ComplexityKind enum value");
                     return true;
                 }
 
@@ -148,7 +150,9 @@ namespace SharpProof.Analyzer
                     declaredComplexity = new DeclaredComplexity(
                         (DeclaredComplexityKind)intValue,
                         intValue.ToString());
-                    invalidContractReason = "invalid expected complexity value '" + intValue + "'";
+                    invalidContract = new InvalidContractArgument(
+                        intValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        "undefined ComplexityKind value");
                     return true;
                 }
 
@@ -157,6 +161,16 @@ namespace SharpProof.Analyzer
             }
 
             return false;
+        }
+
+        private static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
+        {
+            if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+            {
+                return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
+            }
+
+            return "<missing>";
         }
 
         private static ComplexityVerificationClassification Classify(
@@ -324,5 +338,7 @@ namespace SharpProof.Analyzer
             Exceeded,
             Unknown,
         }
+
+        private sealed record InvalidContractArgument(string Argument, string Reason);
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.Analyzer
 {
@@ -36,7 +37,9 @@ namespace SharpProof.Analyzer
                                   SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
                                   SharpProofDiagnostics.ComplexityExceededRule,
                                   SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
-                                  SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule);
+                                  SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
+                                  SharpProofDiagnostics.InvalidContractArgumentRule,
+                                  SharpProofDiagnostics.InvalidAnalyzerConfigurationRule);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -47,6 +50,7 @@ namespace SharpProof.Analyzer
             {
                 var config = Configuration.AnalyzerConfiguration.FromOptions(startContext.Options);
                 var purityService = new Engine.CompilationPurityService(startContext.Compilation, config.SmtOptions);
+                var invalidConfigurationValues = config.InvalidConfigurationValues;
                 var missingPuritySuggestions = config.MissingPuritySuggestions;
                 var emitExplanations = config.EmitExplanations;
                 var reportBclFallbackGuesses = config.ReportBclFallbackGuesses;
@@ -58,7 +62,15 @@ namespace SharpProof.Analyzer
                     ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
                     : null;
 
-                startContext.RegisterCompilationEndAction(_ => purityService.Dispose());
+                startContext.RegisterCompilationEndAction(endContext =>
+                {
+                    foreach (var invalidConfigurationValue in invalidConfigurationValues)
+                    {
+                        endContext.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidConfigurationValue));
+                    }
+
+                    purityService.Dispose();
+                });
 
                 startContext.RegisterSyntaxNodeAction(c =>
                 {
@@ -88,6 +100,40 @@ namespace SharpProof.Analyzer
             });
 
             context.RegisterSyntaxNodeAction(AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration, SyntaxKind.AttributeList);
+            context.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
+        }
+
+        private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context)
+        {
+            var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
+            var invalidConfigurationValues = Configuration.AnalyzerConfiguration.GetInvalidTreeConfigurationValues(options);
+            var location = Location.Create(context.Tree, new TextSpan(0, 0));
+            foreach (var invalidConfigurationValue in invalidConfigurationValues)
+            {
+                context.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location));
+            }
+        }
+
+        private static Diagnostic CreateInvalidConfigurationDiagnostic(
+            Configuration.InvalidAnalyzerConfigurationValue invalidConfigurationValue,
+            Location? location = null)
+        {
+            var properties = ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.ConfigurationKeyProperty, invalidConfigurationValue.Key)
+                .Add(SharpProofDiagnostics.ConfigurationValueProperty, invalidConfigurationValue.Value)
+                .Add(SharpProofDiagnostics.ConfigurationInvalidReasonProperty, invalidConfigurationValue.Reason);
+
+            return Diagnostic.Create(
+                SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
+                location ?? Location.None,
+                additionalLocations: null,
+                properties: properties,
+                messageArgs: new object[]
+                {
+                    invalidConfigurationValue.Key,
+                    invalidConfigurationValue.Value,
+                    invalidConfigurationValue.Reason,
+                });
         }
     }
 }

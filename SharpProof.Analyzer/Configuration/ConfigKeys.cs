@@ -8,6 +8,7 @@ namespace SharpProof.Analyzer.Configuration
         public const string KnownImpureNamespaces = "sharpproof_known_impure_namespaces";
         public const string KnownImpureTypes = "sharpproof_known_impure_types";
         public const string PurityProfile = "sharpproof_purity_profile";
+        public const string EnableDebugLogging = "sharpproof_enable_debug_logging";
 
         /// <summary>When false, SP0004 (missing [EnforcePure]) is not reported. Default: true.</summary>
         public const string SuggestMissingEnforcePure = "sharpproof_suggest_missing_enforce_pure";

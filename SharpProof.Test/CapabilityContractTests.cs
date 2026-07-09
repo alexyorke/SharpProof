@@ -104,6 +104,24 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task AllowedCapabilities_UnknownBits_ReportInvalidContractArgument()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0024:AllowedCapabilities((SharpProofCapability)(1 << 30))|}]
+    public void TestMethod()
+    {
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AllowedCapabilities_None_TransitiveSourceCallee_ReportsCallSiteViolation()
         {
             var test = @"

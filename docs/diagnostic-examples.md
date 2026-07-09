@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0023`.
+from `SP0002` through `SP0025`.
 
 ### SP0002 - Purity not verified
 
@@ -641,4 +641,52 @@ Expected analyzer diagnostics:
 
 ```text
 SP0023 Error docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs:6:6 The [ExpectedComplexity] attribute can only be applied to method-like declarations
+```
+
+### SP0024 - Invalid contract argument
+
+Malformed contract arguments are reported at the contract instead of falling back to a later proof diagnostic.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0024_InvalidContractArgumentExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0024-invalid-contract-argument/input.cs`):
+
+```csharp
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures("")]
+    public int Value()
+    {
+        return 1;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0024 Error docs/readme-examples/sp0024-invalid-contract-argument/input.cs:6:6 SharpProof contract '[Ensures]' has invalid argument '""': condition must not be empty
+```
+
+### SP0025 - Invalid analyzer configuration
+
+Invalid `sharpproof_*` analyzer option values are reported instead of silently falling back to defaults.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0025_InvalidAnalyzerConfigurationExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0025-invalid-analyzer-configuration/input.cs`):
+
+```csharp
+public sealed class TestClass
+{
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, default, deep, aggressive, or a boolean value
 ```

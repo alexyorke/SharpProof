@@ -55,10 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add analyzer diagnostics for invalid contract arguments instead of silent
-  fallback behavior, especially undefined `ExpectedComplexity` enum values,
-  unknown `AllowedCapabilities` bits, empty `[Ensures]` strings, and invalid
-  `sharpproof_*` analyzer configuration values.
 - Revisit the public `AttributeUsage` targets for contract attributes that are
   currently declared with `AttributeTargets.All`: either narrow unsupported
   placements at compile time, or document and test why analyzer diagnostics are

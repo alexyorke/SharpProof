@@ -41,6 +41,22 @@ public class TestClass
         }
 
         [Test]
+        public async Task Sp0004_InvalidPerTreeConfigurationValue_ReportsDiagnostic()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+@"public class TestClass
+{
+}",
+                ImmutableDictionary<string, string>.Empty,
+                treeOptions: ImmutableDictionary<string, string>.Empty.Add("sharpproof_suggest_missing_enforce_pure_scope", "sometimes"));
+
+            var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty], Is.EqualTo("sharpproof_suggest_missing_enforce_pure_scope"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ConfigurationValueProperty], Is.EqualTo("sometimes"));
+            Assert.That(diagnostic.Location.GetLineSpan().StartLinePosition.Line, Is.EqualTo(0));
+        }
+
+        [Test]
         public async Task Sp0004_LegacyBooleanFalse_SuppressesMissingPuritySuggestions()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

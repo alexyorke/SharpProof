@@ -25,6 +25,7 @@ namespace SharpProof.Analyzer.Configuration
         public bool EnableEffectSummaryJson { get; }
         public string PurityProfile { get; }
         public SmtAnalysisOptions SmtOptions { get; }
+        public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; }
 
         private AnalyzerConfiguration(
             ImmutableHashSet<string> extraImpureMethods,
@@ -41,7 +42,8 @@ namespace SharpProof.Analyzer.Configuration
             bool checkedExceptions,
             bool enableEffectSummaryJson,
             string purityProfile,
-            SmtAnalysisOptions smtOptions)
+            SmtAnalysisOptions smtOptions,
+            ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
         {
             ExtraKnownImpureMethods = extraImpureMethods;
             ExtraKnownPureMethods = extraPureMethods;
@@ -58,6 +60,7 @@ namespace SharpProof.Analyzer.Configuration
             EnableEffectSummaryJson = enableEffectSummaryJson;
             PurityProfile = purityProfile;
             SmtOptions = smtOptions;
+            InvalidConfigurationValues = invalidConfigurationValues;
         }
 
         public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
@@ -66,7 +69,8 @@ namespace SharpProof.Analyzer.Configuration
             var pureMethods = GetValues(options, ConfigKeys.KnownPureMethods);
             var impureNamespaces = GetValues(options, ConfigKeys.KnownImpureNamespaces);
             var impureTypes = GetValues(options, ConfigKeys.KnownImpureTypes);
-            bool debug = GetBool(options, "sharpproof_enable_debug_logging");
+            var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
+            bool debug = GetBool(options, ConfigKeys.EnableDebugLogging);
             bool suggestMissing = GetBoolOrDefaultTrue(options, ConfigKeys.SuggestMissingEnforcePure);
             var missingPuritySuggestions = new MissingPuritySuggestionOptions(
                 suggestMissing,
@@ -96,7 +100,8 @@ namespace SharpProof.Analyzer.Configuration
                 checkedExceptions,
                 enableEffectSummaryJson,
                 GetPurityProfile(options),
-                GetSmtOptions(options));
+                GetSmtOptions(options),
+                invalidConfigurationValues);
         }
 
         public static MissingPuritySuggestionOptions GetMissingPuritySuggestionOptions(
@@ -520,7 +525,230 @@ namespace SharpProof.Analyzer.Configuration
             value = string.Empty;
             return false;
         }
+
+        private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(AnalyzerOptions options)
+        {
+            var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
+
+            ValidateBool(builder, TryGetOption, ConfigKeys.EnableDebugLogging);
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePure);
+            ValidateMissingPuritySuggestionScope(builder, TryGetOption);
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated);
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeTests);
+            ValidateNonNegativeInt(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureMinComplexity);
+            ValidateBool(builder, TryGetOption, ConfigKeys.EmitExplanations);
+            ValidateBool(builder, TryGetOption, ConfigKeys.ReportBclFallbackGuesses);
+            ValidateRuntimeHazardMode(builder, TryGetOption);
+            ValidateBool(builder, TryGetOption, ConfigKeys.ReportExceptions);
+            ValidateBool(builder, TryGetOption, ConfigKeys.CheckedExceptions);
+            ValidateBool(builder, TryGetOption, ConfigKeys.EnableEffectSummaryJson);
+            ValidatePurityProfile(builder, TryGetOption);
+            ValidateSmtMode(builder, TryGetOption);
+            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtTimeoutMs);
+            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMethodBudgetMs);
+            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMaxPathConditions);
+            ValidatePositiveInt(builder, TryGetOption, ConfigKeys.SmtMaxExpressionNodes);
+
+            return builder.ToImmutable();
+
+            bool TryGetOption(string key, out string value) => TryGetGlobalOption(options, key, out value);
+        }
+
+        internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(AnalyzerConfigOptions options)
+        {
+            var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
+
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePure);
+            ValidateMissingPuritySuggestionScope(builder, TryGetOption);
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeGenerated);
+            ValidateBool(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureExcludeTests);
+            ValidateNonNegativeInt(builder, TryGetOption, ConfigKeys.SuggestMissingEnforcePureMinComplexity);
+            ValidateBool(builder, TryGetOption, ConfigKeys.EmitExplanations);
+            ValidateBool(builder, TryGetOption, ConfigKeys.ReportBclFallbackGuesses);
+            ValidateRuntimeHazardMode(builder, TryGetOption);
+            ValidateBool(builder, TryGetOption, ConfigKeys.ReportExceptions);
+            ValidateBool(builder, TryGetOption, ConfigKeys.CheckedExceptions);
+
+            return builder.ToImmutable();
+
+            bool TryGetOption(string key, out string value) => TryGetAnalyzerConfigOption(options, key, out value);
+        }
+
+        private static void ValidateBool(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption,
+            string key)
+        {
+            if (tryGetOption(key, out var value) &&
+                !TryParseBool(value, out _))
+            {
+                AddInvalidConfigurationValue(builder, key, value, "expected a boolean value");
+            }
+        }
+
+        private static void ValidatePurityProfile(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption)
+        {
+            if (!tryGetOption(ConfigKeys.PurityProfile, out var value))
+            {
+                return;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+            if (normalized != "strict" &&
+                normalized != "balanced" &&
+                normalized != "pragmatic")
+            {
+                AddInvalidConfigurationValue(builder, ConfigKeys.PurityProfile, value, "expected one of: strict, balanced, pragmatic");
+            }
+        }
+
+        private static void ValidateMissingPuritySuggestionScope(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption)
+        {
+            if (!tryGetOption(ConfigKeys.SuggestMissingEnforcePureScope, out var value))
+            {
+                return;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "all":
+                case "public":
+                case "public-only":
+                case "internal":
+                case "internal-only":
+                case "off":
+                case "none":
+                case "false":
+                    return;
+                default:
+                    AddInvalidConfigurationValue(builder, ConfigKeys.SuggestMissingEnforcePureScope, value, "expected one of: all, public, internal, off");
+                    return;
+            }
+        }
+
+        private static void ValidateRuntimeHazardMode(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption)
+        {
+            if (!tryGetOption(ConfigKeys.RuntimeHazardMode, out var value))
+            {
+                return;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "none":
+                case "disabled":
+                case "sites":
+                case "site":
+                case "checked":
+                case "checked-exceptions":
+                case "warnings":
+                case "warning":
+                case "summaries":
+                case "summary":
+                case "method-summaries":
+                case "method-summary":
+                case "report":
+                case "all":
+                case "both":
+                    return;
+            }
+
+            if (TryParseBool(value, out _))
+            {
+                return;
+            }
+
+            AddInvalidConfigurationValue(builder, ConfigKeys.RuntimeHazardMode, value, "expected one of: none, sites, summaries, all, or a boolean value");
+        }
+
+        private static void ValidateSmtMode(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption)
+        {
+            if (!tryGetOption(ConfigKeys.SmtMode, out var value))
+            {
+                return;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "disabled":
+                case "bounded":
+                case "default":
+                case "deep":
+                case "aggressive":
+                    return;
+            }
+
+            if (TryParseBool(value, out _))
+            {
+                return;
+            }
+
+            AddInvalidConfigurationValue(builder, ConfigKeys.SmtMode, value, "expected one of: disabled, bounded, default, deep, aggressive, or a boolean value");
+        }
+
+        private static void ValidatePositiveInt(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption,
+            string key)
+        {
+            if (tryGetOption(key, out var value) &&
+                (!int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed <= 0))
+            {
+                AddInvalidConfigurationValue(builder, key, value, "expected a positive integer");
+            }
+        }
+
+        private static void ValidateNonNegativeInt(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            TryGetConfigurationOption tryGetOption,
+            string key)
+        {
+            if (tryGetOption(key, out var value) &&
+                (!int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0))
+            {
+                AddInvalidConfigurationValue(builder, key, value, "expected a non-negative integer");
+            }
+        }
+
+        private static void AddInvalidConfigurationValue(
+            ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+            string key,
+            string value,
+            string reason)
+        {
+            builder.Add(new InvalidAnalyzerConfigurationValue(key, value.Trim(), reason));
+        }
+
+        private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
+        {
+            if (options.TryGetValue(key, out var found) && !string.IsNullOrWhiteSpace(found))
+            {
+                value = found;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+
+        private delegate bool TryGetConfigurationOption(string key, out string value);
     }
+
+    internal readonly record struct InvalidAnalyzerConfigurationValue(
+        string Key,
+        string Value,
+        string Reason);
 
     internal enum MissingPuritySuggestionScope
     {

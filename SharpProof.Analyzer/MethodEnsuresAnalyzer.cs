@@ -40,6 +40,16 @@ namespace SharpProof.Analyzer
                 return;
             }
 
+            contracts = ReportAndFilterInvalidContracts(
+                contracts,
+                context,
+                methodSymbol,
+                baseline);
+            if (contracts.Length == 0)
+            {
+                return;
+            }
+
             if (!SupportsReturnValuePostconditions(methodSymbol, context.Node, out var unsupportedReason))
             {
                 if (!baseline.IsSuppressed(SharpProofDiagnostics.EnsuresUnsupportedId, methodSymbol, context.Node.SyntaxTree))
@@ -227,10 +237,66 @@ namespace SharpProof.Analyzer
                     ? attribute.ConstructorArguments[0].Value as string
                     : null;
                 var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-                builder.Add(new EnsuresContract(condition ?? string.Empty, location));
+                var invalidReason = GetInvalidContractReason(attribute, condition);
+                builder.Add(new EnsuresContract(
+                    condition ?? string.Empty,
+                    location,
+                    GetAttributeArgumentText(attribute, cancellationToken),
+                    invalidReason));
             }
 
             return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(
+            ImmutableArray<EnsuresContract> contracts,
+            SyntaxNodeAnalysisContext context,
+            IMethodSymbol methodSymbol,
+            DiagnosticBaseline baseline)
+        {
+            var validContracts = ImmutableArray.CreateBuilder<EnsuresContract>(contracts.Length);
+            foreach (var contract in contracts)
+            {
+                if (contract.InvalidReason == null)
+                {
+                    validContracts.Add(contract);
+                    continue;
+                }
+
+                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
+                {
+                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                        "[Ensures]",
+                        contract.Argument,
+                        contract.InvalidReason,
+                        contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                }
+            }
+
+            return validContracts.ToImmutable();
+        }
+
+        private static string? GetInvalidContractReason(AttributeData attribute, string? condition)
+        {
+            if (attribute.ConstructorArguments.Length != 1 ||
+                attribute.ConstructorArguments[0].Value is not string)
+            {
+                return "expected a string condition";
+            }
+
+            return string.IsNullOrWhiteSpace(condition)
+                ? "condition must not be empty"
+                : null;
+        }
+
+        private static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
+        {
+            if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+            {
+                return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
+            }
+
+            return "<missing>";
         }
 
         private static bool SupportsReturnValuePostconditions(
@@ -513,7 +579,11 @@ namespace SharpProof.Analyzer
             }
         }
 
-        private readonly record struct EnsuresContract(string Condition, Location? Location);
+        private readonly record struct EnsuresContract(
+            string Condition,
+            Location? Location,
+            string Argument,
+            string? InvalidReason);
 
         private readonly record struct ReturnSite(
             ExpressionSyntax Expression,

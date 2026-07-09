@@ -76,6 +76,38 @@ public class TestClass
         }
 
         [Test]
+        public async Task InvalidGlobalConfigurationValues_ReportDiagnostics()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+public sealed class TestClass
+{
+}",
+                ImmutableDictionary<string, string>.Empty
+                    .Add("sharpproof_smt_mode", "turbo")
+                    .Add("sharpproof_smt_timeout_ms", "0")
+                    .Add("sharpproof_suggest_missing_enforce_pure", "maybe"));
+
+            var configurationDiagnostics = diagnostics
+                .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId)
+                .OrderBy(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty], StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(configurationDiagnostics, Has.Length.EqualTo(3));
+            Assert.That(
+                configurationDiagnostics.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty]),
+                Is.EqualTo(new[]
+                {
+                    "sharpproof_smt_mode",
+                    "sharpproof_smt_timeout_ms",
+                    "sharpproof_suggest_missing_enforce_pure",
+                }));
+            Assert.That(configurationDiagnostics[0].Properties[SharpProofDiagnostics.ConfigurationValueProperty], Is.EqualTo("turbo"));
+            Assert.That(configurationDiagnostics[0].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Does.Contain("expected one of"));
+            Assert.That(configurationDiagnostics[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Is.EqualTo("expected a positive integer"));
+            Assert.That(configurationDiagnostics[2].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Is.EqualTo("expected a boolean value"));
+        }
+
+        [Test]
         public void SmtNumericConfiguration_ParsesSignedOverridesWithInvariantCulture()
         {
             var originalCulture = CultureInfo.CurrentCulture;

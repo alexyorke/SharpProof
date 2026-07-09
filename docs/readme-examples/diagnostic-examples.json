@@ -240,5 +240,27 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0024-invalid-contract-argument",
+    "DiagnosticId": "SP0024",
+    "Title": "SP0024 - Invalid contract argument",
+    "Summary": "Malformed contract arguments are reported at the contract instead of falling back to a later proof diagnostic.",
+    "SourcePath": "docs/readme-examples/sp0024-invalid-contract-argument/input.cs",
+    "OutputPath": "docs/readme-examples/sp0024-invalid-contract-argument/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0025-invalid-analyzer-configuration",
+    "DiagnosticId": "SP0025",
+    "Title": "SP0025 - Invalid analyzer configuration",
+    "Summary": "Invalid `sharpproof_*` analyzer option values are reported instead of silently falling back to defaults.",
+    "SourcePath": "docs/readme-examples/sp0025-invalid-analyzer-configuration/input.cs",
+    "OutputPath": "docs/readme-examples/sp0025-invalid-analyzer-configuration/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

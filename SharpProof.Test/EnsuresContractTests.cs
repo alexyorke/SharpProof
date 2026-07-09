@@ -138,6 +138,25 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_EmptyCondition_ReportsInvalidContractArgument()
+        {
+            var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [{|SP0024:Ensures("""")|}]
+    public int Value()
+    {
+        return 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_VoidMethod_IsRejected()
         {
             var diagnostics = await GetDiagnosticsAsync(@"

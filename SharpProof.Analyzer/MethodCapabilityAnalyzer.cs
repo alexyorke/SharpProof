@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
@@ -20,8 +21,27 @@ namespace SharpProof.Analyzer
                 return;
             }
 
-            if (!TryGetAllowedCapabilities(methodSymbol, context.SemanticModel.Compilation, out var allowedCapabilities))
+            if (!TryGetAllowedCapabilities(
+                    methodSymbol,
+                    context.SemanticModel.Compilation,
+                    context.CancellationToken,
+                    out var allowedCapabilities,
+                    out var invalidContract))
             {
+                return;
+            }
+
+            if (invalidContract != null)
+            {
+                if (!baseline.IsSuppressed(SharpProofDiagnostics.InvalidContractArgumentId, methodSymbol, context.Node.SyntaxTree))
+                {
+                    context.ReportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                        "[AllowedCapabilities]",
+                        invalidContract.Argument,
+                        invalidContract.Reason,
+                        invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node)));
+                }
+
                 return;
             }
 
@@ -94,6 +114,21 @@ namespace SharpProof.Analyzer
             NativeInterop = 1 << 12,
         }
 
+        private const CapabilityFlags AllKnownCapabilityFlags =
+            CapabilityFlags.IO |
+            CapabilityFlags.FileRead |
+            CapabilityFlags.FileWrite |
+            CapabilityFlags.Network |
+            CapabilityFlags.Console |
+            CapabilityFlags.Process |
+            CapabilityFlags.Environment |
+            CapabilityFlags.Registry |
+            CapabilityFlags.Clock |
+            CapabilityFlags.Randomness |
+            CapabilityFlags.Reflection |
+            CapabilityFlags.Synchronization |
+            CapabilityFlags.NativeInterop;
+
         private static Diagnostic CreateViolationDiagnostic(
             IMethodSymbol methodSymbol,
             SymbolicCapabilitySite site,
@@ -154,9 +189,12 @@ namespace SharpProof.Analyzer
         private static bool TryGetAllowedCapabilities(
             IMethodSymbol methodSymbol,
             Compilation compilation,
-            out CapabilityFlags capabilities)
+            System.Threading.CancellationToken cancellationToken,
+            out CapabilityFlags capabilities,
+            out InvalidContractArgument? invalidContract)
         {
             capabilities = CapabilityFlags.None;
+            invalidContract = null;
             var attributeSymbol =
                 compilation.GetTypeByMetadataName("SharpProof.Attributes.AllowedCapabilitiesAttribute") ??
                 compilation.GetTypeByMetadataName("AllowedCapabilitiesAttribute");
@@ -168,32 +206,66 @@ namespace SharpProof.Analyzer
                     continue;
                 }
 
-                if (attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is int intValue)
+                var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
+                var argumentText = GetAttributeArgumentText(attribute, cancellationToken);
+                if (!TryGetCapabilityArgumentValue(attribute, out var rawValue))
                 {
-                    capabilities = NormalizeCapabilities((CapabilityFlags)intValue);
+                    invalidContract = new InvalidContractArgument(
+                        argumentText,
+                        "expected a SharpProofCapability enum value",
+                        location);
                     return true;
                 }
 
-                if (attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is uint uintValue)
+                if (rawValue < 0 ||
+                    ((CapabilityFlags)rawValue & ~AllKnownCapabilityFlags) != 0)
                 {
-                    capabilities = NormalizeCapabilities((CapabilityFlags)uintValue);
+                    invalidContract = new InvalidContractArgument(
+                        rawValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        "unknown SharpProofCapability bits are set",
+                        location);
                     return true;
                 }
 
-                if (attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is long longValue)
-                {
-                    capabilities = NormalizeCapabilities((CapabilityFlags)longValue);
-                    return true;
-                }
-
-                capabilities = CapabilityFlags.None;
+                capabilities = NormalizeCapabilities((CapabilityFlags)rawValue);
                 return true;
             }
 
             return false;
+        }
+
+        private static bool TryGetCapabilityArgumentValue(AttributeData attribute, out long value)
+        {
+            value = 0;
+            if (attribute.ConstructorArguments.Length != 1)
+            {
+                return false;
+            }
+
+            switch (attribute.ConstructorArguments[0].Value)
+            {
+                case int intValue:
+                    value = intValue;
+                    return true;
+                case uint uintValue:
+                    value = uintValue;
+                    return true;
+                case long longValue:
+                    value = longValue;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string GetAttributeArgumentText(AttributeData attribute, System.Threading.CancellationToken cancellationToken)
+        {
+            if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+            {
+                return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
+            }
+
+            return "<missing>";
         }
 
         private static CapabilityFlags NormalizeCapabilities(CapabilityFlags capabilities)
@@ -225,5 +297,10 @@ namespace SharpProof.Analyzer
                 .ToArray();
             return values.Length == 0 ? "None" : string.Join(", ", values);
         }
+
+        private sealed record InvalidContractArgument(
+            string Argument,
+            string Reason,
+            Location? Location);
     }
 }
