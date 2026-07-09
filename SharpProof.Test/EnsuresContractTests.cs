@@ -259,6 +259,151 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task Ensures_NullableOutParameterHasValue_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value.HasValue"")]
+    public void Assign(out int? value)
+    {
+        value = 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_NullableOutParameterValuePredicate_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value.Value > 0"")]
+    public void Assign(out int? value)
+    {
+        value = 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_NullableOutParameterNoValueFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value.HasValue"")]
+    public void Assign(out int? value)
+    {
+        value = null;
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ArrayLengthPredicate_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""values.Length == 3"")]
+    public void Fill(out int[] values)
+    {
+        values = new[] { 1, 2, 3 };
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_ArrayLengthPredicateFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""values.Length > 0"")]
+    public void Fill(out int[] values)
+    {
+        values = new int[0];
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_CollectionCountPredicate_Proven()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""values.Count == 2"")]
+    public void Fill(out List<int> values)
+    {
+        values = new List<int> { 1, 2 };
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Ensures_CollectionCountPredicateFailure_ReportsSp0018()
+        {
+            var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using System.Collections.Generic;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""values.Count > 0"")]
+    public void Fill(out List<int> values)
+    {
+        values = new List<int>();
+        {|SP0018:return;|}
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Ensures_ExplicitThisMemberState_Proven()
         {
             var test = @"

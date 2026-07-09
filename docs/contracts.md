@@ -19,6 +19,10 @@ bounded proof question into normal build diagnostics.
   completions. Conditions can reference `result` for value-returning members,
   the annotated member's parameters including `out` and `ref` parameters, and
   current-instance fields/properties through `this` or implicit member access.
+  Supported postcondition predicates include nullable `HasValue`/`Value`,
+  array `Length`, and exact `List<T>.Count` facts from parameterless list
+  constructions and collection initializers when the symbolic state can prove
+  them.
   Failures produce `SP0018`; unsupported conditions produce `SP0019`.
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
   in the annotated method-like body. Violations produce `SP0013`.

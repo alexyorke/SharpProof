@@ -56,7 +56,7 @@ grouped by their original feature area.
 
 #### Missing Contract Types
 - Expand `[Ensures]` beyond the current return-site model to support
-  `old(...)` values and nullable and collection predicates.
+  `old(...)` value snapshots.
 
 #### Runtime Hazard Coverage
 - Track and burn down the remaining runtime-hazard `.formula-fallback`

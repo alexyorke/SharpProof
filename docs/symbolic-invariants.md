@@ -41,7 +41,7 @@ The primary entrypoint is `SymbolicQueryService`:
 Pass a bounded `SmtAnalysisService` to classify reachability or prove `--implies` conditions.
 If SMT is disabled, times out, exceeds budget, or cannot load its native solver, callers should treat the result as unknown rather than proven.
 
-Length and index facts include arrays, strings, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, and `ReadOnlyMemory<T>` when Roslyn syntax and semantic-model lowering can prove them. Direct local and parameter copies preserve known length facts, and supported span/memory `Slice` results expose derived `Length` invariants.
+Length, count, and index facts include arrays, strings, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, `ReadOnlyMemory<T>`, and supported count-backed collections when Roslyn syntax and semantic-model lowering can prove them. Direct local and parameter copies preserve known length facts, exact parameterless `List<T>` constructions preserve `Count` facts, and supported span/memory `Slice` results expose derived `Length` invariants.
 
 Runtime type tests are represented as Z3-backed reference predicates. That lets `is`, declaration/type patterns, switch pattern exclusions, and guarded casts share the same path facts without hard-coded method or branch special cases.
 

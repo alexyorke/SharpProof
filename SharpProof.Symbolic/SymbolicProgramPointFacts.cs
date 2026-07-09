@@ -9768,6 +9768,14 @@ namespace SharpProof.Symbolic
                     provenanceRoot + ".reference-backed-length");
             }
 
+            AddAssignedCollectionCountStateFacts(
+                ref state,
+                targetReference,
+                valueExpression,
+                valueType,
+                sourceType,
+                provenanceRoot);
+
             if (valueType.SpecialType == SpecialType.System_String &&
                 SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) &&
                 SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
@@ -9803,6 +9811,95 @@ namespace SharpProof.Symbolic
                     valueExpression,
                     provenanceRoot + ".reference-backed-array-length");
             }
+        }
+
+        private static void AddAssignedCollectionCountStateFacts(
+            ref SymbolicState state,
+            SymbolicTerm targetReference,
+            ExpressionSyntax valueExpression,
+            ITypeSymbol targetType,
+            ITypeSymbol? sourceType,
+            string provenanceRoot)
+        {
+            if (!SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(targetType, targetReference, out var targetCount) ||
+                targetCount is not SymbolicCountTerm ||
+                !TryCreateExactListCreationCountTerm(valueExpression, sourceType ?? targetType, out var valueCount) ||
+                !CanCompareIrTerms(targetCount, valueCount))
+            {
+                return;
+            }
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetCount,
+                valueCount,
+                valueExpression,
+                provenanceRoot + ".reference-backed-count");
+        }
+
+        private static bool TryCreateExactListCreationCountTerm(
+            ExpressionSyntax valueExpression,
+            ITypeSymbol? sourceType,
+            out SymbolicTerm countTerm)
+        {
+            countTerm = null!;
+            if (!IsKnownExactCountListType(sourceType))
+            {
+                return false;
+            }
+
+            valueExpression = UnwrapExpression(valueExpression);
+            switch (valueExpression)
+            {
+                case ObjectCreationExpressionSyntax objectCreation:
+                    return TryCreateExactListObjectCreationCountTerm(
+                        objectCreation.ArgumentList?.Arguments.Count ?? 0,
+                        objectCreation.Initializer,
+                        out countTerm);
+                case ImplicitObjectCreationExpressionSyntax implicitObjectCreation:
+                    return TryCreateExactListObjectCreationCountTerm(
+                        implicitObjectCreation.ArgumentList?.Arguments.Count ?? 0,
+                        implicitObjectCreation.Initializer,
+                        out countTerm);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryCreateExactListObjectCreationCountTerm(
+            int argumentCount,
+            InitializerExpressionSyntax? initializer,
+            out SymbolicTerm countTerm)
+        {
+            countTerm = null!;
+            if (argumentCount != 0)
+            {
+                return false;
+            }
+
+            if (initializer == null)
+            {
+                countTerm = new SymbolicIntegerConstantTerm(0);
+                return true;
+            }
+
+            if (!initializer.IsKind(SyntaxKind.CollectionInitializerExpression))
+            {
+                return false;
+            }
+
+            countTerm = new SymbolicIntegerConstantTerm(initializer.Expressions.Count);
+            return true;
+        }
+
+        private static bool IsKnownExactCountListType(ITypeSymbol? type)
+        {
+            return type is INamedTypeSymbol namedType &&
+                string.Equals(
+                    namedType.OriginalDefinition.ToDisplayString(),
+                    "System.Collections.Generic.List<T>",
+                    StringComparison.Ordinal);
         }
 
         private static bool TryCreateReferenceBackedLengthFactsFromSourceType(
