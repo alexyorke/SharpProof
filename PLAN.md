@@ -55,15 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Purity Rule Precision Targets
-- Add an explicit modern C# language-surface tracking matrix across analyzer,
-  symbolic IR, runtime hazards, capability, allocation, complexity, and
-  `[Ensures]` behavior for C# 12 through C# 14 features such as primary
-  constructors, collection expressions, inline arrays, `ref readonly`
-  parameters, alias-any-type, interceptors, params collections, the new lock
-  type and semantics, `ref` locals in async/iterator methods, `ref struct`
-  interfaces and `allows ref struct` generics, partial properties/indexers,
-  field-backed properties, extension properties, extension operators, and
-  static extension members.
 - Add regression tests that require each conservative fuzz family to preserve
   structured diagnostic evidence, then track how many conservative families are
   burned down in the coverage dashboard.

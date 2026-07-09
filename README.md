@@ -618,6 +618,7 @@ JSON automation.
 - [Contracts and analyzer diagnostics](docs/contracts.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
+- [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)
 - [Diagnostic example gallery](docs/diagnostic-examples.md)
 - [Symbolic query examples](docs/symbolic-query-examples.md)
 - [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)
