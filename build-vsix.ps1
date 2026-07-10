@@ -1,6 +1,8 @@
 param(
     [string]$Configuration = 'Release',
-    [switch]$RunHarness
+    [switch]$RunHarness,
+    [ValidateRange(0, 1048576)]
+    [int]$MemoryLimitMb = 6144
 )
 
 Set-StrictMode -Version Latest
@@ -12,6 +14,13 @@ function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
     $exitCode = Invoke-ProcessUnderJobObject -FilePath 'dotnet' -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $repoRoot
     if ($exitCode -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
+    }
+}
+
+function Invoke-MSBuildInRepo([string]$MSBuildPath, [string[]]$Arguments) {
+    $exitCode = Invoke-ProcessUnderJobObject -FilePath $MSBuildPath -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $repoRoot
+    if ($exitCode -ne 0) {
+        throw "MSBuild $($Arguments -join ' ') failed with exit code $exitCode"
     }
 }
 
@@ -39,7 +48,12 @@ $msbuild = Find-MSBuild
 Write-Host "MSBuild: $msbuild" -ForegroundColor Green
 
 Write-Host "Building VSIX ($Configuration)..." -ForegroundColor Cyan
-& $msbuild $vsixProj /t:Restore,Build /p:Configuration=$Configuration /p:EnableVsixPackaging=true /v:m | Out-Host
+Invoke-MSBuildInRepo $msbuild @(
+    $vsixProj,
+    '/t:Restore,Build',
+    "/p:Configuration=$Configuration",
+    '/p:EnableVsixPackaging=true',
+    '/v:m')
 
 $vsixDir = Join-Path $repoRoot "SharpProof.Vsix\bin\$Configuration"
 $vsix = Get-ChildItem -Path $vsixDir -Recurse -Filter *.vsix | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName -First 1
@@ -57,5 +71,4 @@ if ($RunHarness) {
     Write-Host "Running harness against VSIX..." -ForegroundColor Cyan
     Invoke-DotnetInRepo @('run', '--project', $harnessProj, '-c', $Configuration, '--', $vsix)
 }
-
 

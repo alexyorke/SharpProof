@@ -1742,6 +1742,24 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain(@".\SharpProof.Symbolic\SharpProof.Symbolic.csproj"));
     }
 
+    [Test]
+    public void BuildScripts_ShouldBoundVsixMsBuildAndStageNuGetPublication()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var buildSource = File.ReadAllText(Path.Combine(repositoryRoot, "build.ps1"));
+        var vsixSource = File.ReadAllText(Path.Combine(repositoryRoot, "build-vsix.ps1"));
+        var nugetSource = File.ReadAllText(Path.Combine(repositoryRoot, "build-nuget.ps1"));
+
+        Assert.That(buildSource, Does.Contain("Invoke-MSBuildInRepo $msbuildPath"));
+        Assert.That(vsixSource, Does.Contain("Invoke-MSBuildInRepo $msbuild"));
+        Assert.That(buildSource, Does.Contain("Invoke-ProcessUnderJobObject -FilePath $MSBuildPath"));
+        Assert.That(vsixSource, Does.Contain("Invoke-ProcessUnderJobObject -FilePath $MSBuildPath"));
+        Assert.That(nugetSource, Does.Contain("Packing NuGet packages to staging directory"));
+        Assert.That(
+            nugetSource.IndexOf("-o', $stagingDir", StringComparison.Ordinal),
+            Is.LessThan(nugetSource.IndexOf("Remove-Item -Force", StringComparison.Ordinal)));
+    }
+
     private static string ReadPackageVersion(string projectPath, string elementName)
     {
         var document = XDocument.Load(projectPath);

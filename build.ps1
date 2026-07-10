@@ -1,5 +1,7 @@
 param(
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    [ValidateRange(0, 1048576)]
+    [int]$MemoryLimitMb = 6144
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,6 +22,13 @@ function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
     $exitCode = Invoke-ProcessUnderJobObject -FilePath "dotnet" -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $root
     if ($exitCode -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
+    }
+}
+
+function Invoke-MSBuildInRepo([string]$MSBuildPath, [string[]]$Arguments) {
+    $exitCode = Invoke-ProcessUnderJobObject -FilePath $MSBuildPath -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $root
+    if ($exitCode -ne 0) {
+        throw "MSBuild $($Arguments -join ' ') failed with exit code $exitCode"
     }
 }
 
@@ -73,8 +82,11 @@ if (-not $vsix) {
 
     if (-not $msbuildPath) { throw "Could not locate MSBuild.exe. Please install Visual Studio 2022 (any edition) or MSBuild Build Tools with the VS extension workload." }
 
-    & $msbuildPath ".\SharpProof.Vsix\SharpProof.Vsix.csproj" /t:Build /p:Configuration=$Configuration /p:EnableVsixPackaging=true
-    if ($LASTEXITCODE -ne 0) { throw "MSBuild VSIX build failed with exit code $LASTEXITCODE" }
+    Invoke-MSBuildInRepo $msbuildPath @(
+        ".\SharpProof.Vsix\SharpProof.Vsix.csproj",
+        "/t:Build",
+        "/p:Configuration=$Configuration",
+        "/p:EnableVsixPackaging=true")
 
     $vsix = Get-ChildItem -Path $vsixDir -Filter *.vsix -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
@@ -93,5 +105,4 @@ if ($vsix) { Write-Host ("VSIX: " + $vsix.FullName) } else { Write-Host "VSIX: n
 if ($nupkgs) { $nupkgs | ForEach-Object { Write-Host ("NuGet: " + $_.FullName) } } else { Write-Host "NuGet: not found" }
 
 exit 0
-
 
