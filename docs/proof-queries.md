@@ -48,6 +48,10 @@ Use `SymbolicQueryService` as the public entrypoint:
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
 and unknown reasons. Raw SMT terms are not the primary public abstraction.
 
+Bounded fact and state merges expose `AnalysisTruncation` instead of silently
+discarding proof quality. The analyzer, API, CLI, defaults, event codes, and
+override names are documented in [bounded analysis limits](analysis-limits.md).
+
 Reachability, implication, and runtime-hazard results also expose concrete
 solver assignments and conservative input-domain summaries. See
 [solver witnesses and input domains](input-witnesses.md) for the status model,
@@ -160,3 +164,5 @@ review.
 Query results are bounded. Unsupported syntax, unknown external calls, SMT-off
 mode, solver timeout, cancellation, native-load failure, and budget exhaustion
 must stay visible as unknown, unsupported, unproven, or conservative results.
+Fact-collection and state-merge limit hits are separately visible through
+stable `analysis_limit.*` events.

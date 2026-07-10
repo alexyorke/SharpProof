@@ -8,6 +8,17 @@ SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfi
 
 | Key | Scope | Valid values | Default | Related diagnostics | Description |
 | --- | --- | --- | --- | --- | --- |
+| `sharpproof_analysis_max_fact_choice_combinations_per_target` | Global-only | positive integer | `64` | configuration consumers; SP0025 for invalid values | Maximum fact-choice combinations explored per merge target. |
+| `sharpproof_analysis_max_finite_foreach_element_facts` | Global-only | positive integer | `8` | configuration consumers; SP0025 for invalid values | Maximum finite collection elements modeled for foreach facts. |
+| `sharpproof_analysis_max_guard_facts_per_target_per_state` | Global-only | positive integer | `6` | configuration consumers; SP0025 for invalid values | Maximum guard facts retained per target and state. |
+| `sharpproof_analysis_max_mergeable_facts_per_target_per_state` | Global-only | positive integer | `4` | configuration consumers; SP0025 for invalid values | Maximum mergeable facts retained per target and state. |
+| `sharpproof_analysis_max_merged_if_else_facts` | Global-only | positive integer | `16` | configuration consumers; SP0025 for invalid values | Maximum facts retained while merging if/else branches. |
+| `sharpproof_analysis_max_merged_path_conditions` | Global-only | positive integer | `32` | configuration consumers; SP0025 for invalid values | Maximum synthesized path conditions retained across merged states. |
+| `sharpproof_analysis_max_merged_switch_facts` | Global-only | positive integer | `32` | configuration consumers; SP0025 for invalid values | Maximum facts retained while merging switch branches. |
+| `sharpproof_analysis_max_merged_try_facts` | Global-only | positive integer | `16` | configuration consumers; SP0025 for invalid values | Maximum facts retained while merging try/catch/finally branches. |
+| `sharpproof_analysis_max_scoped_block_completion_statements` | Global-only | positive integer | `32` | configuration consumers; SP0025 for invalid values | Maximum completed statements scanned while deriving scoped block facts. |
+| `sharpproof_analysis_max_structural_null_state_depth` | Global-only | positive integer | `4` | configuration consumers; SP0025 for invalid values | Maximum structural expression depth inspected for null-state facts. |
+| `sharpproof_analysis_max_try_completion_branches` | Global-only | positive integer | `8` | configuration consumers; SP0025 for invalid values | Maximum try/catch completion branches analyzed at a program point. |
 | `sharpproof_attribute_stub_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `SharpProof.Attributes` | configuration consumers; SP0025 for invalid values | Namespaces accepted for source-only SharpProof attribute stubs. |
 | `sharpproof_checked_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0011; SP0025 for invalid values | Emits optional SP0011 exception site diagnostics. |
 | `sharpproof_emit_explanations` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0009; SP0025 for invalid values | Emits optional SP0009 proof explanation diagnostics. |
@@ -38,6 +49,17 @@ Global-only options must be set in a global AnalyzerConfig file. Global-and-tree
 
 ```ini
 is_global = true
+sharpproof_analysis_max_fact_choice_combinations_per_target = 1000
+sharpproof_analysis_max_finite_foreach_element_facts = 1000
+sharpproof_analysis_max_guard_facts_per_target_per_state = 1000
+sharpproof_analysis_max_mergeable_facts_per_target_per_state = 1000
+sharpproof_analysis_max_merged_if_else_facts = 1000
+sharpproof_analysis_max_merged_path_conditions = 1000
+sharpproof_analysis_max_merged_switch_facts = 1000
+sharpproof_analysis_max_merged_try_facts = 1000
+sharpproof_analysis_max_scoped_block_completion_statements = 1000
+sharpproof_analysis_max_structural_null_state_depth = 1000
+sharpproof_analysis_max_try_completion_branches = 1000
 sharpproof_attribute_stub_namespaces = SharpProof.Attributes; My.Contracts
 sharpproof_checked_exceptions = false
 sharpproof_emit_explanations = false

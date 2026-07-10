@@ -3415,7 +3415,8 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         AnalysisSummary = SymbolicCompactAnalysisSummary.From(
             InvariantQuery,
             ProgramPointSummary,
-            SmtDiagnostics);
+            SmtDiagnostics,
+            AnalysisTruncation);
         QueryDescriptor = SymbolicCompactSourceQueryDescriptor.FromCompactResult(this);
         Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
@@ -3809,6 +3810,7 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
         bool conditionProofsTruncated,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
         int? lineCount,
         int linesWithProgramPoints,
         int programPointCount)
@@ -3827,6 +3829,7 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
         ConditionProofsTruncated = conditionProofsTruncated;
         SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+        AnalysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
         LineCount = lineCount;
         LinesWithProgramPoints = linesWithProgramPoints;
         ProgramPointCount = programPointCount;
@@ -3869,6 +3872,8 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
     public bool ConditionProofsTruncated { get; }
 
     public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public int? LineCount { get; }
 
@@ -3926,6 +3931,7 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
             result.ConditionProofs,
             result.Truncation.Proofs,
             result.SmtDiagnostics,
+            result.AnalysisTruncation,
             result.LineCount,
             result.LinesWithProgramPoints,
             result.ProgramPointCount);
@@ -5443,7 +5449,8 @@ public sealed class SymbolicCompactAnalysisSummary
         int smtQueryTimeoutMs,
         int smtMethodBudgetMs,
         int smtMaxPathConditions,
-        int smtMaxExpressionNodes)
+        int smtMaxExpressionNodes,
+        bool analysisTruncated)
     {
         ProgramPointCount = programPointCount;
         InvariantConditionCount = invariantConditionCount;
@@ -5472,6 +5479,7 @@ public sealed class SymbolicCompactAnalysisSummary
         SmtMethodBudgetMs = smtMethodBudgetMs;
         SmtMaxPathConditions = smtMaxPathConditions;
         SmtMaxExpressionNodes = smtMaxExpressionNodes;
+        AnalysisTruncated = analysisTruncated;
     }
 
     public int ProgramPointCount { get; }
@@ -5528,22 +5536,28 @@ public sealed class SymbolicCompactAnalysisSummary
 
     public int SmtMaxExpressionNodes { get; }
 
+    public bool AnalysisTruncated { get; }
+
     public bool HasUnresolvedAnalysis =>
         ConservativeUnknownCount != 0 ||
         ReachabilityUnknownCount != 0 ||
         ReachabilityNotCheckedCount != 0 ||
-        ProofUnknownCount != 0;
+        ProofUnknownCount != 0 ||
+        AnalysisTruncated;
 
     internal static SymbolicCompactAnalysisSummary From(
         SymbolicCompactInvariantQueryView invariantQuery,
         SymbolicProgramPointSummary programPointSummary,
-        SymbolicCompactSmtDiagnostics smtDiagnostics)
+        SymbolicCompactSmtDiagnostics smtDiagnostics,
+        SymbolicAnalysisTruncationInfo analysisTruncation)
     {
         if (invariantQuery == null) throw new ArgumentNullException(nameof(invariantQuery));
 
         if (programPointSummary == null) throw new ArgumentNullException(nameof(programPointSummary));
 
         if (smtDiagnostics == null) throw new ArgumentNullException(nameof(smtDiagnostics));
+
+        if (analysisTruncation == null) throw new ArgumentNullException(nameof(analysisTruncation));
 
         var reachability = programPointSummary.Reachability;
         var proofOutcomes = programPointSummary.ProofOutcomes;
@@ -5586,7 +5600,8 @@ public sealed class SymbolicCompactAnalysisSummary
             smtDiagnostics.QueryTimeoutMs,
             smtDiagnostics.MethodBudgetMs,
             smtDiagnostics.MaxPathConditions,
-            smtDiagnostics.MaxExpressionNodes);
+            smtDiagnostics.MaxExpressionNodes,
+            analysisTruncation.IsTruncated);
     }
 }
 

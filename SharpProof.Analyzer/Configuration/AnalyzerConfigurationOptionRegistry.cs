@@ -162,63 +162,72 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationValueKind.PositiveInteger,
             "mode default",
             "Maximum SMT expression nodes considered per query."),
-        PositiveAnalysisLimit(
+        new AnalyzerConfigurationOption(
             ConfigKeys.AnalysisMaxMergedIfElseFacts,
-            "16",
-            "Maximum facts retained while merging if/else branches."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxMergedSwitchFacts,
-            "32",
-            "Maximum facts retained while merging switch branches."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxMergedTryFacts,
-            "16",
-            "Maximum facts retained while merging try/catch/finally branches."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxTryCompletionBranches,
-            "8",
-            "Maximum try/catch completion branches analyzed at a program point."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxFiniteForeachElementFacts,
-            "8",
-            "Maximum finite collection elements modeled for foreach facts."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxScopedBlockCompletionStatements,
-            "32",
-            "Maximum completed statements scanned while deriving scoped block facts."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxStructuralNullStateDepth,
-            "4",
-            "Maximum structural expression depth inspected for null-state facts."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxMergedPathConditions,
-            "32",
-            "Maximum synthesized path conditions retained across merged states."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState,
-            "4",
-            "Maximum mergeable facts retained per target and state."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget,
-            "64",
-            "Maximum fact-choice combinations explored per merge target."),
-        PositiveAnalysisLimit(
-            ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState,
-            "6",
-            "Maximum guard facts retained per target and state."));
-
-    private static AnalyzerConfigurationOption PositiveAnalysisLimit(
-        string key,
-        string defaultValue,
-        string description)
-    {
-        return new AnalyzerConfigurationOption(
-            key,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,
-            defaultValue,
-            description);
-    }
+            "16",
+            "Maximum facts retained while merging if/else branches."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxMergedSwitchFacts,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "32",
+            "Maximum facts retained while merging switch branches."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxMergedTryFacts,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "16",
+            "Maximum facts retained while merging try/catch/finally branches."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxTryCompletionBranches,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "8",
+            "Maximum try/catch completion branches analyzed at a program point."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxFiniteForeachElementFacts,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "8",
+            "Maximum finite collection elements modeled for foreach facts."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxScopedBlockCompletionStatements,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "32",
+            "Maximum completed statements scanned while deriving scoped block facts."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxStructuralNullStateDepth,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "4",
+            "Maximum structural expression depth inspected for null-state facts."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxMergedPathConditions,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "32",
+            "Maximum synthesized path conditions retained across merged states."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "4",
+            "Maximum mergeable facts retained per target and state."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "64",
+            "Maximum fact-choice combinations explored per merge target."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.PositiveInteger,
+            "6",
+            "Maximum guard facts retained per target and state."));
 
     public static ImmutableArray<AnalyzerConfigurationOption> GlobalOptions =>
         All.Where(static option => option.IsGlobal).ToImmutableArray();

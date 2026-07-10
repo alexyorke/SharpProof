@@ -4177,6 +4177,62 @@ public class TestClass
     }
 
     [Test]
+    public async Task SymbolicCli_AnalysisLimit_EmitsTruncationEvidence()
+    {
+        const string source = """
+                              public sealed class Sample
+                              {
+                                  public int Visit()
+                                  {
+                                      foreach (var value in new[] { 1, 2 })
+                                      {
+                                          return value;
+                                      }
+
+                                      return 0;
+                                  }
+                              }
+                              """;
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliAnalysisLimit-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--all-lines",
+                "--analysis-limit",
+                "finite-foreach-element-facts=1",
+                "--compact-json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var truncation = document.RootElement.GetProperty("analysisTruncation");
+            Assert.That(truncation.GetProperty("isTruncated").GetBoolean(), Is.True);
+            Assert.That(
+                truncation.GetProperty("events").EnumerateArray()
+                    .Select(static item => item.GetProperty("code").GetString()),
+                Does.Contain("analysis_limit.foreach_element_facts"));
+
+            var textResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--all-lines",
+                "--analysis-limit",
+                "finite-foreach-element-facts=1");
+            Assert.That(textResult.ExitCode, Is.EqualTo(0), textResult.StandardError);
+            Assert.That(textResult.StandardOutput, Does.Contain("Analysis limits hit:"));
+            Assert.That(textResult.StandardOutput, Does.Contain("analysis_limit.foreach_element_facts"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
     public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
     {
         var sourcePath = Path.Combine(

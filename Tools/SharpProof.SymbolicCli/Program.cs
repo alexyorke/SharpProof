@@ -158,6 +158,7 @@ static void PrintFileResult(
     Console.WriteLine($"Total lines: {result.LineCount}");
     Console.WriteLine($"Lines with program points: {result.LinesWithProgramPoints}");
     Console.WriteLine($"Program points: {result.ProgramPointCount}");
+    PrintAnalysisTruncation(result.AnalysisTruncation);
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Merged invariant merge: {result.InvariantInfo.MergeKind}");
@@ -190,6 +191,7 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    PrintAnalysisTruncation(result.AnalysisTruncation);
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
@@ -213,6 +215,7 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"{result.FilePath}:{result.SpanStart}-{result.SpanEnd}");
     Console.WriteLine($"Span lines: {result.StartLine}:{result.StartColumn}-{result.EndLine}:{result.EndColumn}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    PrintAnalysisTruncation(result.AnalysisTruncation);
     PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Span merged invariant: {result.MergedInvariantText}");
@@ -242,6 +245,7 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
         Console.WriteLine($"Total lines: {result.LineCount}");
 
     Console.WriteLine($"Runtime hazards: {result.HazardCount}");
+    PrintAnalysisTruncation(result.AnalysisTruncation);
     Console.WriteLine("Hazard status summary: " +
                       FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Status.ToString())));
     Console.WriteLine("Hazard exception summary: " +
@@ -292,6 +296,7 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
         Console.WriteLine($"Merged invariant: {point.MergedInvariantText}");
         Console.WriteLine($"Reachability: {point.Reachability}");
         Console.WriteLine($"Reachability reason: {point.ReachabilityReason}");
+        PrintAnalysisTruncation(point.AnalysisTruncation);
         Console.WriteLine(
             "Proof outcomes: " +
             $"Total={point.ProofOutcomes.TotalCount}, " +
@@ -325,6 +330,7 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
         Console.WriteLine();
         Console.WriteLine("Runtime hazards");
         Console.WriteLine($"Count: {hazards.HazardCount}");
+        PrintAnalysisTruncation(hazards.AnalysisTruncation);
         Console.WriteLine("Status summary: " +
                           FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
         foreach (var hazard in hazards.Hazards.Take(5))
@@ -697,6 +703,7 @@ static void PrintPointResult(
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
     Console.WriteLine($"Conservative unknown conditions: {result.Invariant.ConservativeUnknownCount}");
+    PrintAnalysisTruncation(result.AnalysisTruncation);
     PrintInvariantQuery("Invariant query", result.InvariantQuery, options);
     if (result.Invariant.ConditionCount != 0)
     {
@@ -862,6 +869,22 @@ static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
     Console.WriteLine($"  Cache entries: {diagnostics.CacheEntryCount}");
 }
 
+static void PrintAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
+{
+    if (!truncation.IsTruncated) return;
+
+    Console.WriteLine($"Analysis limits hit: {truncation.Events.Count}");
+    foreach (var item in truncation.Events)
+    {
+        var location = item.SourceSpanStart.HasValue
+            ? " spanStart=" + item.SourceSpanStart.Value.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
+        Console.WriteLine(
+            $"  - {item.Code} limit={item.Limit} observed={item.Observed}{location} " +
+            $"provenance={item.Provenance}");
+    }
+}
+
 static JsonSerializerOptions CreateCompactJsonOptions()
 {
     var options = new JsonSerializerOptions
@@ -970,6 +993,8 @@ internal sealed class SymbolicCliOptions
                                                       Maximum path conditions before conservative fallback.
                                   --smt-max-expression-nodes <n>
                                                       Maximum formula nodes before conservative fallback.
+                                  --analysis-limit <name>=<n>
+                                                      Override a positive bounded-analysis limit. Repeat for multiple limits.
                                   --json              Emit JSON instead of text.
                                   --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
                                   --invariant-json    Emit only the compact invariant query answer, query/focus metadata, bounded reasons, proof summaries, and analysis summary.
@@ -987,6 +1012,13 @@ internal sealed class SymbolicCliOptions
                                   Runtime hazard output includes only Proven hazards by default.
                                   Add --include-unproven-hazards to inspect Unknown, Unreachable, or Unsupported candidates.
                                   Use --hazard-kind, --hazard-status, --hazard-exception-type, or --hazard-category to narrow hazards.
+
+                                Analysis limit names:
+                                  merged-if-else-facts, merged-switch-facts, merged-try-facts,
+                                  try-completion-branches, finite-foreach-element-facts,
+                                  scoped-block-completion-statements, structural-null-state-depth,
+                                  merged-path-conditions, mergeable-facts-per-target-per-state,
+                                  fact-choice-combinations-per-target, guard-facts-per-target-per-state.
 
                                 Complexity notes:
                                   --complexity accepts --line, --line --column, or --position.
@@ -1134,6 +1166,8 @@ internal sealed class SymbolicCliOptions
     public int? SmtMaxPathConditions { get; private set; }
 
     public int? SmtMaxExpressionNodes { get; private set; }
+
+    private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
     public int CompactMaxLines { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxLines;
 
@@ -1443,6 +1477,9 @@ internal sealed class SymbolicCliOptions
                 case "--smt-max-expression-nodes":
                     options.SmtMaxExpressionNodes = ReadPositiveInt(args, ref index, arg);
                     break;
+                case "--analysis-limit":
+                    options.AddAnalysisLimitOverride(ReadString(args, ref index, arg), arg);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown option '{arg}'.");
             }
@@ -1728,12 +1765,36 @@ internal sealed class SymbolicCliOptions
         bool includeResultFilter)
     {
         return new SymbolicQueryOptions(
-            CreateReferences(),
-            smtAnalysis,
-            ImpliedConditions,
-            LineExpressions,
-            PostLineInvariants,
-            includeResultFilter && HasResultFilter ? CreateResultFilter() : null);
+                CreateReferences(),
+                smtAnalysis,
+                ImpliedConditions,
+                LineExpressions,
+                PostLineInvariants,
+                includeResultFilter && HasResultFilter ? CreateResultFilter() : null)
+            .WithAnalysisLimits(CreateAnalysisLimits());
+    }
+
+    public SymbolicAnalysisLimits CreateAnalysisLimits()
+    {
+        var defaults = SymbolicAnalysisLimits.Default;
+        return new SymbolicAnalysisLimits(
+            GetAnalysisLimit("merged-if-else-facts", defaults.MaxMergedIfElseFacts),
+            GetAnalysisLimit("merged-switch-facts", defaults.MaxMergedSwitchFacts),
+            GetAnalysisLimit("merged-try-facts", defaults.MaxMergedTryFacts),
+            GetAnalysisLimit("try-completion-branches", defaults.MaxTryCompletionBranches),
+            GetAnalysisLimit("finite-foreach-element-facts", defaults.MaxFiniteForeachElementFacts),
+            GetAnalysisLimit(
+                "scoped-block-completion-statements",
+                defaults.MaxScopedBlockCompletionStatements),
+            GetAnalysisLimit("structural-null-state-depth", defaults.MaxStructuralNullStateDepth),
+            GetAnalysisLimit("merged-path-conditions", defaults.MaxMergedPathConditions),
+            GetAnalysisLimit(
+                "mergeable-facts-per-target-per-state",
+                defaults.MaxMergeableFactsPerTargetPerState),
+            GetAnalysisLimit(
+                "fact-choice-combinations-per-target",
+                defaults.MaxFactChoiceCombinationsPerTarget),
+            GetAnalysisLimit("guard-facts-per-target-per-state", defaults.MaxGuardFactsPerTargetPerState));
     }
 
     public SymbolicQueryTarget CreateQueryTarget()
@@ -1871,6 +1932,47 @@ internal sealed class SymbolicCliOptions
         if (parsed < 0) throw new ArgumentException(optionName + " requires a non-negative integer value.");
 
         return parsed;
+    }
+
+    private void AddAnalysisLimitOverride(string value, string optionName)
+    {
+        var separator = value.IndexOf('=');
+        if (separator <= 0 || separator == value.Length - 1)
+            throw new ArgumentException(optionName + " requires <name>=<positive-integer>.");
+
+        var name = value[..separator].Trim().ToLowerInvariant();
+        if (!IsAnalysisLimitName(name))
+            throw new ArgumentException(optionName + " has an unknown limit name '" + name + "'.");
+
+        if (!int.TryParse(
+                value[(separator + 1)..].Trim(),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var limit) ||
+            limit <= 0)
+            throw new ArgumentException(optionName + " requires <name>=<positive-integer>.");
+
+        AnalysisLimitOverrides[name] = limit;
+    }
+
+    private int GetAnalysisLimit(string name, int fallback)
+    {
+        return AnalysisLimitOverrides.TryGetValue(name, out var value) ? value : fallback;
+    }
+
+    private static bool IsAnalysisLimitName(string name)
+    {
+        return name is "merged-if-else-facts" or
+            "merged-switch-facts" or
+            "merged-try-facts" or
+            "try-completion-branches" or
+            "finite-foreach-element-facts" or
+            "scoped-block-completion-statements" or
+            "structural-null-state-depth" or
+            "merged-path-conditions" or
+            "mergeable-facts-per-target-per-state" or
+            "fact-choice-combinations-per-target" or
+            "guard-facts-per-target-per-state";
     }
 
     private static LanguageVersion ReadLanguageVersion(string[] args, ref int index, string optionName)

@@ -176,6 +176,225 @@ public sealed class SymbolicAnalysisLimitsTests
         Assert.That(
             result.AnalysisTruncation.Events.Select(static item => item.Code),
             Does.Contain("analysis_limit.foreach_element_facts"));
+        var compact = result.ToCompactResult();
+        Assert.That(compact.AnalysisTruncation.IsTruncated, Is.True);
+        Assert.That(compact.AnalysisSummary.AnalysisTruncated, Is.True);
+        Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.True);
+        Assert.That(result.ToInvariantQueryResult().AnalysisTruncation.IsTruncated, Is.True);
+    }
+
+    [Test]
+    public void RuntimeHazardQuery_ExposesCandidateTruncationInFullAndCompactResults()
+    {
+        const string source = """
+                              #nullable enable
+                              public sealed class Sample
+                              {
+                                  public int Visit()
+                                  {
+                                      foreach (var value in new string?[] { null, "ok" })
+                                      {
+                                          return value.Length;
+                                      }
+
+                                      return 0;
+                                  }
+                              }
+                              """;
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
+        var options = new SymbolicQueryOptions(smtAnalysis: smtAnalysis).WithAnalysisLimits(limits);
+
+        var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(
+            SymbolicSourceInput.FromText(source, "Sample.cs"),
+            SymbolicQueryTarget.AllLines(),
+            options,
+            new SymbolicRuntimeHazardQueryOptions(
+                includeUnprovenCandidates: true,
+                kinds: new[] { SymbolicRuntimeHazardKind.NullDereference })));
+
+        Assert.That(result.Hazards, Is.Not.Empty);
+        Assert.That(result.AnalysisTruncation.IsTruncated, Is.True);
+        Assert.That(result.Hazards.Any(static hazard => hazard.AnalysisTruncation.IsTruncated), Is.True);
         Assert.That(result.ToCompactResult().AnalysisTruncation.IsTruncated, Is.True);
+        Assert.That(
+            result.ToCompactResult().Hazards.Any(static hazard => hazard.AnalysisTruncation.IsTruncated),
+            Is.True);
+    }
+
+    [Test]
+    public void ProgramPointQueries_ReportEveryStructuralTruncationFamily()
+    {
+        var defaults = SymbolicAnalysisLimits.Default;
+        var cases = new (string Code, string Source, SymbolicAnalysisLimits Limits)[]
+        {
+            (
+                "analysis_limit.if_else_fact_merge",
+                """
+                public sealed class Sample
+                {
+                    public int Visit(bool selectFirst)
+                    {
+                        int first;
+                        int second;
+                        if (selectFirst)
+                        {
+                            first = 1;
+                            second = 2;
+                        }
+                        else
+                        {
+                            first = 3;
+                            second = 4;
+                        }
+
+                        return first + second;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxMergedIfElseFacts: 1)),
+            (
+                "analysis_limit.switch_fact_merge",
+                """
+                public sealed class Sample
+                {
+                    public int Visit(int choice)
+                    {
+                        int first;
+                        int second;
+                        switch (choice)
+                        {
+                            case 0:
+                                first = 1;
+                                second = 2;
+                                break;
+                            default:
+                                first = 3;
+                                second = 4;
+                                break;
+                        }
+
+                        return first + second;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxMergedSwitchFacts: 1)),
+            (
+                "analysis_limit.try_fact_merge",
+                """
+                using System;
+
+                public sealed class Sample
+                {
+                    public int Visit()
+                    {
+                        int first;
+                        int second;
+                        try
+                        {
+                            first = 1;
+                            second = 2;
+                        }
+                        catch (Exception)
+                        {
+                            first = 1;
+                            second = 2;
+                        }
+
+                        return first + second;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxMergedTryFacts: 1)),
+            (
+                "analysis_limit.try_completion_branches",
+                """
+                using System;
+
+                public sealed class Sample
+                {
+                    public int Visit()
+                    {
+                        try
+                        {
+                            _ = 1;
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            _ = 2;
+                        }
+
+                        return 0;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxTryCompletionBranches: 1)),
+            (
+                "analysis_limit.scoped_block_completion_statements",
+                """
+                public sealed class Sample
+                {
+                    public int Visit()
+                    {
+                        int value = 0;
+                        {
+                            value = 1;
+                            value = 2;
+                        }
+
+                        return value;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxScopedBlockCompletionStatements: 1)),
+            (
+                "analysis_limit.foreach_element_facts",
+                """
+                public sealed class Sample
+                {
+                    public int Visit()
+                    {
+                        foreach (var value in new[] { 1, 2 })
+                        {
+                            return value;
+                        }
+
+                        return 0;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxFiniteForeachElementFacts: 1)),
+            (
+                "analysis_limit.structural_null_state_depth",
+                """
+                #nullable enable
+                public sealed class Sample
+                {
+                    public object? Visit(bool enabled, object? first, object? second, object? third)
+                    {
+                        object? value = enabled ? first ?? second : third;
+                        return value;
+                    }
+                }
+                """,
+                defaults.WithOverrides(maxStructuralNullStateDepth: 1))
+        };
+
+        Assert.Multiple(() =>
+        {
+            foreach (var item in cases)
+            {
+                var options = new SymbolicQueryOptions().WithAnalysisLimits(item.Limits);
+                var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+                    SymbolicSourceInput.FromText(item.Source, "Sample.cs"),
+                    SymbolicQueryTarget.AllLines(),
+                    options));
+
+                Assert.That(
+                    result.AnalysisTruncation.Events.Select(static item => item.Code),
+                    Does.Contain(item.Code),
+                    item.Code);
+            }
+        });
     }
 }

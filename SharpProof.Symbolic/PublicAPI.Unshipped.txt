@@ -375,3 +375,5 @@ SharpProof.Symbolic.SymbolicCompactRuntimeHazard.AnalysisTruncation.get -> Sharp
 SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
 SharpProof.Symbolic.SymbolicRuntimeHazard.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
 SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicCompactAnalysisSummary.AnalysisTruncated.get -> bool
+SharpProof.Symbolic.SymbolicInvariantQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
