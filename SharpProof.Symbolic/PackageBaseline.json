@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "packageId": "SharpProof.Symbolic",
+  "packageVersion": "0.1.0-preview.1",
+  "targetFramework": "netstandard2.0",
+  "requiredEntries": [
+    "README.md",
+    "lib/netstandard2.0/SharpProof.Symbolic.dll",
+    "lib/netstandard2.0/SharpProof.Symbolic.pdb",
+    "lib/netstandard2.0/SharpProof.Symbolic.xml",
+    "lib/netstandard2.0/SearchLib.dll",
+    "lib/netstandard2.0/SearchLib.pdb",
+    "samples/SharpProof.Symbolic/Program.cs",
+    "samples/SharpProof.Symbolic/README.md",
+    "samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj"
+  ],
+  "dependencies": {
+    "Microsoft.CodeAnalysis.CSharp": "4.14.0",
+    "Microsoft.Z3": "4.12.2",
+    "System.Collections.Immutable": "9.0.0"
+  }
+}

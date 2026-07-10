@@ -6,16 +6,58 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <PackageId>SharpProof.Symbolic</PackageId>
+    <Version>0.1.0-preview.1</Version>
+    <Authors>Alex Yorke</Authors>
+    <Title>SharpProof Symbolic</Title>
+    <Description>Public .NET query API for SharpProof bounded symbolic C# invariants, reachability, runtime hazards, capabilities, complexity, and SMT-backed proofs.</Description>
+    <PackageTags>SharpProof;Roslyn;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/alexyorke/SharpProof</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial public preview of the supported SharpProof symbolic query API.</PackageReleaseNotes>
+
+    <DebugType>portable</DebugType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddSymbolicRuntimeDependency</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    <PackageReference Include="Microsoft.Z3" Version="4.12.2" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
+    <ProjectReference Include="..\SearchLib\SearchLib.csproj" PrivateAssets="all" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\samples\SharpProof.Symbolic\README.md" Pack="true" PackagePath="samples/SharpProof.Symbolic/README.md" />
+    <None Include="..\samples\SharpProof.Symbolic\Program.cs" Pack="true" PackagePath="samples/SharpProof.Symbolic/Program.cs" />
+    <None Include="..\samples\SharpProof.Symbolic\SharpProof.Symbolic.Sample.csproj" Pack="true" PackagePath="samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj" />
+  </ItemGroup>
+
+  <Target Name="_AddSymbolicRuntimeDependency">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="..\SearchLib\bin\$(Configuration)\$(TargetFramework)\SearchLib.dll" PackagePath="lib/$(TargetFramework)" />
+      <TfmSpecificPackageFile Include="..\SearchLib\bin\$(Configuration)\$(TargetFramework)\SearchLib.pdb" PackagePath="lib/$(TargetFramework)" />
+    </ItemGroup>
+  </Target>
 
 </Project>
