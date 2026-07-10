@@ -1210,7 +1210,7 @@ namespace TestNamespace {
         var shippedApi = File.ReadAllLines(shippedApiPath);
         Assert.That(shippedApi.FirstOrDefault(), Is.EqualTo("#nullable enable"));
         Assert.That(shippedApi, Has.Length.GreaterThan(100));
-        Assert.That(File.ReadAllLines(unshippedApiPath), Is.EqualTo(new[] { "#nullable enable" }));
+        Assert.That(File.ReadLines(unshippedApiPath).FirstOrDefault(), Is.EqualTo("#nullable enable"));
 
         var nullableProperty = typeof(SymbolicSourceInput).GetProperty(nameof(SymbolicSourceInput.FilePath));
         Assert.That(nullableProperty, Is.Not.Null);

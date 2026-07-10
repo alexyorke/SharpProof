@@ -56,7 +56,8 @@ internal enum SymbolicExceptionPreconditionKind
     NullableValueWithoutValue,
     DynamicNullBinding,
     SwitchExpressionNoMatch,
-    DirectThrow
+    DirectThrow,
+    InvalidCollectionCardinality
 }
 
 internal enum SymbolicBorrowKind

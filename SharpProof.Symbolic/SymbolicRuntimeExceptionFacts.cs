@@ -37,6 +37,8 @@ internal static class SymbolicRuntimeExceptionFacts
                string.Equals(category, ExceptionCategories.DefiniteArgumentOutOfRangeGuard, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, StringComparison.Ordinal) ||
+               string.Equals(category, ExceptionCategories.DefiniteInvalidCollectionCardinality,
+                   StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteStringSubstringOutOfRange,
                    StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteStringRemoveOutOfRange, StringComparison.Ordinal) ||
@@ -144,6 +146,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string DefiniteArgumentOutOfRangeGuard = "definite_argument_out_of_range_guard";
         internal const string DefiniteRangeOutOfRange = "definite_range_out_of_range";
         internal const string DefiniteCountIndexOutOfRange = "definite_count_index_out_of_range";
+        internal const string DefiniteInvalidCollectionCardinality = "definite_invalid_collection_cardinality";
         internal const string DefiniteStringSubstringOutOfRange = "definite_string_substring_out_of_range";
         internal const string DefiniteStringRemoveOutOfRange = "definite_string_remove_out_of_range";
         internal const string DefiniteSliceOutOfRange = "definite_slice_out_of_range";
@@ -178,6 +181,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string WithExpression = "with_expression";
         internal const string DeconstructionReceiver = "deconstruction_receiver";
         internal const string CountIndex = "count_index";
+        internal const string CollectionOperation = "collection_operation";
         internal const string SwitchExpression = "switch_expression";
     }
 }

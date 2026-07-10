@@ -395,6 +395,28 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
         }
 
+        foreach (var collectionHazard in CollectProvenInvalidCollectionCardinalityHazards(
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     smtAnalysis))
+        {
+            var collectionNode = FindHazardSiteNode(methodNode, collectionHazard);
+            var entry = TryCreateProvenExceptionSiteEntry(
+                collectionNode,
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                methodSymbol,
+                smtAnalysis,
+                ExceptionTypes.InvalidOperationException,
+                ExceptionCategories.DefiniteInvalidCollectionCardinality,
+                ExceptionSources.CollectionOperation);
+            if (entry == null) continue;
+
+            yield return entry;
+        }
+
         foreach (var symbolicHazard in CollectProvenAnalyzerOnlySymbolicHazards(methodNode, semanticModel,
                      cancellationToken, smtAnalysis))
         {

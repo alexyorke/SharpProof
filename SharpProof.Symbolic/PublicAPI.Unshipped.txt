@@ -1,1 +1,2 @@
 #nullable enable
+SharpProof.Symbolic.SymbolicRuntimeHazardKind.InvalidCollectionCardinality = 16 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind

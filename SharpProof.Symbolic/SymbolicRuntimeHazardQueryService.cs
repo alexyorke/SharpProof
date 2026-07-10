@@ -823,7 +823,8 @@ public enum SymbolicRuntimeHazardKind
     SwitchExpressionNoMatch,
     NegativeArrayLength,
     NegativeStackAllocLength,
-    ArgumentNull
+    ArgumentNull,
+    InvalidCollectionCardinality
 }
 
 public enum SymbolicRuntimeHazardStatus

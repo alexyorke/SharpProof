@@ -220,6 +220,27 @@ public class TestClass
 
         yield return new TestCaseData(
                 @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int EmptyQueuePeek(Queue<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values.Peek();
+        }
+
+        return 0;
+    }
+}",
+                "values.Peek()",
+                "System.InvalidOperationException",
+                "definite_invalid_collection_cardinality")
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportEmptyQueuePeekWithoutEnforcePure");
+
+        yield return new TestCaseData(
+                @"
 public class TestClass
 {
     public int SwitchExpressionNoMatch(int value)
@@ -480,6 +501,24 @@ public class TestClass
     }
 }")
             .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedCountIndexOutOfRange");
+
+        yield return new TestCaseData(
+                @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int GuardedQueueDequeue(Queue<int> values)
+    {
+        if (values.Count > 0)
+        {
+            return values.Dequeue();
+        }
+
+        return 0;
+    }
+}")
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedQueueDequeue");
 
         yield return new TestCaseData(
                 @"

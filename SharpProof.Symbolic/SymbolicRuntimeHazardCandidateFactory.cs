@@ -203,6 +203,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken,
                         out var slicingCandidate)) yield return slicingCandidate;
 
+                if (TryCreateInvalidCollectionCardinalityCandidate(
+                        invocation,
+                        semanticModel,
+                        cancellationToken,
+                        out var collectionCardinalityCandidate))
+                    yield return collectionCardinalityCandidate;
+
                 if (invocation.Expression is not MemberAccessExpressionSyntax &&
                     TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel,
                         cancellationToken, out var invocationNullCandidate))
@@ -805,6 +812,69 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             semanticModel,
             cancellationToken,
             out candidate);
+    }
+
+    private static bool TryCreateInvalidCollectionCardinalityCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
+            !TryGetCollectionCardinalityContract(
+                invocation,
+                operation,
+                out var receiver,
+                out var relation,
+                out var triggeringCount) ||
+            !TryCreateInvalidCollectionCardinalityTrigger(
+                receiver,
+                relation,
+                triggeringCount,
+                semanticModel,
+                cancellationToken,
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            invocation,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality,
+            trigger,
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteInvalidCollectionCardinality);
+        return true;
+    }
+
+    private static bool TryGetCollectionCardinalityContract(
+        InvocationExpressionSyntax invocation,
+        IInvocationOperation operation,
+        out ExpressionSyntax receiver,
+        out SymbolicRelationOperator relation,
+        out long triggeringCount)
+    {
+        receiver = null!;
+        relation = default;
+        triggeringCount = 0;
+        var method = operation.TargetMethod;
+        if (!method.IsStatic &&
+            method.Parameters.Length == 0 &&
+            method.Name is "Dequeue" or "Peek" or "Pop" &&
+            IsKnownCardinalityCheckedCollection(method.ContainingType) &&
+            invocation.Expression is MemberAccessExpressionSyntax instanceMember)
+        {
+            receiver = instanceMember.Expression;
+            relation = SymbolicRelationOperator.Equal;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsKnownCardinalityCheckedCollection(INamedTypeSymbol type)
+    {
+        return type.ContainingNamespace.ToDisplayString() == "System.Collections.Generic" &&
+               type.OriginalDefinition.MetadataName is "Queue`1" or "Stack`1" or "PriorityQueue`2";
     }
 
     private static bool TryCreateNullDereferenceCandidate(

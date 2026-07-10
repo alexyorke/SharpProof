@@ -850,6 +850,36 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return false;
     }
 
+    private static bool TryCreateInvalidCollectionCardinalityTrigger(
+        ExpressionSyntax receiver,
+        SymbolicRelationOperator relation,
+        long triggeringCount,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerBuiltInLengthTerm(receiver, context, out var count) ||
+            count.Kind != SmtValueKind.Int)
+            return false;
+
+        var condition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                relation,
+                count,
+                new SymbolicIntegerConstantTerm(triggeringCount)),
+            receiver,
+            "ir.runtime-hazard.collection-cardinality.trigger"));
+        return TryEncodeIrExceptionPreconditionTrigger(
+            SymbolicExceptionPreconditionKind.InvalidCollectionCardinality,
+            count,
+            condition,
+            receiver,
+            "ir.runtime-hazard.collection-cardinality",
+            out trigger);
+    }
+
     private static bool TryCreateIrRelationalExceptionPreconditionTrigger(
         SymbolicExceptionPreconditionKind kind,
         ExpressionSyntax subjectExpression,

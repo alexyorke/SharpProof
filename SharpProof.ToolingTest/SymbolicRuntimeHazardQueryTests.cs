@@ -2921,6 +2921,140 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesQueuePeekOnEmptyCollection()
+    {
+        const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Queue<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values.Peek();
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values.Peek();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_collection_cardinality"));
+        Assert.That(hazard.TriggerPrecondition?.Provenance,
+            Is.EqualTo("ir.runtime-hazard.collection-cardinality"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_PrunesQueueDequeueAfterCountGuard()
+    {
+        const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Queue<int> values)
+    {
+        if (values.Count > 0)
+        {
+            return values.Dequeue();
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values.Dequeue();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesStackPopOnEmptyCollection()
+    {
+        const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(Stack<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values.Pop();
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values.Pop();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_PrunesPriorityQueuePeekAfterCountGuard()
+    {
+        const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(PriorityQueue<int, int> values)
+    {
+        if (values.Count > 0)
+        {
+            return values.Peek();
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values.Peek();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.InvalidCollectionCardinality }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCollectionCardinality));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
     {
         const string source = @"

@@ -55,6 +55,20 @@ internal static partial class ExceptionFlowQuery
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch);
     }
 
+    private static IEnumerable<SymbolicRuntimeHazard> CollectProvenInvalidCollectionCardinalityHazards(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return CollectProvenRuntimeHazards(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            SymbolicRuntimeHazardKind.InvalidCollectionCardinality);
+    }
+
     private static IEnumerable<SymbolicRuntimeHazard> CollectProvenAnalyzerOnlySymbolicHazards(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
