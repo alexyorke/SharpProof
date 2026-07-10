@@ -35,6 +35,8 @@ internal static class SymbolicUnknownReasonClassifier
             ContainsReason(reason, "smt_off"))
             return SymbolicUnknownReason.SmtDisabled;
 
+        if (ContainsReason(reason, "transient_failure")) return SymbolicUnknownReason.SmtUnavailable;
+
         if (ContainsReason(reason, "z3") ||
             ContainsReason(reason, "native") ||
             ContainsReason(reason, "unavailable") ||
@@ -62,6 +64,7 @@ internal static class SymbolicReasonDisplay
             "smt_disposed" => "SMT solver disposed",
             "smt_timeout" => "SMT solver timed out",
             "smt_unavailable" => "SMT solver unavailable",
+            "smt_transient_failure" => "SMT solver remained unavailable after transient-failure retries",
             "smt_encoding_failure" => "SMT formula encoding failed",
             "smt_expression_budget_exceeded" => "SMT expression node budget exceeded",
             "smt_path_condition_budget_exceeded" => "SMT path condition budget exceeded",

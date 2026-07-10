@@ -18,6 +18,25 @@ public sealed class SmtAnalysisOptions
         int maxPathConditions,
         int maxExpressionNodes,
         bool useSharedResultCache = false)
+        : this(
+            mode,
+            queryTimeout,
+            methodBudget,
+            maxPathConditions,
+            maxExpressionNodes,
+            useSharedResultCache,
+            SmtSolverLifecycleOptions.Default)
+    {
+    }
+
+    private SmtAnalysisOptions(
+        SmtAnalysisMode mode,
+        TimeSpan queryTimeout,
+        TimeSpan methodBudget,
+        int maxPathConditions,
+        int maxExpressionNodes,
+        bool useSharedResultCache,
+        SmtSolverLifecycleOptions lifecycle)
     {
         Mode = mode;
         QueryTimeout = queryTimeout;
@@ -25,6 +44,7 @@ public sealed class SmtAnalysisOptions
         MaxPathConditions = maxPathConditions;
         MaxExpressionNodes = maxExpressionNodes;
         UseSharedResultCache = useSharedResultCache;
+        Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
     }
 
     public SmtAnalysisMode Mode { get; }
@@ -33,6 +53,7 @@ public sealed class SmtAnalysisOptions
     public int MaxPathConditions { get; }
     public int MaxExpressionNodes { get; }
     public bool UseSharedResultCache { get; }
+    public SmtSolverLifecycleOptions Lifecycle { get; }
     public bool IsEnabled => Mode != SmtAnalysisMode.Off;
 
     public static SmtAnalysisOptions ForMode(SmtAnalysisMode mode)
@@ -78,6 +99,19 @@ public sealed class SmtAnalysisOptions
             methodBudget ?? MethodBudget,
             maxPathConditions ?? MaxPathConditions,
             maxExpressionNodes ?? MaxExpressionNodes,
-            UseSharedResultCache);
+            UseSharedResultCache,
+            Lifecycle);
+    }
+
+    public SmtAnalysisOptions WithLifecycle(SmtSolverLifecycleOptions lifecycle)
+    {
+        return new SmtAnalysisOptions(
+            Mode,
+            QueryTimeout,
+            MethodBudget,
+            MaxPathConditions,
+            MaxExpressionNodes,
+            UseSharedResultCache,
+            lifecycle);
     }
 }

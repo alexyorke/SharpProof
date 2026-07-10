@@ -404,12 +404,19 @@ internal class AnalyzerConfiguration
         var maxPathConditions = GetPositiveInt(options, ConfigKeys.SmtMaxPathConditions, defaults.MaxPathConditions);
         var maxExpressionNodes = GetPositiveInt(options, ConfigKeys.SmtMaxExpressionNodes, defaults.MaxExpressionNodes);
         return new SmtAnalysisOptions(
-            mode,
-            TimeSpan.FromMilliseconds(timeoutMs),
-            TimeSpan.FromMilliseconds(methodBudgetMs),
-            maxPathConditions,
-            maxExpressionNodes,
-            true);
+                mode,
+                TimeSpan.FromMilliseconds(timeoutMs),
+                TimeSpan.FromMilliseconds(methodBudgetMs),
+                maxPathConditions,
+                maxExpressionNodes,
+                true)
+            .WithLifecycle(new SmtSolverLifecycleOptions(
+                GetNonNegativeInt(
+                    options,
+                    ConfigKeys.SmtTransientRetryCount,
+                    SmtSolverLifecycleOptions.Default.MaxTransientRetries),
+                GetBoolOrDefaultTrue(options, ConfigKeys.SmtRecycleContextOnTransientFailure),
+                GetBool(options, ConfigKeys.SmtDisposeThreadContextOnServiceDispose)));
     }
 
     private static SymbolicAnalysisLimits GetAnalysisLimits(AnalyzerOptions options)
@@ -506,12 +513,17 @@ internal class AnalyzerConfiguration
 
     private static int GetNonNegativeInt(AnalyzerOptions options, string key)
     {
+        return GetNonNegativeInt(options, key, 0);
+    }
+
+    private static int GetNonNegativeInt(AnalyzerOptions options, string key, int fallback)
+    {
         if (TryGetGlobalOption(options, key, out var value) &&
             int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
             parsed >= 0)
             return parsed;
 
-        return 0;
+        return fallback;
     }
 
     private static int GetNonNegativeInt(AnalyzerConfigOptions options, string key, int fallback)

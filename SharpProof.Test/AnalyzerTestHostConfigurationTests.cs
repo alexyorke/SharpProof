@@ -544,6 +544,18 @@ public sealed class TestClass
             Is.EqualTo(new AnalysisLimitsSnapshot(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)));
     }
 
+    [Test]
+    public void SmtLifecycleConfiguration_ParsesGlobalOverrides()
+    {
+        var lifecycle = ReadSmtLifecycle(
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_smt_transient_retry_count", "3")
+                .Add("sharpproof_smt_recycle_context_on_transient_failure", "false")
+                .Add("sharpproof_smt_dispose_thread_context_on_service_dispose", "true"));
+
+        Assert.That(lifecycle, Is.EqualTo(new SmtLifecycleSnapshot(3, false, true)));
+    }
+
     private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
     {
         var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
@@ -596,6 +608,24 @@ public sealed class TestClass
             Read("MaxGuardFactsPerTargetPerState"));
     }
 
+    private static SmtLifecycleSnapshot ReadSmtLifecycle(ImmutableDictionary<string, string> globalOptions)
+    {
+        var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+        var configurationType = typeof(SharpProofAnalyzer).Assembly
+            .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
+        var fromOptions = configurationType.GetMethod(
+            "FromOptions",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+        var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
+        var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
+        var lifecycle = smtOptions.GetType().GetProperty("Lifecycle")!.GetValue(smtOptions)!;
+        var lifecycleType = lifecycle.GetType();
+        return new SmtLifecycleSnapshot(
+            (int)lifecycleType.GetProperty("MaxTransientRetries")!.GetValue(lifecycle)!,
+            (bool)lifecycleType.GetProperty("RecycleContextOnTransientFailure")!.GetValue(lifecycle)!,
+            (bool)lifecycleType.GetProperty("DisposeCurrentThreadContextOnServiceDispose")!.GetValue(lifecycle)!);
+    }
+
     private readonly record struct AnalysisLimitsSnapshot(
         int MaxMergedIfElseFacts,
         int MaxMergedSwitchFacts,
@@ -608,6 +638,11 @@ public sealed class TestClass
         int MaxMergeableFactsPerTargetPerState,
         int MaxFactChoiceCombinationsPerTarget,
         int MaxGuardFactsPerTargetPerState);
+
+    private readonly record struct SmtLifecycleSnapshot(
+        int MaxTransientRetries,
+        bool RecycleContextOnTransientFailure,
+        bool DisposeCurrentThreadContextOnServiceDispose);
 
     private static string[] GetConfigKeys()
     {

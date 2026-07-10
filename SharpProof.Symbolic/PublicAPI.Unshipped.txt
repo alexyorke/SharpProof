@@ -377,3 +377,46 @@ SharpProof.Symbolic.SymbolicRuntimeHazard.AnalysisTruncation.get -> SharpProof.S
 SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
 SharpProof.Symbolic.SymbolicCompactAnalysisSummary.AnalysisTruncated.get -> bool
 SharpProof.Symbolic.SymbolicInvariantQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.Smt.SmtAnalysisHealth
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.ConsecutiveTransientFailureCount.get -> int
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.ContextGeneration.get -> long
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.ContextRecycleCount.get -> int
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.IsAvailable.get -> bool
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.IsPermanentlyUnavailable.get -> bool
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.LastFailureCode.get -> string!
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.RecoveredTransientFailureCount.get -> int
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.State.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealth.TransientRetryCount.get -> int
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Degraded = 2 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Disabled = 0 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Disposed = 4 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState.PermanentlyUnavailable = 3 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Ready = 1 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
+SharpProof.Symbolic.Smt.SmtAnalysisOptions.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
+SharpProof.Symbolic.Smt.SmtAnalysisOptions.WithLifecycle(SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions! lifecycle) -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+SharpProof.Symbolic.Smt.SmtAnalysisService.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
+SharpProof.Symbolic.Smt.SmtAnalysisService.IsPermanentlyUnavailable.get -> bool
+SharpProof.Symbolic.Smt.SmtAnalysisService.RecycleCurrentThreadSolverContext() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
+SharpProof.Symbolic.Smt.SmtAnalysisService.RequestGlobalSolverContextRecycle() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.DisposedCurrentThreadContext.get -> bool
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.LocalCacheEntryCount.get -> int
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.RequestedGeneration.get -> long
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.Scope.get -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.SharedCacheEntryCount.get -> int
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope.AllThreadsOnNextUse = 1 -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
+SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope.CurrentThread = 0 -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleScope
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.DisposeCurrentThreadContextOnServiceDispose.get -> bool
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.MaxTransientRetries.get -> int
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.RecycleContextOnTransientFailure.get -> bool
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.SmtSolverLifecycleOptions(int maxTransientRetries = 1, bool recycleContextOnTransientFailure = true, bool disposeCurrentThreadContextOnServiceDispose = false) -> void
+static readonly SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.Default -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
+SharpProof.Symbolic.SymbolicCompactSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
+SharpProof.Symbolic.SymbolicCompactSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
+SharpProof.Symbolic.SymbolicSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
+SharpProof.Symbolic.SymbolicSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!

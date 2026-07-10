@@ -20,19 +20,42 @@ public sealed class SmtAnalysisService : IDisposable
     private static readonly ConcurrentDictionary<string, SharedQueryFlight> s_sharedQueryFlights =
         new(StringComparer.Ordinal);
 
-    [ThreadStatic] private static PurityProofSearch? t_sharedProofSearch;
+    private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
+        static () => new SearchLibProofSearchSession();
+
+    [ThreadStatic] private static SharedProofSearchContext? t_sharedProofSearchContext;
+
+    private static long s_solverContextGeneration;
 
     private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
+    private readonly Func<ISmtProofSearchSession> _proofSearchFactory;
     private readonly object _solverLock = new();
+    private readonly object _healthLock = new();
     private long _consumedQueryTicks;
     private long _consumedResourceCount;
     private bool _disposed;
+    private int _consecutiveTransientFailureCount;
+    private int _contextRecycleCount;
     private int _executedQueryCount;
-    private bool _solverUnavailable;
+    private int _healthState;
+    private string _lastFailureCode = string.Empty;
+    private int _recoveredTransientFailureCount;
+    private int _transientRetryCount;
 
     public SmtAnalysisService(SmtAnalysisOptions options)
+        : this(options, s_defaultProofSearchFactory)
+    {
+    }
+
+    internal SmtAnalysisService(
+        SmtAnalysisOptions options,
+        Func<ISmtProofSearchSession> proofSearchFactory)
     {
         Options = options ?? throw new ArgumentNullException(nameof(options));
+        _proofSearchFactory = proofSearchFactory ?? throw new ArgumentNullException(nameof(proofSearchFactory));
+        _healthState = (int)(Options.IsEnabled
+            ? SmtAnalysisHealthState.Ready
+            : SmtAnalysisHealthState.Disabled);
     }
 
     public SmtAnalysisOptions Options { get; }
@@ -41,13 +64,68 @@ public sealed class SmtAnalysisService : IDisposable
 
     public int CacheEntryCount => _queryCache.Count;
 
+    public bool IsPermanentlyUnavailable =>
+        GetHealthState() == SmtAnalysisHealthState.PermanentlyUnavailable;
+
+    public SmtAnalysisHealth Health
+    {
+        get
+        {
+            lock (_healthLock)
+                return new SmtAnalysisHealth(
+                    GetHealthState(),
+                    _lastFailureCode,
+                    _consecutiveTransientFailureCount,
+                    _transientRetryCount,
+                    _recoveredTransientFailureCount,
+                    _contextRecycleCount,
+                    Interlocked.Read(ref s_solverContextGeneration));
+        }
+    }
+
     public void Dispose()
     {
-        if (_disposed) return;
+        lock (_solverLock)
+        {
+            if (_disposed) return;
 
-        _disposed = true;
-        // Note: We deliberately do not dispose the thread-local solver context here
-        // to allow caching and reuse across SmtAnalysisService instances on the same thread.
+            _disposed = true;
+            SetHealthState(SmtAnalysisHealthState.Disposed);
+            if (Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose &&
+                DisposeCurrentThreadProofSearch())
+                Interlocked.Increment(ref _contextRecycleCount);
+        }
+    }
+
+    public SmtSolverContextRecycleResult RecycleCurrentThreadSolverContext()
+    {
+        lock (_solverLock)
+        {
+            var disposed = DisposeCurrentThreadProofSearch();
+            if (disposed) Interlocked.Increment(ref _contextRecycleCount);
+
+            ResetDegradedHealth();
+            return CreateRecycleResult(
+                SmtSolverContextRecycleScope.CurrentThread,
+                disposed,
+                Interlocked.Read(ref s_solverContextGeneration));
+        }
+    }
+
+    public SmtSolverContextRecycleResult RequestGlobalSolverContextRecycle()
+    {
+        var generation = Interlocked.Increment(ref s_solverContextGeneration);
+        lock (_solverLock)
+        {
+            var disposed = DisposeCurrentThreadProofSearch();
+            if (disposed) Interlocked.Increment(ref _contextRecycleCount);
+
+            ResetDegradedHealth();
+            return CreateRecycleResult(
+                SmtSolverContextRecycleScope.AllThreadsOnNextUse,
+                disposed,
+                generation);
+        }
     }
 
     internal PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions)
@@ -85,7 +163,7 @@ public sealed class SmtAnalysisService : IDisposable
 
         if (!Options.IsEnabled) return Unknown("smt_disabled");
 
-        if (_solverUnavailable) return Unknown("smt_unavailable");
+        if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
 
         if (!IsWithinFormulaDepthBudget(
                 query.PathConditions,
@@ -142,7 +220,7 @@ public sealed class SmtAnalysisService : IDisposable
             result = flight.Result.Value;
             if (ownsFlight)
             {
-                _queryCache.TryAdd(queryKey, result);
+                if (IsLocallyCacheableResult(result)) _queryCache.TryAdd(queryKey, result);
                 AddSharedResult(queryKey, result);
             }
             else if (IsShareableResult(result))
@@ -173,7 +251,7 @@ public sealed class SmtAnalysisService : IDisposable
         if (IsMethodBudgetExceeded()) return Unknown("smt_method_budget_exceeded");
 
         var result = ClassifyCore(query);
-        _queryCache.TryAdd(queryKey, result);
+        if (IsLocallyCacheableResult(result)) _queryCache.TryAdd(queryKey, result);
         AddSharedResult(queryKey, result);
         return result;
     }
@@ -186,33 +264,67 @@ public sealed class SmtAnalysisService : IDisposable
             lock (_solverLock)
             {
                 if (_disposed) return Unknown("smt_disposed");
+                if (IsPermanentlyUnavailable) return Unknown("smt_unavailable");
 
-                Interlocked.Increment(ref _executedQueryCount);
-                var search = GetOrCreateProofSearch();
-                var resourcesBefore = search.ConsumedResourceCount;
-                try
+                for (var attempt = 0;; attempt++)
                 {
-                    return search.Classify(query, Options.QueryTimeout);
-                }
-                finally
-                {
-                    Interlocked.Add(ref _consumedResourceCount, search.ConsumedResourceCount - resourcesBefore);
+                    PurityProofResult result;
+                    try
+                    {
+                        Interlocked.Increment(ref _executedQueryCount);
+                        var search = GetOrCreateProofSearch();
+                        var resourcesBefore = search.ConsumedResourceCount;
+                        try
+                        {
+                            result = search.Classify(query, Options.QueryTimeout);
+                        }
+                        finally
+                        {
+                            Interlocked.Add(
+                                ref _consumedResourceCount,
+                                search.ConsumedResourceCount - resourcesBefore);
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        RecordFailure("smt_encoding_failure", SmtAnalysisHealthState.Ready);
+                        return Unknown("smt_encoding_failure");
+                    }
+                    catch (RegexMatchTimeoutException)
+                    {
+                        RecordFailure("smt_timeout", SmtAnalysisHealthState.Ready);
+                        return Unknown("smt_timeout");
+                    }
+                    catch (Exception ex) when (IsTransientSolverFailure(ex))
+                    {
+                        result = Unknown("smt_transient_failure");
+                    }
+                    catch (Exception ex) when (IsPermanentSolverFailure(ex))
+                    {
+                        MarkPermanentlyUnavailable(GetPermanentFailureCode(ex));
+                        if (DisposeCurrentThreadProofSearch())
+                            Interlocked.Increment(ref _contextRecycleCount);
+
+                        return Unknown("smt_unavailable");
+                    }
+
+                    if (!IsTransientSolverFailure(result))
+                    {
+                        RecordSolverSuccess();
+                        return result;
+                    }
+
+                    RecordTransientFailure();
+                    if (Options.Lifecycle.RecycleContextOnTransientFailure &&
+                        DisposeCurrentThreadProofSearch())
+                        Interlocked.Increment(ref _contextRecycleCount);
+
+                    if (attempt >= Options.Lifecycle.MaxTransientRetries)
+                        return Unknown("smt_transient_failure");
+
+                    Interlocked.Increment(ref _transientRetryCount);
                 }
             }
-        }
-        catch (InvalidOperationException)
-        {
-            return Unknown("smt_encoding_failure");
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return Unknown("smt_timeout");
-        }
-        catch (Exception ex) when (IsZ3OrEncodingFailure(ex))
-        {
-            _solverUnavailable = true;
-            DisposeProofSearch();
-            return Unknown("smt_unavailable");
         }
         finally
         {
@@ -221,31 +333,43 @@ public sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    private PurityProofSearch GetOrCreateProofSearch()
+    private ISmtProofSearchSession GetOrCreateProofSearch()
     {
-        if (t_sharedProofSearch == null) t_sharedProofSearch = new PurityProofSearch();
+        var generation = Interlocked.Read(ref s_solverContextGeneration);
+        if (t_sharedProofSearchContext != null &&
+            (t_sharedProofSearchContext.Generation != generation ||
+             !ReferenceEquals(t_sharedProofSearchContext.Factory, _proofSearchFactory)))
+        {
+            var belongsToServiceFactory =
+                ReferenceEquals(t_sharedProofSearchContext.Factory, _proofSearchFactory);
+            if (DisposeCurrentThreadProofSearch() && belongsToServiceFactory)
+                Interlocked.Increment(ref _contextRecycleCount);
+        }
 
-        return t_sharedProofSearch;
+        if (t_sharedProofSearchContext == null)
+            t_sharedProofSearchContext = new SharedProofSearchContext(
+                _proofSearchFactory(),
+                _proofSearchFactory,
+                generation);
+
+        return t_sharedProofSearchContext.Search;
     }
 
-    private void DisposeProofSearch()
+    private static bool DisposeCurrentThreadProofSearch()
     {
-        lock (_solverLock)
-        {
-            if (t_sharedProofSearch != null)
-            {
-                try
-                {
-                    t_sharedProofSearch.Dispose();
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    // Ignore disposal errors on failed context
-                }
+        if (t_sharedProofSearchContext == null) return false;
 
-                t_sharedProofSearch = null;
-            }
+        try
+        {
+            t_sharedProofSearchContext.Search.Dispose();
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Disposal is best effort for a failed or stale native context.
+        }
+
+        t_sharedProofSearchContext = null;
+        return true;
     }
 
     private bool IsMethodBudgetExceeded()
@@ -290,6 +414,11 @@ public sealed class SmtAnalysisService : IDisposable
         return result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
     }
 
+    private static bool IsLocallyCacheableResult(PurityProofResult result)
+    {
+        return !IsTransientSolverFailure(result);
+    }
+
     private static PurityProofResult Unknown(string reason)
     {
         return new PurityProofResult(
@@ -299,12 +428,116 @@ public sealed class SmtAnalysisService : IDisposable
             reason);
     }
 
-    private static bool IsZ3OrEncodingFailure(Exception ex)
+    private static bool IsTransientSolverFailure(PurityProofResult result)
     {
-        return ex is DllNotFoundException ||
-               ex is BadImageFormatException ||
-               ex is FileNotFoundException ||
-               ex is TypeInitializationException;
+        return string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
+               string.Equals(result.PathWitness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
+               string.Equals(result.TriggerWitness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
+    }
+
+    private static bool IsTransientSolverFailure(Exception ex)
+    {
+        return string.Equals(ex.GetType().FullName, "Microsoft.Z3.Z3Exception", StringComparison.Ordinal) ||
+               string.Equals(ex.GetType().Name, "Z3Exception", StringComparison.Ordinal);
+    }
+
+    private static bool IsPermanentSolverFailure(Exception ex)
+    {
+        return ex is DllNotFoundException or
+            BadImageFormatException or
+            FileNotFoundException or
+            TypeInitializationException or
+            EntryPointNotFoundException or
+            PlatformNotSupportedException;
+    }
+
+    private static string GetPermanentFailureCode(Exception ex)
+    {
+        return ex switch
+        {
+            DllNotFoundException or FileNotFoundException => "smt_native_library_missing",
+            BadImageFormatException or EntryPointNotFoundException => "smt_native_library_incompatible",
+            PlatformNotSupportedException => "smt_platform_unsupported",
+            _ => "smt_initialization_failure"
+        };
+    }
+
+    private SmtSolverContextRecycleResult CreateRecycleResult(
+        SmtSolverContextRecycleScope scope,
+        bool disposedCurrentThreadContext,
+        long requestedGeneration)
+    {
+        return new SmtSolverContextRecycleResult(
+            scope,
+            disposedCurrentThreadContext,
+            requestedGeneration,
+            _queryCache.Count,
+            s_sharedQueryCache.Count);
+    }
+
+    private SmtAnalysisHealthState GetHealthState()
+    {
+        return (SmtAnalysisHealthState)Volatile.Read(ref _healthState);
+    }
+
+    private void SetHealthState(SmtAnalysisHealthState state)
+    {
+        Volatile.Write(ref _healthState, (int)state);
+    }
+
+    private void RecordFailure(string failureCode, SmtAnalysisHealthState state)
+    {
+        lock (_healthLock)
+        {
+            _lastFailureCode = failureCode;
+            if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
+                SetHealthState(state);
+        }
+    }
+
+    private void RecordTransientFailure()
+    {
+        lock (_healthLock)
+        {
+            _lastFailureCode = "smt_transient_failure";
+            _consecutiveTransientFailureCount++;
+            if (!_disposed && GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
+                SetHealthState(SmtAnalysisHealthState.Degraded);
+        }
+    }
+
+    private void RecordSolverSuccess()
+    {
+        lock (_healthLock)
+        {
+            if (GetHealthState() == SmtAnalysisHealthState.Degraded)
+                _recoveredTransientFailureCount++;
+
+            _consecutiveTransientFailureCount = 0;
+            if (!_disposed && Options.IsEnabled &&
+                GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
+                SetHealthState(SmtAnalysisHealthState.Ready);
+        }
+    }
+
+    private void ResetDegradedHealth()
+    {
+        lock (_healthLock)
+        {
+            _consecutiveTransientFailureCount = 0;
+            if (!_disposed && Options.IsEnabled &&
+                GetHealthState() != SmtAnalysisHealthState.PermanentlyUnavailable)
+                SetHealthState(SmtAnalysisHealthState.Ready);
+        }
+    }
+
+    private void MarkPermanentlyUnavailable(string failureCode)
+    {
+        lock (_healthLock)
+        {
+            _lastFailureCode = failureCode;
+            SetHealthState(SmtAnalysisHealthState.PermanentlyUnavailable);
+        }
     }
 
     private static string CreateQueryKey(PurityProofQuery query)
@@ -505,6 +738,25 @@ public sealed class SmtAnalysisService : IDisposable
         }
 
         return true;
+    }
+
+    private sealed class SharedProofSearchContext
+    {
+        public SharedProofSearchContext(
+            ISmtProofSearchSession search,
+            Func<ISmtProofSearchSession> factory,
+            long generation)
+        {
+            Search = search;
+            Factory = factory;
+            Generation = generation;
+        }
+
+        public ISmtProofSearchSession Search { get; }
+
+        public Func<ISmtProofSearchSession> Factory { get; }
+
+        public long Generation { get; }
     }
 
     private sealed class SharedQueryFlight

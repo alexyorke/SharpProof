@@ -1348,6 +1348,7 @@ internal sealed class SymbolicIrProofResult
         {
             "smt_disabled" => SymbolicUnknownReason.SmtDisabled,
             "smt_unavailable" => SymbolicUnknownReason.SmtUnavailable,
+            "smt_transient_failure" => SymbolicUnknownReason.SmtUnavailable,
             "smt_timeout" => SymbolicUnknownReason.Timeout,
             "smt_method_budget_exceeded" => SymbolicUnknownReason.MethodBudgetExceeded,
             "smt_path_condition_budget_exceeded" => SymbolicUnknownReason.PathConditionBudgetExceeded,

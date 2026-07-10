@@ -36,6 +36,11 @@ internal static class ConfigKeys
     public const string SmtMethodBudgetMs = "sharpproof_smt_method_budget_ms";
     public const string SmtMaxPathConditions = "sharpproof_smt_max_path_conditions";
     public const string SmtMaxExpressionNodes = "sharpproof_smt_max_expression_nodes";
+    public const string SmtTransientRetryCount = "sharpproof_smt_transient_retry_count";
+    public const string SmtRecycleContextOnTransientFailure =
+        "sharpproof_smt_recycle_context_on_transient_failure";
+    public const string SmtDisposeThreadContextOnServiceDispose =
+        "sharpproof_smt_dispose_thread_context_on_service_dispose";
     public const string AnalysisMaxMergedIfElseFacts = "sharpproof_analysis_max_merged_if_else_facts";
     public const string AnalysisMaxMergedSwitchFacts = "sharpproof_analysis_max_merged_switch_facts";
     public const string AnalysisMaxMergedTryFacts = "sharpproof_analysis_max_merged_try_facts";

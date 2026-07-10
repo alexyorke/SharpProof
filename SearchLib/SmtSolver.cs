@@ -121,7 +121,7 @@ public sealed class SmtSolver : IDisposable
         {
             return new SmtFeasibilityResult(
                 Feasibility.Unknown,
-                SmtSatisfyingWitness.Unsupported("solver_or_encoding_failure"));
+                SmtSatisfyingWitness.Unsupported(GetConservativeSolverFailureReason(ex)));
         }
     }
 
@@ -305,6 +305,16 @@ public sealed class SmtSolver : IDisposable
                ex is InvalidCastException ||
                ex is RegexMatchTimeoutException ||
                ex is ArithmeticException;
+    }
+
+    private static string GetConservativeSolverFailureReason(Exception ex)
+    {
+        return ex switch
+        {
+            Z3Exception => "z3_transient_failure",
+            RegexMatchTimeoutException => "solver_timeout",
+            _ => "solver_encoding_failure"
+        };
     }
 
     private ConcreteFactPreparationStatus PrepareConcreteFacts(

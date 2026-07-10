@@ -163,6 +163,24 @@ internal static class AnalyzerConfigurationOptionRegistry
             "mode default",
             "Maximum SMT expression nodes considered per query."),
         new AnalyzerConfigurationOption(
+            ConfigKeys.SmtTransientRetryCount,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.NonNegativeInteger,
+            "1",
+            "Retries after a transient Z3 context failure."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.SmtRecycleContextOnTransientFailure,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.Bool,
+            "true",
+            "Recycles the current thread's solver context after a transient failure."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.SmtDisposeThreadContextOnServiceDispose,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.Bool,
+            "false",
+            "Disposes the current thread's shared solver context with the analysis service."),
+        new AnalyzerConfigurationOption(
             ConfigKeys.AnalysisMaxMergedIfElseFacts,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,

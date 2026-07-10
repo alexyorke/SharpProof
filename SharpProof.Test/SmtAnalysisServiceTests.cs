@@ -46,6 +46,243 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
+    public void LifecycleOptions_DefaultsAndOverridesAreStable()
+    {
+        var defaults = SmtSolverLifecycleOptions.Default;
+
+        Assert.That(defaults.MaxTransientRetries, Is.EqualTo(1));
+        Assert.That(defaults.RecycleContextOnTransientFailure, Is.True);
+        Assert.That(defaults.DisposeCurrentThreadContextOnServiceDispose, Is.False);
+        Assert.That(
+            () => new SmtSolverLifecycleOptions(maxTransientRetries: -1),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+
+        var lifecycle = new SmtSolverLifecycleOptions(3, false, true);
+        var options = SmtAnalysisOptions.Default.WithLifecycle(lifecycle);
+
+        Assert.That(options.Lifecycle, Is.SameAs(lifecycle));
+        Assert.That(options.WithOverrides(queryTimeout: TimeSpan.FromMilliseconds(123)).Lifecycle,
+            Is.SameAs(lifecycle));
+    }
+
+    [Test]
+    public void Classify_TransientFailure_RecyclesRetriesAndRecovers()
+    {
+        var attempts = 0;
+        var disposedSessions = 0;
+        var options = SmtAnalysisOptions.Default.WithLifecycle(
+            new SmtSolverLifecycleOptions(maxTransientRetries: 1));
+        using var service = new SmtAnalysisService(
+            options,
+            () => new StubProofSearchSession(
+                (_, _) => Interlocked.Increment(ref attempts) == 1
+                    ? CreateTransientFailure()
+                    : CreateImpureResult(),
+                () => Interlocked.Increment(ref disposedSessions)));
+
+        var result = service.Classify(CreateSolverQuery("transient_recovery"));
+        var health = service.Health;
+        var diagnostics = SymbolicSmtDiagnostics.FromService(service);
+        var compactDiagnostics = SymbolicCompactSmtDiagnostics.FromDiagnostics(diagnostics);
+        var compactHazardDiagnostics = SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(diagnostics);
+
+        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(attempts, Is.EqualTo(2));
+        Assert.That(disposedSessions, Is.EqualTo(1));
+        Assert.That(service.ExecutedQueryCount, Is.EqualTo(2));
+        Assert.That(health.State, Is.EqualTo(SmtAnalysisHealthState.Ready));
+        Assert.That(health.LastFailureCode, Is.EqualTo("smt_transient_failure"));
+        Assert.That(health.TransientRetryCount, Is.EqualTo(1));
+        Assert.That(health.RecoveredTransientFailureCount, Is.EqualTo(1));
+        Assert.That(health.ConsecutiveTransientFailureCount, Is.Zero);
+        Assert.That(health.ContextRecycleCount, Is.EqualTo(1));
+        Assert.That(diagnostics.Health.State, Is.EqualTo(SmtAnalysisHealthState.Ready));
+        Assert.That(diagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
+        Assert.That(compactDiagnostics.Health.TransientRetryCount, Is.EqualTo(1));
+        Assert.That(compactDiagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
+        Assert.That(compactHazardDiagnostics.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
+        Assert.That(compactHazardDiagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
+    }
+
+    [Test]
+    public void Classify_ExhaustedTransientFailure_IsNotCached()
+    {
+        var attempts = 0;
+        var options = SmtAnalysisOptions.Default.WithLifecycle(
+            new SmtSolverLifecycleOptions(maxTransientRetries: 0));
+        using var service = new SmtAnalysisService(
+            options,
+            () => new StubProofSearchSession(
+                (_, _) =>
+                {
+                    Interlocked.Increment(ref attempts);
+                    return CreateTransientFailure();
+                }));
+        var query = CreateSolverQuery("transient_not_cached");
+
+        var first = service.Classify(query);
+        var second = service.Classify(query);
+
+        Assert.That(first.Reason, Is.EqualTo("smt_transient_failure"));
+        Assert.That(second.Reason, Is.EqualTo("smt_transient_failure"));
+        Assert.That(attempts, Is.EqualTo(2));
+        Assert.That(service.CacheEntryCount, Is.Zero);
+        Assert.That(service.Health.State, Is.EqualTo(SmtAnalysisHealthState.Degraded));
+        Assert.That(service.Health.ConsecutiveTransientFailureCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void Classify_NativeLoadFailure_IsPermanentlyUnavailable()
+    {
+        var factoryCalls = 0;
+        using var service = new SmtAnalysisService(
+            SmtAnalysisOptions.Default,
+            () =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                throw new DllNotFoundException("missing test solver");
+            });
+        var query = CreateSolverQuery("permanent_failure");
+
+        var first = service.Classify(query);
+        var second = service.Classify(query);
+        var health = service.Health;
+
+        Assert.That(first.Reason, Is.EqualTo("smt_unavailable"));
+        Assert.That(second.Reason, Is.EqualTo("smt_unavailable"));
+        Assert.That(factoryCalls, Is.EqualTo(1));
+        Assert.That(service.IsPermanentlyUnavailable, Is.True);
+        Assert.That(health.State, Is.EqualTo(SmtAnalysisHealthState.PermanentlyUnavailable));
+        Assert.That(health.LastFailureCode, Is.EqualTo("smt_native_library_missing"));
+    }
+
+    [Test]
+    public void RequestGlobalSolverContextRecycle_PreservesLocalAndSharedCaches()
+    {
+        var firstFactoryCalls = 0;
+        var firstDisposedSessions = 0;
+        var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1000),
+                4,
+                32,
+                true)
+            .WithLifecycle(SmtSolverLifecycleOptions.Default);
+        var query = CreateSolverQuery("recycle_cache_" + Guid.NewGuid().ToString("N"));
+        using var firstService = new SmtAnalysisService(
+            options,
+            () =>
+            {
+                Interlocked.Increment(ref firstFactoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => CreateImpureResult(),
+                    () => Interlocked.Increment(ref firstDisposedSessions));
+            });
+
+        var first = firstService.Classify(query);
+        var recycle = firstService.RequestGlobalSolverContextRecycle();
+        var localCached = firstService.Classify(query);
+        var secondFactoryCalls = 0;
+        using var secondService = new SmtAnalysisService(
+            options,
+            () =>
+            {
+                Interlocked.Increment(ref secondFactoryCalls);
+                return new StubProofSearchSession((_, _) => CreateImpureResult());
+            });
+        var sharedCached = secondService.Classify(query);
+
+        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(localCached.Outcome, Is.EqualTo(first.Outcome));
+        Assert.That(sharedCached.Outcome, Is.EqualTo(first.Outcome));
+        Assert.That(recycle.Scope, Is.EqualTo(SmtSolverContextRecycleScope.AllThreadsOnNextUse));
+        Assert.That(recycle.DisposedCurrentThreadContext, Is.True);
+        Assert.That(recycle.LocalCacheEntryCount, Is.EqualTo(1));
+        Assert.That(recycle.SharedCacheEntryCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(firstFactoryCalls, Is.EqualTo(1));
+        Assert.That(firstDisposedSessions, Is.EqualTo(1));
+        Assert.That(secondFactoryCalls, Is.Zero);
+        Assert.That(firstService.CacheEntryCount, Is.EqualTo(1));
+        Assert.That(secondService.CacheEntryCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void RequestGlobalSolverContextRecycle_RecyclesOtherThreadOnNextUse()
+    {
+        var factoryCalls = 0;
+        var disposedSessions = 0;
+        Exception? workerException = null;
+        SmtAnalysisHealth? healthAfterRecycle = null;
+        using var contextReady = new ManualResetEventSlim();
+        using var recycleRequested = new ManualResetEventSlim();
+        var options = SmtAnalysisOptions.Default.WithLifecycle(
+            new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true));
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                using var service = new SmtAnalysisService(
+                    options,
+                    () =>
+                    {
+                        Interlocked.Increment(ref factoryCalls);
+                        return new StubProofSearchSession(
+                            (_, _) => CreateImpureResult(),
+                            () => Interlocked.Increment(ref disposedSessions));
+                    });
+                _ = service.Classify(CreateSolverQuery("global_recycle_first"));
+                contextReady.Set();
+                recycleRequested.Wait();
+                _ = service.Classify(CreateSolverQuery("global_recycle_second"));
+                healthAfterRecycle = service.Health;
+            }
+            catch (Exception ex)
+            {
+                workerException = ex;
+                contextReady.Set();
+            }
+        });
+        worker.Start();
+        Assert.That(contextReady.Wait(TimeSpan.FromSeconds(10)), Is.True);
+
+        using (var controller = new SmtAnalysisService(options))
+        {
+            var recycle = controller.RequestGlobalSolverContextRecycle();
+            Assert.That(recycle.Scope, Is.EqualTo(SmtSolverContextRecycleScope.AllThreadsOnNextUse));
+        }
+
+        recycleRequested.Set();
+        Assert.That(worker.Join(TimeSpan.FromSeconds(10)), Is.True);
+
+        Assert.That(workerException, Is.Null);
+        Assert.That(factoryCalls, Is.EqualTo(2));
+        Assert.That(disposedSessions, Is.EqualTo(2));
+        Assert.That(healthAfterRecycle, Is.Not.Null);
+        Assert.That(healthAfterRecycle!.ContextRecycleCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Dispose_ConfiguredLifecycle_DisposesCurrentThreadContext()
+    {
+        var disposedSessions = 0;
+        var options = SmtAnalysisOptions.Default.WithLifecycle(
+            new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true));
+        var service = new SmtAnalysisService(
+            options,
+            () => new StubProofSearchSession(
+                (_, _) => CreateImpureResult(),
+                () => Interlocked.Increment(ref disposedSessions)));
+
+        _ = service.Classify(CreateSolverQuery("dispose_context"));
+        service.Dispose();
+
+        Assert.That(disposedSessions, Is.EqualTo(1));
+        Assert.That(service.Health.State, Is.EqualTo(SmtAnalysisHealthState.Disposed));
+        Assert.That(service.Health.ContextRecycleCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void Classify_OffMode_ReturnsConservativeUnknown()
     {
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
@@ -2036,6 +2273,64 @@ public class SmtAnalysisServiceTests
             new PurityHazard(
                 PurityHazardKind.ImpureCallReachability,
                 triggerCondition));
+    }
+
+    private static PurityProofQuery CreateSolverQuery(string name)
+    {
+        var value = new SmtVariable(name, SmtValueKind.Int);
+        var valueIsZero = new SmtBinaryFormula(
+            SmtBinaryOperator.Equal,
+            value,
+            new SmtIntegerConstant(0));
+        return CreateQuery(new[] { valueIsZero }, valueIsZero);
+    }
+
+    private static PurityProofResult CreateTransientFailure()
+    {
+        return new PurityProofResult(
+            PurityProofOutcome.Unknown,
+            Feasibility.Unknown,
+            Feasibility.Unknown,
+            "path_feasibility_unknown",
+            new SmtSatisfyingWitness(
+                SmtWitnessStatus.Unsupported,
+                "z3_transient_failure",
+                Array.Empty<SmtModelAssignment>()));
+    }
+
+    private static PurityProofResult CreateImpureResult()
+    {
+        return new PurityProofResult(
+            PurityProofOutcome.ProvablyImpure,
+            Feasibility.Satisfiable,
+            Feasibility.Satisfiable,
+            "impure_call_reachable");
+    }
+
+    private sealed class StubProofSearchSession : ISmtProofSearchSession
+    {
+        private readonly Func<PurityProofQuery, TimeSpan, PurityProofResult> _classify;
+        private readonly Action? _dispose;
+
+        public StubProofSearchSession(
+            Func<PurityProofQuery, TimeSpan, PurityProofResult> classify,
+            Action? dispose = null)
+        {
+            _classify = classify;
+            _dispose = dispose;
+        }
+
+        public long ConsumedResourceCount => 0;
+
+        public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
+        {
+            return _classify(query, timeout);
+        }
+
+        public void Dispose()
+        {
+            _dispose?.Invoke();
+        }
     }
 
     private static SmtFormula CreateNestedNegation(int depth)

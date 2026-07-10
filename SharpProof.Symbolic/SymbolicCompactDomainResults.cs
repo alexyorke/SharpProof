@@ -1,3 +1,5 @@
+using SharpProof.Symbolic.Smt;
+
 namespace SharpProof.Symbolic;
 
 public interface ISymbolicCompactResult
@@ -602,7 +604,9 @@ public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
         int maxPathConditions,
         int maxExpressionNodes,
         int executedQueryCount,
-        int cacheEntryCount)
+        int cacheEntryCount,
+        SmtAnalysisHealth health,
+        SmtSolverLifecycleOptions lifecycle)
     {
         IsConfigured = isConfigured;
         Mode = mode;
@@ -613,6 +617,8 @@ public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
         MaxExpressionNodes = maxExpressionNodes;
         ExecutedQueryCount = executedQueryCount;
         CacheEntryCount = cacheEntryCount;
+        Health = health;
+        Lifecycle = lifecycle;
     }
 
     public bool IsConfigured { get; }
@@ -633,6 +639,10 @@ public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
 
     public int CacheEntryCount { get; }
 
+    public SmtAnalysisHealth Health { get; }
+
+    public SmtSolverLifecycleOptions Lifecycle { get; }
+
     public static SymbolicCompactRuntimeHazardSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
     {
         if (diagnostics == null) throw new ArgumentNullException(nameof(diagnostics));
@@ -646,7 +656,9 @@ public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
             diagnostics.MaxPathConditions,
             diagnostics.MaxExpressionNodes,
             diagnostics.ExecutedQueryCount,
-            diagnostics.CacheEntryCount);
+            diagnostics.CacheEntryCount,
+            diagnostics.Health,
+            diagnostics.Lifecycle);
     }
 }
 

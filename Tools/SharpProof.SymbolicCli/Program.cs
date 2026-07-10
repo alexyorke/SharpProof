@@ -16,7 +16,7 @@ try
         return options.ShowHelp ? 0 : 64;
     }
 
-    var smtAnalysis = options.RequiresSmt
+    using var smtAnalysis = options.RequiresSmt
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
@@ -867,6 +867,19 @@ static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
     Console.WriteLine($"  Max expression nodes: {diagnostics.MaxExpressionNodes}");
     Console.WriteLine($"  Executed queries: {diagnostics.ExecutedQueryCount}");
     Console.WriteLine($"  Cache entries: {diagnostics.CacheEntryCount}");
+    Console.WriteLine($"  Health: {diagnostics.Health.State}");
+    Console.WriteLine($"  Permanently unavailable: {diagnostics.Health.IsPermanentlyUnavailable}");
+    if (!string.IsNullOrWhiteSpace(diagnostics.Health.LastFailureCode))
+        Console.WriteLine($"  Last failure: {diagnostics.Health.LastFailureCode}");
+    Console.WriteLine($"  Transient retries: {diagnostics.Health.TransientRetryCount}");
+    Console.WriteLine($"  Recovered transient failures: {diagnostics.Health.RecoveredTransientFailureCount}");
+    Console.WriteLine($"  Context recycles: {diagnostics.Health.ContextRecycleCount}");
+    Console.WriteLine($"  Context generation: {diagnostics.Health.ContextGeneration}");
+    Console.WriteLine($"  Max transient retries: {diagnostics.Lifecycle.MaxTransientRetries}");
+    Console.WriteLine(
+        $"  Recycle context on transient failure: {diagnostics.Lifecycle.RecycleContextOnTransientFailure}");
+    Console.WriteLine(
+        $"  Dispose context with service: {diagnostics.Lifecycle.DisposeCurrentThreadContextOnServiceDispose}");
 }
 
 static void PrintAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
@@ -993,6 +1006,12 @@ internal sealed class SymbolicCliOptions
                                                       Maximum path conditions before conservative fallback.
                                   --smt-max-expression-nodes <n>
                                                       Maximum formula nodes before conservative fallback.
+                                  --smt-transient-retries <n>
+                                                      Retry count after transient Z3 context failures. Default: 1.
+                                  --smt-keep-context-on-transient-failure
+                                                      Retry without first recycling the failed thread-local context.
+                                  --smt-dispose-context-on-exit
+                                                      Dispose the current thread's solver context when the CLI service exits.
                                   --analysis-limit <name>=<n>
                                                       Override a positive bounded-analysis limit. Repeat for multiple limits.
                                   --json              Emit JSON instead of text.
@@ -1166,6 +1185,14 @@ internal sealed class SymbolicCliOptions
     public int? SmtMaxPathConditions { get; private set; }
 
     public int? SmtMaxExpressionNodes { get; private set; }
+
+    public int SmtTransientRetryCount { get; private set; } =
+        SmtSolverLifecycleOptions.Default.MaxTransientRetries;
+
+    public bool SmtRecycleContextOnTransientFailure { get; private set; } =
+        SmtSolverLifecycleOptions.Default.RecycleContextOnTransientFailure;
+
+    public bool SmtDisposeContextOnExit { get; private set; }
 
     private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
@@ -1477,6 +1504,15 @@ internal sealed class SymbolicCliOptions
                 case "--smt-max-expression-nodes":
                     options.SmtMaxExpressionNodes = ReadPositiveInt(args, ref index, arg);
                     break;
+                case "--smt-transient-retries":
+                    options.SmtTransientRetryCount = ReadNonNegativeInt(args, ref index, arg);
+                    break;
+                case "--smt-keep-context-on-transient-failure":
+                    options.SmtRecycleContextOnTransientFailure = false;
+                    break;
+                case "--smt-dispose-context-on-exit":
+                    options.SmtDisposeContextOnExit = true;
+                    break;
                 case "--analysis-limit":
                     options.AddAnalysisLimitOverride(ReadString(args, ref index, arg), arg);
                     break;
@@ -1753,11 +1789,16 @@ internal sealed class SymbolicCliOptions
 
     public SmtAnalysisOptions CreateSmtOptions()
     {
-        return SmtAnalysisOptions.ForMode(SmtMode).WithOverrides(
-            SmtTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(SmtTimeoutMs.Value) : null,
-            SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
-            SmtMaxPathConditions,
-            SmtMaxExpressionNodes);
+        return SmtAnalysisOptions.ForMode(SmtMode)
+            .WithOverrides(
+                SmtTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(SmtTimeoutMs.Value) : null,
+                SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
+                SmtMaxPathConditions,
+                SmtMaxExpressionNodes)
+            .WithLifecycle(new SmtSolverLifecycleOptions(
+                SmtTransientRetryCount,
+                SmtRecycleContextOnTransientFailure,
+                SmtDisposeContextOnExit));
     }
 
     public SymbolicQueryOptions CreateQueryOptions(

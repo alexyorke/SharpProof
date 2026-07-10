@@ -537,6 +537,40 @@ public sealed class SymbolicSmtDiagnostics
         int maxExpressionNodes,
         int executedQueryCount,
         int cacheEntryCount)
+        : this(
+            isConfigured,
+            mode,
+            isEnabled,
+            queryTimeoutMs,
+            methodBudgetMs,
+            maxPathConditions,
+            maxExpressionNodes,
+            executedQueryCount,
+            cacheEntryCount,
+            new SmtAnalysisHealth(
+                isConfigured && isEnabled ? SmtAnalysisHealthState.Ready : SmtAnalysisHealthState.Disabled,
+                string.Empty,
+                0,
+                0,
+                0,
+                0,
+                0),
+            SmtSolverLifecycleOptions.Default)
+    {
+    }
+
+    private SymbolicSmtDiagnostics(
+        bool isConfigured,
+        SmtAnalysisMode mode,
+        bool isEnabled,
+        int queryTimeoutMs,
+        int methodBudgetMs,
+        int maxPathConditions,
+        int maxExpressionNodes,
+        int executedQueryCount,
+        int cacheEntryCount,
+        SmtAnalysisHealth health,
+        SmtSolverLifecycleOptions lifecycle)
     {
         IsConfigured = isConfigured;
         Mode = mode;
@@ -547,6 +581,8 @@ public sealed class SymbolicSmtDiagnostics
         MaxExpressionNodes = maxExpressionNodes;
         ExecutedQueryCount = executedQueryCount;
         CacheEntryCount = cacheEntryCount;
+        Health = health ?? throw new ArgumentNullException(nameof(health));
+        Lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
     }
 
     public bool IsConfigured { get; }
@@ -567,6 +603,10 @@ public sealed class SymbolicSmtDiagnostics
 
     public int CacheEntryCount { get; }
 
+    public SmtAnalysisHealth Health { get; }
+
+    public SmtSolverLifecycleOptions Lifecycle { get; }
+
     public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
     {
         if (smtAnalysis == null) return NotConfigured;
@@ -580,7 +620,9 @@ public sealed class SymbolicSmtDiagnostics
             smtAnalysis.Options.MaxPathConditions,
             smtAnalysis.Options.MaxExpressionNodes,
             smtAnalysis.ExecutedQueryCount,
-            smtAnalysis.CacheEntryCount);
+            smtAnalysis.CacheEntryCount,
+            smtAnalysis.Health,
+            smtAnalysis.Options.Lifecycle);
     }
 
     internal static int ToBoundedMilliseconds(TimeSpan value)

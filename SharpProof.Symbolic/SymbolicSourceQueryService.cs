@@ -5374,7 +5374,9 @@ public sealed class SymbolicCompactSmtDiagnostics
         int maxPathConditions,
         int maxExpressionNodes,
         int executedQueryCount,
-        int cacheEntryCount)
+        int cacheEntryCount,
+        SmtAnalysisHealth health,
+        SmtSolverLifecycleOptions lifecycle)
     {
         IsConfigured = isConfigured;
         Mode = mode ?? string.Empty;
@@ -5385,6 +5387,8 @@ public sealed class SymbolicCompactSmtDiagnostics
         MaxExpressionNodes = maxExpressionNodes;
         ExecutedQueryCount = executedQueryCount;
         CacheEntryCount = cacheEntryCount;
+        Health = health;
+        Lifecycle = lifecycle;
     }
 
     public bool IsConfigured { get; }
@@ -5405,6 +5409,10 @@ public sealed class SymbolicCompactSmtDiagnostics
 
     public int CacheEntryCount { get; }
 
+    public SmtAnalysisHealth Health { get; }
+
+    public SmtSolverLifecycleOptions Lifecycle { get; }
+
     internal static SymbolicCompactSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
     {
         return new SymbolicCompactSmtDiagnostics(
@@ -5416,7 +5424,9 @@ public sealed class SymbolicCompactSmtDiagnostics
             diagnostics.MaxPathConditions,
             diagnostics.MaxExpressionNodes,
             diagnostics.ExecutedQueryCount,
-            diagnostics.CacheEntryCount);
+            diagnostics.CacheEntryCount,
+            diagnostics.Health,
+            diagnostics.Lifecycle);
     }
 }
 
