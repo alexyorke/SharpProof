@@ -35,8 +35,6 @@ terms.
   and every major symbolic query mode.
 - Add focused explanation flows that connect build diagnostics to CLI/API proof
   queries.
-- Continue reducing runtime-hazard formula fallbacks by migrating them to IR
-  exception-precondition facts.
 - Consolidate proof-status, unknown-reason, and fallback wording across
   analyzer diagnostics, CLI output, and public result DTOs.
 - Split large symbolic/analyzer files only when the split removes duplicated
@@ -55,9 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Keep reducing legacy formula-shaped compatibility paths by moving useful
-  facts into typed symbolic IR, typed path conditions, and source-like public
-  result DTOs.
 - Add a public proof/evidence schema version and compatibility policy for
   compact JSON, diagnostic properties, effect summaries, and baseline entries.
 - Add a standalone source-query compilation profile for non-MSBuild API and CLI
