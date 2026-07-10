@@ -249,6 +249,13 @@ namespace TestNamespace {
                 generatedSummaryStampPath,
                 Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp"));
 
+            var skipGeneratedEffectSummaries = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "SharpProofSkipGeneratedEffectSummaries", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(skipGeneratedEffectSummaries, Is.EqualTo("false"));
+
             var buildTarget = document
                 .Descendants()
                 .Single(element =>
@@ -262,6 +269,10 @@ namespace TestNamespace {
             Assert.That(stageBuilds[0].Attribute("Projects")?.Value, Is.EqualTo("$(GeneratedPurityToolProjectPath)"));
             Assert.That(stageBuilds[0].Attribute("Targets")?.Value, Is.EqualTo("Build"));
 
+            Assert.That(
+                buildTarget.Attribute("Condition")?.Value,
+                Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
+
             var stageTarget = document
                 .Descendants()
                 .Single(element =>
@@ -270,9 +281,14 @@ namespace TestNamespace {
             Assert.That(stageTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
             Assert.That(stageTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("BuildBuiltInEffectSummaryTool"));
             Assert.That(
+                stageTarget.Attribute("Condition")?.Value,
+                Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
+            Assert.That(
                 stageTarget.Attribute("Inputs")?.Value,
                 Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"));
-            Assert.That(stageTarget.Attribute("Outputs")?.Value, Is.EqualTo("$(GeneratedPurityGenerationStampPath)"));
+            Assert.That(
+                stageTarget.Attribute("Outputs")?.Value,
+                Is.EqualTo("$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPuritySummaryOutputs)"));
 
             var stageCopies = stageTarget
                 .Descendants()
@@ -311,6 +327,20 @@ namespace TestNamespace {
             Assert.That(
                 stageExecs[0].Attribute("Command")?.Value,
                 Is.EqualTo("dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec \"$(GeneratedPurityArtifactSpecPath)\""));
+            Assert.That(stageExecs[0].Attribute("IgnoreExitCode")?.Value, Is.EqualTo("true"));
+            Assert.That(stageExecs[0].Attribute("ConsoleToMSBuild")?.Value, Is.EqualTo("true"));
+            Assert.That(
+                stageExecs[0]
+                    .Descendants()
+                    .Single(element => string.Equals(element.Name.LocalName, "Output", StringComparison.Ordinal))
+                    .Attribute("TaskParameter")?.Value,
+                Is.EqualTo("ExitCode"));
+
+            var stageError = stageTarget
+                .Descendants()
+                .Single(element => string.Equals(element.Name.LocalName, "Error", StringComparison.Ordinal));
+            Assert.That(stageError.Attribute("Condition")?.Value, Is.EqualTo("'$(_SharpProofEffectSummaryExitCode)' != '0'"));
+            Assert.That(stageError.Attribute("Text")?.Value, Does.Contain("SharpProof effect-summary generation failed"));
 
             var stampWrite = stageTarget
                 .Descendants()
@@ -326,6 +356,9 @@ namespace TestNamespace {
                     string.Equals(element.Attribute("Name")?.Value, "IncludeGeneratedPurityBuiltInSummaries", StringComparison.Ordinal));
             Assert.That(includeTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
             Assert.That(includeTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("GenerateBuiltInEffectSummaries"));
+            Assert.That(
+                includeTarget.Attribute("Condition")?.Value,
+                Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
 
             var generatedSummaryInclude = includeTarget
                 .Descendants()

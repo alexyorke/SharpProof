@@ -13,6 +13,7 @@
     <GeneratedPurityToolProjectPath Condition="'$(GeneratedPurityToolProjectPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj</GeneratedPurityToolProjectPath>
     <GeneratedPurityToolDllPath Condition="'$(GeneratedPurityToolDllPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\bin\$(Configuration)\net8.0\SharpProof.EffectSummary.dll</GeneratedPurityToolDllPath>
     <GeneratedPurityGenerationStampPath Condition="'$(GeneratedPurityGenerationStampPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp</GeneratedPurityGenerationStampPath>
+    <SharpProofSkipGeneratedEffectSummaries Condition="'$(SharpProofSkipGeneratedEffectSummaries)' == ''">false</SharpProofSkipGeneratedEffectSummaries>
     <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
 
@@ -41,9 +42,11 @@
     <Compile Include="..\Shared\BclPurityFallbackHeuristics.cs" Link="Engine\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
+    <_GeneratedPuritySummaryOutputs Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.SharpProof.EffectSummary.json" />
   </ItemGroup>
   
-  <Target Name="BuildBuiltInEffectSummaryTool">
+  <Target Name="BuildBuiltInEffectSummaryTool"
+          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
     <MSBuild Projects="$(GeneratedPurityToolProjectPath)"
              Targets="Build"
              Properties="Configuration=$(Configuration)" />
@@ -52,8 +55,9 @@
   <Target Name="GenerateBuiltInEffectSummaries"
           BeforeTargets="AssignTargetPaths"
           DependsOnTargets="BuildBuiltInEffectSummaryTool"
+          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"
           Inputs="$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"
-          Outputs="$(GeneratedPurityGenerationStampPath)">
+          Outputs="$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPuritySummaryOutputs)">
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
                Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
     <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)" />
@@ -61,16 +65,23 @@
     <Copy SourceFiles="$(GeneratedPurityArtifactSpecSourcePath)"
           DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
 
-    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityArtifactSpecPath)&quot;' />
+    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityArtifactSpecPath)&quot;' IgnoreExitCode="true" ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="_SharpProofEffectSummaryExitCode" />
+    </Exec>
 
-    <WriteLinesToFile File="$(GeneratedPurityGenerationStampPath)"
+    <Error Condition="'$(_SharpProofEffectSummaryExitCode)' != '0'"
+           Text="SharpProof effect-summary generation failed with exit code $(_SharpProofEffectSummaryExitCode). Check artifact spec '$(GeneratedPurityArtifactSpecPath)' and tool '$(GeneratedPurityToolDllPath)'." />
+
+    <WriteLinesToFile Condition="'$(_SharpProofEffectSummaryExitCode)' == '0'"
+                      File="$(GeneratedPurityGenerationStampPath)"
                       Lines="$(NETCoreSdkVersion)"
                       Overwrite="true" />
   </Target>
 
   <Target Name="IncludeGeneratedPurityBuiltInSummaries"
           BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="GenerateBuiltInEffectSummaries">
+          DependsOnTargets="GenerateBuiltInEffectSummaries"
+          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
     <ItemGroup Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')">
       <_GeneratedPurityBuiltInSummary Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.SharpProof.EffectSummary.json" />
       <EmbeddedResource Include="@(_GeneratedPurityBuiltInSummary)">

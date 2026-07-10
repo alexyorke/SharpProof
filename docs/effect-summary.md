@@ -9,6 +9,13 @@ and consumes those summaries only as embedded resources from the current build.
 Checked-in effect-summary JSON artifacts and the reviewed artifact spec are
 gone. Treat ad hoc outputs from this tool as disposable local calibration data.
 
+The MSBuild target is incremental: its artifact-spec copy, generated summary
+resources, generation stamp, and tool binary participate in the target's input
+and output checks. For a fast inner loop that intentionally skips regeneration,
+pass `-p:SharpProofSkipGeneratedEffectSummaries=true`; the analyzer still builds,
+but no generated built-in summaries are embedded. If the generator fails, the
+target reports the artifact-spec and tool paths in the build error.
+
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,
 implementation-derived purity classifications without changing live `SP0002`
