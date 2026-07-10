@@ -135,8 +135,10 @@ mismatches.
 
 SharpProof uses `sharpproof_*` analyzer configuration keys. SMT-related keys
 control bounded proof work, including mode, timeout, method budget, path
-condition budget, and expression-node budget. Unsupported or over-budget proof
-obligations remain conservative.
+condition budget, expression-node budget, transient retry count, and thread
+context recycling. Unsupported or over-budget proof obligations remain
+conservative. See [SMT lifecycle and health](smt-lifecycle.md) for recovery and
+cleanup behavior.
 
 Scope is explicit:
 

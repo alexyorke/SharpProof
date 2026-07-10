@@ -2931,6 +2931,10 @@ public class TestClass
                 "33",
                 "--smt-max-expression-nodes",
                 "333",
+                "--smt-transient-retries",
+                "3",
+                "--smt-keep-context-on-transient-failure",
+                "--smt-dispose-context-on-exit",
                 "--compact-json",
                 "--max-points",
                 "2",
@@ -2993,6 +2997,15 @@ public class TestClass
             Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
             Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
             Assert.That(analysisSummary.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(333));
+            var smtDiagnostics = root.GetProperty("smtDiagnostics");
+            Assert.That(smtDiagnostics.GetProperty("health").GetProperty("state").GetString(), Is.EqualTo("Ready"));
+            Assert.That(
+                smtDiagnostics.GetProperty("health").GetProperty("isPermanentlyUnavailable").GetBoolean(),
+                Is.False);
+            var lifecycle = smtDiagnostics.GetProperty("lifecycle");
+            Assert.That(lifecycle.GetProperty("maxTransientRetries").GetInt32(), Is.EqualTo(3));
+            Assert.That(lifecycle.GetProperty("recycleContextOnTransientFailure").GetBoolean(), Is.False);
+            Assert.That(lifecycle.GetProperty("disposeCurrentThreadContextOnServiceDispose").GetBoolean(), Is.True);
         }
         finally
         {

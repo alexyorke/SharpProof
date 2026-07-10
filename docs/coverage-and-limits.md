@@ -46,6 +46,9 @@ The analyzer combines:
   not wall-clock timing, allocation complexity, or JIT/cache behavior.
 - External calls, dynamic dispatch, reflection-heavy flows, native interop, and
   hidden framework behavior can force conservative results.
+- Transient Z3 failures retry with a recycled context by default; permanent
+  native availability failures and explicit thread-context maintenance remain
+  visible through [SMT lifecycle health](smt-lifecycle.md).
 
 ## Common Runtime-Hazard Shapes
 

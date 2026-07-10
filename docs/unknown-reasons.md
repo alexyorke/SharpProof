@@ -73,6 +73,12 @@ Proof codes distinguish the solver failure modes directly:
 | `proof.canceled` | `Cancellation` |
 | `proof.unknown` | `Unknown` |
 
+An exhausted transient retry uses raw reason `smt_transient_failure` and maps
+to the retryable `proof.native_solver_failure` code. A service-level permanent
+native failure uses raw reason `smt_unavailable` and the same stable proof code;
+inspect `SmtAnalysisHealth` to distinguish recovered, degraded, and permanent
+service state.
+
 Runtime hazards and `[Ensures]` reuse these suffixes with
 `runtime_hazard.` or `ensures.` prefixes. They also define family boundaries
 such as `runtime_hazard.unsupported_typed_projection`,

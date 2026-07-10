@@ -39,6 +39,7 @@ The primary entrypoint is `SymbolicQueryService`:
 - Compact program points include file path, line, column, absolute position, node span start/end/length, node start/end line and column, containing method name, program-point kind, direct merged invariant text, reachability and reachability reason, proof outcomes, and bounded proof details. This metadata remains available at the top level for a single point result even when `--max-points 0` suppresses nested program point arrays.
 - `SymbolicQueryResult` is the unified public result for point, line, span, and all-lines queries. It exposes program points, observed and conservative merged invariants, reachability, proof summaries, SMT diagnostics, and compact/invariant projections.
 - `AnalysisTruncation` on full and compact query and runtime-hazard results reports stable `analysis_limit.*` events whenever a configured fact, branch, depth, or state-merge cap drops proof evidence. See [bounded analysis limits](analysis-limits.md).
+- Full and compact `SmtDiagnostics` include nested lifecycle options and an immutable health snapshot with transient retry/recovery counts, permanent-unavailability state, context recycle count, and generation. See [SMT lifecycle and health](smt-lifecycle.md).
 - Program points expose `ReachabilityWitness` and `InputDomainSummary`; line,
   span, file, and unified query results expose alternative
   `ReachabilityWitnesses` and a conservatively merged domain summary.

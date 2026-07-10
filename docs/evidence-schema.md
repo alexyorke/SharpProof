@@ -55,6 +55,10 @@ event codes and analyzer diagnostic properties. Their typed payload, defaults,
 and configuration controls are documented in
 [bounded analysis limits](analysis-limits.md).
 
+SMT diagnostics add nested lifecycle configuration and immutable health state.
+Transient recovery counters, permanent-unavailability state, and context
+generation semantics are described in [SMT lifecycle and health](smt-lifecycle.md).
+
 Consumers should inspect the evidence version before interpreting proof fields.
 `SharpProofEvidenceSchema.IsReadCompatible(...)` accepts the legacy
 unversioned value and the current version; it rejects negative and future

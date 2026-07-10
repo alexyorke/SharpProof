@@ -31,11 +31,14 @@ SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfi
 | `sharpproof_report_bcl_fallback_guesses` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0012; SP0025 for invalid values | Emits optional SP0012 BCL fallback guess diagnostics. |
 | `sharpproof_report_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0010; SP0025 for invalid values | Emits optional SP0010 exception summary diagnostics. |
 | `sharpproof_runtime_hazard_mode` | Global and per-tree | `none`, `sites`, `summaries`, `all`, `unknowns`, `sites-and-unknowns`, `all-and-unknowns` | `none` | SP0010, SP0011, SP0033; SP0025 for invalid values | Controls SP0010, SP0011, and opt-in SP0033 runtime-hazard reporting. |
+| `sharpproof_smt_dispose_thread_context_on_service_dispose` | Global-only | boolean (`true` or `false`) | `false` | SMT-backed proof results; SP0025 for invalid values | Disposes the current thread's shared solver context with the analysis service. |
 | `sharpproof_smt_max_expression_nodes` | Global-only | positive integer | `mode default: 2048 (bounded/off), 8192 (deep)` | SMT-backed proof results; SP0025 for invalid values | Maximum SMT expression nodes considered per query. |
 | `sharpproof_smt_max_path_conditions` | Global-only | positive integer | `mode default: 192 (bounded/off), 512 (deep)` | SMT-backed proof results; SP0025 for invalid values | Maximum SMT path conditions considered per method. |
 | `sharpproof_smt_method_budget_ms` | Global-only | positive integer | `mode default: 5000 ms (bounded/off), 15000 ms (deep)` | SMT-backed proof results; SP0025 for invalid values | Per-method SMT budget in milliseconds. |
 | `sharpproof_smt_mode` | Global-only | `disabled`, `bounded`, `deep` | `bounded` | SMT-backed proof results; SP0025 for invalid values | Controls bounded SMT proof mode. |
+| `sharpproof_smt_recycle_context_on_transient_failure` | Global-only | boolean (`true` or `false`) | `true` | SMT-backed proof results; SP0025 for invalid values | Recycles the current thread's solver context after a transient failure. |
 | `sharpproof_smt_timeout_ms` | Global-only | positive integer | `mode default: 750 ms (bounded/off), 2000 ms (deep)` | SMT-backed proof results; SP0025 for invalid values | Per-query SMT timeout in milliseconds. |
+| `sharpproof_smt_transient_retry_count` | Global-only | non-negative integer | `1` | SMT-backed proof results; SP0025 for invalid values | Retries after a transient Z3 context failure. |
 | `sharpproof_suggest_missing_enforce_pure` | Global and per-tree | boolean (`true` or `false`) | `true` | SP0004; SP0025 for invalid values | Controls SP0004 inferred purity suggestions. |
 | `sharpproof_suggest_missing_enforce_pure_exclude_generated` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0004; SP0025 for invalid values | Suppresses SP0004 in generated-looking source paths. |
 | `sharpproof_suggest_missing_enforce_pure_exclude_tests` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0004; SP0025 for invalid values | Suppresses SP0004 in test-looking namespaces and source paths. |
@@ -72,11 +75,14 @@ sharpproof_purity_profile = balanced
 sharpproof_report_bcl_fallback_guesses = false
 sharpproof_report_exceptions = false
 sharpproof_runtime_hazard_mode = all
+sharpproof_smt_dispose_thread_context_on_service_dispose = false
 sharpproof_smt_max_expression_nodes = 1000
 sharpproof_smt_max_path_conditions = 1000
 sharpproof_smt_method_budget_ms = 1000
 sharpproof_smt_mode = deep
+sharpproof_smt_recycle_context_on_transient_failure = true
 sharpproof_smt_timeout_ms = 1000
+sharpproof_smt_transient_retry_count = 3
 sharpproof_suggest_missing_enforce_pure = true
 sharpproof_suggest_missing_enforce_pure_exclude_generated = false
 sharpproof_suggest_missing_enforce_pure_exclude_tests = false

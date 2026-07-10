@@ -52,6 +52,10 @@ Bounded fact and state merges expose `AnalysisTruncation` instead of silently
 discarding proof quality. The analyzer, API, CLI, defaults, event codes, and
 override names are documented in [bounded analysis limits](analysis-limits.md).
 
+Long-running hosts can inspect solver health, retry transient Z3 failures, and
+recycle thread-local contexts without clearing proof-result caches. See
+[SMT lifecycle and health](smt-lifecycle.md).
+
 Reachability, implication, and runtime-hazard results also expose concrete
 solver assignments and conservative input-domain summaries. See
 [solver witnesses and input domains](input-witnesses.md) for the status model,
