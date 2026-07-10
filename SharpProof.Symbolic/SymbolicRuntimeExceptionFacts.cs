@@ -47,6 +47,7 @@ namespace SharpProof.Symbolic
             internal const string DefiniteArrayTypeMismatch = "definite_array_type_mismatch";
             internal const string DefiniteIndexOutOfRange = "definite_index_out_of_range";
             internal const string DefiniteArrayGetValueIndexOutOfRange = "definite_array_get_value_index_out_of_range";
+            internal const string DefiniteArgumentOutOfRangeGuard = "definite_argument_out_of_range_guard";
             internal const string DefiniteRangeOutOfRange = "definite_range_out_of_range";
             internal const string DefiniteCountIndexOutOfRange = "definite_count_index_out_of_range";
             internal const string DefiniteStringSubstringOutOfRange = "definite_string_substring_out_of_range";
@@ -106,6 +107,7 @@ namespace SharpProof.Symbolic
                 string.Equals(category, ExceptionCategories.DefiniteArrayTypeMismatch, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange, System.StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteArgumentOutOfRangeGuard, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, System.StringComparison.Ordinal) ||
                 string.Equals(category, ExceptionCategories.DefiniteStringSubstringOutOfRange, System.StringComparison.Ordinal) ||

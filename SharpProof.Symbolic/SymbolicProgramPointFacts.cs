@@ -11,7 +11,7 @@ using SearchLib.Smt;
 
 namespace SharpProof.Symbolic
 {
-    internal static class SymbolicProgramPointFacts
+    internal static partial class SymbolicProgramPointFacts
     {
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;
@@ -5523,6 +5523,7 @@ namespace SharpProof.Symbolic
             }
 
             AddTopLevelNotNullParameterNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            AddTopLevelKnownGuardNormalCompletionFacts(expression, semanticModel, cancellationToken, facts);
             AddTopLevelDoesNotReturnIfNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelMemberNotNullNormalCompletionFacts(expression, semanticModel, cancellationToken, facts);
             AddTopLevelArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
@@ -5551,6 +5552,11 @@ namespace SharpProof.Symbolic
                 ref state,
                 expression,
                 statement,
+                semanticModel,
+                cancellationToken);
+            AddTopLevelKnownGuardNormalCompletionStateFacts(
+                ref state,
+                expression,
                 semanticModel,
                 cancellationToken);
             AddTopLevelDoesNotReturnIfNormalCompletionStateFacts(

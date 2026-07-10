@@ -4059,6 +4059,136 @@ public class TestClass
             }
         }
 
+        [TestCase("ArgumentOutOfRangeException.ThrowIfNegative(-1);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfZero(0);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfNegativeOrZero(0);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThan(0, 1);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(1, 1);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThan(2, 1);")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(1, 1);")]
+        public void QuerySourceRuntimeHazardsLine_ProvesArgumentOutOfRangeGuardFailure(string guardInvocation)
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        " + guardInvocation + @"
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                guardInvocation,
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_argument_out_of_range_guard"));
+            Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+            Assert.That(
+                hazard.TriggerPrecondition!.Provenance,
+                Does.StartWith("ir.runtime-hazard.argument-out-of-range.guard."));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardConditionMakesArgumentOutOfRangeGuardUnreachable()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int value)
+    {
+        if (value >= 0)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+        }
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "ArgumentOutOfRangeException.ThrowIfNegative(value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownArgumentOutOfRangeGuardCandidate()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int value)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "ArgumentOutOfRangeException.ThrowIfNegative(value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "ArgumentOutOfRangeException.ThrowIfNegative(value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ArgumentOutOfRangeGuardsProveArrayIndexInRange()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, values.Length);
+        return values[index];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values[index];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        }
+
         [Test]
         public void ClassifyTriggerCore_ReportsFormulaFallbackHazardPreconditionsAsUnknown()
         {

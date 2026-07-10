@@ -56,13 +56,11 @@ grouped by their original feature area.
 
 #### Runtime Hazard Coverage
 - Promote known runtime-hazard limitations into dedicated backlog items and
-  tests: failed `as` conversions as reusable negative type facts, richer
-  dynamic binder modeling, array covariance stores through aliases or merged
-  array identities, and broader throw-expression flow beyond proven
+  tests: richer dynamic binder modeling, array covariance stores through
+  merged array identities, and broader throw-expression flow beyond proven
   `throw null` cases.
-- Expand runtime-hazard modeling for common guard APIs and BCL patterns such as
-  `ArgumentNullException.ThrowIfNull`, range/slice argument checks,
-  collection-count guards, and nullable/value-task/async result shapes.
+- Expand runtime-hazard modeling for common BCL patterns such as
+  collection-count guards and nullable/value-task/async result shapes.
 - Add a mode that reports unknown runtime-hazard candidates from the analyzer,
   not only the CLI, with conservative severity defaults and strong suppression
   support.

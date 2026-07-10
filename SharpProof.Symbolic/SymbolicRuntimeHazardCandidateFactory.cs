@@ -243,6 +243,11 @@ namespace SharpProof.Symbolic
 
                     break;
                 case InvocationExpressionSyntax invocation:
+                    if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken, out var guardCandidate))
+                    {
+                        yield return guardCandidate;
+                    }
+
                     if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
                     {
                         yield return invocationDynamicCandidate;

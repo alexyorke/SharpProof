@@ -614,6 +614,57 @@ public class TestClass
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
         }
 
+        [TestCase("ArgumentOutOfRangeException.ThrowIfNegative(value);", "value >= 0")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfZero(value);", "value != 0")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);", "value > 0")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThan(value, 10);", "value >= 10")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, 10);", "value > 10")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 10);", "value <= 10")]
+        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(value, 10);", "value < 10")]
+        public void ProgramPointFacts_ArgumentOutOfRangeGuardNormalCompletionProvesInverseCondition(
+            string guardInvocation,
+            string expectedCondition)
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        " + guardInvocation + @"
+        return value;
+    }
+}";
+
+            var marker = FindMarker(source, "return value;");
+            var proof = ProveAtMarker(source, marker, expectedCondition);
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_ArgumentOutOfRangeGuardFactDoesNotSurviveArgumentReassignment()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
+        value = -1;
+        return value;
+    }
+}";
+
+            var marker = FindMarker(source, "return value;");
+            var proof = ProveAtMarker(source, marker, "value >= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
         [Test]
         public void ProgramPointFacts_MemberNotNullNormalCompletionProvesFieldNonNull()
         {
