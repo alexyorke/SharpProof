@@ -98,7 +98,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0032`.
+`SP0002` through `SP0033`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.

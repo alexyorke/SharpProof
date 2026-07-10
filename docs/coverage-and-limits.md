@@ -49,6 +49,14 @@ completed async shapes: `Task.FromResult`, `ValueTask.FromResult`, the
 claim to predict arbitrary task scheduling, cancellation, faults, or custom
 awaiters.
 
+Unknown candidates stay opt-in in analyzer builds. Set
+`sharpproof_runtime_hazard_mode = unknowns` for informational `SP0033` only,
+`sites-and-unknowns` for warning-level proven sites plus informational unknowns,
+or `all-and-unknowns` to add method summaries. SP0033 has its own diagnostic ID,
+structured proof and trigger properties, explain metadata, and exact baseline
+evidence, so it can be suppressed with normal `.editorconfig`, pragma, or
+`SharpProof.Baseline.json` controls without hiding proven SP0011 hazards.
+
 ## Soundness Rule
 
 When SharpProof cannot justify a proof, it must not silently upgrade the result

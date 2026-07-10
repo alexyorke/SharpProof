@@ -339,5 +339,16 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0033-unknown-runtime-hazard",
+    "DiagnosticId": "SP0033",
+    "Title": "SP0033 - Unknown runtime-hazard candidate",
+    "Summary": "Opt-in informational diagnostics expose source-visible hazard candidates whose bounded proof remains unknown.",
+    "SourcePath": "docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs",
+    "OutputPath": "docs/readme-examples/sp0033-unknown-runtime-hazard/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

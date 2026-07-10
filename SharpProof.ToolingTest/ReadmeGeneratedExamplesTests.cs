@@ -220,6 +220,17 @@ namespace System.Experimental
                     "{ invalid json")));
     }
 
+    [ReadmeExample("sp0033-unknown-runtime-hazard")]
+    [Test]
+    public async Task Sp0033_UnknownRuntimeHazardExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0033-unknown-runtime-hazard",
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_runtime_hazard_mode", "unknowns")
+                .Add("sharpproof_suggest_missing_enforce_pure", "false"));
+    }
+
     [ReadmeExample("sp0026-unrecognized-attribute-identity")]
     [Test]
     public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
@@ -352,7 +363,7 @@ namespace System.Experimental
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
 
-        var expectedIds = Enumerable.Range(2, 30)
+        var expectedIds = Enumerable.Range(2, 32)
             .Select(index => "SP" + index.ToString("0000"))
             .ToHashSet(StringComparer.Ordinal);
 

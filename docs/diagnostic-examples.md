@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0032`.
+from `SP0002` through `SP0033`.
 
 <a id="sp0002"></a>
 
@@ -940,4 +940,27 @@ Expected analyzer diagnostics:
 
 ```text
 SP0032 Warning <no-location>:1:1 SharpProof analyzer input file 'SharpProof.EffectSummary.json' is invalid: malformed effect-summary JSON
+```
+
+<a id="sp0033"></a>
+
+### SP0033 - Unknown runtime-hazard candidate
+
+Opt-in informational diagnostics expose source-visible hazard candidates whose bounded proof remains unknown.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0033_UnknownRuntimeHazardExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs`):
+
+```csharp
+public sealed class Demo
+{
+    public int Divide(int divisor) => 10 / divisor;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0033 Info docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs:3:39 Runtime hazard candidate 'DivideByZero' at operation '10 / divisor' could not be proven: branch_reachable
 ```

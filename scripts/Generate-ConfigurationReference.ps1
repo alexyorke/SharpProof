@@ -236,7 +236,7 @@ function Get-RelatedDiagnostics {
         { $_ -like "SuggestMissingEnforcePure*" } { "SP0004"; break }
         "EmitExplanations" { "SP0009"; break }
         "ReportBclFallbackGuesses" { "SP0012"; break }
-        "RuntimeHazardMode" { "SP0010, SP0011"; break }
+        "RuntimeHazardMode" { "SP0010, SP0011, SP0033"; break }
         "ReportExceptions" { "SP0010"; break }
         "CheckedExceptions" { "SP0011"; break }
         "EnableEffectSummaryJson" { "SP0002, SP0010, SP0011"; break }

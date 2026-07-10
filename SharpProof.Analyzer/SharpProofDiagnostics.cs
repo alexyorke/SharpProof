@@ -213,7 +213,7 @@ public static class SharpProofDiagnostics
     private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
 
     private static readonly LocalizableString ExceptionSummaryDescription =
-        "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
+        "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
 
     public static readonly DiagnosticDescriptor ExceptionSummaryRule = CreateDescriptor(
         ExceptionSummaryId,
@@ -230,7 +230,7 @@ public static class SharpProofDiagnostics
         "Operation '{0}' may throw uncaught exceptions: {1}";
 
     private static readonly LocalizableString UncaughtExceptionSiteDescription =
-        "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.";
+        "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all/sites-and-unknowns/all-and-unknowns. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.";
 
     public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = CreateDescriptor(
         UncaughtExceptionSiteId,

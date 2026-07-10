@@ -162,7 +162,7 @@ Source Link symbols, and an executable sample under
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
   `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0032`.
+  and related diagnostics from `SP0002` through `SP0033`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
