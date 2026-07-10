@@ -49,13 +49,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 divisor,
                 SymbolicExceptionPreconditionKind.DivideByZero,
                 null,
                 formula,
-                "ir.runtime-hazard.divide-by-zero.translated",
-                "ir.runtime-hazard.divide-by-zero.formula-fallback");
+                "ir.runtime-hazard.divide-by-zero.translated");
             return true;
         }
 
@@ -157,13 +156,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             elementAccess,
             preconditionKind,
             null,
             new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
-            "ir.runtime-hazard.index.out-of-range.translated",
-            "ir.runtime-hazard.index.out-of-range.formula-fallback");
+            "ir.runtime-hazard.index.out-of-range.translated");
         return true;
     }
 
@@ -404,13 +402,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 lengthExpression,
                 kind,
                 null,
                 formula,
-                provenance + ".translated",
-                provenance + ".formula-fallback");
+                provenance + ".translated");
             return true;
         }
 
@@ -571,13 +568,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 receiver,
                 SymbolicExceptionPreconditionKind.NullDereference,
                 null,
                 formula,
-                "ir.runtime-hazard.null-dereference.translated",
-                "ir.runtime-hazard.null-dereference.formula-fallback");
+                "ir.runtime-hazard.null-dereference.translated");
             return true;
         }
 
@@ -604,13 +600,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 expression,
                 SymbolicExceptionPreconditionKind.UnboxNull,
                 null,
                 formula,
-                "ir.runtime-hazard.unbox-null.translated",
-                "ir.runtime-hazard.unbox-null.formula-fallback");
+                "ir.runtime-hazard.unbox-null.translated");
             return true;
         }
 
@@ -637,13 +632,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 expression,
                 SymbolicExceptionPreconditionKind.ArgumentNull,
                 null,
                 formula,
-                "ir.runtime-hazard.argument-null.translated",
-                "ir.runtime-hazard.argument-null.formula-fallback");
+                "ir.runtime-hazard.argument-null.translated");
             return true;
         }
 
@@ -680,13 +674,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 cancellationToken,
                 out var hasValueFormula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 nullableExpression,
                 SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
                 null,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
-                "ir.runtime-hazard.nullable-value.without-value.translated",
-                "ir.runtime-hazard.nullable-value.without-value.formula-fallback");
+                "ir.runtime-hazard.nullable-value.without-value.translated");
             return true;
         }
 
@@ -744,7 +737,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var runtimeTypeTest))
             return false;
 
-        trigger = CreateInvalidCastFormulaBackedTrigger(
+        trigger = CreateInvalidCastTypedProjectionTrigger(
             expression,
             semanticModel,
             cancellationToken,
@@ -776,7 +769,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        trigger = CreateInvalidCastFormulaBackedTrigger(
+        trigger = CreateInvalidCastTypedProjectionTrigger(
             expression,
             semanticModel,
             cancellationToken,
@@ -785,7 +778,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return true;
     }
 
-    private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger(
+    private static RuntimeHazardTrigger CreateInvalidCastTypedProjectionTrigger(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -795,21 +788,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var triggerFormula = Conjoin(
             CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
             mismatchTrigger);
-        const string fallbackProvenance = "ir.runtime-hazard.invalid-cast.formula-fallback";
-        return translatedProvenance != null
-            ? CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                expression,
-                SymbolicExceptionPreconditionKind.InvalidCast,
-                null,
-                triggerFormula,
-                translatedProvenance,
-                fallbackProvenance)
-            : CreateFormulaBackedExceptionPreconditionTrigger(
-                expression,
-                SymbolicExceptionPreconditionKind.InvalidCast,
-                null,
-                triggerFormula,
-                fallbackProvenance);
+        return CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+            expression,
+            SymbolicExceptionPreconditionKind.InvalidCast,
+            null,
+            triggerFormula,
+            translatedProvenance ?? "ir.runtime-hazard.invalid-cast.translated");
     }
 
     private static bool TryCreateDynamicNullBindingTrigger(
@@ -836,13 +820,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
         {
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 receiver,
                 SymbolicExceptionPreconditionKind.DynamicNullBinding,
                 null,
                 formula,
-                "ir.runtime-hazard.dynamic-null-binding.translated",
-                "ir.runtime-hazard.dynamic-null-binding.formula-fallback");
+                "ir.runtime-hazard.dynamic-null-binding.translated");
             return true;
         }
 

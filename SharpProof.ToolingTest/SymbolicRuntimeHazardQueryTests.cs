@@ -4701,7 +4701,7 @@ public class TestClass
     }
 
     [Test]
-    public void ClassifyTriggerCore_ReportsFormulaFallbackHazardPreconditionsAsUnknown()
+    public void ClassifyTriggerCore_UsesTypedFactInsteadOfProvenanceAsControlFlow()
     {
         var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");
         var node = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -4737,9 +4737,10 @@ public class TestClass
             fallbackTrigger,
             smtAnalysis);
 
-        Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
-        Assert.That(reason, Is.EqualTo("unsupported_formula_fallback"));
-        Assert.That(proof, Is.Null);
+        Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(reason, Is.Not.Empty);
+        Assert.That(proof, Is.Not.Null);
+        Assert.That(proof!.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
     }
 
     [Test]

@@ -2090,7 +2090,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardDivideByZero_UsesIrExceptionPreconditionTriggerBeforeLegacyFallback()
+    public void RuntimeHazardDivideByZero_UsesTypedIrProjection()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2100,26 +2100,22 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateNumericZeroCondition("));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.translated"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.formula-fallback"));
-        Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.divide-by-zero.formula-fallback"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
         Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
         Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(binaryExpression.Right"));
         Assert.That(source, Does.Not.Contain("TryTranslateZeroCondition(assignment.Right"));
     }
 
     [Test]
-    public void RuntimeHazardDivideByZero_UsesIrZeroConditionBeforeFormulaFallback()
+    public void RuntimeHazardDivideByZero_UsesIrZeroConditionBeforeTypedProjection()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var helperIndex = source.IndexOf("TryCreateNumericZeroCondition(\r\n                    divisor,",
-            StringComparison.Ordinal);
-        if (helperIndex < 0)
-            helperIndex = source.IndexOf("TryCreateNumericZeroCondition(\n                    divisor,",
-                StringComparison.Ordinal);
+        var helperIndex = source.IndexOf("TryCreateNumericZeroCondition(", StringComparison.Ordinal);
 
         var fallbackIndex = source.IndexOf("TryTranslateZeroCondition(divisor", StringComparison.Ordinal);
         var translatedIndex = source.IndexOf("ir.runtime-hazard.divide-by-zero.translated", StringComparison.Ordinal);
@@ -2129,7 +2125,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(fallbackIndex, Is.GreaterThan(helperIndex));
         Assert.That(translatedIndex, Is.GreaterThan(fallbackIndex));
-        Assert.That(formulaFallbackIndex, Is.GreaterThan(translatedIndex));
+        Assert.That(formulaFallbackIndex, Is.EqualTo(-1));
         Assert.That(source, Does.Contain("SymbolicIrLowerer.CreateIntegerZeroCondition("));
         Assert.That(source, Does.Contain("new SymbolicConstantCondition(true)"));
         Assert.That(source, Does.Contain("new SymbolicConstantCondition(false)"));
@@ -2138,7 +2134,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardSimpleIndexing_UsesIrBoundsPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardSimpleIndexing_UsesTypedIrBoundsPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2150,15 +2146,15 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.translated"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.formula-fallback"));
-        Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.index.out-of-range.formula-fallback"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
         Assert.That(source,
             Does.Not.Contain(
                 "trigger = new RuntimeHazardTrigger(new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula));"));
     }
 
     [Test]
-    public void RuntimeHazardIndexFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+    public void RuntimeHazardIndexFallback_UsesTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -2171,7 +2167,7 @@ public sealed class ArchitectureReductionTests
             StringComparison.Ordinal);
 
         Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex));
+        Assert.That(fallbackIndex, Is.EqualTo(-1));
     }
 
     [Test]
@@ -2294,7 +2290,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardSlicing_PreservesIrExceptionPreconditionWhenFormulaLowers()
+    public void RuntimeHazardSlicing_UsesTypedProjectionWhenFormulaLowers()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2311,14 +2307,15 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
-        Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.argument-out-of-range"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.argument-out-of-range.translated"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.slicing.argument-out-of-range.fallback"));
         Assert.That(lowererSource, Does.Contain("provenance + \".count-within-remaining-length\""));
         Assert.That(lowererSource, Does.Contain("provenance + \".addition-does-not-overflow\""));
     }
 
     [Test]
-    public void RuntimeHazardArrayGetValue_UsesIrBoundsPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardArrayGetValue_UsesTypedBoundsProjection()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2361,7 +2358,8 @@ public sealed class ArchitectureReductionTests
             Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
         Assert.That(coreSource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
         Assert.That(reachabilitySource, Does.Contain("private static bool TryTranslateArrayGetValueDimensionLength("));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
+        Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.translated"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
         Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
         Assert.That(irTriggerSource,
             Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
@@ -2376,7 +2374,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardMultidimensionalElementAccess_UsesIrBoundsPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardMultidimensionalElementAccess_UsesTypedIrBoundsPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2398,14 +2396,14 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         Assert.That(irTriggerSource,
-            Does.Contain(
-                "GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol { Rank: > 1 }"));
+            Does.Contain("GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken)"));
+        Assert.That(irTriggerSource, Does.Contain("Rank: > 1"));
         Assert.That(irTriggerSource,
             Does.Contain("return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger("));
     }
 
     [Test]
-    public void RuntimeHazardNegativeLengths_UseIrExceptionPreconditionsBeforeLegacyFallback()
+    public void RuntimeHazardNegativeLengths_UseTypedIrExceptionPreconditions()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2420,36 +2418,34 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("ir.runtime-hazard.stackalloc.negative-length.aggregate"));
         Assert.That(source, Does.Contain("TryTranslateNegativeCondition(lengthExpression"));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateNegativeLengthTrigger("));
-        Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger("));
-        Assert.That(source, Does.Contain("provenance + \".formula-fallback\""));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger("));
+        Assert.That(source, Does.Not.Contain("provenance + \".formula-fallback\""));
         Assert.That(source, Does.Not.Contain("if (!TryTranslateNegativeCondition(lengthExpression"));
         Assert.That(source, Does.Not.Contain("trigger = new RuntimeHazardTrigger(formula);"));
     }
 
     [Test]
-    public void RuntimeHazardNegativeLengthFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+    public void RuntimeHazardNegativeLengthFallback_UsesTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var helperIndex =
-            source.IndexOf(
-                "CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(\r\n                    lengthExpression,",
-                StringComparison.Ordinal);
-        if (helperIndex < 0)
-            helperIndex =
-                source.IndexOf(
-                    "CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(\n                    lengthExpression,",
-                    StringComparison.Ordinal);
+        var translatedFallbackIndex =
+            source.IndexOf("TryTranslateNegativeCondition(lengthExpression", StringComparison.Ordinal);
+        var helperIndex = source.IndexOf(
+            "CreateTypedFormulaProjectionExceptionPreconditionTrigger(",
+            translatedFallbackIndex,
+            StringComparison.Ordinal);
 
         var translatedProvenanceIndex = source.IndexOf("provenance + \".translated\"", StringComparison.Ordinal);
         var fallbackProvenanceIndex = source.IndexOf("provenance + \".formula-fallback\"", StringComparison.Ordinal);
 
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(translatedFallbackIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(helperIndex, Is.GreaterThan(translatedFallbackIndex));
         Assert.That(translatedProvenanceIndex, Is.GreaterThan(helperIndex));
-        Assert.That(fallbackProvenanceIndex, Is.GreaterThan(translatedProvenanceIndex));
+        Assert.That(fallbackProvenanceIndex, Is.EqualTo(-1));
     }
 
     [Test]
@@ -2599,7 +2595,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardStableNullDereferences_UseIrExceptionPreconditionsBeforeLegacyFallback()
+    public void RuntimeHazardStableNullDereferences_UseTypedIrExceptionPreconditions()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2610,12 +2606,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateIrRelationalExceptionPreconditionTrigger"));
         Assert.That(source, Does.Contain("TryTranslateNullCondition(receiver"));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateReferenceNullComparison("));
-        Assert.That(source, Does.Contain("\"ir.runtime-hazard.null-dereference.formula-fallback\""));
+        Assert.That(source, Does.Not.Contain("\"ir.runtime-hazard.null-dereference.formula-fallback\""));
         Assert.That(source, Does.Contain("!TryCreateNullDereferenceTrigger(receiver"));
     }
 
     [Test]
-    public void RuntimeHazardUnboxNull_UsesIrExceptionPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardUnboxNull_UsesTypedIrExceptionPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2624,12 +2620,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.UnboxNull"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.unbox-null"));
         Assert.That(source, Does.Contain("TryTranslateNullCondition(expression"));
-        Assert.That(source, Does.Contain("\"ir.runtime-hazard.unbox-null.formula-fallback\""));
+        Assert.That(source, Does.Not.Contain("\"ir.runtime-hazard.unbox-null.formula-fallback\""));
         Assert.That(source, Does.Contain("TryCreateUnboxNullTrigger("));
     }
 
     [Test]
-    public void RuntimeHazardStableArgumentNull_UsesIrExceptionPreconditionsBeforeLegacyFallback()
+    public void RuntimeHazardStableArgumentNull_UsesTypedIrExceptionPreconditions()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2639,12 +2635,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("ir.runtime-hazard.argument-null"));
         Assert.That(source, Does.Not.Contain("IsStableIrReferenceSubject"));
         Assert.That(source, Does.Contain("TryTranslateNullCondition(expression"));
-        Assert.That(source, Does.Contain("\"ir.runtime-hazard.argument-null.formula-fallback\""));
+        Assert.That(source, Does.Not.Contain("\"ir.runtime-hazard.argument-null.formula-fallback\""));
         Assert.That(source, Does.Contain("!TryCreateArgumentNullTrigger(expression"));
     }
 
     [Test]
-    public void RuntimeHazardNullLikeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
+    public void RuntimeHazardNullLikeFallbacks_UseTypedProjectionsWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -2670,14 +2666,14 @@ public sealed class ArchitectureReductionTests
                 StringComparison.Ordinal);
 
             Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0), provenance);
-            Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex), provenance);
+            Assert.That(fallbackIndex, Is.EqualTo(-1), provenance);
         }
 
-        Assert.That(source, Does.Contain("CreateIrPreferredFormulaBackedExceptionPreconditionTrigger("));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger("));
     }
 
     [Test]
-    public void RuntimeHazardNullableValue_UsesIrExceptionPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardNullableValue_UsesTypedIrExceptionPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2687,13 +2683,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateNullableHasValueCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.nullable-value.without-value.formula-fallback"));
-        Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.nullable-value.without-value.formula-fallback"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
         Assert.That(source, Does.Contain("!TryCreateNullableValueWithoutValueTrigger("));
     }
 
     [Test]
-    public void RuntimeHazardInvalidReferenceCast_UsesIrTypeTestPreconditionBeforeLegacyFallback()
+    public void RuntimeHazardInvalidReferenceCast_UsesTypedIrTypeTestPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2715,12 +2711,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateRuntimeTypeTestFormula("));
         Assert.That(source, Does.Contain("TryCreateReferenceNullCondition("));
         Assert.That(source, Does.Contain("\"ir.runtime-hazard.reference.non-null.guard\""));
-        Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
-        Assert.That(source, Does.Contain("\"ir.runtime-hazard.invalid-cast.formula-fallback\""));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Not.Contain("\"ir.runtime-hazard.invalid-cast.formula-fallback\""));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
         Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateExactRuntimeInvalidCastTrigger"));
         Assert.That(irTriggerSource,
-            Does.Contain("private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger"));
+            Does.Contain("private static RuntimeHazardTrigger CreateInvalidCastTypedProjectionTrigger"));
         Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
         Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateReferenceNullCondition"));
     }
@@ -2754,7 +2750,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
 
         Assert.That(source, Does.Contain("TryCreateSwitchExpressionNoMatchCandidate"));
-        Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch"));
         Assert.That(source, Does.Contain("SymbolicSmtFormulaLowerer.TryLowerCondition"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.switch-expression.no-match"));
@@ -2763,7 +2759,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardDynamicNullBinding_UsesIrExceptionPreconditionBeforeFormulaFallback()
+    public void RuntimeHazardDynamicNullBinding_UsesTypedIrExceptionPrecondition()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2771,7 +2767,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateDynamicNullBindingTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DynamicNullBinding"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.dynamic-null-binding"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.dynamic-null-binding.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.dynamic-null-binding.formula-fallback"));
         Assert.That(source, Does.Contain("TryCreateOptionalReferenceSubject"));
         Assert.That(source,
             Does.Not.Contain(
@@ -2976,30 +2972,17 @@ public sealed class ArchitectureReductionTests
             .GroupBy(static provenance => provenance, StringComparer.Ordinal)
             .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-        Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(8));
+        Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(0));
         Assert.That(
             runtimeHazardFormulaFallbackLocations.All(static location =>
                 location.Path.StartsWith("SharpProof.Symbolic/", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             runtimeHazardFormulaFallbackCountsByPath,
-            Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"] = 8
-            }));
+            Is.Empty);
         Assert.That(
             runtimeHazardFormulaFallbackCountsByProvenance,
-            Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["ir.runtime-hazard.argument-null.formula-fallback"] = 1,
-                ["ir.runtime-hazard.divide-by-zero.formula-fallback"] = 1,
-                ["ir.runtime-hazard.dynamic-null-binding.formula-fallback"] = 1,
-                ["ir.runtime-hazard.index.out-of-range.formula-fallback"] = 1,
-                ["ir.runtime-hazard.invalid-cast.formula-fallback"] = 1,
-                ["ir.runtime-hazard.nullable-value.without-value.formula-fallback"] = 1,
-                ["ir.runtime-hazard.null-dereference.formula-fallback"] = 1,
-                ["ir.runtime-hazard.unbox-null.formula-fallback"] = 1
-            }));
+            Is.Empty);
     }
 
     [Test]
@@ -9314,7 +9297,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardThrowNullRefinement_UsesIrPathStateBeforeLegacyFormulaFallback()
+    public void RuntimeHazardThrowNullRefinement_UsesTypedPathStateBeforeFormulaCompatibility()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -9322,15 +9305,10 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardQueryService.cs"));
         var helperIndex = source.IndexOf("TryCreateReferenceNullCondition(", StringComparison.Ordinal);
-        var irProofIndex =
-            source.IndexOf(
-                "ClassifyStateConditionTruth(\r\n                    analysis.PathState,\r\n                    nullCondition,",
-                StringComparison.Ordinal);
-        if (irProofIndex < 0)
-            irProofIndex =
-                source.IndexOf(
-                    "ClassifyStateConditionTruth(\n                    analysis.PathState,\n                    nullCondition,",
-                    StringComparison.Ordinal);
+        var irProofIndex = source.IndexOf(
+            "ClassifyStateConditionTruth(",
+            helperIndex,
+            StringComparison.Ordinal);
 
         var legacyFallbackIndex = source.IndexOf("PathConditionsImplyWithIrFirst(", StringComparison.Ordinal);
 

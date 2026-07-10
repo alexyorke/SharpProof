@@ -807,7 +807,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (mismatchTrigger is SmtBooleanConstant { Value: false }) return false;
 
-        var formulaTrigger = CreateInvalidCastFormulaBackedTrigger(
+        var formulaTrigger = CreateInvalidCastTypedProjectionTrigger(
             castExpression.Expression,
             semanticModel,
             cancellationToken,
@@ -1126,12 +1126,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         candidate = new RuntimeHazardCandidate(
             invocation,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            CreateFormulaBackedExceptionPreconditionTrigger(
+            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 invocation,
                 SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
                 null,
                 trigger,
-                "ir.runtime-hazard.slicing.argument-out-of-range"),
+                "ir.runtime-hazard.slicing.argument-out-of-range.translated"),
             ExceptionTypes.ArgumentOutOfRangeException,
             category);
         return true;
@@ -1190,12 +1190,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         candidate = new RuntimeHazardCandidate(
             invocation,
             SymbolicRuntimeHazardKind.IndexOutOfRange,
-            CreateFormulaBackedExceptionPreconditionTrigger(
+            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 invocation,
                 SymbolicExceptionPreconditionKind.IndexOutOfRange,
                 null,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
-                "ir.runtime-hazard.array-get-value.index-out-of-range.fallback"),
+                "ir.runtime-hazard.array-get-value.index-out-of-range.translated"),
             ExceptionTypes.IndexOutOfRangeException,
             ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
         return true;
@@ -1328,7 +1328,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         bool allTriggersAreIr,
         string provenance)
     {
-        if (!allTriggersAreIr || triggerCondition == null) return new RuntimeHazardTrigger(triggerFormula);
+        if (!allTriggersAreIr || triggerCondition == null)
+            return CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+                site,
+                kind,
+                subject,
+                triggerFormula,
+                provenance + ".translated");
 
         var precondition = SymbolicFact.Exact(
             new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
@@ -1384,60 +1390,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         candidate = new RuntimeHazardCandidate(
             switchExpression,
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            CreateFormulaBackedExceptionPreconditionTrigger(
+            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 switchExpression,
                 SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
                 null,
                 trigger,
-                "ir.runtime-hazard.switch-expression.no-match"),
+                "ir.runtime-hazard.switch-expression.no-match.translated"),
             ExceptionTypes.SwitchExpressionException,
             ExceptionCategories.DefiniteSwitchExpressionNoMatch);
         return true;
-    }
-
-    private static RuntimeHazardTrigger CreateFormulaBackedExceptionPreconditionTrigger(
-        SyntaxNode site,
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SmtFormula triggerFormula,
-        string provenance)
-    {
-        if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                triggerFormula,
-                site,
-                provenance + ".trigger",
-                provenance + ".trigger",
-                out var triggerCondition))
-            return new RuntimeHazardTrigger(triggerFormula);
-
-        var precondition = SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-            site,
-            provenance);
-        return new RuntimeHazardTrigger(triggerFormula, precondition);
-    }
-
-    private static RuntimeHazardTrigger CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-        SyntaxNode site,
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SmtFormula triggerFormula,
-        string translatedProvenance,
-        string fallbackProvenance)
-    {
-        return TryCreateIrExceptionPreconditionTriggerFromFormula(
-            site,
-            kind,
-            triggerFormula,
-            translatedProvenance,
-            out var trigger)
-            ? trigger
-            : CreateFormulaBackedExceptionPreconditionTrigger(
-                site,
-                kind,
-                subject,
-                triggerFormula,
-                fallbackProvenance);
     }
 
     private static RuntimeHazardTrigger CreateTypedFormulaProjectionExceptionPreconditionTrigger(

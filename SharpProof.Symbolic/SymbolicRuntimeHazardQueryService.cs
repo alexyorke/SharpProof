@@ -484,9 +484,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (triggerPrecondition is { Confidence: SymbolicFactConfidence.Unsupported })
             return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_typed_projection", null);
 
-        if (IsFallbackDerivedTriggerPrecondition(triggerPrecondition))
-            return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_formula_fallback", null);
-
         if (triggerPrecondition != null &&
             TryClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis, out var irResult))
             return irResult;
@@ -506,14 +503,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return (SymbolicRuntimeHazardStatus.Unreachable, formulaTruth.Info.Reason, formulaTruth.Info);
 
         return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason, formulaTruth.Info);
-    }
-
-    private static bool IsFallbackDerivedTriggerPrecondition(SymbolicFact? triggerPrecondition)
-    {
-        if (triggerPrecondition == null) return false;
-
-        return triggerPrecondition.Provenance.EndsWith(".formula-fallback", StringComparison.Ordinal) ||
-               triggerPrecondition.Provenance.EndsWith(".fallback", StringComparison.Ordinal);
     }
 
     private static bool TryClassifyIrTrigger(
