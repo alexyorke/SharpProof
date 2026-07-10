@@ -15,6 +15,9 @@
     <GeneratedPurityGenerationStampPath Condition="'$(GeneratedPurityGenerationStampPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp</GeneratedPurityGenerationStampPath>
     <GeneratedPurityBuiltInSummaryStagingDirectory Condition="'$(GeneratedPurityBuiltInSummaryStagingDirectory)' == ''">$(GeneratedPurityBuiltInSummaryDirectory).staging</GeneratedPurityBuiltInSummaryStagingDirectory>
     <GeneratedPurityStagingArtifactSpecPath Condition="'$(GeneratedPurityStagingArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryStagingDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityStagingArtifactSpecPath>
+    <GeneratedPurityDependencyManifestDirectory Condition="'$(GeneratedPurityDependencyManifestDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)</GeneratedPurityDependencyManifestDirectory>
+    <GeneratedPurityInputManifestPath Condition="'$(GeneratedPurityInputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.inputs.txt</GeneratedPurityInputManifestPath>
+    <GeneratedPurityOutputManifestPath Condition="'$(GeneratedPurityOutputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.outputs.txt</GeneratedPurityOutputManifestPath>
     <SharpProofSkipGeneratedEffectSummaries Condition="'$(SharpProofSkipGeneratedEffectSummaries)' == ''">false</SharpProofSkipGeneratedEffectSummaries>
     <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
@@ -44,7 +47,6 @@
     <Compile Include="..\Shared\BclPurityFallbackHeuristics.cs" Link="Engine\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
-    <_GeneratedPuritySummaryOutputs Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.SharpProof.EffectSummary.json" />
   </ItemGroup>
   
   <Target Name="BuildBuiltInEffectSummaryTool"
@@ -54,12 +56,39 @@
              Properties="Configuration=$(Configuration)" />
   </Target>
 
+  <Target Name="ResolveBuiltInEffectSummaryDependencies"
+          DependsOnTargets="BuildBuiltInEffectSummaryTool"
+          Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'">
+    <MakeDir Directories="$(GeneratedPurityDependencyManifestDirectory)" />
+
+    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec-dependencies &quot;$(GeneratedPurityArtifactSpecSourcePath)&quot; --input-manifest &quot;$(GeneratedPurityInputManifestPath)&quot; --output-manifest &quot;$(GeneratedPurityOutputManifestPath)&quot; --dependency-output-root &quot;$(GeneratedPurityBuiltInSummaryDirectory)&quot;'
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="_SharpProofEffectSummaryDependencyExitCode" />
+    </Exec>
+
+    <Error Condition="'$(_SharpProofEffectSummaryDependencyExitCode)' != '0'"
+           Code="SPB0001"
+           Text="SharpProof could not resolve effect-summary dependencies from artifact spec '$(GeneratedPurityArtifactSpecSourcePath)' (exit code $(_SharpProofEffectSummaryDependencyExitCode)). Verify framework/runtime availability, package restore state, and artifact source paths." />
+
+    <ReadLinesFromFile File="$(GeneratedPurityInputManifestPath)">
+      <Output TaskParameter="Lines" ItemName="_GeneratedPuritySummaryInputs" />
+    </ReadLinesFromFile>
+    <ReadLinesFromFile File="$(GeneratedPurityOutputManifestPath)">
+      <Output TaskParameter="Lines" ItemName="_GeneratedPurityExpectedOutputs" />
+    </ReadLinesFromFile>
+
+    <Error Condition="'@(_GeneratedPuritySummaryInputs)' == '' or '@(_GeneratedPurityExpectedOutputs)' == ''"
+           Code="SPB0001"
+           Text="SharpProof effect-summary dependency resolution produced an empty input or output manifest. Check '$(GeneratedPurityInputManifestPath)' and '$(GeneratedPurityOutputManifestPath)'." />
+  </Target>
+
   <Target Name="GenerateBuiltInEffectSummaries"
           BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="BuildBuiltInEffectSummaryTool"
+          DependsOnTargets="ResolveBuiltInEffectSummaryDependencies"
           Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"
-          Inputs="$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"
-          Outputs="$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPuritySummaryOutputs)">
+          Inputs="$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath);$(GeneratedPurityInputManifestPath);$(GeneratedPurityOutputManifestPath);@(_GeneratedPuritySummaryInputs)"
+          Outputs="$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPurityExpectedOutputs)">
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)"
                Condition="Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')" />
     <MakeDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)" />
@@ -72,6 +101,7 @@
     </Exec>
 
     <Error Condition="'$(_SharpProofEffectSummaryExitCode)' != '0'"
+           Code="SPB0002"
            Text="SharpProof effect-summary generation failed with exit code $(_SharpProofEffectSummaryExitCode). Check artifact spec '$(GeneratedPurityStagingArtifactSpecPath)' and tool '$(GeneratedPurityToolDllPath)'. The previous generated summaries were left untouched." />
 
     <ItemGroup>
@@ -79,6 +109,7 @@
     </ItemGroup>
 
     <Error Condition="'@(_SharpProofStagedSummaryFiles)' == ''"
+           Code="SPB0003"
            Text="SharpProof effect-summary generation produced no summary resources from '$(GeneratedPurityStagingArtifactSpecPath)'. The previous generated summaries were left untouched." />
 
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
@@ -87,6 +118,7 @@
 
     <Copy SourceFiles="$(GeneratedPurityStagingArtifactSpecPath)"
           DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
+    <Touch Files="$(GeneratedPurityArtifactSpecPath)" />
 
     <Copy SourceFiles="@(_SharpProofStagedSummaryFiles)"
           DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)" />

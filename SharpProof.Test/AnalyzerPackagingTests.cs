@@ -285,6 +285,34 @@ namespace TestNamespace {
             generatedSummaryStagingSpecPath,
             Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryStagingDirectory)\BuiltInEffectSummaryArtifactSpec.json"));
 
+        var dependencyManifestDirectory = document
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityDependencyManifestDirectory",
+                StringComparison.Ordinal))
+            .Select(element => element.Value.Trim())
+            .LastOrDefault();
+        Assert.That(
+            dependencyManifestDirectory,
+            Is.EqualTo(@"$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)"));
+        var inputManifestPath = document
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityInputManifestPath",
+                StringComparison.Ordinal))
+            .Select(element => element.Value.Trim())
+            .LastOrDefault();
+        Assert.That(
+            inputManifestPath,
+            Is.EqualTo(@"$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.inputs.txt"));
+        var outputManifestPath = document
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityOutputManifestPath",
+                StringComparison.Ordinal))
+            .Select(element => element.Value.Trim())
+            .LastOrDefault();
+        Assert.That(
+            outputManifestPath,
+            Is.EqualTo(@"$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.outputs.txt"));
+
         var skipGeneratedEffectSummaries = document
             .Descendants()
             .Where(element => string.Equals(element.Name.LocalName, "SharpProofSkipGeneratedEffectSummaries",
@@ -311,6 +339,45 @@ namespace TestNamespace {
             buildTarget.Attribute("Condition")?.Value,
             Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
 
+        var dependencyTarget = document
+            .Descendants()
+            .Single(element =>
+                string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
+                string.Equals(element.Attribute("Name")?.Value, "ResolveBuiltInEffectSummaryDependencies",
+                    StringComparison.Ordinal));
+        Assert.That(dependencyTarget.Attribute("DependsOnTargets")?.Value,
+            Is.EqualTo("BuildBuiltInEffectSummaryTool"));
+        Assert.That(
+            dependencyTarget.Attribute("Condition")?.Value,
+            Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
+        var dependencyExec = dependencyTarget
+            .Descendants()
+            .Single(element => string.Equals(element.Name.LocalName, "Exec", StringComparison.Ordinal));
+        Assert.That(
+            dependencyExec.Attribute("Command")?.Value,
+            Is.EqualTo(
+                "dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec-dependencies \"$(GeneratedPurityArtifactSpecSourcePath)\" --input-manifest \"$(GeneratedPurityInputManifestPath)\" --output-manifest \"$(GeneratedPurityOutputManifestPath)\" --dependency-output-root \"$(GeneratedPurityBuiltInSummaryDirectory)\""));
+        Assert.That(dependencyExec.Attribute("IgnoreExitCode")?.Value, Is.EqualTo("true"));
+        Assert.That(dependencyExec.Attribute("ConsoleToMSBuild")?.Value, Is.EqualTo("true"));
+        var dependencyReads = dependencyTarget
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "ReadLinesFromFile", StringComparison.Ordinal))
+            .ToArray();
+        Assert.That(dependencyReads, Has.Length.EqualTo(2));
+        Assert.That(dependencyReads[0].Attribute("File")?.Value,
+            Is.EqualTo("$(GeneratedPurityInputManifestPath)"));
+        Assert.That(dependencyReads[1].Attribute("File")?.Value,
+            Is.EqualTo("$(GeneratedPurityOutputManifestPath)"));
+        var dependencyErrors = dependencyTarget
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "Error", StringComparison.Ordinal))
+            .ToArray();
+        Assert.That(dependencyErrors, Has.Length.EqualTo(2));
+        Assert.That(dependencyErrors.Select(error => error.Attribute("Code")?.Value),
+            Is.EqualTo(new[] { "SPB0001", "SPB0001" }));
+        Assert.That(dependencyErrors[0].Attribute("Text")?.Value,
+            Does.Contain("framework/runtime availability, package restore state, and artifact source paths"));
+
         var stageTarget = document
             .Descendants()
             .Single(element =>
@@ -318,17 +385,19 @@ namespace TestNamespace {
                 string.Equals(element.Attribute("Name")?.Value, "GenerateBuiltInEffectSummaries",
                     StringComparison.Ordinal));
         Assert.That(stageTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
-        Assert.That(stageTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("BuildBuiltInEffectSummaryTool"));
+        Assert.That(stageTarget.Attribute("DependsOnTargets")?.Value,
+            Is.EqualTo("ResolveBuiltInEffectSummaryDependencies"));
         Assert.That(
             stageTarget.Attribute("Condition")?.Value,
             Is.EqualTo("'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"));
         Assert.That(
             stageTarget.Attribute("Inputs")?.Value,
-            Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"));
+            Is.EqualTo(
+                "$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath);$(GeneratedPurityInputManifestPath);$(GeneratedPurityOutputManifestPath);@(_GeneratedPuritySummaryInputs)"));
         Assert.That(
             stageTarget.Attribute("Outputs")?.Value,
             Is.EqualTo(
-                "$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPuritySummaryOutputs)"));
+                "$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPurityExpectedOutputs)"));
 
         var stageCopies = stageTarget
             .Descendants()
@@ -346,6 +415,12 @@ namespace TestNamespace {
         Assert.That(stageCopies[2].Attribute("SourceFiles")?.Value, Is.EqualTo("@(_SharpProofStagedSummaryFiles)"));
         Assert.That(stageCopies[2].Attribute("DestinationFolder")?.Value,
             Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+
+        var artifactSpecTouch = stageTarget
+            .Descendants()
+            .Single(element => string.Equals(element.Name.LocalName, "Touch", StringComparison.Ordinal));
+        Assert.That(artifactSpecTouch.Attribute("Files")?.Value,
+            Is.EqualTo("$(GeneratedPurityArtifactSpecPath)"));
 
         var stageRemovals = stageTarget
             .Descendants()
@@ -406,12 +481,14 @@ namespace TestNamespace {
         Assert.That(stageErrors, Has.Length.EqualTo(2));
         Assert.That(stageErrors[0].Attribute("Condition")?.Value,
             Is.EqualTo("'$(_SharpProofEffectSummaryExitCode)' != '0'"));
+        Assert.That(stageErrors[0].Attribute("Code")?.Value, Is.EqualTo("SPB0002"));
         Assert.That(stageErrors[0].Attribute("Text")?.Value,
             Does.Contain("SharpProof effect-summary generation failed"));
         Assert.That(stageErrors[0].Attribute("Text")?.Value,
             Does.Contain("previous generated summaries were left untouched"));
         Assert.That(stageErrors[1].Attribute("Condition")?.Value,
             Is.EqualTo("'@(_SharpProofStagedSummaryFiles)' == ''"));
+        Assert.That(stageErrors[1].Attribute("Code")?.Value, Is.EqualTo("SPB0003"));
         Assert.That(stageErrors[1].Attribute("Text")?.Value, Does.Contain("produced no summary resources"));
 
         var stampWrite = stageTarget
