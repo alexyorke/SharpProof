@@ -65,7 +65,16 @@ internal static class SmtPathConditionMerger
             foreach (var factChoices in EnumerateFactChoices(stateFacts, target, options))
             {
                 combinationCount++;
-                if (combinationCount > options.MaxFactChoiceCombinationsPerTarget) break;
+                if (combinationCount > options.MaxFactChoiceCombinationsPerTarget)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget,
+                        options.MaxFactChoiceCombinationsPerTarget,
+                        combinationCount,
+                        null,
+                        "state_merge.fact_choice_combinations");
+                    break;
+                }
 
                 if (factChoices.Select(static fact => fact.FactKey).Distinct(StringComparer.Ordinal).Count() ==
                     1) continue;
@@ -74,9 +83,19 @@ internal static class SmtPathConditionMerger
                 var mergedKey = GetFormulaKey(mergedFact);
                 if (!existingKeys.Add(mergedKey)) continue;
 
+                if (emittedCount >= options.MaxMergedPathConditions)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.MergedPathConditions,
+                        options.MaxMergedPathConditions,
+                        emittedCount + 1,
+                        null,
+                        "state_merge.merged_path_conditions");
+                    return;
+                }
+
                 builder.Add(mergedFact);
                 emittedCount++;
-                if (emittedCount >= options.MaxMergedPathConditions) return;
             }
         }
     }
@@ -199,6 +218,14 @@ internal static class SmtPathConditionMerger
                 static kvp => kvp.Key,
                 static kvp => kvp.Value.ToArray(),
                 StringComparer.Ordinal);
+            foreach (var pair in FactsByTarget)
+                if (pair.Value.Length > options.MaxFactsPerTargetPerState)
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState,
+                        options.MaxFactsPerTargetPerState,
+                        pair.Value.Length,
+                        null,
+                        "state_merge.facts_per_target_per_state");
         }
 
         internal IReadOnlyDictionary<string, MergeablePathFact[]> FactsByTarget { get; }
@@ -213,9 +240,19 @@ internal static class SmtPathConditionMerger
             {
                 if (string.Equals(fact.TargetKey, targetKey, StringComparison.Ordinal)) continue;
 
+                if (guardFactCount >= options.MaxGuardFactsPerTargetPerState)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState,
+                        options.MaxGuardFactsPerTargetPerState,
+                        guardFactCount + 1,
+                        null,
+                        "state_merge.guard_facts_per_target_per_state");
+                    break;
+                }
+
                 conditions.Add(fact.Formula);
                 guardFactCount++;
-                if (guardFactCount >= options.MaxGuardFactsPerTargetPerState) break;
             }
 
             return CreateConjunction(conditions);

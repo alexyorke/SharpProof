@@ -1,6 +1,9 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -92,6 +95,54 @@ public sealed class SymbolicAnalysisLimitsTests
             {
                 "analysis_limit.if_else_fact_merge",
                 "analysis_limit.foreach_element_facts"
+            }));
+    }
+
+    [Test]
+    public void PathConditionMerger_ReportsEveryStateMergeCap()
+    {
+        static SmtFormula Equal(string name, int value)
+        {
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable(name, SmtValueKind.Int),
+                new SmtIntegerConstant(value));
+        }
+
+        var first = ImmutableArray.Create(
+            Equal("x", 1),
+            Equal("x", 2),
+            Equal("x", 3),
+            Equal("y", 10),
+            Equal("y", 11),
+            Equal("y", 12));
+        var second = ImmutableArray.Create(
+            Equal("x", 4),
+            Equal("x", 5),
+            Equal("x", 6),
+            Equal("y", 13),
+            Equal("y", 14),
+            Equal("y", 15));
+
+        using var scope = SymbolicAnalysisLimitContext.Push();
+        var merged = SmtPathConditionMerger.MergeAcrossAll(
+            new[] { first, second },
+            new SmtPathConditionMergeOptions(
+                maxMergedPathConditions: 1,
+                maxFactsPerTargetPerState: 2,
+                maxFactChoiceCombinationsPerTarget: 1,
+                maxGuardFactsPerTargetPerState: 1));
+        var info = scope.Snapshot();
+
+        Assert.That(merged, Has.Length.EqualTo(1));
+        Assert.That(
+            info.Events.Select(item => item.Kind),
+            Is.EquivalentTo(new[]
+            {
+                SymbolicAnalysisLimitKind.MergedPathConditions,
+                SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState,
+                SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget,
+                SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState
             }));
     }
 }

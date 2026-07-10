@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SearchLib.Smt;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
@@ -9,17 +10,6 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
-    private const int MaxMergedStatePathConditions = 32;
-    private const int MaxMergeableFactsPerTargetPerState = 4;
-    private const int MaxMergedStateFactChoiceCombinationsPerTarget = 64;
-    private const int MaxMergedStateGuardFactsPerTargetPerState = 6;
-
-    private static readonly SmtPathConditionMergeOptions MergedStatePathConditionMergeOptions = new(
-        MaxMergedStatePathConditions,
-        MaxMergeableFactsPerTargetPerState,
-        MaxMergedStateFactChoiceCombinationsPerTarget,
-        MaxMergedStateGuardFactsPerTargetPerState);
-
     private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsFromBlockStates(
         IEnumerable<PurityAnalysisState> states)
     {
@@ -158,7 +148,14 @@ internal partial class PurityAnalysisEngine
             .ToArray();
         if (sets.Length == 0) return ImmutableArray<SmtFormula>.Empty;
 
-        return SmtPathConditionMerger.MergeAcrossAll(sets, MergedStatePathConditionMergeOptions);
+        var limits = SymbolicAnalysisLimitContext.Limits;
+        return SmtPathConditionMerger.MergeAcrossAll(
+            sets,
+            new SmtPathConditionMergeOptions(
+                limits.MaxMergedPathConditions,
+                limits.MaxMergeableFactsPerTargetPerState,
+                limits.MaxFactChoiceCombinationsPerTarget,
+                limits.MaxGuardFactsPerTargetPerState));
     }
 
     private static SymbolicState MergePathStatesAcrossAll(IReadOnlyList<PurityAnalysisState> states)
