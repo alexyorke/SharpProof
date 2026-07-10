@@ -1412,7 +1412,9 @@ public class TestClass
         Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
         Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
         Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("copy > 0"));
-        Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("!(copy > 0)"));
+        Assert.That(
+            result.InvariantQuery.MaybeFacts.Any(static fact => fact is "!(copy > 0)" or "copy <= 0"),
+            Is.True);
         Assert.That(result.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
         Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
 
