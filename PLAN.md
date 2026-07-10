@@ -53,8 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Add a public proof/evidence schema version and compatibility policy for
-  compact JSON, diagnostic properties, effect summaries, and baseline entries.
 - Add a standalone source-query compilation profile for non-MSBuild API and CLI
   calls, covering language version, preprocessor symbols, nullable context,
   unsafe allowance, documentation mode, platform, optimization, and assembly
