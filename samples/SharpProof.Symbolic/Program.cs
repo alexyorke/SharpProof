@@ -19,4 +19,4 @@ var request = new SymbolicQueryRequest(
 var result = new SymbolicQueryService().Query(request);
 
 Console.WriteLine($"Program points: {result.ProgramPointCount}");
-Console.WriteLine($"Invariant: {result.InvariantInfo.MergedInvariantText}");
+Console.WriteLine($"Invariant: {result.InvariantInfo.MergedText}");

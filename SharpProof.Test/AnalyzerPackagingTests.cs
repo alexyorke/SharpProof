@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +15,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -1148,6 +1150,208 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void SymbolicPackage_ShouldDeclareSupportedPublicContract()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var projectPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj");
+        var baselinePath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PackageBaseline.json");
+        var project = XDocument.Load(projectPath);
+        using var baseline = JsonDocument.Parse(File.ReadAllText(baselinePath));
+        var baselineRoot = baseline.RootElement;
+        var properties = project
+            .Descendants()
+            .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
+            .GroupBy(element => element.Name.LocalName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last().Value.Trim(), StringComparer.Ordinal);
+
+        Assert.That(baselineRoot.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(properties["PackageId"], Is.EqualTo(baselineRoot.GetProperty("packageId").GetString()));
+        Assert.That(properties["Version"], Is.EqualTo(baselineRoot.GetProperty("packageVersion").GetString()));
+        Assert.That(properties["TargetFramework"],
+            Is.EqualTo(baselineRoot.GetProperty("targetFramework").GetString()));
+        Assert.That(properties["IsPackable"], Is.EqualTo("true"));
+        Assert.That(properties["GeneratePackageOnBuild"], Is.EqualTo("true"));
+        Assert.That(properties["GenerateDocumentationFile"], Is.EqualTo("true"));
+        Assert.That(properties["Nullable"], Is.EqualTo("enable"));
+        Assert.That(properties["DebugType"], Is.EqualTo("portable"));
+        Assert.That(properties["PublishRepositoryUrl"], Is.EqualTo("true"));
+        Assert.That(properties["EmbedUntrackedSources"], Is.EqualTo("true"));
+        Assert.That(properties["PackageReadmeFile"], Is.EqualTo("README.md"));
+        Assert.That(properties["PackageLicenseExpression"], Is.EqualTo("MIT"));
+        Assert.That(properties["AllowedOutputExtensionsInPackageBuildOutputFolder"], Does.Contain(".pdb"));
+
+        var packageReferences = project.Descendants()
+            .Where(element => element.Name.LocalName == "PackageReference")
+            .ToDictionary(
+                element => element.Attribute("Include")!.Value,
+                element => element,
+                StringComparer.Ordinal);
+        Assert.That(packageReferences, Does.ContainKey("Microsoft.CodeAnalysis.PublicApiAnalyzers"));
+        Assert.That(packageReferences["Microsoft.CodeAnalysis.PublicApiAnalyzers"].Attribute("PrivateAssets")?.Value,
+            Is.EqualTo("all"));
+        Assert.That(packageReferences, Does.ContainKey("Microsoft.Z3"));
+
+        var searchLibReference = project.Descendants()
+            .Single(element =>
+                element.Name.LocalName == "ProjectReference" &&
+                element.Attribute("Include")?.Value.EndsWith("SearchLib\\SearchLib.csproj",
+                    StringComparison.Ordinal) == true);
+        Assert.That(searchLibReference.Attribute("PrivateAssets")?.Value, Is.EqualTo("all"));
+
+        var additionalFiles = project.Descendants()
+            .Where(element => element.Name.LocalName == "AdditionalFiles")
+            .Select(element => element.Attribute("Include")?.Value)
+            .ToArray();
+        Assert.That(additionalFiles, Does.Contain("PublicAPI.Shipped.txt"));
+        Assert.That(additionalFiles, Does.Contain("PublicAPI.Unshipped.txt"));
+
+        var shippedApiPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PublicAPI.Shipped.txt");
+        var unshippedApiPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PublicAPI.Unshipped.txt");
+        var shippedApi = File.ReadAllLines(shippedApiPath);
+        Assert.That(shippedApi.FirstOrDefault(), Is.EqualTo("#nullable enable"));
+        Assert.That(shippedApi, Has.Length.GreaterThan(100));
+        Assert.That(File.ReadAllLines(unshippedApiPath), Is.EqualTo(new[] { "#nullable enable" }));
+
+        var nullableProperty = typeof(SymbolicSourceInput).GetProperty(nameof(SymbolicSourceInput.FilePath));
+        Assert.That(nullableProperty, Is.Not.Null);
+        Assert.That(new NullabilityInfoContext().Create(nullableProperty!).ReadState,
+            Is.EqualTo(NullabilityState.Nullable));
+    }
+
+    [Test]
+    public void BuiltSymbolicPackage_ShouldMatchPackageBaseline_WhenPackageExists()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var baselinePath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PackageBaseline.json");
+        using var baseline = JsonDocument.Parse(File.ReadAllText(baselinePath));
+        var baselineRoot = baseline.RootElement;
+        var packageId = baselineRoot.GetProperty("packageId").GetString()!;
+        var packageVersion = baselineRoot.GetProperty("packageVersion").GetString()!;
+        var packagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            $"{packageId}.{packageVersion}.nupkg");
+        if (packagePath == null)
+            Assert.Inconclusive("Build the symbolic package before verifying its compatibility baseline.");
+
+        using var archive = ZipFile.OpenRead(packagePath!);
+        var entryNames = archive.Entries
+            .Select(entry => entry.FullName.Replace('\\', '/'))
+            .ToArray();
+        var expectedEntries = baselineRoot.GetProperty("requiredEntries")
+            .EnumerateArray()
+            .Select(entry => entry.GetString())
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Cast<string>()
+            .ToArray();
+        Assert.That(entryNames, Is.SupersetOf(expectedEntries));
+
+        var nuspecEntry = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(".nuspec", StringComparison.Ordinal));
+        using var nuspecStream = nuspecEntry.Open();
+        var nuspec = XDocument.Load(nuspecStream);
+        string MetadataValue(string name) => nuspec.Descendants()
+            .Single(element => element.Name.LocalName == name)
+            .Value.Trim();
+
+        Assert.That(MetadataValue("id"), Is.EqualTo(packageId));
+        Assert.That(MetadataValue("version"), Is.EqualTo(packageVersion));
+
+        var expectedDependencies = baselineRoot.GetProperty("dependencies")
+            .EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value.GetString()!, StringComparer.Ordinal);
+        var actualDependencies = nuspec.Descendants()
+            .Where(element => element.Name.LocalName == "dependency")
+            .ToDictionary(
+                element => element.Attribute("id")!.Value,
+                element => element.Attribute("version")!.Value,
+                StringComparer.Ordinal);
+        Assert.That(actualDependencies, Has.Count.EqualTo(expectedDependencies.Count));
+        foreach (var expectedDependency in expectedDependencies)
+        {
+            Assert.That(actualDependencies, Does.ContainKey(expectedDependency.Key));
+            Assert.That(actualDependencies[expectedDependency.Key], Is.EqualTo(expectedDependency.Value));
+        }
+    }
+
+    [Test]
+    public void BuiltSymbolicPackage_ShouldContainPortableSourceLinkedSymbols_WhenPackageExists()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var packageVersion = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj"),
+            "Version");
+        var packagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            $"SharpProof.Symbolic.{packageVersion}.nupkg");
+        if (packagePath == null)
+            Assert.Inconclusive("Build the symbolic package before verifying Source Link metadata.");
+
+        using var archive = ZipFile.OpenRead(packagePath!);
+        var pdbEntry = archive.GetEntry("lib/netstandard2.0/SharpProof.Symbolic.pdb");
+        Assert.That(pdbEntry, Is.Not.Null);
+        using var pdb = new MemoryStream();
+        using (var pdbEntryStream = pdbEntry!.Open()) pdbEntryStream.CopyTo(pdb);
+        pdb.Position = 0;
+
+        using var provider = MetadataReaderProvider.FromPortablePdbStream(pdb, MetadataStreamOptions.LeaveOpen);
+        var reader = provider.GetMetadataReader();
+        var sourceLinkKind = new Guid("CC110556-A091-4D38-9FEC-25AB9A351A6A");
+        var sourceLinkHandles = reader.CustomDebugInformation
+            .Where(handle =>
+            {
+                var information = reader.GetCustomDebugInformation(handle);
+                return reader.GetGuid(information.Kind) == sourceLinkKind;
+            })
+            .ToArray();
+        Assert.That(sourceLinkHandles, Has.Length.EqualTo(1));
+
+        var sourceLink = reader.GetCustomDebugInformation(sourceLinkHandles[0]);
+        var sourceLinkJson = Encoding.UTF8.GetString(reader.GetBlobBytes(sourceLink.Value));
+        using var sourceLinkDocument = JsonDocument.Parse(sourceLinkJson);
+        var mappings = sourceLinkDocument.RootElement.GetProperty("documents")
+            .EnumerateObject()
+            .ToArray();
+        Assert.That(mappings, Is.Not.Empty);
+        Assert.That(mappings.Select(mapping => mapping.Value.GetString()),
+            Has.Some.StartsWith("https://raw.githubusercontent.com/alexyorke/SharpProof/"));
+    }
+
+    [Test]
+    public async Task BuiltSymbolicPackage_WhenConsumedByDisposableConsole_RunsPackagedSample_WhenPackageExists()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var packageVersion = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj"),
+            "Version");
+        var packagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            $"SharpProof.Symbolic.{packageVersion}.nupkg");
+        if (packagePath == null)
+            Assert.Inconclusive("Build the symbolic package before verifying external package consumption.");
+
+        string sampleSource;
+        using (var archive = ZipFile.OpenRead(packagePath!))
+        {
+            var sampleEntry = archive.GetEntry("samples/SharpProof.Symbolic/Program.cs");
+            Assert.That(sampleEntry, Is.Not.Null);
+            using var reader = new StreamReader(sampleEntry!.Open(), Encoding.UTF8);
+            sampleSource = await reader.ReadToEndAsync().ConfigureAwait(false);
+        }
+
+        var runResult = await RunDisposablePackageConsoleAsync(
+            "SharpProof.Symbolic",
+            packageVersion,
+            Path.GetDirectoryName(packagePath!)!,
+            sampleSource).ConfigureAwait(false);
+        Assert.That(runResult.ExitCode, Is.EqualTo(0), runResult.Output);
+        Assert.That(runResult.Output, Does.Contain("Program points:"));
+        Assert.That(runResult.Output, Does.Contain("Invariant:"));
+    }
+
+    [Test]
     public void SymbolicCli_ShouldUseSymbolicLibrary_NotAnalyzerProject()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -1653,6 +1857,70 @@ namespace TestNamespace {
                 "--no-restore",
                 "/warnaserror:SP0032",
                 "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+        }
+        finally
+        {
+            if (Directory.Exists(probeRoot)) Directory.Delete(probeRoot, true);
+        }
+    }
+
+    private static async Task<ProcessResult> RunDisposablePackageConsoleAsync(
+        string packageId,
+        string packageVersion,
+        string packageSource,
+        string source)
+    {
+        var probeRoot = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "symbolic-package-consumer-" + Guid.NewGuid().ToString("N"));
+        var packageCache = Path.Combine(probeRoot, ".nuget");
+
+        Directory.CreateDirectory(probeRoot);
+        try
+        {
+            var nugetConfig = new XDocument(
+                new XElement("configuration",
+                    new XElement("packageSources",
+                        new XElement("clear"),
+                        new XElement("add",
+                            new XAttribute("key", "local-symbolic-package"),
+                            new XAttribute("value", packageSource)),
+                        new XElement("add",
+                            new XAttribute("key", "nuget.org"),
+                            new XAttribute("value", "https://api.nuget.org/v3/index.json")))));
+            nugetConfig.Save(Path.Combine(probeRoot, "NuGet.Config"));
+
+            var newResult = await RunDotnetAsync(
+                probeRoot,
+                packageCache,
+                "new",
+                "console",
+                "--framework",
+                "net8.0",
+                "--name",
+                "Probe").ConfigureAwait(false);
+            Assert.That(newResult.ExitCode, Is.EqualTo(0), newResult.Output);
+
+            var projectDirectory = Path.Combine(probeRoot, "Probe");
+            var addPackageResult = await RunDotnetAsync(
+                projectDirectory,
+                packageCache,
+                "add",
+                "package",
+                packageId,
+                "--version",
+                packageVersion).ConfigureAwait(false);
+            Assert.That(addPackageResult.ExitCode, Is.EqualTo(0), addPackageResult.Output);
+
+            File.WriteAllText(
+                Path.Combine(projectDirectory, "Program.cs"),
+                source,
+                new UTF8Encoding(false));
+            return await RunDotnetAsync(
+                projectDirectory,
+                packageCache,
+                "run",
+                "--no-restore").ConfigureAwait(false);
         }
         finally
         {
