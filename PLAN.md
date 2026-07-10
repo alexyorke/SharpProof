@@ -53,13 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Add solver-model witness and input-domain synthesis for point, line, span,
-  all-lines, implication, reachability, and runtime-hazard queries. Expose
-  satisfying assignments and conservative domain summaries for parameters,
-  locals, receiver state, integers/ranges, nullness, string length/content,
-  regex or prefix/suffix predicates, collection lengths, and indexes, with
-  explicit unsupported or approximate markers so users can ask what inputs
-  reach a line or trigger a specific hazard.
 - Add stable unknown-reason taxonomies for capability, complexity, runtime
   hazard, purity, and `[Ensures]` results so users can distinguish unsupported
   syntax, unsupported library modeling, solver budget, timeout, cancellation,
