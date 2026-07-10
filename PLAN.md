@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Move CLI-only compact projections for capability, complexity, runtime-hazard,
-  and future `explain` results into `SharpProof.Symbolic` public DTOs with
-  shared schema tests, instead of keeping invariant compact output in the
-  library and other compact shapes as internal CLI classes.
 - Add solver-model witness and input-domain synthesis for point, line, span,
   all-lines, implication, reachability, and runtime-hazard queries. Expose
   satisfying assignments and conservative domain summaries for parameters,
