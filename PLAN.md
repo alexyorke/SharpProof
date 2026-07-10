@@ -53,11 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Make bounded-analysis truncation observable and configurable where it affects
-  proof quality: path-condition merges, if/switch/try fact merges, foreach
-  element facts, structural null-state depth, and state-merge fact caps should
-  emit proof evidence or diagnostics when limits are hit instead of silently
-  losing facts.
 - Add SMT solver lifecycle and health controls for long-running analyzer hosts:
   reset or retry after transient Z3 failures, expose when a service has become
   permanently unavailable, and provide an intentional way to dispose or recycle
