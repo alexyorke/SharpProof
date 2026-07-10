@@ -254,7 +254,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 "System.Math",
                 StringComparison.Ordinal) ||
             operation.TargetMethod.Parameters.Length != 1 ||
-            !TryGetCheckedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
+            !TryGetBoundedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
             minValue >= 0 ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var operand) ||
             !TryCreateCheckedEqualityOverflowTrigger(

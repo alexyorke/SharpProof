@@ -2029,6 +2029,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownStaticValueMember("));
         Assert.That(knownApiSource, Does.Contain("KnownApiLowerings ="));
         Assert.That(knownApiSource, Does.Contain("KnownApiTermLowerings"));
+        Assert.That(knownApiSource, Does.Contain("\"System.Math\""));
+        Assert.That(knownApiSource, Does.Contain("TryLowerIntegralMathMinMaxInvocation"));
+        Assert.That(knownApiSource, Does.Contain("TryLowerIntegralMathAbsInvocation"));
+        Assert.That(knownApiSource, Does.Contain("TryLowerIntegralMathClampInvocation"));
         Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocation("));
         Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocationTerm("));
         Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownStaticValueMember("));
@@ -2939,9 +2943,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(
             symbolicTranslatorShimFamilyCounts,
             Is.Empty);
-        Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("irKnownApiLoweringCount").GetInt32(), Is.GreaterThanOrEqualTo(17));
         Assert.That(root.GetProperty("irKnownApiConditionLoweringCount").GetInt32(), Is.GreaterThan(0));
-        Assert.That(root.GetProperty("irKnownApiTermLoweringCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("irKnownApiTermLoweringCount").GetInt32(), Is.GreaterThanOrEqualTo(9));
         Assert.That(
             root.GetProperty("irKnownApiLoweringLocations")
                 .EnumerateArray()

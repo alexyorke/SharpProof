@@ -814,6 +814,71 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
+    public void KnownApiLowering_IntegralMathClampWithOrderedBoundsUsesTypedConditionalTerm()
+    {
+        var context = CreateExpressionContext(
+            "int value",
+            "System.Math.Clamp(value, 0, 10) >= 0");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+        var belowMin = (SymbolicConditionalTerm)term;
+
+        Assert.That(
+            AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition).Operator,
+            Is.EqualTo(SymbolicRelationOperator.LessThan));
+        Assert.That(belowMin.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+        Assert.That(belowMin.WhenFalse, Is.TypeOf<SymbolicConditionalTerm>());
+        var aboveMax = (SymbolicConditionalTerm)belowMin.WhenFalse;
+        Assert.That(
+            AssertFactCondition<SymbolicRelationAtom>(aboveMax.Condition).Operator,
+            Is.EqualTo(SymbolicRelationOperator.GreaterThan));
+        Assert.That(aboveMax.WhenTrue, Is.EqualTo(new SymbolicIntegerConstantTerm(10)));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var formula), Is.True);
+        Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+    }
+
+    [Test]
+    public void KnownApiLowering_IntegralMathClampMapsNamedArgumentsByParameter()
+    {
+        var context = CreateExpressionContext(
+            "int value",
+            "System.Math.Clamp(max: 10, value: value, min: 0) >= 0");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        var belowMin = (SymbolicConditionalTerm)term;
+        var comparison = AssertFactCondition<SymbolicRelationAtom>(belowMin.Condition);
+
+        Assert.That(((SymbolicVariableTerm)comparison.Left).Name, Does.StartWith("value#"));
+        Assert.That(comparison.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(0)));
+    }
+
+    [TestCase("System.Math.Clamp(value, 10, 0) >= 0")]
+    [TestCase("System.Math.Clamp(value, min, max) >= 0")]
+    public void KnownApiLowering_IntegralMathClampWithUnprovenBoundsStaysOnLegacyPath(string expression)
+    {
+        var context = CreateExpressionContext(
+            "int value, int min, int max",
+            expression);
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
+    }
+
+    [Test]
+    public void KnownApiLowering_FloatingMathClampStaysOnLegacyPath()
+    {
+        var context = CreateExpressionContext(
+            "double value",
+            "System.Math.Clamp(value, 0.0, 10.0) >= 0.0");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
+    }
+
+    [Test]
     public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm()
     {
         var context = CreateExpressionContext(

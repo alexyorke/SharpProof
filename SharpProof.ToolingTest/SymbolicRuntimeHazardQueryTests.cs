@@ -3204,6 +3204,61 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesShortMathAbsMinimumOverflow()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public short TestMethod()
+    {
+        return Math.Abs(short.MinValue);
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return Math.Abs(short.MinValue);", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesConstantBoundMathClampIndexIsInRangeThroughIr()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int index)
+    {
+        var values = new int[11];
+        return values[Math.Clamp(index, 0, 10)];
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return values[Math.Clamp(index, 0, 10)];",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Provenance,
+            Is.EqualTo("ir.runtime-hazard.index.out-of-range"));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedIntegralOverflowCandidate()
     {
         const string source = @"

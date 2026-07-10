@@ -55,7 +55,11 @@ internal static partial class SymbolicIrLowerer
             new KnownApiTermLoweringDescriptor(
                 "System.Math",
                 nameof(Math.Abs),
-                TryLowerIntegralMathAbsInvocation));
+                TryLowerIntegralMathAbsInvocation),
+            new KnownApiTermLoweringDescriptor(
+                "System.Math",
+                "Clamp",
+                TryLowerIntegralMathClampInvocation));
 
     private static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,
