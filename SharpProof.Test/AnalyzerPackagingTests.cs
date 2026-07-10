@@ -1494,7 +1494,7 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void CiWorkflow_ShouldRun_AllTestLanes_AndPackBothNuGetPackages()
+    public void CiWorkflow_ShouldRun_AllTestLanes_AndPackAllNuGetPackages()
     {
         var workflowPath = Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml");
         var source = File.ReadAllText(workflowPath);
@@ -1506,7 +1506,23 @@ namespace TestNamespace {
         Assert.That(source,
             Does.Contain(
                 "dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs"));
+        Assert.That(source,
+            Does.Contain(
+                "dotnet pack SharpProof.Symbolic/SharpProof.Symbolic.csproj --configuration Release --no-build --output nupkgs"));
         Assert.That(source, Does.Contain("SharpProof.Attributes package"));
+        Assert.That(source, Does.Contain("SharpProof.Symbolic package"));
+        Assert.That(source, Does.Contain("SharpProof.Symbolic/PackageBaseline.json"));
+    }
+
+    [Test]
+    public void NuGetBuildScript_ShouldPackAllPublicPackages()
+    {
+        var scriptPath = Path.Combine(FindRepositoryRoot(), "build-nuget.ps1");
+        var source = File.ReadAllText(scriptPath);
+
+        Assert.That(source, Does.Contain(@".\SharpProof.Package\SharpProof.Package.csproj"));
+        Assert.That(source, Does.Contain(@".\SharpProof.Attributes\SharpProof.Attributes.csproj"));
+        Assert.That(source, Does.Contain(@".\SharpProof.Symbolic\SharpProof.Symbolic.csproj"));
     }
 
     private static string ReadPackageVersion(string projectPath, string elementName)

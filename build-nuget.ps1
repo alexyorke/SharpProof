@@ -35,6 +35,7 @@ try {
 	Write-Host "Packing NuGet packages to $outFull" -ForegroundColor Cyan
 	Invoke-DotnetInRepo @('pack', '.\SharpProof.Package\SharpProof.Package.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
 	Invoke-DotnetInRepo @('pack', '.\SharpProof.Attributes\SharpProof.Attributes.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
+	Invoke-DotnetInRepo @('pack', '.\SharpProof.Symbolic\SharpProof.Symbolic.csproj', '-c', $Configuration, '-o', $outFull, '--no-build')
 
 	$packages = Get-ChildItem -Path $outFull -Filter *.nupkg -File | Sort-Object Name
 	if (-not $packages -or $packages.Count -eq 0) {
@@ -54,4 +55,3 @@ try {
 finally {
 	Pop-Location
 }
-

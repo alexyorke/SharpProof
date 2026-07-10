@@ -56,14 +56,20 @@ jobs:
         run: |
           dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs
           dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs
+          dotnet pack SharpProof.Symbolic/SharpProof.Symbolic.csproj --configuration Release --no-build --output nupkgs
 
       - name: Validate NuGet package contents
         shell: pwsh
         run: |
           $analyzerPackages = @(Get-ChildItem nupkgs -Filter SharpProof.*.nupkg -File |
-            Where-Object { $_.Name -notlike "SharpProof.Attributes.*" } |
+            Where-Object {
+              $_.Name -notlike "SharpProof.Attributes.*" -and
+              $_.Name -notlike "SharpProof.Symbolic.*"
+            } |
             Sort-Object Name)
           $attributePackages = @(Get-ChildItem nupkgs -Filter SharpProof.Attributes.*.nupkg -File |
+            Sort-Object Name)
+          $symbolicPackages = @(Get-ChildItem nupkgs -Filter SharpProof.Symbolic.*.nupkg -File |
             Sort-Object Name)
 
           if ($analyzerPackages.Count -ne 1) {
@@ -74,6 +80,11 @@ jobs:
           if ($attributePackages.Count -ne 1) {
             $found = if ($attributePackages.Count -eq 0) { "<none>" } else { $attributePackages.Name -join ", " }
             throw "Expected exactly one SharpProof.Attributes package, found $($attributePackages.Count): $found"
+          }
+
+          if ($symbolicPackages.Count -ne 1) {
+            $found = if ($symbolicPackages.Count -eq 0) { "<none>" } else { $symbolicPackages.Name -join ", " }
+            throw "Expected exactly one SharpProof.Symbolic package, found $($symbolicPackages.Count): $found"
           }
 
           $package = $analyzerPackages[0]
@@ -103,6 +114,20 @@ jobs:
           foreach ($entry in $requiredAttributeEntries) {
             if ($attributesEntries -notcontains $entry) {
               throw "Package $($attributesPackage.Name) is missing required entry: $entry"
+            }
+          }
+
+          $symbolicBaseline = Get-Content SharpProof.Symbolic/PackageBaseline.json -Raw | ConvertFrom-Json
+          $symbolicPackage = $symbolicPackages[0]
+          $expectedSymbolicName = "$($symbolicBaseline.packageId).$($symbolicBaseline.packageVersion).nupkg"
+          if ($symbolicPackage.Name -ne $expectedSymbolicName) {
+            throw "Expected symbolic package $expectedSymbolicName, found $($symbolicPackage.Name)"
+          }
+
+          $symbolicEntries = tar -tf $symbolicPackage.FullName
+          foreach ($entry in $symbolicBaseline.requiredEntries) {
+            if ($symbolicEntries -notcontains $entry) {
+              throw "Package $($symbolicPackage.Name) is missing baseline entry: $entry"
             }
           }
 
