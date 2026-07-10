@@ -3445,7 +3445,7 @@ internal static class SymbolicReachabilityService
         formula = null!;
         var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
         if (operation is IInvocationOperation invocationOperation &&
-            NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod,
+            NullableFlowFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod,
                 out var methodParameterName) &&
             TryGetInvocationSourceExpression(invocationOperation, methodParameterName, out var invocationSource) &&
             TryCreateIrNotNullIfNotNullSourceReference(
@@ -3458,7 +3458,7 @@ internal static class SymbolicReachabilityService
             return true;
 
         if (operation is IPropertyReferenceOperation propertyReferenceOperation &&
-            NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property,
+            NullableFlowFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property,
                 out var propertyParameterName) &&
             TryGetPropertySourceExpression(propertyReferenceOperation, propertyParameterName, out var propertySource) &&
             TryCreateIrNotNullIfNotNullSourceReference(

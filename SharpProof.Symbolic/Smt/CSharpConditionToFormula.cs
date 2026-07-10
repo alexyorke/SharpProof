@@ -1062,7 +1062,7 @@ internal static partial class CSharpConditionToFormula
         formula = null!;
         var operation = semanticModel.GetOperation(resultExpression, cancellationToken);
         if (operation is IInvocationOperation invocationOperation &&
-            NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod,
+            NullableFlowFacts.TryGetNotNullIfNotNullParameterName(invocationOperation.TargetMethod,
                 out var methodParameterName) &&
             TryCreateNotNullIfNotNullInvocationSourceFormula(
                 invocationOperation,
@@ -1076,7 +1076,7 @@ internal static partial class CSharpConditionToFormula
             return true;
 
         if (operation is IPropertyReferenceOperation propertyReferenceOperation &&
-            NotNullIfNotNullFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property,
+            NullableFlowFacts.TryGetNotNullIfNotNullParameterName(propertyReferenceOperation.Property,
                 out var propertyParameterName) &&
             TryCreateNotNullIfNotNullPropertySourceFormula(
                 propertyReferenceOperation,
