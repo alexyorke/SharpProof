@@ -68,6 +68,10 @@ public sealed class ProjectAnalysisContextTests
         Assert.That(context.SmtOptions.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
         Assert.That(context.SmtOptions.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(1234)));
         Assert.That(context.AnalysisLimits.MaxMergedIfElseFacts, Is.EqualTo(17));
+        Assert.That(context.SymbolicContext.Configuration.SmtOptions, Is.EqualTo(context.SmtOptions));
+        Assert.That(
+            context.SymbolicContext.CreateQueryOptions().AnalysisLimits,
+            Is.EqualTo(context.AnalysisLimits));
         Assert.That(context.HasBaseline, Is.True);
         Assert.That(context.EffectSummaryFileCount, Is.EqualTo(1));
         Assert.That(context.AnalyzerConfigPaths, Has.Count.EqualTo(1));

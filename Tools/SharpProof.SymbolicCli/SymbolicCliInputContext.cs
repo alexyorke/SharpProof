@@ -91,10 +91,22 @@ internal sealed class SymbolicCliInputContext : IDisposable
                 context,
                 workspaceDiagnostics.ToImmutable());
         }
-        catch
+        catch (OperationCanceledException)
         {
             workspace.Dispose();
             throw;
+        }
+        catch (ArgumentException)
+        {
+            workspace.Dispose();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            workspace.Dispose();
+            throw new ArgumentException(
+                "Could not load the MSBuild project context: " + exception.Message,
+                exception);
         }
     }
 

@@ -1136,6 +1136,8 @@ internal sealed class SymbolicCliOptions
 
                                 Examples:
                                   SharpProof.SymbolicCli explain --file Example.cs --line 42 --implies "index >= 0"
+                                  SharpProof.SymbolicCli explain --project Example.csproj --file src/Example.cs --line 42
+                                  SharpProof.SymbolicCli explain --solution Example.sln --project-name Example --file src/Example.cs --line 42
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
                                   SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards

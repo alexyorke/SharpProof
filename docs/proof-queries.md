@@ -30,6 +30,12 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability --implies "value > 0"
 ```
 
+When the source belongs to a restored project, add `--project` or `--solution`
+so references, compiler settings, analyzer configuration, baselines, and effect
+summaries come from the build. In project-aware `explain`, SharpProof also runs
+the analyzer and prints the diagnostics that survive configured severity and
+baseline suppression. See [project-aware proof queries](project-aware-queries.md).
+
 ## .NET API Workflow
 
 Install the supported public library package:
@@ -44,6 +50,11 @@ Use `SymbolicQueryService` as the public entrypoint:
 - `QueryRuntimeHazards(...)` for bounded runtime-hazard candidates
 - `QueryCapabilities(...)` for method capability summaries
 - `QueryComplexity(...)` for conservative method complexity
+
+For a compilation loaded by a Roslyn workspace, use
+`SymbolicProjectQueryContext`. It creates a source input over the existing
+project compilation and decodes the same global SMT and bounded-analysis
+options used by the analyzer.
 
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
 and unknown reasons. Raw SMT terms are not the primary public abstraction.

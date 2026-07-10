@@ -140,6 +140,10 @@ context recycling. Unsupported or over-budget proof obligations remain
 conservative. See [SMT lifecycle and health](smt-lifecycle.md) for recovery and
 cleanup behavior.
 
+Project-aware CLI and API queries preserve the build's references, parse and
+compilation options, analyzer configuration, baselines, and effect-summary
+AdditionalFiles. See [project-aware proof queries](project-aware-queries.md).
+
 Scope is explicit:
 
 - Global-only keys are read once per compilation. Set them in a global

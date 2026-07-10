@@ -2775,6 +2775,10 @@ public class TestClass
             sourcePath,
             "--project",
             projectPath,
+            "--configuration",
+            "Debug",
+            "--framework",
+            "net8.0",
             "--line",
             "39");
 
@@ -2784,7 +2788,7 @@ public class TestClass
         Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
         Assert.That(standardOutput, Does.Contain("Effect summaries: 1"));
         Assert.That(standardOutput, Does.Contain("Build diagnostics"));
-        Assert.That(standardOutput, Does.Contain("SP0004 Warning"));
+        Assert.That(standardOutput, Does.Contain("SP0004 Info"));
         Assert.That(standardOutput, Does.Contain("Query timeout ms: 321"));
     }
 
@@ -2811,6 +2815,28 @@ public class TestClass
         Assert.That(standardOutput, Does.Contain("Solution file:"));
         Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
         Assert.That(standardOutput, Does.Contain("Build diagnostics"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_ProjectModeRejectsStandaloneCompilationOverrides()
+    {
+        var sourcePath = Path.Combine("SharpProof.Demo", "Program.cs");
+        var projectPath = Path.Combine("SharpProof.Demo", "SharpProof.Demo.csproj");
+
+        var (exitCode, _, standardError) = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "--file",
+            sourcePath,
+            "--project",
+            projectPath,
+            "--line",
+            "39",
+            "--language-version",
+            "preview");
+
+        Assert.That(exitCode, Is.EqualTo(64));
+        Assert.That(
+            standardError,
+            Does.Contain("Standalone compilation options cannot be combined with --project or --solution"));
     }
 
     [Test]

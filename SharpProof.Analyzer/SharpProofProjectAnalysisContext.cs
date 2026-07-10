@@ -38,11 +38,19 @@ public sealed class SharpProofProjectAnalysisContext
         SolutionFilePath = NormalizeOptionalPath(solutionFilePath);
         _analyzerConfigPaths = NormalizePaths(analyzerConfigPaths);
         _additionalFilePaths = NormalizePaths(analyzerOptions.AdditionalFiles.Select(static file => file.Path));
-        SourceInput = SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation);
+        SymbolicContext = new SymbolicProjectQueryContext(
+            compilation,
+            syntaxTree,
+            analyzerOptions,
+            ProjectName,
+            ProjectFilePath,
+            SolutionFilePath,
+            _analyzerConfigPaths);
+        SourceInput = SymbolicContext.SourceInput;
 
         var configuration = AnalyzerConfiguration.FromOptions(analyzerOptions);
-        SmtOptions = configuration.SmtOptions;
-        AnalysisLimits = configuration.AnalysisLimits;
+        SmtOptions = SymbolicContext.Configuration.SmtOptions;
+        AnalysisLimits = SymbolicContext.Configuration.AnalysisLimits;
         ConfigurationIssues = configuration.InvalidConfigurationValues
             .Select(static issue => new SharpProofProjectConfigurationIssue(
                 issue.Key,
@@ -58,6 +66,8 @@ public sealed class SharpProofProjectAnalysisContext
     public AnalyzerOptions AnalyzerOptions { get; }
 
     public SymbolicSourceInput SourceInput { get; }
+
+    public SymbolicProjectQueryContext SymbolicContext { get; }
 
     public string ProjectName { get; }
 

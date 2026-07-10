@@ -87,6 +87,7 @@ internal class AnalyzerConfiguration
         var reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
         var checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
         var enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
+        var symbolicConfiguration = SymbolicProjectConfiguration.FromAnalyzerOptions(options);
         return new AnalyzerConfiguration(
             impureMethods,
             pureMethods,
@@ -102,8 +103,8 @@ internal class AnalyzerConfiguration
             checkedExceptions,
             enableEffectSummaryJson,
             GetPurityProfile(options),
-            GetSmtOptions(options),
-            GetAnalysisLimits(options),
+            symbolicConfiguration.SmtOptions,
+            symbolicConfiguration.AnalysisLimits,
             invalidConfigurationValues);
     }
 
@@ -390,98 +391,6 @@ internal class AnalyzerConfiguration
         }
 
         if (TryParseBool(value, out var parsed)) return parsed ? RuntimeHazardMode.Sites : RuntimeHazardMode.Off;
-
-        return fallback;
-    }
-
-    private static SmtAnalysisOptions GetSmtOptions(AnalyzerOptions options)
-    {
-        var mode = GetSmtMode(options, SmtAnalysisOptions.Default.Mode);
-        var defaults = SmtAnalysisOptions.ForMode(mode);
-        var timeoutMs = GetPositiveInt(options, ConfigKeys.SmtTimeoutMs, (int)defaults.QueryTimeout.TotalMilliseconds);
-        var methodBudgetMs = GetPositiveInt(options, ConfigKeys.SmtMethodBudgetMs,
-            (int)defaults.MethodBudget.TotalMilliseconds);
-        var maxPathConditions = GetPositiveInt(options, ConfigKeys.SmtMaxPathConditions, defaults.MaxPathConditions);
-        var maxExpressionNodes = GetPositiveInt(options, ConfigKeys.SmtMaxExpressionNodes, defaults.MaxExpressionNodes);
-        return new SmtAnalysisOptions(
-                mode,
-                TimeSpan.FromMilliseconds(timeoutMs),
-                TimeSpan.FromMilliseconds(methodBudgetMs),
-                maxPathConditions,
-                maxExpressionNodes,
-                true)
-            .WithLifecycle(new SmtSolverLifecycleOptions(
-                GetNonNegativeInt(
-                    options,
-                    ConfigKeys.SmtTransientRetryCount,
-                    SmtSolverLifecycleOptions.Default.MaxTransientRetries),
-                GetBoolOrDefaultTrue(options, ConfigKeys.SmtRecycleContextOnTransientFailure),
-                GetBool(options, ConfigKeys.SmtDisposeThreadContextOnServiceDispose)));
-    }
-
-    private static SymbolicAnalysisLimits GetAnalysisLimits(AnalyzerOptions options)
-    {
-        var defaults = SymbolicAnalysisLimits.Default;
-        return new SymbolicAnalysisLimits(
-            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedIfElseFacts, defaults.MaxMergedIfElseFacts),
-            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedSwitchFacts, defaults.MaxMergedSwitchFacts),
-            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedTryFacts, defaults.MaxMergedTryFacts),
-            GetPositiveInt(options, ConfigKeys.AnalysisMaxTryCompletionBranches, defaults.MaxTryCompletionBranches),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxFiniteForeachElementFacts,
-                defaults.MaxFiniteForeachElementFacts),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxScopedBlockCompletionStatements,
-                defaults.MaxScopedBlockCompletionStatements),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxStructuralNullStateDepth,
-                defaults.MaxStructuralNullStateDepth),
-            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedPathConditions, defaults.MaxMergedPathConditions),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState,
-                defaults.MaxMergeableFactsPerTargetPerState),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget,
-                defaults.MaxFactChoiceCombinationsPerTarget),
-            GetPositiveInt(
-                options,
-                ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState,
-                defaults.MaxGuardFactsPerTargetPerState));
-    }
-
-    private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)
-    {
-        if (TryGetGlobalOption(options, ConfigKeys.SmtMode, out var value))
-        {
-            switch (value.Trim().ToLowerInvariant())
-            {
-                case "disabled":
-                    return SmtAnalysisMode.Off;
-                case "bounded":
-                case "default":
-                    return SmtAnalysisMode.Bounded;
-                case "deep":
-                case "aggressive":
-                    return SmtAnalysisMode.Deep;
-            }
-
-            if (TryParseBool(value, out var parsed)) return parsed ? SmtAnalysisMode.Bounded : SmtAnalysisMode.Off;
-        }
-
-        return fallback;
-    }
-
-    private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
-    {
-        if (TryGetGlobalOption(options, key, out var value) &&
-            int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
-            parsed > 0)
-            return parsed;
 
         return fallback;
     }

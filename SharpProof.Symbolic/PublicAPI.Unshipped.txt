@@ -420,3 +420,22 @@ SharpProof.Symbolic.SymbolicCompactSmtDiagnostics.Health.get -> SharpProof.Symbo
 SharpProof.Symbolic.SymbolicCompactSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
 SharpProof.Symbolic.SymbolicSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
 SharpProof.Symbolic.SymbolicSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
+SharpProof.Symbolic.SymbolicProjectConfiguration
+SharpProof.Symbolic.SymbolicProjectConfiguration.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+SharpProof.Symbolic.SymbolicProjectConfiguration.SmtOptions.get -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+static SharpProof.Symbolic.SymbolicProjectConfiguration.FromAnalyzerOptions(Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions! analyzerOptions) -> SharpProof.Symbolic.SymbolicProjectConfiguration!
+SharpProof.Symbolic.SymbolicProjectQueryContext
+SharpProof.Symbolic.SymbolicProjectQueryContext.AdditionalFilePaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicProjectQueryContext.AnalyzerConfigPaths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicProjectQueryContext.AnalyzerOptions.get -> Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions!
+SharpProof.Symbolic.SymbolicProjectQueryContext.Compilation.get -> Microsoft.CodeAnalysis.Compilation!
+SharpProof.Symbolic.SymbolicProjectQueryContext.Configuration.get -> SharpProof.Symbolic.SymbolicProjectConfiguration!
+SharpProof.Symbolic.SymbolicProjectQueryContext.CreateQueryOptions(SharpProof.Symbolic.Smt.SmtAnalysisService? smtAnalysis = null, System.Collections.Generic.IEnumerable<string!>? impliedConditions = null, bool includeExpressionProgramPoints = false, bool includeCurrentStatementCompletionFacts = false, SharpProof.Symbolic.SymbolicSourceQueryFilter? filter = null) -> SharpProof.Symbolic.SymbolicQueryOptions!
+SharpProof.Symbolic.SymbolicProjectQueryContext.EffectSummaryFileCount.get -> int
+SharpProof.Symbolic.SymbolicProjectQueryContext.HasBaseline.get -> bool
+SharpProof.Symbolic.SymbolicProjectQueryContext.ProjectFilePath.get -> string?
+SharpProof.Symbolic.SymbolicProjectQueryContext.ProjectName.get -> string!
+SharpProof.Symbolic.SymbolicProjectQueryContext.SolutionFilePath.get -> string?
+SharpProof.Symbolic.SymbolicProjectQueryContext.SourceInput.get -> SharpProof.Symbolic.SymbolicSourceInput!
+SharpProof.Symbolic.SymbolicProjectQueryContext.SymbolicProjectQueryContext(Microsoft.CodeAnalysis.Compilation! compilation, Microsoft.CodeAnalysis.SyntaxTree! syntaxTree, Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions! analyzerOptions, string! projectName, string? projectFilePath = null, string? solutionFilePath = null, System.Collections.Generic.IEnumerable<string!>? analyzerConfigPaths = null) -> void
+SharpProof.Symbolic.SymbolicProjectQueryContext.SyntaxTree.get -> Microsoft.CodeAnalysis.SyntaxTree!

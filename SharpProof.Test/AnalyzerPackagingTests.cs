@@ -1394,6 +1394,10 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("--smt-method-budget-ms <n>"));
         Assert.That(source, Does.Contain("--smt-max-path-conditions <n>"));
         Assert.That(source, Does.Contain("--smt-max-expression-nodes <n>"));
+        Assert.That(source, Does.Contain("--project <path>"));
+        Assert.That(source, Does.Contain("--solution <path>"));
+        Assert.That(source, Does.Contain("--project-name <name>"));
+        Assert.That(source, Does.Contain("--msbuild-property <name=value>"));
         Assert.That(source, Does.Contain("--position <n>"));
         Assert.That(source, Does.Contain("--all-lines"));
         Assert.That(source, Does.Contain("--line-expressions"));
@@ -1417,7 +1421,7 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("new SymbolicRuntimeHazardRequest("));
         Assert.That(source, Does.Contain("new SymbolicComplexityRequest("));
         Assert.That(source, Does.Contain("new SymbolicCapabilityRequest("));
-        Assert.That(source, Does.Contain("options.CreateSourceInput()"));
+        Assert.That(source, Does.Contain("inputContext.SourceInput"));
         Assert.That(source, Does.Contain("options.CreateQueryTarget()"));
         Assert.That(source, Does.Contain("options.CreateRuntimeHazardTarget()"));
         Assert.That(source, Does.Contain("options.CreateComplexityTarget()"));

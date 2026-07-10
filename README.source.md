@@ -184,6 +184,7 @@ Source Link symbols, and an executable sample under
 - [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
+- [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
 - [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
 - [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)
