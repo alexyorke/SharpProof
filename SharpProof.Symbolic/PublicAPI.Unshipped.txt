@@ -1,2 +1,12 @@
 #nullable enable
+const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "additive-v1" -> string!
+const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 1 -> int
+const SharpProof.Symbolic.SharpProofEvidenceSchema.LegacyUnversionedVersion = 0 -> int
+const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 0 -> int
+SharpProof.Symbolic.SharpProofEvidenceSchema
+SharpProof.Symbolic.SymbolicCompactQueryResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.SymbolicCompactQueryResult.EvidenceSchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicInvariantQueryResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.SymbolicInvariantQueryResult.EvidenceSchemaVersion.get -> int
 SharpProof.Symbolic.SymbolicRuntimeHazardKind.InvalidCollectionCardinality = 16 -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaVersion) -> bool

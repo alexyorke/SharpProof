@@ -1799,6 +1799,9 @@ public class TestClass
 
         Assert.That(compact.Kind, Is.EqualTo("point"));
         Assert.That(compact.SchemaVersion, Is.EqualTo(1));
+        Assert.That(compact.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(compact.EvidenceSchemaCompatibility,
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
         Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("point"));
         Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
         Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
@@ -1865,6 +1868,7 @@ public class TestClass
         Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
         Assert.That(kind.GetString(), Is.EqualTo("point"));
         Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        AssertEvidenceSchema(root);
         Assert.That(root.TryGetProperty("Kind", out _), Is.False);
         Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
         var queryDescriptor = root.GetProperty("queryDescriptor");
@@ -2178,6 +2182,9 @@ public class TestClass
 
         Assert.That(invariantResult.Kind, Is.EqualTo("invariantQuery"));
         Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
+        Assert.That(invariantResult.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(invariantResult.EvidenceSchemaCompatibility,
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
         Assert.That(invariantResult.ScopeKind, Is.EqualTo("span"));
         Assert.That(invariantResult.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
         Assert.That(invariantResult.QueryDescriptor.Kind, Is.EqualTo("span"));
@@ -2598,6 +2605,7 @@ public class TestClass
             var root = document.RootElement;
             Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            AssertEvidenceSchema(root);
             Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
             Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
             var queryDescriptor = root.GetProperty("queryDescriptor");
@@ -2739,6 +2747,7 @@ public class TestClass
             var root = document.RootElement;
             Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            AssertEvidenceSchema(root);
             Assert.That(root.GetProperty("queryDescriptor").GetProperty("kind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("queryDescriptor").TryGetProperty("line", out _), Is.False);
             Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
@@ -3177,6 +3186,7 @@ public class TestClass
             var root = document.RootElement;
             Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            AssertEvidenceSchema(root);
             Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
             Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
             Assert.That(root.TryGetProperty("programPoints", out _), Is.False);
@@ -3648,6 +3658,7 @@ public class TestClass
             var root = document.RootElement;
             Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            AssertEvidenceSchema(root);
             Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
             Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
             Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
@@ -4175,6 +4186,14 @@ public class TestClass
                 return index + 1;
 
         throw new InvalidOperationException("Text not found: " + text);
+    }
+
+    private static void AssertEvidenceSchema(JsonElement root)
+    {
+        Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
     }
 
     private static int FindColumn(string source, string text)

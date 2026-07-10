@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="..\..\Shared\BclPurityFallbackHeuristics.cs" Link="Shared\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\..\Shared\Constants.cs" Link="Shared\Constants.cs" />
+    <Compile Include="..\..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
   </ItemGroup>
 </Project>

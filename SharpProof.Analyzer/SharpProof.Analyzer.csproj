@@ -46,6 +46,7 @@
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <Compile Include="..\Shared\BclPurityFallbackHeuristics.cs" Link="Engine\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
+    <Compile Include="..\Shared\ProofEvidenceSchemaContract.cs" Link="Configuration\ProofEvidenceSchemaContract.cs" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>
   

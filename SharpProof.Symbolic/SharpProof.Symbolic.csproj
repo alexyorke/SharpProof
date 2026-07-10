@@ -42,6 +42,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" PrivateAssets="all" />
+    <Compile Include="..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
   </ItemGroup>
 
   <ItemGroup>

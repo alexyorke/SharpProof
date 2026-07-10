@@ -1899,6 +1899,10 @@ internal sealed class CompactSymbolicComplexityResult
 
     public int SchemaVersion => 1;
 
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+
     public string Kind => "complexity";
 
     public string FilePath { get; }
@@ -1981,6 +1985,10 @@ internal sealed class CompactSymbolicCapabilityResult
     }
 
     public int SchemaVersion => 1;
+
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
     public string Kind => "capabilities";
 
@@ -2094,6 +2102,10 @@ internal sealed class CompactRuntimeHazardQueryResult
     public string Kind => "runtimeHazards";
 
     public int SchemaVersion => 1;
+
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
     public string FilePath { get; }
 

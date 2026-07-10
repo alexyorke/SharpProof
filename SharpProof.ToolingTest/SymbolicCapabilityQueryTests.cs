@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -79,6 +80,10 @@ public sealed class SymbolicCapabilityQueryTests
             using var document = JsonDocument.Parse(result.StandardOutput);
             var root = document.RootElement;
             Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("capabilities"));
+            Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(),
+                Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+            Assert.That(root.GetProperty("evidenceSchemaCompatibility").GetString(),
+                Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
             Assert.That(root.GetProperty("hasUnknowns").GetBoolean(), Is.True);
             Assert.That(root.GetProperty("unknownReasons")[0].GetString(), Is.EqualTo("DynamicDispatch"));
         }

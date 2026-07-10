@@ -3257,6 +3257,10 @@ public sealed class SymbolicCompactQueryResult
 
     public int SchemaVersion => 1;
 
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
+
     public string FilePath { get; }
 
     public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
@@ -3658,6 +3662,10 @@ public sealed class SymbolicInvariantQueryResult
     public string Kind => "invariantQuery";
 
     public int SchemaVersion => 1;
+
+    public int EvidenceSchemaVersion => SharpProofEvidenceSchema.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
     public string ScopeKind { get; }
 
