@@ -18,11 +18,6 @@ internal static partial class CSharpConditionToFormula
     private const int MaxCollectionExpressionLengthSpreads = 8;
     private const string ImplicitThisVariableName = "this";
 
-    private const string MemberNotNullWhenAttributeMetadataName =
-        "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
-
-    private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
-
     private static readonly
         ConditionalWeakTable<Compilation,
             ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>>

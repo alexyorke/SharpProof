@@ -263,6 +263,14 @@ internal static class NullableFlowFacts
         return targets.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
 
+    internal static ImmutableArray<string> GetMemberNotNullWhenTargets(IMethodSymbol method)
+    {
+        return GetMemberNotNullWhenTargets(method, true)
+            .Concat(GetMemberNotNullWhenTargets(method, false))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+    }
+
     internal static bool TryResolveInstanceMemberTarget(
         INamedTypeSymbol containingType,
         string target,

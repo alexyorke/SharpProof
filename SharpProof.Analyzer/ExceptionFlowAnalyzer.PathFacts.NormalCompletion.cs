@@ -158,7 +158,7 @@ internal static partial class ExceptionFlowAnalyzer
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !ParameterHasNotNullAttribute(parameter) ||
+                !NullableFlowFacts.HasNotNullPostcondition(parameter) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
                 GetLocalOrParameterSymbol(argumentSyntax.Expression, semanticModel, cancellationToken) is not
@@ -169,22 +169,6 @@ internal static partial class ExceptionFlowAnalyzer
 
             AddSymbolNonNullFact(argumentSymbol, facts);
         }
-    }
-
-    private static bool ParameterHasNotNullAttribute(IParameterSymbol parameter)
-    {
-        return SymbolHasNotNullAttribute(parameter) ||
-               (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-                SymbolHasNotNullAttribute(parameter.OriginalDefinition));
-    }
-
-    private static bool SymbolHasNotNullAttribute(IParameterSymbol parameter)
-    {
-        return parameter.GetAttributes().Any(attribute =>
-            string.Equals(
-                SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                NotNullAttributeName,
-                StringComparison.Ordinal));
     }
 
     private static void AddDoesNotReturnIfNormalCompletionFacts(
@@ -203,7 +187,7 @@ internal static partial class ExceptionFlowAnalyzer
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
                 AnyConditionSymbolMutatedInStatement(argumentSyntax.Expression, statement, semanticModel,
@@ -217,33 +201,6 @@ internal static partial class ExceptionFlowAnalyzer
                 cancellationToken,
                 facts);
         }
-    }
-
-    private static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
-    {
-        return TryGetDoesNotReturnIfValueFromSymbol(parameter, out value) ||
-               (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-                TryGetDoesNotReturnIfValueFromSymbol(parameter.OriginalDefinition, out value));
-    }
-
-    private static bool TryGetDoesNotReturnIfValueFromSymbol(IParameterSymbol parameter, out bool value)
-    {
-        foreach (var attribute in parameter.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    DoesNotReturnIfAttributeName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeValue)
-                continue;
-
-            value = attributeValue;
-            return true;
-        }
-
-        value = false;
-        return false;
     }
 
     private static ExpressionSyntax UnwrapAwaitedFactExpression(ExpressionSyntax expression)

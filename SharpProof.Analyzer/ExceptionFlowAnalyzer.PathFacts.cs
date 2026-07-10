@@ -10,9 +10,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer
 {
-    private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
-    private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
-
     private static bool IsKnownByDominatingIf(
         ExpressionSyntax expression,
         SyntaxNode useNode,

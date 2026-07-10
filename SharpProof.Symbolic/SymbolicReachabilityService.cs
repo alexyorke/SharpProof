@@ -17,11 +17,6 @@ internal static class SymbolicReachabilityService
 {
     private const string ImplicitThisVariableName = "this";
 
-    private const string MemberNotNullWhenAttributeMetadataName =
-        "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
-
-    private const string NotNullWhenAttributeMetadataName = "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
-
     private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache>
         s_structuralPathConditionCache = new();
 
@@ -636,7 +631,7 @@ internal static class SymbolicReachabilityService
                 argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
-                !TryGetIrNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
                 notNullWhenValue != branchWhenTrue ||
                 !TryCreateIrNotNullWhenArgumentFormula(
                     argumentSyntax.Expression,
@@ -661,38 +656,6 @@ internal static class SymbolicReachabilityService
             RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
             _ => false
         };
-    }
-
-    private static bool TryGetIrNotNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        if (TryGetIrSymbolNotNullWhenValue(parameter, out value)) return true;
-
-        if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-            TryGetIrSymbolNotNullWhenValue(parameter.OriginalDefinition, out value))
-            return true;
-
-        value = false;
-        return false;
-    }
-
-    private static bool TryGetIrSymbolNotNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        foreach (var attribute in parameter.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    NotNullWhenAttributeMetadataName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeValue)
-                continue;
-
-            value = attributeValue;
-            return true;
-        }
-
-        value = false;
-        return false;
     }
 
     private static bool TryCreateIrNotNullWhenArgumentFormula(
@@ -1600,7 +1563,7 @@ internal static class SymbolicReachabilityService
                 argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
-                !TryGetIrNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
                 notNullWhenValue != branchWhenTrue ||
                 !TryCreateIrNotNullWhenArgumentCondition(
                     argumentSyntax.Expression,
@@ -1680,9 +1643,11 @@ internal static class SymbolicReachabilityService
             return false;
 
         var conditions = new List<SymbolicCondition>();
-        foreach (var memberTarget in GetIrMemberNotNullWhenTargets(invocationOperation.TargetMethod, branchWhenTrue))
+        foreach (var memberTarget in NullableFlowFacts.GetMemberNotNullWhenTargets(
+                     invocationOperation.TargetMethod,
+                     branchWhenTrue))
         {
-            if (!TryResolveIrMemberNotNullWhenTarget(
+            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
                     invocationOperation.TargetMethod.ContainingType,
                     memberTarget,
                     out var member) ||
@@ -1721,7 +1686,7 @@ internal static class SymbolicReachabilityService
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryGetIrMemberNotNullTargetType(member, out var memberType) ||
+        if (!NullableFlowFacts.TryGetMemberType(member, out var memberType) ||
             !SymbolicFactFactory.TryGetValueKind(
                 memberType,
                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
@@ -1747,101 +1712,6 @@ internal static class SymbolicReachabilityService
         var invokedExpression = UnwrapExpression(invocation.Expression);
         return invokedExpression is IdentifierNameSyntax ||
                invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
-    }
-
-    private static IEnumerable<string> GetIrMemberNotNullWhenTargets(IMethodSymbol method, bool branchWhenTrue)
-    {
-        var targets = new List<string>();
-        AddIrMemberNotNullWhenTargets(method, branchWhenTrue, targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddIrMemberNotNullWhenTargets(method.OriginalDefinition, branchWhenTrue, targets);
-
-        return targets.Distinct(StringComparer.Ordinal);
-    }
-
-    private static void AddIrMemberNotNullWhenTargets(
-        IMethodSymbol method,
-        bool branchWhenTrue,
-        ICollection<string> targets)
-    {
-        foreach (var attribute in method.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    MemberNotNullWhenAttributeMetadataName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length < 2 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeBranch ||
-                attributeBranch != branchWhenTrue)
-                continue;
-
-            for (var index = 1; index < attribute.ConstructorArguments.Length; index++)
-                AddIrMemberNotNullWhenTarget(attribute.ConstructorArguments[index], targets);
-        }
-    }
-
-    private static void AddIrMemberNotNullWhenTarget(
-        TypedConstant argument,
-        ICollection<string> targets)
-    {
-        if (argument.Kind == TypedConstantKind.Array)
-        {
-            foreach (var item in argument.Values) AddIrMemberNotNullWhenTarget(item, targets);
-
-            return;
-        }
-
-        if (argument.Value is string target &&
-            !string.IsNullOrWhiteSpace(target))
-            targets.Add(target);
-    }
-
-    private static bool TryResolveIrMemberNotNullWhenTarget(
-        INamedTypeSymbol containingType,
-        string target,
-        out ISymbol member)
-    {
-        member = null!;
-        var memberName = NormalizeIrMemberNotNullWhenTarget(target);
-        if (memberName == null) return false;
-
-        var candidates = containingType.GetMembers(memberName)
-            .Where(candidate =>
-                candidate is IFieldSymbol or IPropertySymbol &&
-                !candidate.IsStatic &&
-                TryGetIrMemberNotNullTargetType(candidate, out var type) &&
-                SymbolicTypeFacts.IsReferenceLikeType(type))
-            .ToArray();
-        if (candidates.Length != 1) return false;
-
-        member = candidates[0].OriginalDefinition;
-        return true;
-    }
-
-    private static string? NormalizeIrMemberNotNullWhenTarget(string target)
-    {
-        target = target.Trim();
-        if (target.StartsWith("this.", StringComparison.Ordinal)) target = target.Substring("this.".Length);
-
-        return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
-            ? target
-            : null;
-    }
-
-    private static bool TryGetIrMemberNotNullTargetType(ISymbol member, out ITypeSymbol type)
-    {
-        switch (member)
-        {
-            case IFieldSymbol fieldSymbol:
-                type = fieldSymbol.Type;
-                return true;
-            case IPropertySymbol propertySymbol:
-                type = propertySymbol.Type;
-                return true;
-            default:
-                type = null!;
-                return false;
-        }
     }
 
     internal static bool IsBranchUnreachable(

@@ -642,10 +642,15 @@ internal static partial class CSharpConditionToFormula
             !IsCurrentInstanceInvocation(invocation))
             return;
 
-        foreach (var memberTarget in GetMemberNotNullWhenTargets(invocationOperation.TargetMethod, branchWhenTrue))
+        foreach (var memberTarget in NullableFlowFacts.GetMemberNotNullWhenTargets(
+                     invocationOperation.TargetMethod,
+                     branchWhenTrue))
         {
-            if (!TryResolveMemberNotNullWhenTarget(invocationOperation.TargetMethod.ContainingType, memberTarget,
-                    out var member, out var memberType) ||
+            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
+                    invocationOperation.TargetMethod.ContainingType,
+                    memberTarget,
+                    out var member) ||
+                !NullableFlowFacts.TryGetMemberType(member, out var memberType) ||
                 !TryCreateMemberFormula(new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference), member.Name,
                     memberType, out var memberFormula) ||
                 memberFormula is not { Kind: SmtValueKind.Reference })
@@ -660,110 +665,6 @@ internal static partial class CSharpConditionToFormula
         var invokedExpression = UnwrapExpression(invocation.Expression);
         return invokedExpression is IdentifierNameSyntax ||
                invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
-    }
-
-    private static IEnumerable<string> GetMemberNotNullWhenTargets(IMethodSymbol method, bool branchWhenTrue)
-    {
-        var targets = new List<string>();
-        AddMemberNotNullWhenTargets(method, branchWhenTrue, targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddMemberNotNullWhenTargets(method.OriginalDefinition, branchWhenTrue, targets);
-
-        return targets.Distinct(StringComparer.Ordinal);
-    }
-
-    private static void AddMemberNotNullWhenTargets(
-        IMethodSymbol method,
-        bool branchWhenTrue,
-        ICollection<string> targets)
-    {
-        foreach (var attribute in method.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    MemberNotNullWhenAttributeMetadataName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length < 2 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeBranch ||
-                attributeBranch != branchWhenTrue)
-                continue;
-
-            for (var index = 1; index < attribute.ConstructorArguments.Length; index++)
-                AddMemberNotNullWhenTarget(attribute.ConstructorArguments[index], targets);
-        }
-    }
-
-    private static void AddMemberNotNullWhenTarget(TypedConstant argument, ICollection<string> targets)
-    {
-        if (argument.Kind == TypedConstantKind.Array)
-        {
-            foreach (var item in argument.Values) AddMemberNotNullWhenTarget(item, targets);
-
-            return;
-        }
-
-        if (argument.Value is string target &&
-            !string.IsNullOrWhiteSpace(target))
-            targets.Add(target);
-    }
-
-    private static bool TryResolveMemberNotNullWhenTarget(
-        INamedTypeSymbol containingType,
-        string target,
-        out ISymbol member,
-        out ITypeSymbol memberType)
-    {
-        var memberName = NormalizeMemberNotNullWhenTarget(target);
-        if (memberName == null)
-        {
-            member = null!;
-            memberType = null!;
-            return false;
-        }
-
-        var candidates = containingType.GetMembers(memberName)
-            .Where(candidate =>
-                candidate is IFieldSymbol or IPropertySymbol &&
-                !candidate.IsStatic &&
-                TryGetMemberNotNullWhenTargetType(candidate, out var type) &&
-                IsReferenceLikeType(type))
-            .ToArray();
-        if (candidates.Length != 1 ||
-            !TryGetMemberNotNullWhenTargetType(candidates[0], out memberType))
-        {
-            member = null!;
-            memberType = null!;
-            return false;
-        }
-
-        member = candidates[0].OriginalDefinition;
-        return true;
-    }
-
-    private static string? NormalizeMemberNotNullWhenTarget(string target)
-    {
-        target = target.Trim();
-        if (target.StartsWith("this.", StringComparison.Ordinal)) target = target.Substring("this.".Length);
-
-        return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
-            ? target
-            : null;
-    }
-
-    private static bool TryGetMemberNotNullWhenTargetType(ISymbol member, out ITypeSymbol type)
-    {
-        switch (member)
-        {
-            case IFieldSymbol fieldSymbol:
-                type = fieldSymbol.Type;
-                return true;
-            case IPropertySymbol propertySymbol:
-                type = propertySymbol.Type;
-                return true;
-            default:
-                type = null!;
-                return false;
-        }
     }
 
     private static bool TryGetBoolLiteral(ExpressionSyntax expression, out bool value)
@@ -812,7 +713,7 @@ internal static partial class CSharpConditionToFormula
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { IsParams: false } parameter ||
                 !IsSupportedNotNullWhenArgument(parameter, argument.Syntax as ArgumentSyntax) ||
-                !TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
                 notNullWhenValue != branchWhenTrue ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !TryCreateNotNullWhenArgumentFormula(
@@ -839,38 +740,6 @@ internal static partial class CSharpConditionToFormula
             RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
             _ => false
         };
-    }
-
-    private static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        if (TryGetSymbolNotNullWhenValue(parameter, out value)) return true;
-
-        if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-            TryGetSymbolNotNullWhenValue(parameter.OriginalDefinition, out value))
-            return true;
-
-        value = false;
-        return false;
-    }
-
-    private static bool TryGetSymbolNotNullWhenValue(IParameterSymbol parameter, out bool value)
-    {
-        foreach (var attribute in parameter.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    NotNullWhenAttributeMetadataName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeValue)
-                continue;
-
-            value = attributeValue;
-            return true;
-        }
-
-        value = false;
-        return false;
     }
 
     private static bool TryCreateNotNullWhenArgumentFormula(

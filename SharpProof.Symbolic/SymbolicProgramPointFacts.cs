@@ -18,12 +18,7 @@ internal static partial class SymbolicProgramPointFacts
     private const int MaxFiniteForeachElementFacts = 8;
     private const int MaxScopedBlockCompletionStatements = 32;
     private const int MaxStructuralNullStateDepth = 4;
-    private const string DoesNotReturnAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute";
-    private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
     private const string ImplicitThisVariableName = "this";
-    private const string MemberNotNullAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute";
-    private const string MemberNotNullWhenAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
-    private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
 
     internal static List<SmtFormula> CollectPriorAssignmentFacts(
         SyntaxNode site,
@@ -5011,7 +5006,7 @@ internal static partial class SymbolicProgramPointFacts
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !ParameterHasNotNullAttribute(parameter) ||
+                !NullableFlowFacts.HasNotNullPostcondition(parameter) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
                 continue;
@@ -5037,7 +5032,7 @@ internal static partial class SymbolicProgramPointFacts
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !ParameterHasNotNullAttribute(parameter) ||
+                !NullableFlowFacts.HasNotNullPostcondition(parameter) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
                 continue;
@@ -5050,22 +5045,6 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 "ir.path.normal-completion.parameter-not-null");
         }
-    }
-
-    private static bool ParameterHasNotNullAttribute(IParameterSymbol parameter)
-    {
-        return SymbolHasNotNullAttribute(parameter) ||
-               (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-                SymbolHasNotNullAttribute(parameter.OriginalDefinition));
-    }
-
-    private static bool SymbolHasNotNullAttribute(IParameterSymbol parameter)
-    {
-        return parameter.GetAttributes().Any(attribute =>
-            string.Equals(
-                SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                NotNullAttributeName,
-                StringComparison.Ordinal));
     }
 
     private static void AddTopLevelMemberNotNullNormalCompletionFacts(
@@ -5081,10 +5060,12 @@ internal static partial class SymbolicProgramPointFacts
             !IsCurrentInstanceInvocation(invocation))
             return;
 
-        var memberTargets = GetMemberNotNullTargets(invocationOperation.TargetMethod);
+        var memberTargets = NullableFlowFacts.GetMemberNotNullTargets(invocationOperation.TargetMethod);
         foreach (var memberTarget in memberTargets)
         {
-            if (!TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, memberTarget,
+            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
+                    invocationOperation.TargetMethod.ContainingType,
+                    memberTarget,
                     out var member) ||
                 !TryCreateImplicitThisMemberReferenceFormula(member, out var memberFormula))
                 continue;
@@ -5111,12 +5092,14 @@ internal static partial class SymbolicProgramPointFacts
             !IsCurrentInstanceInvocation(invocation))
             return;
 
-        var memberTargets = GetMemberNotNullTargets(invocationOperation.TargetMethod);
+        var memberTargets = NullableFlowFacts.GetMemberNotNullTargets(invocationOperation.TargetMethod);
         foreach (var memberTarget in memberTargets)
         {
-            if (!TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, memberTarget,
+            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
+                    invocationOperation.TargetMethod.ContainingType,
+                    memberTarget,
                     out var member) ||
-                !TryGetMemberNotNullTargetType(member, out var type) ||
+                !NullableFlowFacts.TryGetMemberType(member, out var type) ||
                 !TryGetValueKind(type, out var kind) ||
                 kind != SmtValueKind.Reference)
                 continue;
@@ -5141,102 +5124,9 @@ internal static partial class SymbolicProgramPointFacts
                invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
     }
 
-    private static IEnumerable<string> GetMemberNotNullTargets(IMethodSymbol method)
-    {
-        var targets = new List<string>();
-        AddMemberNotNullTargets(method, targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddMemberNotNullTargets(method.OriginalDefinition, targets);
-
-        return targets.Distinct(StringComparer.Ordinal);
-    }
-
-    private static void AddMemberNotNullTargets(IMethodSymbol method, ICollection<string> targets)
-    {
-        foreach (var attribute in method.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    MemberNotNullAttributeName,
-                    StringComparison.Ordinal))
-                continue;
-
-            foreach (var argument in attribute.ConstructorArguments) AddMemberNotNullTarget(argument, targets);
-        }
-    }
-
-    private static void AddMemberNotNullTarget(TypedConstant argument, ICollection<string> targets)
-    {
-        if (argument.Kind == TypedConstantKind.Array)
-        {
-            foreach (var item in argument.Values) AddMemberNotNullTarget(item, targets);
-
-            return;
-        }
-
-        if (argument.Value is string target &&
-            !string.IsNullOrWhiteSpace(target))
-            targets.Add(target);
-    }
-
-    private static bool TryResolveMemberNotNullTarget(
-        INamedTypeSymbol containingType,
-        string target,
-        out ISymbol member)
-    {
-        var memberName = NormalizeMemberNotNullTarget(target);
-        if (memberName == null)
-        {
-            member = null!;
-            return false;
-        }
-
-        var candidates = containingType.GetMembers(memberName)
-            .Where(candidate =>
-                candidate is IFieldSymbol or IPropertySymbol &&
-                !candidate.IsStatic &&
-                TryGetMemberNotNullTargetType(candidate, out var type) &&
-                IsReferenceLikeType(type))
-            .ToArray();
-        if (candidates.Length != 1)
-        {
-            member = null!;
-            return false;
-        }
-
-        member = candidates[0].OriginalDefinition;
-        return true;
-    }
-
-    private static string? NormalizeMemberNotNullTarget(string target)
-    {
-        target = target.Trim();
-        if (target.StartsWith("this.", StringComparison.Ordinal)) target = target.Substring("this.".Length);
-
-        return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
-            ? target
-            : null;
-    }
-
-    private static bool TryGetMemberNotNullTargetType(ISymbol member, out ITypeSymbol type)
-    {
-        switch (member)
-        {
-            case IFieldSymbol fieldSymbol:
-                type = fieldSymbol.Type;
-                return true;
-            case IPropertySymbol propertySymbol:
-                type = propertySymbol.Type;
-                return true;
-            default:
-                type = null!;
-                return false;
-        }
-    }
-
     private static bool TryCreateImplicitThisMemberReferenceFormula(ISymbol member, out SmtFormula formula)
     {
-        if (!TryGetMemberNotNullTargetType(member, out var type) ||
+        if (!NullableFlowFacts.TryGetMemberType(member, out var type) ||
             !TryGetValueKind(type, out var kind) ||
             kind != SmtValueKind.Reference)
         {
@@ -5254,7 +5144,7 @@ internal static partial class SymbolicProgramPointFacts
 
     private static bool TryCreateImplicitThisMemberTerm(ISymbol member, out SymbolicTerm term)
     {
-        if (!TryGetMemberNotNullTargetType(member, out var type) ||
+        if (!NullableFlowFacts.TryGetMemberType(member, out var type) ||
             !TryGetValueKind(type, out var kind))
         {
             term = null!;
@@ -5284,7 +5174,7 @@ internal static partial class SymbolicProgramPointFacts
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
                 AnyConditionSymbolInvalidatedInStatement(argumentSyntax.Expression, statement, semanticModel,
@@ -5316,7 +5206,7 @@ internal static partial class SymbolicProgramPointFacts
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                !NullableFlowFacts.TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
                 AnyConditionSymbolInvalidatedInStatement(argumentSyntax.Expression, statement, semanticModel,
@@ -5330,49 +5220,6 @@ internal static partial class SymbolicProgramPointFacts
                 semanticModel,
                 cancellationToken);
         }
-    }
-
-    private static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
-    {
-        return TryGetDoesNotReturnIfValueFromSymbol(parameter, out value) ||
-               (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
-                TryGetDoesNotReturnIfValueFromSymbol(parameter.OriginalDefinition, out value));
-    }
-
-    private static bool TryGetDoesNotReturnIfValueFromSymbol(IParameterSymbol parameter, out bool value)
-    {
-        foreach (var attribute in parameter.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    DoesNotReturnIfAttributeName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Value is not bool attributeValue)
-                continue;
-
-            value = attributeValue;
-            return true;
-        }
-
-        value = false;
-        return false;
-    }
-
-    private static bool MethodHasDoesNotReturnAttribute(IMethodSymbol method)
-    {
-        return SymbolHasDoesNotReturnAttribute(method) ||
-               (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition) &&
-                SymbolHasDoesNotReturnAttribute(method.OriginalDefinition));
-    }
-
-    private static bool SymbolHasDoesNotReturnAttribute(IMethodSymbol method)
-    {
-        return method.GetAttributes().Any(attribute =>
-            string.Equals(
-                SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                DoesNotReturnAttributeName,
-                StringComparison.Ordinal));
     }
 
     private static void AddTopLevelArrayCreationNormalCompletionFacts(
@@ -6252,36 +6099,13 @@ internal static partial class SymbolicProgramPointFacts
                 !IsCurrentInstanceInvocation(invocation))
                 continue;
 
-            foreach (var target in GetMemberNotNullWhenTargets(invocationOperation.TargetMethod))
-                if (TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, target,
+            foreach (var target in NullableFlowFacts.GetMemberNotNullWhenTargets(
+                         invocationOperation.TargetMethod))
+                if (NullableFlowFacts.TryResolveInstanceMemberTarget(
+                        invocationOperation.TargetMethod.ContainingType,
+                        target,
                         out var member))
                     AddSymbolIfAbsent(symbols, member);
-        }
-    }
-
-    private static IEnumerable<string> GetMemberNotNullWhenTargets(IMethodSymbol method)
-    {
-        var targets = new List<string>();
-        AddMemberNotNullWhenTargets(method, targets);
-        if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            AddMemberNotNullWhenTargets(method.OriginalDefinition, targets);
-
-        return targets.Distinct(StringComparer.Ordinal);
-    }
-
-    private static void AddMemberNotNullWhenTargets(IMethodSymbol method, ICollection<string> targets)
-    {
-        foreach (var attribute in method.GetAttributes())
-        {
-            if (!string.Equals(
-                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
-                    MemberNotNullWhenAttributeName,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length < 2)
-                continue;
-
-            for (var index = 1; index < attribute.ConstructorArguments.Length; index++)
-                AddMemberNotNullTarget(attribute.ConstructorArguments[index], targets);
         }
     }
 
@@ -7866,7 +7690,7 @@ internal static partial class SymbolicProgramPointFacts
         var expression = UnwrapExpression(statement.Expression);
         return expression is InvocationExpressionSyntax invocation &&
                semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
-               MethodHasDoesNotReturnAttribute(invocationOperation.TargetMethod);
+               NullableFlowFacts.HasDoesNotReturn(invocationOperation.TargetMethod);
     }
 
     private static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement)
@@ -10620,38 +10444,10 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapExpression(expression);
-        var type = semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
-                   semanticModel.GetTypeInfo(expression, cancellationToken).Type;
-        if (type?.IsReferenceType != true) return false;
-
-        var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-        if (constantValue is { HasValue: true, Value: not null }) return true;
-
-        if (SymbolicIrLowerer.TryLowerTerm(
-                expression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var loweredTerm) &&
-            loweredTerm is SymbolicStringConstantTerm)
-            return true;
-
-        if (expression is ConditionalExpressionSyntax conditionalExpression)
-            return IsDefinitelyNonNullReferenceValue(conditionalExpression.WhenTrue, semanticModel,
-                       cancellationToken) &&
-                   IsDefinitelyNonNullReferenceValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken);
-
-        if (expression is BinaryExpressionSyntax coalesceExpression &&
-            coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
-            return IsDefinitelyNonNullReferenceValue(coalesceExpression.Left, semanticModel, cancellationToken) ||
-                   IsDefinitelyNonNullReferenceValue(coalesceExpression.Right, semanticModel, cancellationToken);
-
-        return expression is ObjectCreationExpressionSyntax or
-            AnonymousObjectCreationExpressionSyntax or
-            ArrayCreationExpressionSyntax or
-            ImplicitArrayCreationExpressionSyntax or
-            CollectionExpressionSyntax or
-            InterpolatedStringExpressionSyntax or
-            TypeOfExpressionSyntax;
+        return NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+            expression,
+            semanticModel,
+            cancellationToken);
     }
 
     private static bool TryGetThrowGuardedValue(
