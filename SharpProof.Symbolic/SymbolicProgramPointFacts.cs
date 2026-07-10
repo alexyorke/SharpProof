@@ -2317,16 +2317,27 @@ internal static partial class SymbolicProgramPointFacts
 
     private static SymbolicState RemoveStateFactsReferencingImplicitThisMember(SymbolicState state, string memberName)
     {
-        _ = memberName;
-        var symbolName = ImplicitThisVariableName;
+        var variableName = ImplicitThisVariableName + "." + memberName;
         var remainingFacts = state.Facts
-            .Where(fact => !ReferencesStateSymbol(fact, symbolName));
+            .Where(fact => !ReferencesImplicitThisMember(fact, variableName));
         var remainingConditions = state.PathConditions
-            .Where(condition => !ReferencesStateSymbol(condition, symbolName));
+            .Where(condition => !ReferencesImplicitThisMember(condition, variableName));
         return new SymbolicState(
             remainingFacts,
             remainingConditions,
             state.SymbolVersions).Normalize();
+    }
+
+    private static bool ReferencesImplicitThisMember(SymbolicFact fact, string variableName)
+    {
+        return SymbolicIrFormulaEncoder.TryEncode(fact, out var formula) &&
+               SmtFormulaReferenceScanner.ContainsVariableOrMember(formula, variableName);
+    }
+
+    private static bool ReferencesImplicitThisMember(SymbolicCondition condition, string variableName)
+    {
+        return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula) &&
+               SmtFormulaReferenceScanner.ContainsVariableOrMember(formula, variableName);
     }
 
     private static bool ReferencesStateSymbol(SymbolicFact fact, string symbolName)

@@ -895,6 +895,39 @@ public class TestClass
     }
 
     [Test]
+    public void ProgramPointFacts_MemberReassignmentPreservesFactsForOtherMembers()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    public string? First { get; private set; }
+    public string? Second { get; private set; }
+
+    [MemberNotNull(nameof(First), nameof(Second))]
+    private void EnsureValues()
+    {
+        First = string.Empty;
+        Second = string.Empty;
+    }
+
+    public int TestMethod()
+    {
+        EnsureValues();
+        First = null;
+        return Second.Length;
+    }
+}";
+
+        var marker = FindMarker(source, "return Second.Length;");
+        var proof = ProveAtMarker(source, marker, "Second != null");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
+
+    [Test]
     public void ProgramPointFacts_MemberNotNullWhenTrueBranchProvesPropertyNonNull()
     {
         const string source = @"
