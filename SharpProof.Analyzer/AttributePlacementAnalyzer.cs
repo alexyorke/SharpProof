@@ -23,124 +23,91 @@ namespace SharpProof.Analyzer
             ReportUnrecognizedAttributeIdentities(context, baseline, attributePolicy, attributeList);
             var attributeTarget = attributeList.Parent;
 
-            var enforcePureAttributeLocation = FindAttributeLocation(attributeList, "EnforcePureAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (enforcePureAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
+            var isAllowedPurityTarget = IsAllowedPurityTarget(attributeTarget);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "EnforcePureAttribute", "EnforcePure",
+                SharpProofDiagnostics.MisplacedAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                IsAllowedPureAttributeTarget(attributeTarget),
+                "PureAttribute", "Pure",
+                SharpProofDiagnostics.MisplacedAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "AllowSynchronizationAttribute", "AllowSynchronization",
+                SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "ZeroAllocationsAttribute", "ZeroAllocations",
+                SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "AllowedCapabilitiesAttribute", "AllowedCapabilities",
+                SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "EnsuresAttribute", "Ensures",
+                SharpProofDiagnostics.MisplacedEnsuresAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "RequiresAttribute", "Requires",
+                SharpProofDiagnostics.MisplacedRequiresAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "DoesNotThrowAttribute", "DoesNotThrow",
+                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "AllowedExceptionsAttribute", "AllowedExceptions",
+                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedPurityTarget,
+                "ExpectedComplexityAttribute", "ExpectedComplexity",
+                SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule);
+        }
+
+        private static void ReportMisplacedAttributes(
+            SyntaxNodeAnalysisContext context,
+            DiagnosticBaseline baseline,
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            AttributeListSyntax attributeList,
+            SyntaxNode? attributeTarget,
+            bool isAllowedTarget,
+            string attributeTypeName,
+            string attributeName,
+            DiagnosticDescriptor descriptor)
+        {
+            if (isAllowedTarget)
             {
+                return;
+            }
+
+            foreach (var attribute in attributeList.Attributes)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var attributeClass = GetAttributeClass(attribute, context.SemanticModel, context.CancellationToken);
+                if (!attributePolicy.IsAccepted(attributeClass, attributeTypeName))
+                {
+                    continue;
+                }
+
                 var diagnostic = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedAttributeRule,
-                    enforcePureAttributeLocation,
-                    "EnforcePure",
+                    descriptor,
+                    attribute.GetLocation(),
+                    attributeName,
                     attributeTarget,
                     context);
                 ReportIfNotSuppressed(context, baseline, diagnostic);
-            }
-
-            var pureAttributeLocation = FindAttributeLocation(attributeList, "PureAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (pureAttributeLocation != null && !IsAllowedPureAttributeTarget(attributeTarget))
-            {
-                var diagnostic = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedAttributeRule,
-                    pureAttributeLocation,
-                    "Pure",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diagnostic);
-            }
-
-            var allowSynchronizationAttributeLocation = FindAttributeLocation(attributeList, "AllowSynchronizationAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (allowSynchronizationAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
-                    allowSynchronizationAttributeLocation,
-                    "AllowSynchronization",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var zeroAllocationsAttributeLocation = FindAttributeLocation(attributeList, "ZeroAllocationsAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (zeroAllocationsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
-                    zeroAllocationsAttributeLocation,
-                    "ZeroAllocations",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var allowedCapabilitiesAttributeLocation = FindAttributeLocation(attributeList, "AllowedCapabilitiesAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (allowedCapabilitiesAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
-                    allowedCapabilitiesAttributeLocation,
-                    "AllowedCapabilities",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var ensuresAttributeLocation = FindAttributeLocation(attributeList, "EnsuresAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (ensuresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
-                    ensuresAttributeLocation,
-                    "Ensures",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var requiresAttributeLocation = FindAttributeLocation(attributeList, "RequiresAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (requiresAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedRequiresAttributeRule,
-                    requiresAttributeLocation,
-                    "Requires",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var doesNotThrowAttributeLocation = FindAttributeLocation(attributeList, "DoesNotThrowAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (doesNotThrowAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
-                    doesNotThrowAttributeLocation,
-                    "DoesNotThrow",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var allowedExceptionsAttributeLocation = FindAttributeLocation(attributeList, "AllowedExceptionsAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (allowedExceptionsAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
-                    allowedExceptionsAttributeLocation,
-                    "AllowedExceptions",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
-            }
-
-            var expectedComplexityAttributeLocation = FindAttributeLocation(attributeList, "ExpectedComplexityAttribute", attributePolicy, context.SemanticModel, context.CancellationToken);
-            if (expectedComplexityAttributeLocation != null && !IsAllowedPurityTarget(attributeTarget))
-            {
-                var diag = CreateMisplacedAttributeDiagnostic(
-                    SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
-                    expectedComplexityAttributeLocation,
-                    "ExpectedComplexity",
-                    attributeTarget,
-                    context);
-                ReportIfNotSuppressed(context, baseline, diag);
             }
         }
 
@@ -263,25 +230,6 @@ namespace SharpProof.Analyzer
             {
                 context.ReportDiagnostic(diagnostic);
             }
-        }
-
-        private static Location? FindAttributeLocation(
-            AttributeListSyntax attributeList,
-            string attributeTypeName,
-            SharpProofAttributeIdentityPolicy attributePolicy,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            foreach (var attribute in attributeList.Attributes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var attributeClass = GetAttributeClass(attribute, semanticModel, cancellationToken);
-                if (attributePolicy.IsAccepted(attributeClass, attributeTypeName))
-                {
-                    return attribute.GetLocation();
-                }
-            }
-            return null;
         }
 
         private static INamedTypeSymbol? GetAttributeClass(

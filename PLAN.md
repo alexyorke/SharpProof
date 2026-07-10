@@ -230,11 +230,6 @@ grouped by their original feature area.
   an analysis run, with exact symbol, source of trust, configured value or
   attribute, and whether a stronger generated summary or direct contract
   overrode it.
-- Report every misplaced SharpProof attribute on a declaration instead of
-  short-circuiting after the first one, so `[EnforcePure]`, `[Pure]`,
-  `[AllowSynchronization]`, `[ZeroAllocations]`, `[AllowedCapabilities]`,
-  `[Ensures]`, and `[ExpectedComplexity]` all produce independent diagnostics
-  and fixable locations when stacked on the same unsupported target.
 - Ship ready-to-copy `.editorconfig` and `.globalconfig` profiles for
   migration, audit, CI, and strict adoption modes, including recommended
   `dotnet_diagnostic.SP*.severity` entries and `sharpproof_*` option defaults

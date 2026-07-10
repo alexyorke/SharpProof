@@ -146,7 +146,7 @@
                                 "path":  "SharpProof.Analyzer/SharpProofDiagnostics.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  114,
+                                "fixtureCount":  115,
                                 "tokens":  [
                                                "SharpProofDiagnostics"
                                            ]
@@ -3604,7 +3604,7 @@
                             "declaredTypes":  [
                                                   "SharpProofDiagnostics"
                                               ],
-                            "referencingFixtureCount":  114,
+                            "referencingFixtureCount":  115,
                             "referencedTokens":  [
                                                      "SharpProofDiagnostics"
                                                  ]
@@ -3648,7 +3648,7 @@
                             "declaredTypes":  [
                                                   "ComplexityKind"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "ComplexityKind"
                                                  ]
@@ -3747,7 +3747,7 @@
                             "declaredTypes":  [
                                                   "SharpProofCapability"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "SharpProofCapability"
                                                  ]
@@ -6799,13 +6799,14 @@
                                     "path":  "SharpProof.Attributes/ComplexityKind.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
+                                                                 "AttributePlacementPurityTests",
                                                                  "ExpectedComplexityContractTests",
                                                                  "SharpProofCodeFixTests"
                                                              ],
                                     "tokens":  [
                                                    "ComplexityKind"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Attributes/DoesNotThrowAttribute.cs",
@@ -6908,13 +6909,14 @@
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "AttributePlacementPurityTests",
                                                                  "CapabilityContractTests",
                                                                  "SharpProofCodeFixTests"
                                                              ],
                                     "tokens":  [
                                                    "SharpProofCapability"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Attributes/ZeroAllocationsAttribute.cs",
