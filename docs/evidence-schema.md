@@ -50,6 +50,11 @@ category, source family, raw reason, and retry/configuration flags are described
 in [the unknown-reason registry](unknown-reasons.md). Existing family reason
 fields remain and are not replaced.
 
+Bounded fact and state processing likewise exposes additive `analysis_limit.*`
+event codes and analyzer diagnostic properties. Their typed payload, defaults,
+and configuration controls are documented in
+[bounded analysis limits](analysis-limits.md).
+
 Consumers should inspect the evidence version before interpreting proof fields.
 `SharpProofEvidenceSchema.IsReadCompatible(...)` accepts the legacy
 unversioned value and the current version; it rejects negative and future

@@ -36,6 +36,9 @@ The analyzer combines:
   keeps its promise.
 - Runtime hazards are source-visible and bounded, not a guarantee that every
   possible runtime exception is modeled.
+- Fact collection, structural null-state inspection, and control-flow/state
+  merges have configurable positive caps. Exceeded caps emit stable evidence
+  instead of disappearing; see [bounded analysis limits](analysis-limits.md).
 - Known runtime-hazard coverage gaps have explicit acceptance criteria and
   executable current-behavior regressions in
   [the runtime-hazard backlog](runtime-hazard-backlog.md).
