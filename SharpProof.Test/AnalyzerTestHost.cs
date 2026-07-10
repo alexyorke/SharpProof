@@ -22,8 +22,8 @@ namespace SharpProof.Test
         private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
             DefaultCompilationOptions.WithAllowUnsafe(true);
 
-        private static readonly ImmutableArray<DiagnosticAnalyzer> AnalyzerInstance =
-            ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
+        private static readonly ConcurrentDictionary<AnalyzerFeatures, ImmutableArray<DiagnosticAnalyzer>> AnalyzerInstances =
+            new ConcurrentDictionary<AnalyzerFeatures, ImmutableArray<DiagnosticAnalyzer>>();
 
         private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
             new Lazy<ImmutableArray<MetadataReference>>(CreateTrustedPlatformReferences);
@@ -118,7 +118,8 @@ namespace SharpProof.Test
             bool autoEnableEffectSummaryJsonForAdditionalFiles = true,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
             bool concurrentAnalysis = false,
-            string compilationName = "AnalyzerTestHost")
+            string compilationName = "AnalyzerTestHost",
+            AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
         {
             return await GetDiagnosticsAsync(
                 source,
@@ -130,7 +131,8 @@ namespace SharpProof.Test
                 frameworkReferences,
                 concurrentAnalysis,
                 additionalMetadataReferences: null,
-                compilationName: compilationName);
+                compilationName: compilationName,
+                analyzerFeatures: analyzerFeatures);
         }
 
         public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
@@ -143,7 +145,8 @@ namespace SharpProof.Test
             ImmutableArray<MetadataReference>? frameworkReferences = null,
             bool concurrentAnalysis = false,
             ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-            string compilationName = "AnalyzerTestHost")
+            string compilationName = "AnalyzerTestHost",
+            AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
@@ -170,7 +173,7 @@ namespace SharpProof.Test
                 autoEnableEffectSummaryJsonForAdditionalFiles);
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
-                AnalyzerInstance,
+                GetAnalyzers(analyzerFeatures),
                 new CompilationWithAnalyzersOptions(
                     analyzerOptions,
                     onAnalyzerException: null,
@@ -179,6 +182,14 @@ namespace SharpProof.Test
                     reportSuppressedDiagnostics: false));
 
             return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+        }
+
+        private static ImmutableArray<DiagnosticAnalyzer> GetAnalyzers(AnalyzerFeatures features)
+        {
+            return AnalyzerInstances.GetOrAdd(
+                AnalyzerFeatureDependencies.Expand(features),
+                static expandedFeatures => ImmutableArray.Create<DiagnosticAnalyzer>(
+                    new SharpProofAnalyzer(expandedFeatures)));
         }
 
         public static AnalyzerOptions CreateAnalyzerOptions(
@@ -260,13 +271,15 @@ namespace SharpProof.Test
         public static async Task<(string Source, Diagnostic? Diagnostic)> AssertOptionalSingleSp0002Async(
             string markedSource,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
-            bool concurrentAnalysis = false)
+            bool concurrentAnalysis = false,
+            AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
         {
             var (source, expectedSpanText) = StripSp0002Markup(markedSource);
             var diagnostics = await GetDiagnosticsAsync(
                 source,
                 frameworkReferences: frameworkReferences,
-                concurrentAnalysis: concurrentAnalysis);
+                concurrentAnalysis: concurrentAnalysis,
+                analyzerFeatures: analyzerFeatures);
             var purityDiagnostics = diagnostics
                 .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
                 .ToArray();
@@ -289,17 +302,42 @@ namespace SharpProof.Test
         public static async Task<(string Source, Diagnostic Diagnostic)> AssertSingleSp0002Async(
             string markedSource,
             ImmutableArray<MetadataReference>? frameworkReferences = null,
-            bool concurrentAnalysis = false)
+            bool concurrentAnalysis = false,
+            AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
         {
             var (source, expectedSpanText) = StripRequiredSp0002Markup(markedSource);
             var diagnostics = await GetDiagnosticsAsync(
                 source,
                 frameworkReferences: frameworkReferences,
-                concurrentAnalysis: concurrentAnalysis);
+                concurrentAnalysis: concurrentAnalysis,
+                analyzerFeatures: analyzerFeatures);
             var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
             Assert.That(diagnostics, Has.Length.EqualTo(1));
             AssertDiagnosticSpan(source, diagnostic, expectedSpanText);
+            return (source, diagnostic);
+        }
+
+        public static async Task<(string Source, Diagnostic Diagnostic)> AssertSingleDiagnosticAsync(
+            string markedSource,
+            string diagnosticId,
+            ImmutableArray<MetadataReference>? frameworkReferences = null,
+            bool concurrentAnalysis = false,
+            AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
+        {
+            var (source, expectedSpanText) = StripDiagnosticMarkup(
+                markedSource,
+                diagnosticId,
+                required: true);
+            var diagnostics = await GetDiagnosticsAsync(
+                source,
+                frameworkReferences: frameworkReferences,
+                concurrentAnalysis: concurrentAnalysis,
+                analyzerFeatures: analyzerFeatures);
+            var diagnostic = SingleDiagnostic(diagnostics, diagnosticId);
+
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+            AssertDiagnosticSpan(source, diagnostic, expectedSpanText!);
             return (source, diagnostic);
         }
 

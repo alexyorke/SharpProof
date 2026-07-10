@@ -45,6 +45,9 @@ param(
     [string]$ImpactInventoryPath = '',
 
     [Parameter()]
+    [string]$ModuleImpactManifestPath = '',
+
+    [Parameter()]
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
@@ -418,6 +421,393 @@ function Get-TestImpactInventory
     }
 
     return $inventory
+}
+
+function Resolve-TestImpactModuleManifestPath
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$RequestedPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RequestedPath))
+    {
+        return Join-Path $RepoRoot 'scripts\test-impact-modules.json'
+    }
+
+    if ([System.IO.Path]::IsPathRooted($RequestedPath))
+    {
+        return $RequestedPath
+    }
+
+    return Join-Path $RepoRoot $RequestedPath
+}
+
+function Get-TestImpactModuleManifest
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [AllowNull()]$Inventory
+    )
+
+    $loaded = Test-Path -LiteralPath $Path
+    $schemaVersion = 0
+    if (-not $loaded)
+    {
+        return [pscustomobject][ordered]@{
+            loaded = $false
+            valid = $false
+            schemaVersion = 0
+            modules = @()
+            sourceOwners = @{}
+            error = 'Module impact manifest was not found.'
+        }
+    }
+
+    try
+    {
+        $json = Get-Content -LiteralPath $Path -Raw
+        if ([string]::IsNullOrWhiteSpace($json))
+        {
+            throw 'Module impact manifest is empty.'
+        }
+
+        $document = $json | ConvertFrom-Json
+        $schemaProperty = $document.PSObject.Properties['schemaVersion']
+        if ($null -eq $schemaProperty)
+        {
+            throw 'Module impact manifest is missing schemaVersion.'
+        }
+
+        $schemaVersion = [int]$schemaProperty.Value
+        if ($schemaVersion -ne 1)
+        {
+            throw "Unsupported module impact manifest schema: $schemaVersion"
+        }
+
+        $modulesProperty = $document.PSObject.Properties['modules']
+        $moduleEntries = if ($null -eq $modulesProperty) { @() } else { @($modulesProperty.Value) }
+        if ($moduleEntries.Count -eq 0)
+        {
+            throw 'Module impact manifest must define at least one module.'
+        }
+
+        if ($null -eq $Inventory -or $null -eq $Inventory.testFixtures)
+        {
+            throw 'Generated test-impact inventory is unavailable for fixture validation.'
+        }
+
+        $knownFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+        foreach ($fixture in @($Inventory.testFixtures))
+        {
+            if ($null -ne $fixture -and $null -ne $fixture.PSObject.Properties['name'])
+            {
+                [void]$knownFixtures.Add([string]$fixture.name)
+            }
+        }
+
+        $moduleNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+        $rawModulesByName = @{}
+        $orderedNames = New-Object System.Collections.Generic.List[string]
+        foreach ($entry in $moduleEntries)
+        {
+            if ($null -eq $entry)
+            {
+                throw 'Module impact manifest contains a null module.'
+            }
+
+            $nameProperty = $entry.PSObject.Properties['name']
+            $name = if ($null -eq $nameProperty) { '' } else { ([string]$nameProperty.Value).Trim() }
+            if ([string]::IsNullOrWhiteSpace($name))
+            {
+                throw 'Every module impact entry must have a nonempty name.'
+            }
+
+            if (-not $moduleNames.Add($name))
+            {
+                throw "Duplicate module impact name: $name"
+            }
+
+            $rawModulesByName[$name] = $entry
+            $orderedNames.Add($name)
+        }
+
+        $sourceOwners = @{}
+        $normalizedModules = New-Object System.Collections.Generic.List[object]
+        foreach ($name in $orderedNames)
+        {
+            $entry = $rawModulesByName[$name]
+            $sourcePathsProperty = $entry.PSObject.Properties['sourcePaths']
+            $dependsOnProperty = $entry.PSObject.Properties['dependsOn']
+            $testFixturesProperty = $entry.PSObject.Properties['testFixtures']
+            if ($null -eq $sourcePathsProperty -or $null -eq $dependsOnProperty -or $null -eq $testFixturesProperty)
+            {
+                throw "Module $name must define sourcePaths, dependsOn, and testFixtures arrays."
+            }
+
+            $fullProperty = $entry.PSObject.Properties['fullSuiteOnDirectChange']
+            $fullSuiteOnDirectChange = $false
+            if ($null -ne $fullProperty)
+            {
+                if ($fullProperty.Value -isnot [bool])
+                {
+                    throw "Module $name fullSuiteOnDirectChange must be a JSON boolean."
+                }
+
+                $fullSuiteOnDirectChange = [bool]$fullProperty.Value
+            }
+
+            $sourcePaths = New-Object System.Collections.Generic.List[string]
+            foreach ($rawSourcePath in @($sourcePathsProperty.Value))
+            {
+                $sourcePath = ([string]$rawSourcePath).Trim().Replace('\', '/')
+                if ([string]::IsNullOrWhiteSpace($sourcePath) -or
+                    [System.IO.Path]::IsPathRooted($sourcePath) -or
+                    $sourcePath.StartsWith('./', [StringComparison]::Ordinal) -or
+                    $sourcePath -match '(^|/)\.\.(/|$)')
+                {
+                    throw "Module $name has an invalid repo-relative source path: $rawSourcePath"
+                }
+
+                if ($sourceOwners.ContainsKey($sourcePath))
+                {
+                    throw "Source path $sourcePath is owned by more than one module."
+                }
+
+                $sourceOwners[$sourcePath] = $name
+                $sourcePaths.Add($sourcePath)
+            }
+
+            if ($sourcePaths.Count -eq 0)
+            {
+                throw "Module $name must own at least one source path."
+            }
+
+            $dependencies = New-Object System.Collections.Generic.List[string]
+            $dependencyNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+            foreach ($rawDependency in @($dependsOnProperty.Value))
+            {
+                $dependency = ([string]$rawDependency).Trim()
+                if ([string]::IsNullOrWhiteSpace($dependency) -or -not $moduleNames.Contains($dependency))
+                {
+                    throw "Module $name has an unknown dependency: $rawDependency"
+                }
+
+                if ([string]::Equals($name, $dependency, [StringComparison]::OrdinalIgnoreCase))
+                {
+                    throw "Module $name cannot depend on itself."
+                }
+
+                if (-not $dependencyNames.Add($dependency))
+                {
+                    throw "Module $name contains duplicate dependency $dependency."
+                }
+
+                $dependencies.Add($dependency)
+            }
+
+            $fixtures = New-Object System.Collections.Generic.List[string]
+            $fixtureNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+            foreach ($rawFixture in @($testFixturesProperty.Value))
+            {
+                $fixture = ([string]$rawFixture).Trim()
+                if ([string]::IsNullOrWhiteSpace($fixture) -or -not $knownFixtures.Contains($fixture))
+                {
+                    throw "Module $name references unknown test fixture: $rawFixture"
+                }
+
+                if (-not $fixtureNames.Add($fixture))
+                {
+                    throw "Module $name contains duplicate test fixture $fixture."
+                }
+
+                $fixtures.Add($fixture)
+            }
+
+            if (-not $fullSuiteOnDirectChange -and $fixtures.Count -eq 0)
+            {
+                throw "Module $name must select at least one test fixture."
+            }
+
+            $normalizedModules.Add([pscustomobject][ordered]@{
+                name = $name
+                sourcePaths = @($sourcePaths)
+                dependsOn = @($dependencies)
+                testFixtures = @($fixtures)
+                fullSuiteOnDirectChange = $fullSuiteOnDirectChange
+            })
+        }
+
+        $indegree = @{}
+        $dependents = @{}
+        foreach ($module in $normalizedModules)
+        {
+            $indegree[$module.name] = @($module.dependsOn).Count
+            $dependents[$module.name] = New-Object System.Collections.Generic.List[string]
+        }
+
+        foreach ($module in $normalizedModules)
+        {
+            foreach ($dependency in @($module.dependsOn))
+            {
+                $dependents[$dependency].Add([string]$module.name)
+            }
+        }
+
+        $queue = New-Object System.Collections.Generic.Queue[string]
+        foreach ($name in $orderedNames)
+        {
+            if ([int]$indegree[$name] -eq 0)
+            {
+                $queue.Enqueue($name)
+            }
+        }
+
+        $visitedCount = 0
+        while ($queue.Count -gt 0)
+        {
+            $current = $queue.Dequeue()
+            $visitedCount++
+            foreach ($dependent in $dependents[$current])
+            {
+                $indegree[$dependent] = [int]$indegree[$dependent] - 1
+                if ([int]$indegree[$dependent] -eq 0)
+                {
+                    $queue.Enqueue($dependent)
+                }
+            }
+        }
+
+        if ($visitedCount -ne $normalizedModules.Count)
+        {
+            throw 'Module impact manifest dependencies contain a cycle.'
+        }
+
+        return [pscustomobject][ordered]@{
+            loaded = $true
+            valid = $true
+            schemaVersion = $schemaVersion
+            modules = @($normalizedModules.ToArray())
+            sourceOwners = $sourceOwners
+            error = ''
+        }
+    }
+    catch
+    {
+        return [pscustomobject][ordered]@{
+            loaded = $loaded
+            valid = $false
+            schemaVersion = $schemaVersion
+            modules = @()
+            sourceOwners = @{}
+            error = $_.Exception.Message
+        }
+    }
+}
+
+function Get-DirectImpactModule
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$Manifest
+    )
+
+    if (-not $Manifest.valid -or -not $Manifest.sourceOwners.ContainsKey($Path))
+    {
+        return $null
+    }
+
+    $moduleName = [string]$Manifest.sourceOwners[$Path]
+    return @($Manifest.modules | Where-Object {
+        [string]::Equals([string]$_.name, $moduleName, [StringComparison]::OrdinalIgnoreCase)
+    })[0]
+}
+
+function Get-ReverseModuleClosure
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$DirectModuleName,
+        [Parameter(Mandatory = $true)][object[]]$Modules
+    )
+
+    $impacted = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+    [void]$impacted.Add($DirectModuleName)
+    $changed = $true
+    while ($changed)
+    {
+        $changed = $false
+        foreach ($module in $Modules)
+        {
+            if ($impacted.Contains([string]$module.name))
+            {
+                continue
+            }
+
+            foreach ($dependency in @($module.dependsOn))
+            {
+                if ($impacted.Contains([string]$dependency))
+                {
+                    [void]$impacted.Add([string]$module.name)
+                    $changed = $true
+                    break
+                }
+            }
+        }
+    }
+
+    return @($impacted | Sort-Object)
+}
+
+function Add-ModuleManifestMappedTests
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set,
+
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$Manifest,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[string]]$FullSuiteReasons,
+
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence
+    )
+
+    $directModule = Get-DirectImpactModule -Path $Path -Manifest $Manifest
+    if ($null -eq $directModule)
+    {
+        return $false
+    }
+
+    $closure = @(Get-ReverseModuleClosure -DirectModuleName ([string]$directModule.name) -Modules @($Manifest.modules))
+    $fixtures = @($Manifest.modules |
+        Where-Object { $closure -contains [string]$_.name } |
+        ForEach-Object { @($_.testFixtures) } |
+        Sort-Object -Unique)
+    Add-TestClasses $Set $fixtures
+    Add-SelectionEvidence `
+        -Evidence $Evidence `
+        -Path $Path `
+        -Source 'module-manifest' `
+        -Reason "Explicit module $($directModule.name) impacts modules: $($closure -join ', ')" `
+        -SelectedTestFixtures $fixtures `
+        -Module ([string]$directModule.name)
+
+    if ([bool]$directModule.fullSuiteOnDirectChange)
+    {
+        Add-FullSuiteFallbackReason `
+            -Reasons $FullSuiteReasons `
+            -Evidence $Evidence `
+            -Path $Path `
+            -Reason "$Path directly changes the $($directModule.name) module, which requires full-suite validation"
+    }
+
+    return $true
 }
 
 function Get-InventoryDependency
@@ -1104,6 +1494,21 @@ try
         modules = if ($null -ne $impactInventory -and $null -ne $impactInventory.modules) { @($impactInventory.modules | ForEach-Object { [string]$_.name }) } else { @() }
     }
 
+    $resolvedModuleImpactManifestPath = Resolve-TestImpactModuleManifestPath `
+        -RepoRoot $script:RepoRoot `
+        -RequestedPath $ModuleImpactManifestPath
+    $moduleImpactManifest = Get-TestImpactModuleManifest `
+        -Path $resolvedModuleImpactManifestPath `
+        -Inventory $impactInventory
+    $moduleManifestSummary = [ordered]@{
+        loaded = [bool]$moduleImpactManifest.loaded
+        valid = [bool]$moduleImpactManifest.valid
+        path = Convert-ToRepoPath $resolvedModuleImpactManifestPath
+        schemaVersion = [int]$moduleImpactManifest.schemaVersion
+        modules = @($moduleImpactManifest.modules | ForEach-Object { [string]$_.name })
+        error = [string]$moduleImpactManifest.error
+    }
+
     $changedFiles = @(Get-ChangedRepoFiles -RequestedBaseRef $BaseRef -IncludeUncommitted $IncludeUncommitted -ExplicitChangedFiles $ChangedFile)
     if ($changedFiles.Count -eq 0)
     {
@@ -1118,6 +1523,7 @@ try
                 fullSuiteFallbackReasons = @()
                 selectionEvidence = @()
                 inventory = $inventorySummary
+                moduleManifest = $moduleManifestSummary
                 suggestedAction = 'Skip'
                 suggestedCommand = ''
                 note = 'No changed files detected. No impacted tests to run.'
@@ -1172,11 +1578,11 @@ try
             continue
         }
 
-        if ($path -match '^scripts/(Get-SharpProofTestImpactInventory\.ps1|test-impact-inventory\.json)$')
+        if ($path -match '^scripts/(Get-SharpProofTestImpactInventory\.ps1|test-impact-(inventory|modules)\.json)$')
         {
             $before = @($testClasses | Sort-Object)
             Add-TestClasses $testClasses @('ImpactedTestSelectionScriptTests')
-            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Impacted-test inventory change' $before $testClasses
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Impacted-test metadata change' $before $testClasses
             continue
         }
 
@@ -1228,6 +1634,30 @@ try
             }
 
             continue
+        }
+
+        if ($path -match '^SharpProof\.Analyzer/.*\.cs$')
+        {
+            if (-not $moduleImpactManifest.valid)
+            {
+                Add-FullSuiteFallbackReason `
+                    -Reasons $fullReasons `
+                    -Evidence $selectionEvidence `
+                    -Path $path `
+                    -Reason "$path cannot use the invalid module impact manifest: $($moduleImpactManifest.error)"
+                continue
+            }
+
+            $hasModuleManifestMapping = Add-ModuleManifestMappedTests `
+                -Set $testClasses `
+                -Path $path `
+                -Manifest $moduleImpactManifest `
+                -FullSuiteReasons $fullReasons `
+                -Evidence $selectionEvidence
+            if ($hasModuleManifestMapping)
+            {
+                continue
+            }
         }
 
         $beforeMappedCount = $testClasses.Count
@@ -1340,6 +1770,7 @@ try
         fullSuiteFallbackReasons = @($fullReasons)
         selectionEvidence = @($selectionEvidence.ToArray())
         inventory = $inventorySummary
+        moduleManifest = $moduleManifestSummary
         filterTooLong = $filterTooLong
         forcePartial = [bool]$ForcePartial
         suggestedAction = $suggestedAction
@@ -1394,6 +1825,11 @@ try
         Write-Host ''
         Write-Host 'Impact-selection evidence:'
         Write-Host "  Inventory loaded: $($inventorySummary.loaded) ($($inventorySummary.path))"
+        Write-Host "  Module manifest loaded: $($moduleManifestSummary.loaded); valid: $($moduleManifestSummary.valid) ($($moduleManifestSummary.path))"
+        if (-not $moduleManifestSummary.valid)
+        {
+            Write-Host "  Module manifest error: $($moduleManifestSummary.error)"
+        }
         foreach ($entry in $selectionEvidence)
         {
             $fixtures = @($entry.selectedTestFixtures) -join ', '

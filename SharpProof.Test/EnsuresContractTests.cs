@@ -11,6 +11,9 @@ namespace SharpProof.Test
     [TestFixture]
     public sealed class EnsuresContractTests
     {
+        private static readonly ImmutableArray<Microsoft.CodeAnalysis.MetadataReference> EnsuresFrameworkReferences =
+            GetMinimalFrameworkReferences();
+
         [Test]
         public async Task Ensures_StraightLineReturn_Proven()
         {
@@ -27,7 +30,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
         }
 
         [Test]
@@ -51,7 +54,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
         }
 
         [Test]
@@ -70,7 +73,11 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            await AssertSingleDiagnosticAsync(
+                test,
+                SharpProofDiagnostics.EnsuresNotProvenId,
+                frameworkReferences: EnsuresFrameworkReferences,
+                analyzerFeatures: AnalyzerFeatures.Ensures);
         }
 
         [Test]
@@ -153,7 +160,7 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
         }
 
         [Test]
@@ -759,7 +766,7 @@ public sealed class TestClass
         [Test]
         public async Task Ensures_VoidMethodResultReference_IsRejected()
         {
-            var diagnostics = await GetDiagnosticsAsync(@"
+            var diagnostics = await GetEnsuresDiagnosticsAsync(@"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -793,7 +800,7 @@ public sealed class TestClass
         [Test]
         public async Task Ensures_SmtOff_RemainsConservative()
         {
-            var diagnostics = await GetDiagnosticsAsync(@"
+            var diagnostics = await GetEnsuresDiagnosticsAsync(@"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -817,6 +824,17 @@ public sealed class TestClass
                 .ToArray();
             Assert.That(ensuresDiagnostics, Has.Length.EqualTo(2));
             Assert.That(ensuresDiagnostics.All(diagnostic => diagnostic.GetMessage().Contains("SMT")), Is.True);
+        }
+
+        private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> GetEnsuresDiagnosticsAsync(
+            string source,
+            ImmutableDictionary<string, string>? globalOptions = null)
+        {
+            return GetDiagnosticsAsync(
+                source,
+                globalOptions: globalOptions,
+                frameworkReferences: EnsuresFrameworkReferences,
+                analyzerFeatures: AnalyzerFeatures.Ensures);
         }
 
         [Test]

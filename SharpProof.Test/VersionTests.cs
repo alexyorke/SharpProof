@@ -7,6 +7,8 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class VersionTests
     {
+        // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
+        // single-tree compilations only oversubscribes the test lane.
         [Test]
         public async Task VersionConstructor_NoDiagnostic()
         {
@@ -59,7 +61,7 @@ public class TestClass
 
         private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
         {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: false);
             Assert.That(diagnostics, Is.Empty);
         }
     }

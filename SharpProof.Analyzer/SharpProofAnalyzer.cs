@@ -11,6 +11,19 @@ namespace SharpProof.Analyzer
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class SharpProofAnalyzer : DiagnosticAnalyzer
     {
+        private readonly AnalyzerFeatures _features;
+
+        public SharpProofAnalyzer()
+            : this(AnalyzerFeatures.All)
+        {
+        }
+
+        internal SharpProofAnalyzer(AnalyzerFeatures features)
+        {
+            _features = AnalyzerFeatureDependencies.Expand(features);
+        }
+
+        internal AnalyzerFeatures Features => _features;
 
         public const string SP0002 = SharpProofDiagnostics.PurityNotVerifiedId;
         public const string SP0004 = SharpProofDiagnostics.MissingEnforcePureAttributeId;
@@ -54,70 +67,72 @@ namespace SharpProof.Analyzer
 
             context.RegisterCompilationStartAction(startContext =>
             {
-                var config = Configuration.AnalyzerConfiguration.FromOptions(startContext.Options);
-                var attributePolicy = SharpProofAttributeIdentityPolicy.Create(config.AttributeStubNamespaces);
-                var purityService = new Engine.CompilationPurityService(startContext.Compilation, config.SmtOptions, attributePolicy);
-                var invalidConfigurationValues = config.InvalidConfigurationValues;
-                var missingPuritySuggestions = config.MissingPuritySuggestions;
-                var emitExplanations = config.EmitExplanations;
-                var reportBclFallbackGuesses = config.ReportBclFallbackGuesses;
-                var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
-                var exceptionSummaryCatalog = config.EnableEffectSummaryJson
-                    ? ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
-                    : ExceptionSummaryCatalog.Empty;
-                var generatedPurityCatalog = config.EnableEffectSummaryJson
-                    ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
-                    : null;
+                var session = new AnalyzerSession(
+                    startContext.Compilation,
+                    startContext.Options,
+                    startContext.CancellationToken,
+                    _features);
 
                 startContext.RegisterCompilationEndAction(endContext =>
                 {
-                    foreach (var invalidConfigurationValue in invalidConfigurationValues)
+                    try
                     {
-                        var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
-                        if (!baseline.IsSuppressed(diagnostic))
+                        foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues)
                         {
-                            endContext.ReportDiagnostic(diagnostic);
+                            var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
+                            if (!session.Baseline.IsSuppressed(diagnostic))
+                            {
+                                endContext.ReportDiagnostic(diagnostic);
+                            }
                         }
                     }
-
-                    purityService.Dispose();
+                    finally
+                    {
+                        session.Dispose();
+                    }
                 });
 
-                startContext.RegisterSyntaxNodeAction(c =>
+                if ((session.Features & AnalyzerFeatures.Callable) != 0)
                 {
-                    using (generatedPurityCatalog == null ? null : GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))
-                    using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
-                    {
-                        MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, reportBclFallbackGuesses, baseline, attributePolicy);
-                        MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(c, baseline, attributePolicy);
-                        MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(c, baseline, attributePolicy);
-                        MethodRequiresAnalyzer.AnalyzeSymbolForRequires(c, baseline, attributePolicy);
-                        MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(c, purityService, baseline, attributePolicy);
-                        MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(c, baseline, attributePolicy);
-                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService, baseline, attributePolicy);
-                    }
-                },
-                    SyntaxKind.AddAccessorDeclaration,
-                    SyntaxKind.MethodDeclaration,
-                    SyntaxKind.GetAccessorDeclaration,
-                    SyntaxKind.InitAccessorDeclaration,
-                    SyntaxKind.IndexerDeclaration,
-                    SyntaxKind.RemoveAccessorDeclaration,
-                    SyntaxKind.PropertyDeclaration,
-                    SyntaxKind.SetAccessorDeclaration,
-                    SyntaxKind.ConstructorDeclaration,
-                    SyntaxKind.ConversionOperatorDeclaration,
-                    SyntaxKind.OperatorDeclaration,
-                    SyntaxKind.LocalFunctionStatement);
+                    startContext.RegisterSyntaxNodeAction(
+                        c => AnalyzerFeaturePipeline.AnalyzeCallable(c, session),
+                        SyntaxKind.AddAccessorDeclaration,
+                        SyntaxKind.MethodDeclaration,
+                        SyntaxKind.GetAccessorDeclaration,
+                        SyntaxKind.InitAccessorDeclaration,
+                        SyntaxKind.IndexerDeclaration,
+                        SyntaxKind.RemoveAccessorDeclaration,
+                        SyntaxKind.PropertyDeclaration,
+                        SyntaxKind.SetAccessorDeclaration,
+                        SyntaxKind.ConstructorDeclaration,
+                        SyntaxKind.ConversionOperatorDeclaration,
+                        SyntaxKind.OperatorDeclaration,
+                        SyntaxKind.LocalFunctionStatement);
+                }
 
-                startContext.RegisterSyntaxNodeAction(
-                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(c, baseline, attributePolicy),
-                    SyntaxKind.AttributeList);
-                startContext.RegisterSyntaxNodeAction(
-                    c => MethodRequiresAnalyzer.AnalyzeCallSiteForRequires(c, purityService, baseline, attributePolicy),
-                    SyntaxKind.InvocationExpression,
-                    SyntaxKind.ObjectCreationExpression);
-                startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, baseline));
+                if (session.Features.Includes(AnalyzerFeatures.Placement))
+                {
+                    startContext.RegisterSyntaxNodeAction(
+                        c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(
+                            c,
+                            session.Baseline,
+                            session.AttributePolicy),
+                        SyntaxKind.AttributeList);
+                }
+
+                if (session.Features.Includes(AnalyzerFeatures.Requires))
+                {
+                    startContext.RegisterSyntaxNodeAction(
+                        c => MethodRequiresAnalyzer.AnalyzeCallSiteForRequires(
+                            c,
+                            session.PurityService,
+                            session.Baseline,
+                            session.AttributePolicy),
+                        SyntaxKind.InvocationExpression,
+                        SyntaxKind.ObjectCreationExpression);
+                }
+
+                startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
             });
         }
 

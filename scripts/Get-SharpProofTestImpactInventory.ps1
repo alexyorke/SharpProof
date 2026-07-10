@@ -123,7 +123,7 @@ $script:Modules = @(
     [ordered]@{ name = 'Shared'; sourceRoots = @('Shared/'); allowedProjectReferences = @() },
     [ordered]@{ name = 'Packaging'; sourceRoots = @('SharpProof.Package/'); allowedProjectReferences = @('SharpProof.CodeFixes') },
     [ordered]@{ name = 'VSIX'; sourceRoots = @('SharpProof.Vsix/', 'Tools/VsixHarness/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Analyzer', 'SharpProof.Symbolic') },
-    [ordered]@{ name = 'Tools'; sourceRoots = @('Tools/SharpProof.CorpusReport.Core/', 'Tools/SharpProof.CorpusReport/', 'Tools/SharpProof.EffectSummary/', 'Tools/SharpProof.Fuzz.Core/', 'Tools/SharpProof.Fuzz/', 'Tools/SharpProof.SymbolicCli/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core') },
+    [ordered]@{ name = 'Tools'; sourceRoots = @('Tools/SharpProof.Baseline.Core/', 'Tools/SharpProof.Baseline/', 'Tools/SharpProof.CorpusReport.Core/', 'Tools/SharpProof.CorpusReport/', 'Tools/SharpProof.EffectSummary/', 'Tools/SharpProof.Fuzz.Core/', 'Tools/SharpProof.Fuzz/', 'Tools/SharpProof.SymbolicCli/'); allowedProjectReferences = @('SharpProof.Analyzer', 'SharpProof.Attributes', 'SharpProof.Symbolic', 'SharpProof.Baseline.Core', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core') },
     [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('SharpProof.Test/', 'SharpProof.ToolingTest/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Attributes', 'SharpProof.Analyzer', 'SharpProof.Symbolic', 'SearchLib', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core', 'SharpProof.SymbolicCli') }
 )
 $script:IgnoredTypeTokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
@@ -208,7 +208,8 @@ try
             $_.FullName -notmatch '[\\/](bin|obj)[\\/]' -and
             (Convert-ToRepoPath $_.FullName) -notmatch '(^|/)\.[^/]+/' -and
             (Convert-ToRepoPath $_.FullName) -notmatch '^SharpProof\.(Demo|Smoke\.Net472)/' -and
-            (Convert-ToRepoPath $_.FullName) -notmatch '^SharpProof\.(Test|ToolingTest)/'
+            (Convert-ToRepoPath $_.FullName) -notmatch '^SharpProof\.(Test|ToolingTest)/' -and
+            (Get-ModuleName -Path (Convert-ToRepoPath $_.FullName)) -ne 'Unknown'
         } |
         Sort-Object FullName)
 
@@ -299,7 +300,7 @@ try
         fixtureDependencies = @($fixtureDependencies | Sort-Object { $_['path'] })
     }
 
-    $json = $inventory | ConvertTo-Json -Depth 8
+    $json = ($inventory | ConvertTo-Json -Depth 8).Replace("`r`n", "`n")
     if ($Validate)
     {
         $parsed = $json | ConvertFrom-Json
@@ -340,7 +341,7 @@ try
             [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
         }
 
-        [System.IO.File]::WriteAllText($resolvedOutputPath, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($resolvedOutputPath, $json + "`n", [System.Text.UTF8Encoding]::new($false))
     }
 }
 finally

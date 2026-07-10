@@ -20,6 +20,13 @@ namespace SharpProof.Test
         private static readonly ConcurrentDictionary<string, string> s_fileContentCache =
             new(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly ConcurrentDictionary<PowerShellJsonScriptCacheKey, Lazy<Task<string>>> s_powerShellJsonOutputCache =
+            new();
+
+        private readonly record struct PowerShellJsonScriptCacheKey(
+            string RepositoryRoot,
+            string ScriptName);
+
         private static string ReadFileCached(string path)
         {
             return s_fileContentCache.GetOrAdd(path, static key =>
@@ -8944,6 +8951,18 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
             string repositoryRoot,
             string scriptName)
         {
+            var cacheKey = new PowerShellJsonScriptCacheKey(repositoryRoot, scriptName);
+            var output = await s_powerShellJsonOutputCache.GetOrAdd(
+                cacheKey,
+                static key => new Lazy<Task<string>>(
+                    () => RunPowerShellJsonScriptCoreAsync(key.RepositoryRoot, key.ScriptName))).Value;
+            return JsonDocument.Parse(output);
+        }
+
+        private static async Task<string> RunPowerShellJsonScriptCoreAsync(
+            string repositoryRoot,
+            string scriptName)
+        {
             var startInfo = new ProcessStartInfo
             {
                 FileName = FindPowerShellExecutable(),
@@ -8993,7 +9012,7 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
             }
 
             Assert.That(error, Is.Empty);
-            return JsonDocument.Parse(output);
+            return output;
         }
 
         private static readonly string[] ApprovedAnalyzerRawSmtHotspots = Array.Empty<string>();

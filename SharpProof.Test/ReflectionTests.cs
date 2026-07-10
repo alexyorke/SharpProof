@@ -14,9 +14,10 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class ReflectionTests
     {
+        // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
+        // single-tree compilations only oversubscribes the test lane.
         private static readonly ImmutableArray<MetadataReference> ReflectionFrameworkReferences =
-            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
-                MetadataReference.CreateFromFile(typeof(System.Reflection.MemberInfo).Assembly.Location));
+            AnalyzerTestHost.GetMinimalFrameworkReferences();
 
         [Test]
         public async Task FieldInfoGetValue_Diagnostic()
@@ -2694,7 +2695,7 @@ public class TestClass
             var (_, diagnostic) = await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
                 markedSource,
                 frameworkReferences: ReflectionFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
             if (diagnostic != null)
             {
                 Assert.That(

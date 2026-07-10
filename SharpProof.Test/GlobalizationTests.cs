@@ -16,9 +16,10 @@ namespace SharpProof.Test
     [Parallelizable(ParallelScope.Children)]
     public class GlobalizationTests
     {
+        // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
+        // single-tree compilations only oversubscribes the test lane.
         private static readonly ImmutableArray<MetadataReference> GlobalizationFrameworkReferences =
-            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
-                MetadataReference.CreateFromFile(typeof(CultureInfo).Assembly.Location));
+            AnalyzerTestHost.GetMinimalFrameworkReferences();
 
         [Test]
         public async Task CultureInfo_InvariantCultureName_Diagnostic()
@@ -1743,7 +1744,7 @@ public class TestClass
     }
 }",
                 frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -1810,7 +1811,7 @@ public class TestClass
     }
 }",
                 frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -1958,7 +1959,7 @@ public class TestClass
 }
 """,
                 frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -2298,7 +2299,7 @@ public class TestClass
 }
 """,
                 frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -4988,7 +4989,7 @@ public class TestClass
             await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
                 markedSource,
                 frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: true);
+                concurrentAnalysis: false);
         }
     }
 }

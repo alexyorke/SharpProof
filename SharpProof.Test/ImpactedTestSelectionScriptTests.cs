@@ -269,10 +269,10 @@ namespace SharpProof.Test
             Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Production metrics script change"));
         }
 
-        [Test]
-        public async Task ListOnlyJson_SelectsSelectorTestsForGeneratedImpactInventory()
+        [TestCase("scripts/test-impact-inventory.json")]
+        [TestCase("scripts/test-impact-modules.json")]
+        public async Task ListOnlyJson_SelectsSelectorTestsForImpactMetadata(string changedFile)
         {
-            const string changedFile = "scripts/test-impact-inventory.json";
             using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
             var root = recommendation.RootElement;
             var evidence = GetEvidenceEntry(root, changedFile, "path-map");
@@ -281,7 +281,7 @@ namespace SharpProof.Test
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
             Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
             Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("ImpactedTestSelectionScriptTests"));
-            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Impacted-test inventory change"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Impacted-test metadata change"));
         }
 
         [Test]
@@ -381,18 +381,87 @@ namespace SharpProof.Test
             const string changedFile = "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs";
             using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
             var root = recommendation.RootElement;
-            var evidence = GetEvidenceEntry(root, changedFile, "full-suite-fallback");
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var manifestEvidence = GetEvidenceEntry(root, changedFile, "module-manifest");
             var command = root.GetProperty("suggestedCommand").GetString();
 
             Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
             Assert.That(
                 GetStringArray(root, "fullSuiteFallbackReasons"),
-                Does.Contain(changedFile + " is high-fanout analyzer core"));
-            Assert.That(
-                GetStringArray(evidence, "fullSuiteFallbackReasons"),
-                Does.Contain(changedFile + " is high-fanout analyzer core"));
+                Has.Some.Contains("PurityCore"));
+            Assert.That(manifestEvidence.GetProperty("module").GetString(), Is.EqualTo("PurityCore"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(fixtures, Does.Contain("EnsuresContractTests"));
+            Assert.That(fixtures, Does.Contain("AnalyzerFeatureCompositionTests"));
             Assert.That(command, Does.Contain("-TestLane All"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_UsesExplicitEnsuresModuleAndReverseClosure()
+        {
+            const string changedFile = "SharpProof.Analyzer/MethodEnsuresAnalyzer.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "module-manifest");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Is.EquivalentTo(new[]
+            {
+                "AnalyzerFeatureCompositionTests",
+                "DiagnosticExplainPropertyTests",
+                "EnsuresContractTests",
+                "RequiresContractTests",
+            }));
+            Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("Ensures"));
+            Assert.That(
+                root.GetProperty("selectionEvidence").EnumerateArray().Any(entry =>
+                    entry.GetProperty("changedFile").GetString() == changedFile &&
+                    (entry.GetProperty("source").GetString() == "token-reference" ||
+                     entry.GetProperty("source").GetString() == "inventory-symbol-reference")),
+                Is.False);
+        }
+
+        [Test]
+        public async Task ListOnlyJson_PreservesFullSuiteFallbackForAnalyzerComposition()
+        {
+            const string changedFile = "SharpProof.Analyzer/SharpProofAnalyzer.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "module-manifest");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+            Assert.That(
+                GetStringArray(root, "selectedTestFixtures"),
+                Is.EquivalentTo(new[] { "AnalyzerFeatureCompositionTests" }));
+            Assert.That(evidence.GetProperty("module").GetString(), Is.EqualTo("AnalyzerComposition"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Has.Some.Contains("AnalyzerComposition"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_MissingModuleManifestFallsBackForAnalyzerChange()
+        {
+            const string changedFile = "SharpProof.Analyzer/MethodEnsuresAnalyzer.cs";
+            var missingManifestPath = Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "missing-test-impact-modules.json");
+            Assert.That(File.Exists(missingManifestPath), Is.False);
+
+            using var recommendation = await RunImpactedSelectorJsonWithManifestAsync(
+                missingManifestPath,
+                changedFile);
+            var root = recommendation.RootElement;
+            var moduleManifest = root.GetProperty("moduleManifest");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+            Assert.That(moduleManifest.GetProperty("loaded").GetBoolean(), Is.False);
+            Assert.That(moduleManifest.GetProperty("valid").GetBoolean(), Is.False);
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Has.Some.Contains("invalid module impact manifest"));
         }
 
         [Test]
@@ -510,17 +579,24 @@ namespace SharpProof.Test
         }
 
         [Test]
-        public async Task ListOnlyJson_IncludesInventorySummary()
+        public async Task ListOnlyJson_IncludesImpactMetadataSummaries()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(
                 "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs");
             var inventory = recommendation.RootElement.GetProperty("inventory");
+            var moduleManifest = recommendation.RootElement.GetProperty("moduleManifest");
 
             Assert.That(inventory.GetProperty("loaded").GetBoolean(), Is.True);
             Assert.That(inventory.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
             Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Analyzer"));
             Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Symbolic"));
             Assert.That(GetStringArray(inventory, "modules"), Does.Contain("Shared"));
+            Assert.That(moduleManifest.GetProperty("loaded").GetBoolean(), Is.True);
+            Assert.That(moduleManifest.GetProperty("valid").GetBoolean(), Is.True);
+            Assert.That(moduleManifest.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("PurityCore"));
+            Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("Ensures"));
+            Assert.That(GetStringArray(moduleManifest, "modules"), Does.Contain("AnalyzerComposition"));
         }
 
         [Test]
@@ -532,6 +608,7 @@ namespace SharpProof.Test
 
             Assert.That(output, Does.Contain("Impact-selection evidence:"));
             Assert.That(output, Does.Contain("Inventory loaded: True"));
+            Assert.That(output, Does.Contain("Module manifest loaded: True; valid: True"));
             Assert.That(output, Does.Contain("inventory-symbol-reference"));
             Assert.That(output, Does.Contain("module=CodeFixes"));
             Assert.That(output, Does.Contain("tokens=SharpProofCodeFixProvider"));
@@ -612,7 +689,32 @@ namespace SharpProof.Test
             return await JsonSession.Value.InvokeJsonAsync(workers, changedFiles);
         }
 
+        private static async Task<JsonDocument> RunImpactedSelectorJsonWithManifestAsync(
+            string moduleImpactManifestPath,
+            params string[] changedFiles)
+        {
+            var output = await RunImpactedSelectorProcessAsync(
+                explain: false,
+                json: true,
+                moduleImpactManifestPath: moduleImpactManifestPath,
+                changedFiles: changedFiles);
+            return JsonDocument.Parse(output);
+        }
+
         private static async Task<string> RunImpactedSelectorTextAsync(bool explain, params string[] changedFiles)
+        {
+            return await RunImpactedSelectorProcessAsync(
+                explain,
+                json: false,
+                moduleImpactManifestPath: string.Empty,
+                changedFiles: changedFiles);
+        }
+
+        private static async Task<string> RunImpactedSelectorProcessAsync(
+            bool explain,
+            bool json,
+            string moduleImpactManifestPath,
+            params string[] changedFiles)
         {
             var repositoryRoot = FindRepositoryRoot();
             var startInfo = CreatePowerShellStartInfo(repositoryRoot);
@@ -620,9 +722,20 @@ namespace SharpProof.Test
             startInfo.ArgumentList.Add("-File");
             startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Invoke-SharpProofImpactedTests.ps1"));
             startInfo.ArgumentList.Add("-ListOnly");
+            if (json)
+            {
+                startInfo.ArgumentList.Add("-Json");
+            }
+
             if (explain)
             {
                 startInfo.ArgumentList.Add("-Explain");
+            }
+
+            if (!string.IsNullOrWhiteSpace(moduleImpactManifestPath))
+            {
+                startInfo.ArgumentList.Add("-ModuleImpactManifestPath");
+                startInfo.ArgumentList.Add(moduleImpactManifestPath);
             }
 
             startInfo.ArgumentList.Add("-ChangedFile");
