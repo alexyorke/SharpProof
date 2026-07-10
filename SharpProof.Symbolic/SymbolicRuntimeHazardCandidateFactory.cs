@@ -1440,6 +1440,45 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 fallbackProvenance);
     }
 
+    private static RuntimeHazardTrigger CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SmtFormula triggerFormula,
+        string provenance)
+    {
+        if (TryCreateIrExceptionPreconditionTriggerFromFormula(
+                site,
+                kind,
+                triggerFormula,
+                provenance,
+                out var trigger))
+            return trigger;
+
+        var unknownTrigger = CreateUnknownTrigger(site, "unsupported_typed_projection");
+        var unknownVariable = (SmtVariable)unknownTrigger;
+        var unsupportedTriggerFact = new SymbolicFact(
+            new SymbolicTruthAtom(new SymbolicVariableTerm(unknownVariable.Name, SmtValueKind.Bool)),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            provenance + ".trigger",
+            site.Span,
+            null,
+            provenance + ".trigger");
+        var unsupportedPrecondition = new SymbolicFact(
+            new SymbolicExceptionPreconditionAtom(
+                kind,
+                subject,
+                new SymbolicFactCondition(unsupportedTriggerFact)),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            provenance,
+            site.Span,
+            null,
+            provenance);
+        return new RuntimeHazardTrigger(unknownTrigger, unsupportedPrecondition);
+    }
+
     private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
         BinaryExpressionSyntax binaryExpression,
         SmtIntegerBinaryOperator smtOperator,
@@ -1487,13 +1526,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     out var signedDivisionOverflow))
                 return false;
 
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 binaryExpression,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
                 signedDivisionOverflow,
-                "ir.runtime-hazard.checked-integral.signed-division-overflow.translated",
-                "ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback");
+                "ir.runtime-hazard.checked-integral.signed-division-overflow.translated");
             return true;
         }
 
@@ -1509,13 +1547,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             binaryExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
             outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.binary-overflow.translated",
-            "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
+            "ir.runtime-hazard.checked-integral.binary-overflow.translated");
         return true;
     }
 
@@ -1554,13 +1591,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             unaryExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
             outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated",
-            "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
+            "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated");
         return true;
     }
 
@@ -1602,15 +1638,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
             ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
             : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             site,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
             outOfRangeFormula,
-            translatedProvenance,
-            smtOperator == SmtIntegerBinaryOperator.Add
-                ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
-                : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
+            translatedProvenance);
         return true;
     }
 
@@ -1647,13 +1680,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     out var signedDivisionOverflow))
                 return false;
 
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 assignment,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
                 signedDivisionOverflow,
-                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated",
-                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback");
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated");
             return true;
         }
 
@@ -1669,13 +1701,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             assignment,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
             outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated",
-            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
+            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated");
         return true;
     }
 
@@ -1711,13 +1742,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
             castExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
             outOfRangeFormula,
-            "ir.runtime-hazard.checked-conversion.overflow.translated",
-            "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
+            "ir.runtime-hazard.checked-conversion.overflow.translated");
         return true;
     }
 

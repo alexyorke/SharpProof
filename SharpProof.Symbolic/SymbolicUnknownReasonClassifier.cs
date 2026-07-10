@@ -68,6 +68,8 @@ internal static class SymbolicReasonDisplay
             "smt_method_budget_exceeded" => "SMT method-level budget exceeded",
             "unsupported_formula_fallback" =>
                 "unsupported formula fallback; legacy translated trigger was not trusted as proof",
+            "unsupported_typed_projection" =>
+                "runtime-hazard trigger could not be projected to typed symbolic IR",
             "trigger_always_true" => "trigger condition is always true",
             "trigger_always_false" => "trigger condition is always false",
             "path_unsatisfiable" => "path condition is unsatisfiable",

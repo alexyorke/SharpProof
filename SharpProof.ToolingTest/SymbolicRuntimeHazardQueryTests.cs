@@ -4743,6 +4743,55 @@ public class TestClass
     }
 
     [Test]
+    public void ClassifyTriggerCore_ReportsUnsupportedTypedProjectionWithSourceLikeEvidence()
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");
+        var node = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var subject = new SymbolicVariableTerm("value", SmtValueKind.Int);
+        var unsupportedTrigger = new SymbolicFact(
+            new SymbolicExceptionPreconditionAtom(
+                SymbolicExceptionPreconditionKind.DivideByZero,
+                subject,
+                new SymbolicFactCondition(new SymbolicFact(
+                    new SymbolicTruthAtom(new SymbolicVariableTerm("unsupported#1", SmtValueKind.Bool)),
+                    true,
+                    SymbolicFactConfidence.Unsupported,
+                    "ir.runtime-hazard.divide-by-zero.translated.trigger",
+                    node.Span,
+                    null,
+                    "unsupported-trigger"))),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            "ir.runtime-hazard.divide-by-zero.translated",
+            node.Span,
+            null,
+            "unsupported-precondition");
+        var analysis = new SymbolicProgramPointAnalysis(
+            node.SpanStart,
+            Array.Empty<SmtFormula>(),
+            new SymbolicState(Array.Empty<SymbolicFact>()),
+            SymbolicReachability.Reachable,
+            "reachable",
+            SymbolicSmtDiagnostics.NotConfigured,
+            node);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+            analysis,
+            node,
+            new SmtVariable("unsupported#1", SmtValueKind.Bool),
+            unsupportedTrigger,
+            smtAnalysis);
+        var publicFact = SymbolicFactInfo.FromFact(unsupportedTrigger);
+
+        Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        Assert.That(reason, Is.EqualTo("unsupported_typed_projection"));
+        Assert.That(proof, Is.Null);
+        Assert.That(publicFact.Confidence, Is.EqualTo("Unsupported"));
+        Assert.That(publicFact.Text, Is.EqualTo("unknown(DivideByZero trigger for value)"));
+    }
+
+    [Test]
     public void ClassifyTriggerCore_PreservesIrBackedHazardProofs()
     {
         var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");

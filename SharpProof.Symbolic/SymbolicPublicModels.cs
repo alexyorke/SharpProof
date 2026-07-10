@@ -219,11 +219,25 @@ public sealed class SymbolicFactInfo
 
     private static string FormatFactText(SymbolicFact fact)
     {
+        if (fact.Confidence != SymbolicFactConfidence.Exact &&
+            fact.Atom is SymbolicExceptionPreconditionAtom precondition)
+            return FormatUnsupportedExceptionPrecondition(precondition);
+
         var text = fact.Confidence == SymbolicFactConfidence.Exact &&
                    SymbolicIrFormulaEncoder.TryEncode(fact.Atom, out var formula)
             ? SymbolicFormulaDisplay.Format(formula)
             : fact.Atom.ToString();
         return fact.Polarity ? text : "!(" + text + ")";
+    }
+
+    private static string FormatUnsupportedExceptionPrecondition(SymbolicExceptionPreconditionAtom precondition)
+    {
+        if (precondition.Subject != null &&
+            SymbolicIrFormulaEncoder.TryEncodeTerm(precondition.Subject, out var subjectFormula))
+            return "unknown(" + precondition.Kind + " trigger for " +
+                   SymbolicFormulaDisplay.Format(subjectFormula) + ")";
+
+        return "unknown(" + precondition.Kind + " trigger)";
     }
 }
 

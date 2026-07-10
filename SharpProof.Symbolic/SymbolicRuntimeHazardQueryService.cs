@@ -481,6 +481,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (triggerCondition is SmtBooleanConstant { Value: false })
             return (SymbolicRuntimeHazardStatus.Unreachable, "trigger_always_false", null);
 
+        if (triggerPrecondition is { Confidence: SymbolicFactConfidence.Unsupported })
+            return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_typed_projection", null);
+
         if (IsFallbackDerivedTriggerPrecondition(triggerPrecondition))
             return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_formula_fallback", null);
 
@@ -727,6 +730,8 @@ public sealed class SymbolicRuntimeHazard
         {
             "unsupported_formula_fallback" =>
                 "unsupported formula fallback; legacy translated trigger was not trusted as proof",
+            "unsupported_typed_projection" =>
+                "runtime-hazard trigger could not be projected to typed symbolic IR",
             "smt_disabled" => "SMT disabled",
             "smt_disposed" => "SMT solver disposed",
             "smt_timeout" => "SMT solver timed out",
@@ -790,7 +795,8 @@ public sealed class SymbolicRuntimeHazard
         string statusReason)
     {
         return status == SymbolicRuntimeHazardStatus.Unsupported ||
-               string.Equals(statusReason, "unsupported_formula_fallback", StringComparison.Ordinal)
+               string.Equals(statusReason, "unsupported_formula_fallback", StringComparison.Ordinal) ||
+               string.Equals(statusReason, "unsupported_typed_projection", StringComparison.Ordinal)
             ? SymbolicProofBackend.None
             : SymbolicProofBackend.Smt;
     }

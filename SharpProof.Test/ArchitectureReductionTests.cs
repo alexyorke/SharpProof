@@ -2453,7 +2453,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardCheckedIntegralOutOfRange_UsesIrExceptionPreconditionsBeforeLegacyFallback()
+    public void RuntimeHazardCheckedIntegralOutOfRange_UsesTypedIrProjections()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
@@ -2521,23 +2521,23 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Contain("provenance + \".upper-bound\""));
         Assert.That(lowererSource, Does.Contain("provenance + \".left-min\""));
         Assert.That(lowererSource, Does.Contain("provenance + \".right-minus-one\""));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"));
         Assert.That(source,
-            Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback"));
+            Does.Not.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback"));
         Assert.That(source,
-            Does.Contain("ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback"));
+            Does.Not.Contain("ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback"));
         Assert.That(source,
-            Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.formula-fallback"));
+            Does.Not.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback"));
+        Assert.That(source, Does.Not.Contain("ir.runtime-hazard.checked-conversion.overflow.formula-fallback"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.CheckedOverflow"));
-        Assert.That(source, Does.Contain("CreateFormulaBackedExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger"));
     }
 
     [Test]
-    public void RuntimeHazardSignedDivisionOverflowFallback_PrefersLoweredIrTriggerBeforeFormulaBackedTrigger()
+    public void RuntimeHazardSignedDivisionOverflow_UsesTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -2557,14 +2557,15 @@ public sealed class ArchitectureReductionTests
                 StringComparison.Ordinal);
 
         Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex));
+        Assert.That(fallbackIndex, Is.EqualTo(-1));
         Assert.That(compoundTranslatedIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(compoundFallbackIndex, Is.GreaterThan(compoundTranslatedIndex));
+        Assert.That(compoundFallbackIndex, Is.EqualTo(-1));
         Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger("));
     }
 
     [Test]
-    public void RuntimeHazardCheckedOverflowRangeFallbacks_PreferLoweredIrTriggerBeforeFormulaBackedTrigger()
+    public void RuntimeHazardCheckedOverflowRanges_UseTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -2590,10 +2591,11 @@ public sealed class ArchitectureReductionTests
                 StringComparison.Ordinal);
 
             Assert.That(translatedIndex, Is.GreaterThanOrEqualTo(0), provenance);
-            Assert.That(fallbackIndex, Is.GreaterThan(translatedIndex), provenance);
+            Assert.That(fallbackIndex, Is.EqualTo(-1), provenance);
         }
 
         Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTriggerFromFormula("));
+        Assert.That(source, Does.Contain("CreateTypedFormulaProjectionExceptionPreconditionTrigger("));
     }
 
     [Test]
@@ -2974,7 +2976,7 @@ public sealed class ArchitectureReductionTests
             .GroupBy(static provenance => provenance, StringComparer.Ordinal)
             .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
-        Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(16));
+        Assert.That(root.GetProperty("runtimeHazardFormulaFallbackCount").GetInt32(), Is.EqualTo(8));
         Assert.That(
             runtimeHazardFormulaFallbackLocations.All(static location =>
                 location.Path.StartsWith("SharpProof.Symbolic/", StringComparison.Ordinal)),
@@ -2983,7 +2985,6 @@ public sealed class ArchitectureReductionTests
             runtimeHazardFormulaFallbackCountsByPath,
             Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
             {
-                ["SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs"] = 8,
                 ["SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"] = 8
             }));
         Assert.That(
@@ -2991,14 +2992,6 @@ public sealed class ArchitectureReductionTests
             Is.EquivalentTo(new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 ["ir.runtime-hazard.argument-null.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-conversion.overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback"] = 1,
-                ["ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback"] = 1,
                 ["ir.runtime-hazard.divide-by-zero.formula-fallback"] = 1,
                 ["ir.runtime-hazard.dynamic-null-binding.formula-fallback"] = 1,
                 ["ir.runtime-hazard.index.out-of-range.formula-fallback"] = 1,
