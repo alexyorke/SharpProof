@@ -33,6 +33,22 @@ The analyzer combines:
 - External calls, dynamic dispatch, reflection-heavy flows, native interop, and
   hidden framework behavior can force conservative results.
 
+## Common Runtime-Hazard Shapes
+
+The bounded model includes direct `Count` guards for count-backed indexers and
+for empty `Queue<T>`, `Stack<T>`, and `PriorityQueue<TElement, TPriority>`
+`Peek`/`Pop`/`Dequeue` operations. A guard that proves the collection non-empty
+prunes the candidate; a path that proves `Count == 0` reports
+`InvalidCollectionCardinality` and `InvalidOperationException` evidence.
+
+Nullable result facts flow through `Nullable<T>.HasValue`, `.Value`, explicit
+casts, coalescing, and conditional access. They also flow through known
+completed async shapes: `Task.FromResult`, `ValueTask.FromResult`, the
+`ValueTask<T>(T)` constructor, `await`, `.Result`, and
+`GetAwaiter().GetResult()`. These models expose the wrapped value; they do not
+claim to predict arbitrary task scheduling, cancellation, faults, or custom
+awaiters.
+
 ## Soundness Rule
 
 When SharpProof cannot justify a proof, it must not silently upgrade the result

@@ -1696,6 +1696,61 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskResultProperty()
+    {
+        const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string? value = Task.FromResult<string?>(null).Result;
+        return value.Length;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Length;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskAwait()
+    {
+        const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod()
+    {
+        int? value = await ValueTask.FromResult<int?>(null);
+        return value.Value;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Value;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
     {
         const string source = @"
