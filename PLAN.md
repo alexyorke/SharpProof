@@ -124,10 +124,6 @@ grouped by their original feature area.
   ignored because assembly identity, module version, method token, method-body
   hash, or the artifact spec's framework/package source no longer matches the
   current compilation.
-- Validate built-in effect-summary embedded resources as required artifacts:
-  fail build/package tests or emit analyzer-visible evidence when expected
-  generated-purity or exception-summary resources are absent, empty, corrupt, or
-  skipped, instead of silently constructing an empty built-in catalog.
 - Report diagnostics on malformed, empty, unsupported-version, or partially
   ignored supplied `AdditionalFiles`, including `SharpProof.Baseline.json` and
   `*.SharpProof.EffectSummary.json`, instead of silently dropping bad JSON or

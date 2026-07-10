@@ -9,6 +9,7 @@ using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -365,6 +366,52 @@ namespace TestNamespace {
             var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
             Assert.That(File.Exists(reviewedSpecPath), Is.False,
                 "The dormant reviewed effect-summary artifact spec should stay out of the repository.");
+        }
+
+        [Test]
+        public void AnalyzerAssembly_ShouldEmbedEveryGeneratedEffectSummaryResource_WhenBuilt()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var specificationPath = Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "BuiltInEffectSummaryArtifactSpec.json");
+            using var specification = JsonDocument.Parse(File.ReadAllText(specificationPath));
+            var expectedArtifacts = specification.RootElement
+                .GetProperty("Artifacts")
+                .EnumerateArray()
+                .Select(artifact => artifact.GetProperty("OutputPath").GetString())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Cast<string>()
+                .ToHashSet(StringComparer.Ordinal);
+
+            const string resourcePrefix = "SharpProof.Analyzer.GeneratedPurity.";
+            var assembly = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly;
+            var resources = assembly
+                .GetManifestResourceNames()
+                .Where(name => name.StartsWith(resourcePrefix, StringComparison.Ordinal) &&
+                              name.EndsWith(".SharpProof.EffectSummary.json", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+            var actualArtifacts = resources
+                .Select(name => name.Substring(resourcePrefix.Length))
+                .ToHashSet(StringComparer.Ordinal);
+
+            Assert.That(resources, Has.Length.EqualTo(expectedArtifacts.Count));
+            Assert.That(actualArtifacts, Is.EquivalentTo(expectedArtifacts));
+
+            foreach (var resourceName in resources)
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                Assert.That(stream, Is.Not.Null, resourceName);
+                Assert.That(stream!.Length, Is.GreaterThan(0), resourceName);
+
+                using var document = JsonDocument.Parse(stream);
+                var root = document.RootElement;
+                Assert.That(root.ValueKind, Is.EqualTo(JsonValueKind.Object), resourceName);
+                Assert.That(root.GetProperty("SchemaVersion").GetInt32(), Is.GreaterThanOrEqualTo(1), resourceName);
+                Assert.That(root.GetProperty("Assemblies").GetArrayLength(), Is.GreaterThan(0), resourceName);
+            }
         }
 
         [Test]
