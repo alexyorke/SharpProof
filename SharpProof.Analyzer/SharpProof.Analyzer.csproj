@@ -13,6 +13,8 @@
     <GeneratedPurityToolProjectPath Condition="'$(GeneratedPurityToolProjectPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj</GeneratedPurityToolProjectPath>
     <GeneratedPurityToolDllPath Condition="'$(GeneratedPurityToolDllPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\SharpProof.EffectSummary\bin\$(Configuration)\net8.0\SharpProof.EffectSummary.dll</GeneratedPurityToolDllPath>
     <GeneratedPurityGenerationStampPath Condition="'$(GeneratedPurityGenerationStampPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp</GeneratedPurityGenerationStampPath>
+    <GeneratedPurityBuiltInSummaryStagingDirectory Condition="'$(GeneratedPurityBuiltInSummaryStagingDirectory)' == ''">$(GeneratedPurityBuiltInSummaryDirectory).staging</GeneratedPurityBuiltInSummaryStagingDirectory>
+    <GeneratedPurityStagingArtifactSpecPath Condition="'$(GeneratedPurityStagingArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryStagingDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityStagingArtifactSpecPath>
     <SharpProofSkipGeneratedEffectSummaries Condition="'$(SharpProofSkipGeneratedEffectSummaries)' == ''">false</SharpProofSkipGeneratedEffectSummaries>
     <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
@@ -58,24 +60,44 @@
           Condition="'$(SharpProofSkipGeneratedEffectSummaries)' != 'true'"
           Inputs="$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"
           Outputs="$(GeneratedPurityGenerationStampPath);$(GeneratedPurityArtifactSpecPath);@(_GeneratedPuritySummaryOutputs)">
-    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
-               Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
-    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)" />
+    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)"
+               Condition="Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')" />
+    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)" />
 
     <Copy SourceFiles="$(GeneratedPurityArtifactSpecSourcePath)"
-          DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
+          DestinationFiles="$(GeneratedPurityStagingArtifactSpecPath)" />
 
-    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityArtifactSpecPath)&quot;' IgnoreExitCode="true" ConsoleToMSBuild="true">
+    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityStagingArtifactSpecPath)&quot;' IgnoreExitCode="true" ConsoleToMSBuild="true">
       <Output TaskParameter="ExitCode" PropertyName="_SharpProofEffectSummaryExitCode" />
     </Exec>
 
     <Error Condition="'$(_SharpProofEffectSummaryExitCode)' != '0'"
-           Text="SharpProof effect-summary generation failed with exit code $(_SharpProofEffectSummaryExitCode). Check artifact spec '$(GeneratedPurityArtifactSpecPath)' and tool '$(GeneratedPurityToolDllPath)'." />
+           Text="SharpProof effect-summary generation failed with exit code $(_SharpProofEffectSummaryExitCode). Check artifact spec '$(GeneratedPurityStagingArtifactSpecPath)' and tool '$(GeneratedPurityToolDllPath)'. The previous generated summaries were left untouched." />
+
+    <ItemGroup>
+      <_SharpProofStagedSummaryFiles Include="$(GeneratedPurityBuiltInSummaryStagingDirectory)\*.SharpProof.EffectSummary.json" />
+    </ItemGroup>
+
+    <Error Condition="'@(_SharpProofStagedSummaryFiles)' == ''"
+           Text="SharpProof effect-summary generation produced no summary resources from '$(GeneratedPurityStagingArtifactSpecPath)'. The previous generated summaries were left untouched." />
+
+    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
+               Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
+    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)" />
+
+    <Copy SourceFiles="$(GeneratedPurityStagingArtifactSpecPath)"
+          DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
+
+    <Copy SourceFiles="@(_SharpProofStagedSummaryFiles)"
+          DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)" />
 
     <WriteLinesToFile Condition="'$(_SharpProofEffectSummaryExitCode)' == '0'"
                       File="$(GeneratedPurityGenerationStampPath)"
                       Lines="$(NETCoreSdkVersion)"
                       Overwrite="true" />
+
+    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryStagingDirectory)"
+               Condition="Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')" />
   </Target>
 
   <Target Name="IncludeGeneratedPurityBuiltInSummaries"

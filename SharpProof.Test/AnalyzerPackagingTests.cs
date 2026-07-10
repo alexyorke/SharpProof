@@ -249,6 +249,22 @@ namespace TestNamespace {
                 generatedSummaryStampPath,
                 Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp"));
 
+            var generatedSummaryStagingDirectory = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityBuiltInSummaryStagingDirectory", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(generatedSummaryStagingDirectory, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory).staging"));
+
+            var generatedSummaryStagingSpecPath = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityStagingArtifactSpecPath", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(
+                generatedSummaryStagingSpecPath,
+                Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryStagingDirectory)\BuiltInEffectSummaryArtifactSpec.json"));
+
             var skipGeneratedEffectSummaries = document
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "SharpProofSkipGeneratedEffectSummaries", StringComparison.Ordinal))
@@ -294,24 +310,33 @@ namespace TestNamespace {
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "Copy", StringComparison.Ordinal))
                 .ToArray();
-            Assert.That(stageCopies, Has.Length.EqualTo(1));
+            Assert.That(stageCopies, Has.Length.EqualTo(3));
             Assert.That(stageCopies[0].Attribute("SourceFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath)"));
-            Assert.That(stageCopies[0].Attribute("DestinationFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecPath)"));
+            Assert.That(stageCopies[0].Attribute("DestinationFiles")?.Value, Is.EqualTo("$(GeneratedPurityStagingArtifactSpecPath)"));
+            Assert.That(stageCopies[1].Attribute("SourceFiles")?.Value, Is.EqualTo("$(GeneratedPurityStagingArtifactSpecPath)"));
+            Assert.That(stageCopies[1].Attribute("DestinationFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecPath)"));
+            Assert.That(stageCopies[2].Attribute("SourceFiles")?.Value, Is.EqualTo("@(_SharpProofStagedSummaryFiles)"));
+            Assert.That(stageCopies[2].Attribute("DestinationFolder")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
 
             var stageRemovals = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "RemoveDir", StringComparison.Ordinal))
                 .ToArray();
-            Assert.That(stageRemovals, Has.Length.EqualTo(1));
-            Assert.That(stageRemovals[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
-            Assert.That(stageRemovals[0].Attribute("Condition")?.Value, Is.EqualTo("Exists('$(GeneratedPurityBuiltInSummaryDirectory)')"));
+            Assert.That(stageRemovals, Has.Length.EqualTo(3));
+            Assert.That(stageRemovals[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryStagingDirectory)"));
+            Assert.That(stageRemovals[0].Attribute("Condition")?.Value, Is.EqualTo("Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')"));
+            Assert.That(stageRemovals[1].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+            Assert.That(stageRemovals[1].Attribute("Condition")?.Value, Is.EqualTo("Exists('$(GeneratedPurityBuiltInSummaryDirectory)')"));
+            Assert.That(stageRemovals[2].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryStagingDirectory)"));
+            Assert.That(stageRemovals[2].Attribute("Condition")?.Value, Is.EqualTo("Exists('$(GeneratedPurityBuiltInSummaryStagingDirectory)')"));
 
             var stageDirectories = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "MakeDir", StringComparison.Ordinal))
                 .ToArray();
-            Assert.That(stageDirectories, Has.Length.EqualTo(1));
-            Assert.That(stageDirectories[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+            Assert.That(stageDirectories, Has.Length.EqualTo(2));
+            Assert.That(stageDirectories[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryStagingDirectory)"));
+            Assert.That(stageDirectories[1].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
 
             var unexpectedStageBuilds = stageTarget
                 .Descendants()
@@ -326,7 +351,7 @@ namespace TestNamespace {
             Assert.That(stageExecs, Has.Length.EqualTo(1));
             Assert.That(
                 stageExecs[0].Attribute("Command")?.Value,
-                Is.EqualTo("dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec \"$(GeneratedPurityArtifactSpecPath)\""));
+                Is.EqualTo("dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec \"$(GeneratedPurityStagingArtifactSpecPath)\""));
             Assert.That(stageExecs[0].Attribute("IgnoreExitCode")?.Value, Is.EqualTo("true"));
             Assert.That(stageExecs[0].Attribute("ConsoleToMSBuild")?.Value, Is.EqualTo("true"));
             Assert.That(
@@ -336,11 +361,16 @@ namespace TestNamespace {
                     .Attribute("TaskParameter")?.Value,
                 Is.EqualTo("ExitCode"));
 
-            var stageError = stageTarget
+            var stageErrors = stageTarget
                 .Descendants()
-                .Single(element => string.Equals(element.Name.LocalName, "Error", StringComparison.Ordinal));
-            Assert.That(stageError.Attribute("Condition")?.Value, Is.EqualTo("'$(_SharpProofEffectSummaryExitCode)' != '0'"));
-            Assert.That(stageError.Attribute("Text")?.Value, Does.Contain("SharpProof effect-summary generation failed"));
+                .Where(element => string.Equals(element.Name.LocalName, "Error", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageErrors, Has.Length.EqualTo(2));
+            Assert.That(stageErrors[0].Attribute("Condition")?.Value, Is.EqualTo("'$(_SharpProofEffectSummaryExitCode)' != '0'"));
+            Assert.That(stageErrors[0].Attribute("Text")?.Value, Does.Contain("SharpProof effect-summary generation failed"));
+            Assert.That(stageErrors[0].Attribute("Text")?.Value, Does.Contain("previous generated summaries were left untouched"));
+            Assert.That(stageErrors[1].Attribute("Condition")?.Value, Is.EqualTo("'@(_SharpProofStagedSummaryFiles)' == ''"));
+            Assert.That(stageErrors[1].Attribute("Text")?.Value, Does.Contain("produced no summary resources"));
 
             var stampWrite = stageTarget
                 .Descendants()
@@ -348,6 +378,7 @@ namespace TestNamespace {
             Assert.That(stampWrite.Attribute("File")?.Value, Is.EqualTo("$(GeneratedPurityGenerationStampPath)"));
             Assert.That(stampWrite.Attribute("Lines")?.Value, Is.EqualTo("$(NETCoreSdkVersion)"));
             Assert.That(stampWrite.Attribute("Overwrite")?.Value, Is.EqualTo("true"));
+            Assert.That(stampWrite.Attribute("Condition")?.Value, Is.EqualTo("'$(_SharpProofEffectSummaryExitCode)' == '0'"));
 
             var includeTarget = document
                 .Descendants()
