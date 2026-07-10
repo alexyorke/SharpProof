@@ -324,3 +324,41 @@ SharpProof.Symbolic.SymbolicUnknownReasonSource.Ensures = 5 -> SharpProof.Symbol
 SharpProof.Symbolic.SymbolicUnknownReasonSource.Proof = 0 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
 SharpProof.Symbolic.SymbolicUnknownReasonSource.Purity = 4 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
 SharpProof.Symbolic.SymbolicUnknownReasonSource.RuntimeHazard = 3 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.FactChoiceCombinationsPerTarget = 9 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.ForeachElementFacts = 4 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState = 10 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.IfElseFactMerge = 0 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.MergeableFactsPerTargetPerState = 8 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.MergedPathConditions = 7 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements = 5 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.StructuralNullStateDepth = 6 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.SwitchFactMerge = 1 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.TryCompletionBranches = 3 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimitKind.TryFactMerge = 2 -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisLimits
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxFactChoiceCombinationsPerTarget.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxFiniteForeachElementFacts.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxGuardFactsPerTargetPerState.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergeableFactsPerTargetPerState.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedIfElseFacts.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedPathConditions.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedSwitchFacts.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxMergedTryFacts.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxScopedBlockCompletionStatements.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxStructuralNullStateDepth.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.MaxTryCompletionBranches.get -> int
+SharpProof.Symbolic.SymbolicAnalysisLimits.SymbolicAnalysisLimits(int maxMergedIfElseFacts = 16, int maxMergedSwitchFacts = 32, int maxMergedTryFacts = 16, int maxTryCompletionBranches = 8, int maxFiniteForeachElementFacts = 8, int maxScopedBlockCompletionStatements = 32, int maxStructuralNullStateDepth = 4, int maxMergedPathConditions = 32, int maxMergeableFactsPerTargetPerState = 4, int maxFactChoiceCombinationsPerTarget = 64, int maxGuardFactsPerTargetPerState = 6) -> void
+SharpProof.Symbolic.SymbolicAnalysisLimits.WithOverrides(int? maxMergedIfElseFacts = null, int? maxMergedSwitchFacts = null, int? maxMergedTryFacts = null, int? maxTryCompletionBranches = null, int? maxFiniteForeachElementFacts = null, int? maxScopedBlockCompletionStatements = null, int? maxStructuralNullStateDepth = null, int? maxMergedPathConditions = null, int? maxMergeableFactsPerTargetPerState = null, int? maxFactChoiceCombinationsPerTarget = null, int? maxGuardFactsPerTargetPerState = null) -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Code.get -> string!
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Kind.get -> SharpProof.Symbolic.SymbolicAnalysisLimitKind
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Limit.get -> int
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Observed.get -> int
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.Provenance.get -> string!
+SharpProof.Symbolic.SymbolicAnalysisTruncationEvent.SourceSpanStart.get -> int?
+SharpProof.Symbolic.SymbolicAnalysisTruncationInfo
+SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.Events.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicAnalysisTruncationEvent!>!
+SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.IsTruncated.get -> bool
+static readonly SharpProof.Symbolic.SymbolicAnalysisLimits.Default -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+static readonly SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.None -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
