@@ -137,7 +137,7 @@
                                 "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  215,
+                                "fixtureCount":  213,
                                 "tokens":  [
                                                "SharpProofAnalyzer"
                                            ]
@@ -1239,10 +1239,6 @@
                              "path":  "SharpProof.Test/SharpProofCodeFixTests.cs"
                          },
                          {
-                             "name":  "SignalRTests",
-                             "path":  "SharpProof.Test/SignalRTests.cs"
-                         },
-                         {
                              "name":  "SimpleCollectionExpressionTests",
                              "path":  "SharpProof.Test/SimpleCollectionExpressionTests.cs"
                          },
@@ -1437,10 +1433,6 @@
                          {
                              "name":  "VolatileFieldTests",
                              "path":  "SharpProof.Test/VolatileFieldTests.cs"
-                         },
-                         {
-                             "name":  "WcfTests",
-                             "path":  "SharpProof.Test/WcfTests.cs"
                          },
                          {
                              "name":  "WebUtilityTests",
@@ -3616,7 +3608,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAnalyzer"
                                               ],
-                            "referencingFixtureCount":  215,
+                            "referencingFixtureCount":  213,
                             "referencedTokens":  [
                                                      "SharpProofAnalyzer"
                                                  ]
@@ -3682,7 +3674,7 @@
                             "declaredTypes":  [
                                                   "ComplexityKind"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "ComplexityKind"
                                                  ]
@@ -3803,7 +3795,7 @@
                             "declaredTypes":  [
                                                   "SharpProofCodeFixProvider"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SharpProofCodeFixProvider"
                                                  ]
@@ -4998,6 +4990,7 @@
                                                   "ArtifactSpecDefaults",
                                                   "ArtifactSpecDocument",
                                                   "ArtifactSpecEntry",
+                                                  "ArtifactSpecProgressDocument",
                                                   "ArtifactSpecSymbolFilter",
                                                   "ArtifactSpecSymbolSet",
                                                   "ArtifactSpecSymbolSource",
@@ -5015,6 +5008,7 @@
                                                   "KnownThrownExceptionSite",
                                                   "MethodEffectSummary",
                                                   "RuntimeAssemblyResolver",
+                                                  "ShardedEffectSummaryProgressDocument",
                                                   "SourceSummaryMethodEntry",
                                                   "StaticFieldFact",
                                                   "StaticFieldFactKind",
@@ -6837,6 +6831,7 @@
                                     "path":  "SharpProof.Attributes/ComplexityKind.cs",
                                     "module":  "Attributes",
                                     "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
                                                                  "AttributePlacementPurityTests",
                                                                  "ExpectedComplexityContractTests",
                                                                  "SharpProofCodeFixTests"
@@ -6844,7 +6839,7 @@
                                     "tokens":  [
                                                    "ComplexityKind"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Attributes/DoesNotThrowAttribute.cs",
@@ -6972,12 +6967,13 @@
                                     "path":  "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
                                     "module":  "CodeFixes",
                                     "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
                                                                  "SharpProofCodeFixTests"
                                                              ],
                                     "tokens":  [
                                                    "SharpProofCodeFixProvider"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIr.cs",

@@ -8922,6 +8922,70 @@ class C { int M(string? value) { Guard.Require(value); return value.Length; } }
         }
 
         [Test]
+        public void StandaloneTestFixtures_DeclareAtLeastOneRunnableTest()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var testRoots = new[]
+            {
+                Path.Combine(repositoryRoot, "SharpProof.Test"),
+                Path.Combine(repositoryRoot, "SharpProof.ToolingTest"),
+            };
+            var emptyFixtures = new List<string>();
+
+            foreach (var sourcePath in testRoots.SelectMany(root =>
+                         Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)))
+            {
+                if (sourcePath.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+                    sourcePath.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var root = CSharpSyntaxTree.ParseText(ReadFileCached(sourcePath)).GetRoot();
+                foreach (var fixture in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
+                {
+                    if (!HasAttribute(fixture.AttributeLists, "TestFixture") ||
+                        fixture.Modifiers.Any(SyntaxKind.PartialKeyword) ||
+                        fixture.BaseList != null)
+                    {
+                        continue;
+                    }
+
+                    var hasRunnableTest = fixture.Members
+                        .OfType<MethodDeclarationSyntax>()
+                        .Any(method =>
+                            HasAttribute(method.AttributeLists, "Test") ||
+                            HasAttribute(method.AttributeLists, "TestCase") ||
+                            HasAttribute(method.AttributeLists, "TestCaseSource") ||
+                            HasAttribute(method.AttributeLists, "Theory"));
+                    if (!hasRunnableTest)
+                    {
+                        emptyFixtures.Add(
+                            Path.GetRelativePath(repositoryRoot, sourcePath).Replace('\\', '/') +
+                            ":" + fixture.Identifier.ValueText);
+                    }
+                }
+            }
+
+            Assert.That(
+                emptyFixtures,
+                Is.Empty,
+                "Standalone [TestFixture] classes must declare at least one runnable test.");
+
+            static bool HasAttribute(SyntaxList<AttributeListSyntax> attributeLists, string expectedName)
+            {
+                return attributeLists
+                    .SelectMany(static list => list.Attributes)
+                    .Select(static attribute => attribute.Name.ToString())
+                    .Any(name =>
+                        string.Equals(name, expectedName, StringComparison.Ordinal) ||
+                        string.Equals(name, expectedName + "Attribute", StringComparison.Ordinal) ||
+                        name.EndsWith("." + expectedName, StringComparison.Ordinal) ||
+                        name.EndsWith("." + expectedName + "Attribute", StringComparison.Ordinal));
+            }
+        }
+
+        [Test]
         public async Task ProductionMetricsScript_ReportsProductionModulesAndExcludesTests()
         {
             var repositoryRoot = FindRepositoryRoot();
