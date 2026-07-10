@@ -125,9 +125,6 @@ grouped by their original feature area.
   hash, or the artifact spec's framework/package source no longer matches the
   current compilation.
 #### Tooling, Packaging, And Verification
-- Add CI-visible package-consumer tests for all current public diagnostics, not
-  only a subset, and include code-fix availability where supported by the
-  package layout.
 - Decide whether `SharpProof.Symbolic` is a supported public library package or
   an analyzer-private implementation assembly. If public, ship it as a real
   NuGet `lib` asset with XML docs, nullable annotations, samples, Source Link,

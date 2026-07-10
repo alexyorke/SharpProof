@@ -571,7 +571,7 @@ namespace TestNamespace {
         }
 
         [Test]
-        public void BuiltAnalyzerPackage_ShouldContainCurrentAnalyzerAssemblyBytes_WhenPackageExists()
+        public void BuiltAnalyzerPackage_ShouldContainCurrentAnalyzerAndCodeFixAssemblyBytes_WhenPackageExists()
         {
             var repositoryRoot = FindRepositoryRoot();
             var packageVersion = ReadPackageVersion(
@@ -589,17 +589,31 @@ namespace TestNamespace {
             }
 
             using var archive = ZipFile.OpenRead(packagePath);
-            var analyzerEntry = archive.Entries.Single(entry =>
-                string.Equals(
-                    entry.FullName.Replace('\\', '/'),
-                    "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
-                    StringComparison.Ordinal));
-            using var analyzerStream = analyzerEntry.Open();
-            var packagedHash = SHA256.HashData(analyzerStream);
-            var builtHash = SHA256.HashData(File.ReadAllBytes(
-                typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly.Location));
+            AssertPackageEntryMatchesAssembly(
+                archive,
+                "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+                typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly.Location);
+            AssertPackageEntryMatchesAssembly(
+                archive,
+                "analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
+                typeof(SharpProof.SharpProofCodeFixProvider).Assembly.Location);
 
-            Assert.That(packagedHash, Is.EqualTo(builtHash));
+            static void AssertPackageEntryMatchesAssembly(
+                ZipArchive archive,
+                string entryPath,
+                string assemblyPath)
+            {
+                var entry = archive.Entries.Single(candidate =>
+                    string.Equals(
+                        candidate.FullName.Replace('\\', '/'),
+                        entryPath,
+                        StringComparison.Ordinal));
+                using var stream = entry.Open();
+                var packagedHash = SHA256.HashData(stream);
+                var builtHash = SHA256.HashData(File.ReadAllBytes(assemblyPath));
+
+                Assert.That(packagedHash, Is.EqualTo(builtHash), entryPath);
+            }
         }
 
         public static IEnumerable<ConsumerPackageScenario> BuiltAnalyzerPackageScenarios()
@@ -681,6 +695,230 @@ public sealed class Demo
 """,
                 ExpectedDiagnosticIds: new[] { "SP0016" },
                 UsePreparedTemplate: true);
+            yield return new ConsumerPackageScenario(
+                "source-diagnostic-surface",
+                """
+using System;
+using SharpProof.Attributes;
+
+[EnforcePure,
+ Pure,
+ ZeroAllocations,
+ AllowedCapabilities(SharpProofCapability.None),
+ Ensures("result > 0"),
+ Requires("true"),
+ DoesNotThrow,
+ AllowedExceptions(typeof(Exception)),
+ ExpectedComplexity(ComplexityKind.Constant)]
+public sealed class MisplacedContracts
+{
+}
+
+namespace SharpProof.Contracts
+{
+    [AttributeUsage(AttributeTargets.All)]
+    public sealed class AllowSynchronizationAttribute : Attribute
+    {
+    }
+}
+
+[SharpProof.Contracts.AllowSynchronization]
+public sealed class StubMisplacedContracts
+{
+}
+
+namespace FakeContracts
+{
+    public sealed class EnforcePureAttribute : Attribute
+    {
+    }
+}
+
+public sealed class ContractSurface
+{
+    [EnforcePure, Impure]
+    public int Conflicting() => DateTime.Now.Second;
+
+    [AllowSynchronization]
+    public int SyncWithoutPurity() => 1;
+
+    [EnforcePure, AllowSynchronization]
+    public int RedundantSynchronization() => 1;
+
+    [ZeroAllocations]
+    public object Allocate() => new object();
+
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void WriteConsole() => Console.WriteLine("hello");
+
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public string DynamicCall(dynamic value) => value.ToString();
+
+    [Ensures("result > 0")]
+    public int FailingEnsure() => 0;
+
+    [Ensures("local > 0")]
+    public int UnsupportedEnsure() => 0;
+
+    [Requires("value > 0")]
+    public int Callee(int value) => value;
+
+    public int Caller() => Callee(0);
+
+    [Requires("result > 0")]
+    public int UnsupportedRequire(int value) => value;
+
+    [ExpectedComplexity(ComplexityKind.Linear)]
+    public int Quadratic(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < n; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+
+    [ExpectedComplexity(ComplexityKind.Linear)]
+    public int UnsupportedComplexity(int n)
+    {
+        var i = 0;
+        while (i < n)
+        {
+            i = ComplexityStep(i);
+        }
+
+        return i;
+    }
+
+    private static int ComplexityStep(int value) => value + 1;
+
+    [AllowedExceptions(typeof(string))]
+    public void InvalidExceptionContract()
+    {
+    }
+
+    [DoesNotThrow]
+    public void ThrowsUnexpectedly() => throw new InvalidOperationException();
+
+    [AllowedExceptions(typeof(ArgumentException))]
+    public void ThrowsDisallowed() => throw new InvalidOperationException();
+
+    [FakeContracts.EnforcePure]
+    public int FakeAttributeIdentity() => 1;
+}
+""",
+                ExpectedDiagnosticIds: new[]
+                {
+                    "SP0002", "SP0003", "SP0004", "SP0005", "SP0006", "SP0007", "SP0008",
+                    "SP0013", "SP0014", "SP0015", "SP0016", "SP0017", "SP0018", "SP0019",
+                    "SP0020", "SP0021", "SP0022", "SP0023", "SP0024", "SP0026", "SP0027",
+                    "SP0028", "SP0029", "SP0030", "SP0031",
+                },
+                UsePreparedTemplate: true,
+                AdditionalEditorConfigText: "build_property.sharpproof_attribute_stub_namespaces = SharpProof.Contracts");
+            yield return new ConsumerPackageScenario(
+                "sp0009-exception-reporting",
+                """
+using System;
+using SharpProof.Attributes;
+
+public sealed class DiagnosticSurface
+{
+    [EnforcePure]
+    public int ExplainAndCall()
+    {
+        Thrower();
+        return DateTime.Now.Second;
+    }
+
+    private static void Thrower() => throw new InvalidOperationException();
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0002", "SP0009", "SP0010", "SP0011" },
+                UsePreparedTemplate: true,
+                AdditionalEditorConfigText: """
+sharpproof_emit_explanations = true
+sharpproof_report_exceptions = true
+sharpproof_checked_exceptions = true
+""");
+            yield return new ConsumerPackageScenario(
+                "sp0012-bcl-fallback",
+                """
+using SharpProof.Attributes;
+
+public sealed class BclFallbackSurface
+{
+    [EnforcePure]
+    public int Normalize(int value) => System.Experimental.NumericFacts.Normalize(value);
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0002", "SP0012" },
+                UsePreparedTemplate: true,
+                AdditionalEditorConfigText: "sharpproof_report_bcl_fallback_guesses = true",
+                AdditionalReferenceAssemblyName: "System.FallbackSdk",
+                AdditionalReferenceSource: """
+namespace System.Experimental
+{
+    public static class NumericFacts
+    {
+        public static int Normalize(int value) => value;
+    }
+}
+""");
+            yield return new ConsumerPackageScenario(
+                "sp0025-invalid-configuration",
+                """
+public sealed class InvalidConfigurationSurface
+{
+    public int Value => 1;
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0025" },
+                UsePreparedTemplate: true,
+                AdditionalEditorConfigText: "sharpproof_runtime_hazard_mode = invalid-mode");
+            yield return new ConsumerPackageScenario(
+                "sp0032-invalid-additional-file",
+                """
+public sealed class InvalidAdditionalFileSurface
+{
+    public int Value => 1;
+}
+""",
+                ExpectedDiagnosticIds: new[] { "SP0032" },
+                UsePreparedTemplate: true,
+                AdditionalFiles: new Dictionary<string, string>
+                {
+                    ["SharpProof.Baseline.json"] = "{",
+                });
+        }
+
+        [Test]
+        public void BuiltAnalyzerPackageScenarios_CoverSupportedDiagnosticsAndCodeFixIds()
+        {
+            var coveredDiagnosticIds = BuiltAnalyzerPackageScenarios()
+                .SelectMany(scenario => scenario.ExpectedDiagnosticIds)
+                .ToHashSet(StringComparer.Ordinal);
+            var supportedDiagnosticIds = new SharpProof.Analyzer.SharpProofAnalyzer()
+                .SupportedDiagnostics
+                .Select(descriptor => descriptor.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            var fixableDiagnosticIds = new SharpProof.SharpProofCodeFixProvider()
+                .FixableDiagnosticIds
+                .ToHashSet(StringComparer.Ordinal);
+
+            Assert.That(
+                coveredDiagnosticIds,
+                Is.SupersetOf(supportedDiagnosticIds),
+                "Every public analyzer diagnostic must have a package-consumer scenario.");
+            Assert.That(
+                coveredDiagnosticIds,
+                Is.SupersetOf(fixableDiagnosticIds),
+                "Every code-fix diagnostic must have a package-consumer scenario.");
         }
 
         [TestCaseSource(nameof(BuiltAnalyzerPackageScenarios))]
@@ -700,32 +938,59 @@ public sealed class Demo
                 Assert.Inconclusive("Build the package before verifying external package consumption.");
             }
             var packageSource = Path.GetDirectoryName(packagePath)!;
-            var buildResult = scenario.UsePreparedTemplate
-                ? await BuildPreparedPackageConsumerAsync(
-                    await GetPreparedConsumerTemplateAsync(
+            var editorConfigText = CreateAnalyzerSeverityEditorConfig(
+                scenario.ExpectedDiagnosticIds,
+                scenario.AdditionalEditorConfigText);
+            (string DirectoryPath, string AssemblyPath)? fixture = null;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(scenario.AdditionalReferenceSource))
+                {
+                    fixture = CreateFixtureAssembly(
+                        scenario.AdditionalReferenceAssemblyName ?? (scenario.Name + ".Fixture"),
+                        scenario.AdditionalReferenceSource);
+                }
+
+                var buildResult = scenario.UsePreparedTemplate
+                    ? await BuildPreparedPackageConsumerAsync(
+                        await GetPreparedConsumerTemplateAsync(
+                            packageId: "SharpProof",
+                            packageVersion,
+                            packageSource).ConfigureAwait(false),
+                        source: scenario.Source,
+                        editorConfigText: editorConfigText,
+                        globalAnalyzerConfigText: scenario.AdditionalEditorConfigText,
+                        additionalFiles: scenario.AdditionalFiles,
+                        additionalReferencePath: fixture?.AssemblyPath).ConfigureAwait(false)
+                    : await BuildDisposablePackageConsumerAsync(
                         packageId: "SharpProof",
                         packageVersion,
-                        packageSource).ConfigureAwait(false),
-                    source: scenario.Source,
-                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false)
-                : await BuildDisposablePackageConsumerAsync(
-                    packageId: "SharpProof",
-                    packageVersion,
-                    packageSource,
-                    source: scenario.Source,
-                    editorConfigText: CreateAnalyzerSeverityEditorConfig(scenario.ExpectedDiagnosticIds)).ConfigureAwait(false);
+                        packageSource,
+                        source: scenario.Source,
+                        editorConfigText: editorConfigText,
+                        globalAnalyzerConfigText: scenario.AdditionalEditorConfigText,
+                        additionalFiles: scenario.AdditionalFiles,
+                        additionalReferencePath: fixture?.AssemblyPath).ConfigureAwait(false);
 
-            Assert.That(
-                buildResult.ExitCode,
-                Is.Not.EqualTo(0),
-                $"The packaged analyzer scenario '{scenario.Name}' should fail when promoted diagnostics are emitted.{Environment.NewLine}{buildResult.Output}");
-
-            foreach (var diagnosticId in scenario.ExpectedDiagnosticIds)
-            {
                 Assert.That(
-                    buildResult.Output,
-                    Does.Contain(diagnosticId),
-                    $"The packaged SharpProof analyzer scenario '{scenario.Name}' should emit {diagnosticId}.{Environment.NewLine}{buildResult.Output}");
+                    buildResult.ExitCode,
+                    Is.Not.EqualTo(0),
+                    $"The packaged analyzer scenario '{scenario.Name}' should fail when promoted diagnostics are emitted.{Environment.NewLine}{buildResult.Output}");
+
+                foreach (var diagnosticId in scenario.ExpectedDiagnosticIds)
+                {
+                    Assert.That(
+                        buildResult.Output,
+                        Does.Contain(diagnosticId),
+                        $"The packaged SharpProof analyzer scenario '{scenario.Name}' should emit {diagnosticId}.{Environment.NewLine}{buildResult.Output}");
+                }
+            }
+            finally
+            {
+                if (fixture is { } createdFixture && Directory.Exists(createdFixture.DirectoryPath))
+                {
+                    Directory.Delete(createdFixture.DirectoryPath, recursive: true);
+                }
             }
         }
 
@@ -1235,7 +1500,10 @@ public static class TestClass
             string packageVersion,
             string packageSource,
             string source,
-            string? editorConfigText = null)
+            string? editorConfigText = null,
+            string? globalAnalyzerConfigText = null,
+            IReadOnlyDictionary<string, string>? additionalFiles = null,
+            string? additionalReferencePath = null)
         {
             var probeRoot = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
@@ -1274,12 +1542,16 @@ public static class TestClass
                 {
                     File.WriteAllText(Path.Combine(projectDirectory, ".editorconfig"), editorConfigText);
                 }
+                AddGlobalAnalyzerConfig(projectDirectory, globalAnalyzerConfigText);
+                AddAdditionalFiles(projectDirectory, additionalFiles);
+                AddAdditionalReference(projectDirectory, additionalReferencePath);
 
                 return await RunDotnetAsync(
                     projectDirectory,
                     packageCache,
                     "build",
                     "--no-restore",
+                    "/warnaserror:SP0032",
                     "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
             }
             finally
@@ -1350,7 +1622,10 @@ public static class TestClass
         private static async Task<ProcessResult> BuildPreparedPackageConsumerAsync(
             PreparedConsumerTemplate template,
             string source,
-            string? editorConfigText = null)
+            string? editorConfigText = null,
+            string? globalAnalyzerConfigText = null,
+            IReadOnlyDictionary<string, string>? additionalFiles = null,
+            string? additionalReferencePath = null)
         {
             var probeRoot = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
@@ -1375,12 +1650,16 @@ public static class TestClass
                 {
                     File.WriteAllText(editorConfigPath, editorConfigText);
                 }
+                AddGlobalAnalyzerConfig(projectDirectory, globalAnalyzerConfigText);
+                AddAdditionalFiles(projectDirectory, additionalFiles);
+                AddAdditionalReference(projectDirectory, additionalReferencePath);
 
                 return await RunDotnetAsync(
                     projectDirectory,
                     template.PackageCacheDirectory,
                     "build",
                     "--no-restore",
+                    "/warnaserror:SP0032",
                     "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
             }
             finally
@@ -1411,11 +1690,116 @@ public static class TestClass
             }
         }
 
-        private static string CreateAnalyzerSeverityEditorConfig(string[] diagnosticIds)
+        private static void AddAdditionalFiles(
+            string projectDirectory,
+            IReadOnlyDictionary<string, string>? additionalFiles)
+        {
+            if (additionalFiles == null || additionalFiles.Count == 0)
+            {
+                return;
+            }
+
+            var projectPath = Path.Combine(projectDirectory, "Probe.csproj");
+            var project = XDocument.Load(projectPath);
+            var itemGroup = new XElement(
+                "ItemGroup",
+                additionalFiles.Select(file =>
+                    new XElement(
+                        "AdditionalFiles",
+                        new XAttribute("Include", file.Key))));
+            project.Root!.Add(itemGroup);
+            project.Save(projectPath);
+
+            foreach (var file in additionalFiles)
+            {
+                var filePath = Path.Combine(projectDirectory, file.Key);
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(filePath, file.Value);
+            }
+        }
+
+        private static void AddAdditionalReference(string projectDirectory, string? assemblyPath)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyPath))
+            {
+                return;
+            }
+
+            var projectPath = Path.Combine(projectDirectory, "Probe.csproj");
+            var project = XDocument.Load(projectPath);
+            var itemGroup = new XElement(
+                "ItemGroup",
+                new XElement(
+                    "Reference",
+                    new XAttribute("Include", Path.GetFileNameWithoutExtension(assemblyPath)),
+                    new XElement("HintPath", assemblyPath),
+                    new XElement("Private", "false")));
+            project.Root!.Add(itemGroup);
+            project.Save(projectPath);
+        }
+
+        private static void AddGlobalAnalyzerConfig(
+            string projectDirectory,
+            string? editorConfigText)
+        {
+            var globalLines = string.IsNullOrWhiteSpace(editorConfigText)
+                ? Array.Empty<string>()
+                : editorConfigText
+                    .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                    .Select(line => line.TrimEnd())
+                    .Where(IsGlobalAttributeStubNamespaceLine)
+                    .ToArray();
+            if (globalLines.Length == 0)
+            {
+                return;
+            }
+
+            var projectPath = Path.Combine(projectDirectory, "Probe.csproj");
+            var project = XDocument.Load(projectPath);
+            project.Root!.Add(
+                new XElement(
+                    "ItemGroup",
+                    new XElement(
+                        "GlobalAnalyzerConfigFiles",
+                        new XAttribute("Include", "SharpProof.globalconfig"))));
+            project.Save(projectPath);
+
+            File.WriteAllText(
+                Path.Combine(projectDirectory, "SharpProof.globalconfig"),
+                "is_global = true" + Environment.NewLine +
+                string.Join(Environment.NewLine, globalLines) + Environment.NewLine);
+
+            static bool IsGlobalAttributeStubNamespaceLine(string line)
+            {
+                var trimmed = line.TrimStart();
+                return trimmed.StartsWith(
+                           "sharpproof_attribute_stub_namespaces",
+                           StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(
+                        "build_property.sharpproof_attribute_stub_namespaces",
+                        StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static string CreateAnalyzerSeverityEditorConfig(
+            string[] diagnosticIds,
+            string? additionalEditorConfigText = null)
         {
             var builder = new StringBuilder()
-                .AppendLine("root = true")
-                .AppendLine()
+                .AppendLine("root = true");
+
+            var additionalLines = string.IsNullOrWhiteSpace(additionalEditorConfigText)
+                ? Array.Empty<string>()
+                : additionalEditorConfigText
+                    .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                    .Select(line => line.TrimEnd())
+                    .ToArray();
+            builder.AppendLine()
                 .AppendLine("[*.cs]");
 
             foreach (var diagnosticId in diagnosticIds.Distinct(StringComparer.Ordinal))
@@ -1425,7 +1809,27 @@ public static class TestClass
                     .AppendLine(".severity = error");
             }
 
+            var sectionAdditionalLines = additionalLines
+                .Where(line => !IsGlobalAttributeStubNamespaceLine(line))
+                .ToArray();
+            if (sectionAdditionalLines.Length > 0)
+            {
+                builder.AppendLine()
+                    .AppendLine(string.Join(Environment.NewLine, sectionAdditionalLines));
+            }
+
             return builder.ToString();
+
+            static bool IsGlobalAttributeStubNamespaceLine(string line)
+            {
+                var trimmed = line.TrimStart();
+                return trimmed.StartsWith(
+                           "sharpproof_attribute_stub_namespaces",
+                           StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(
+                        "build_property.sharpproof_attribute_stub_namespaces",
+                        StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)
@@ -1478,7 +1882,11 @@ public static class TestClass
             string Name,
             string Source,
             string[] ExpectedDiagnosticIds,
-            bool UsePreparedTemplate)
+            bool UsePreparedTemplate,
+            string? AdditionalEditorConfigText = null,
+            IReadOnlyDictionary<string, string>? AdditionalFiles = null,
+            string? AdditionalReferenceAssemblyName = null,
+            string? AdditionalReferenceSource = null)
         {
             public override string ToString()
             {
