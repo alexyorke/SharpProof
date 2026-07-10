@@ -1137,6 +1137,8 @@ internal sealed class SymbolicSourceQueryService
             includeCurrentStatementCompletionFacts,
             initialState);
         return ProveCondition(
+            query.SemanticModel,
+            query.Position,
             query.Node,
             query.Analysis,
             conditionText,
@@ -1276,25 +1278,34 @@ internal sealed class SymbolicSourceQueryService
             "source.query.condition",
             "source-query-condition");
         if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unreachable,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.ProvenTrue,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.ProvenFalse,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (analysis.Reachability == SymbolicReachability.NotChecked)
         {
@@ -1312,19 +1323,24 @@ internal sealed class SymbolicSourceQueryService
 
         if (symbolicCondition != null &&
             TryProveConditionWithIrState(
-                analysis.PathState,
+                analysis,
                 symbolicCondition,
                 conditionText,
                 conditionFormula,
                 smtAnalysis,
+                semanticModel,
+                position,
                 out var irProofResult))
             return irProofResult;
 
-        return new SymbolicConditionProofResult(
+        return CreateConditionProofResult(
             conditionText,
             SymbolicTruthValue.Unknown,
-            formulaTruth.Info.Reason,
-            conditionFormula);
+            formulaTruth,
+            conditionFormula,
+            analysis,
+            semanticModel,
+            position);
     }
 
     private static bool TryTranslateProofCondition(
@@ -1355,15 +1371,17 @@ internal sealed class SymbolicSourceQueryService
     }
 
     private static bool TryProveConditionWithIrState(
-        SymbolicState pathState,
+        SymbolicProgramPointAnalysis analysis,
         SymbolicCondition symbolicCondition,
         string conditionText,
         SmtFormula conditionFormula,
         SmtAnalysisService smtAnalysis,
+        SemanticModel? semanticModel,
+        int position,
         out SymbolicConditionProofResult proofResult)
     {
         var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            pathState,
+            analysis.PathState,
             symbolicCondition,
             smtAnalysis);
         if (truthProof.Info.Status == SymbolicProofStatus.ProvenTrue)
@@ -1372,7 +1390,10 @@ internal sealed class SymbolicSourceQueryService
                 conditionText,
                 SymbolicTruthValue.ProvenTrue,
                 truthProof,
-                conditionFormula);
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
             return true;
         }
 
@@ -1382,7 +1403,10 @@ internal sealed class SymbolicSourceQueryService
                 conditionText,
                 SymbolicTruthValue.ProvenFalse,
                 truthProof,
-                conditionFormula);
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
             return true;
         }
 
@@ -1392,7 +1416,10 @@ internal sealed class SymbolicSourceQueryService
                 conditionText,
                 SymbolicTruthValue.Unreachable,
                 truthProof,
-                conditionFormula);
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
             return true;
         }
 
@@ -1401,6 +1428,8 @@ internal sealed class SymbolicSourceQueryService
     }
 
     private static SymbolicConditionProofResult ProveCondition(
+        SemanticModel semanticModel,
+        int position,
         SyntaxNode sourceNode,
         SymbolicProgramPointAnalysis analysis,
         string conditionText,
@@ -1431,25 +1460,34 @@ internal sealed class SymbolicSourceQueryService
             "source.query.condition",
             "source-query-condition");
         if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unreachable,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.ProvenTrue,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
-            return new SymbolicConditionProofResult(
+            return CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.ProvenFalse,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
 
         if (analysis.Reachability == SymbolicReachability.NotChecked)
         {
@@ -1466,34 +1504,85 @@ internal sealed class SymbolicSourceQueryService
         }
 
         return TryProveConditionWithIrState(
-            analysis.PathState,
+            analysis,
             symbolicCondition,
             conditionText,
             conditionFormula,
             smtAnalysis,
+            semanticModel,
+            position,
             out var irProofResult)
             ? irProofResult
-            : new SymbolicConditionProofResult(
+            : CreateConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unknown,
-                formulaTruth.Info.Reason,
-                conditionFormula);
+                formulaTruth,
+                conditionFormula,
+                analysis,
+                semanticModel,
+                position);
     }
 
     private static SymbolicConditionProofResult CreateConditionProofResult(
         string conditionText,
         SymbolicTruthValue truthValue,
         SymbolicIrProofResult proof,
-        SmtFormula conditionFormula)
+        SmtFormula conditionFormula,
+        SymbolicProgramPointAnalysis analysis,
+        SemanticModel? semanticModel,
+        int position)
     {
         var reason = proof.RawResult?.Reason ?? proof.Info.Reason;
+        var effectiveTruth = string.Equals(reason, "path_unsatisfiable", StringComparison.Ordinal)
+            ? SymbolicTruthValue.Unreachable
+            : truthValue;
+        if (effectiveTruth == SymbolicTruthValue.Unreachable)
+            return new SymbolicConditionProofResult(
+                conditionText,
+                effectiveTruth,
+                reason,
+                conditionFormula,
+                witness: SymbolicInputWitnessFactory.None(reason));
+
+        var rawResult = proof.RawResult;
+        var outcomeCondition = effectiveTruth == SymbolicTruthValue.ProvenFalse
+            ? new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
+            : conditionFormula;
+        var selectedModel = effectiveTruth == SymbolicTruthValue.Unknown
+            ? rawResult?.TriggerWitness ?? rawResult?.PathWitness
+            : rawResult?.PathWitness;
+        var selectedConditions = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.TriggerWitness != null
+            ? analysis.PathConditions.Concat(new[]
+            {
+                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
+            })
+            : analysis.PathConditions.Concat(new[] { outcomeCondition });
+        var witness = SymbolicInputWitnessFactory.Create(
+            selectedModel,
+            selectedConditions,
+            semanticModel,
+            position,
+            SymbolicWitnessStatus.Unsupported,
+            "condition_witness_unavailable");
+        var counterexample = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.TriggerWitness != null
+            ? SymbolicInputWitnessFactory.Create(
+                rawResult.TriggerWitness,
+                analysis.PathConditions.Concat(new[]
+                {
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
+                }),
+                semanticModel,
+                position,
+                SymbolicWitnessStatus.Unsupported,
+                "condition_counterexample_unavailable")
+            : SymbolicInputWitnessFactory.None("counterexample_not_available");
         return new SymbolicConditionProofResult(
             conditionText,
-            string.Equals(reason, "path_unsatisfiable", StringComparison.Ordinal)
-                ? SymbolicTruthValue.Unreachable
-                : truthValue,
+            effectiveTruth,
             reason,
-            conditionFormula);
+            conditionFormula,
+            witness: witness,
+            counterexampleWitness: counterexample);
     }
 
     private static bool TryCreateSpeculativeCondition(
@@ -1696,7 +1785,14 @@ internal sealed class SymbolicSourceQueryService
             requestedPosition,
             requestedPositionDistance,
             containsRequestedPosition,
-            SymbolicFactInfo.FromState(query.Analysis.PathState));
+            SymbolicFactInfo.FromState(query.Analysis.PathState),
+            SymbolicInputWitnessFactory.CreateReachability(
+                query.Analysis.ReachabilityProof?.PathWitness,
+                query.Analysis.PathConditions,
+                query.SemanticModel,
+                query.Position,
+                query.Analysis.Reachability,
+                query.Analysis.ReachabilityReason));
     }
 
     private sealed class ProgramPointQueryContext
@@ -1798,6 +1894,8 @@ public sealed class SymbolicLineQueryResult
             ProgramPointSummary.ProofOutcomes,
             SmtDiagnostics,
             ProgramPoints);
+        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string FilePath { get; }
@@ -1831,6 +1929,10 @@ public sealed class SymbolicLineQueryResult
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
+
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -1914,6 +2016,8 @@ public sealed class SymbolicSpanQueryResult
             ProgramPointSummary.ProofOutcomes,
             SmtDiagnostics,
             ProgramPoints);
+        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string FilePath { get; }
@@ -1963,6 +2067,10 @@ public sealed class SymbolicSpanQueryResult
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
+
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -2035,6 +2143,8 @@ public sealed class SymbolicFileQueryResult
             ProgramPointSummary.ProofOutcomes,
             SmtDiagnostics,
             programPoints);
+        ReachabilityWitnesses = programPoints.Select(static point => point.ReachabilityWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string FilePath { get; }
@@ -2072,6 +2182,10 @@ public sealed class SymbolicFileQueryResult
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
+
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -6755,7 +6869,8 @@ public sealed class SymbolicSourceQueryResult
         int? requestedPosition = null,
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null,
-        IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null)
+        IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
+        SymbolicInputWitness? reachabilityWitness = null)
     {
         FilePath = filePath;
         Line = line;
@@ -6787,6 +6902,13 @@ public sealed class SymbolicSourceQueryResult
             : invariant;
         Reachability = reachability;
         ReachabilityReason = reachabilityReason;
+        ReachabilityWitness = reachabilityWitness ?? SymbolicInputWitnessFactory.CreateReachability(
+            null,
+            Array.Empty<SmtFormula>(),
+            null,
+            position,
+            reachability,
+            reachabilityReason);
         ConditionProofs = AttachProgramPointMetadata(conditionProofs ?? Array.Empty<SymbolicConditionProofResult>());
         ProofOutcomes = SymbolicProofOutcomeSummary.FromProofs(ConditionProofs);
         InvariantInfo = new SymbolicInvariantInfo(
@@ -6852,6 +6974,10 @@ public sealed class SymbolicSourceQueryResult
     public SymbolicReachability Reachability { get; }
 
     public string ReachabilityReason { get; }
+
+    public SymbolicInputWitness ReachabilityWitness { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary => ReachabilityWitness.DomainSummary;
 
     public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
 
@@ -7221,7 +7347,9 @@ public sealed class SymbolicConditionProofResult
         int? requestedColumn = null,
         int? requestedPosition = null,
         int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
+        bool? containsRequestedPosition = null,
+        SymbolicInputWitness? witness = null,
+        SymbolicInputWitness? counterexampleWitness = null)
     {
         Condition = condition ?? string.Empty;
         TruthValue = truthValue;
@@ -7269,6 +7397,11 @@ public sealed class SymbolicConditionProofResult
         RequestedPosition = requestedPosition;
         RequestedPositionDistance = requestedPositionDistance;
         ContainsRequestedPosition = containsRequestedPosition;
+        Witness = witness ?? (TruthValue == SymbolicTruthValue.Unreachable
+            ? SymbolicInputWitnessFactory.None(Reason)
+            : SymbolicInputWitnessFactory.Unsupported("condition_witness_unavailable"));
+        CounterexampleWitness = counterexampleWitness ??
+                                SymbolicInputWitnessFactory.None("counterexample_not_available");
         Proof = new SymbolicProofInfo(
             MapProofStatus(TruthValue),
             ResolveProofBackend(TruthValue, IsSolverBacked),
@@ -7339,6 +7472,10 @@ public sealed class SymbolicConditionProofResult
 
     public bool? ContainsRequestedPosition { get; }
 
+    public SymbolicInputWitness Witness { get; }
+
+    public SymbolicInputWitness CounterexampleWitness { get; }
+
     public string GetDisplayReason()
     {
         return SymbolicReasonDisplay.Format(Reason);
@@ -7390,7 +7527,9 @@ public sealed class SymbolicConditionProofResult
             requestedColumn: RequestedColumn ?? requestedColumn,
             requestedPosition: RequestedPosition ?? requestedPosition,
             requestedPositionDistance: RequestedPositionDistance ?? requestedPositionDistance,
-            containsRequestedPosition: ContainsRequestedPosition ?? containsRequestedPosition);
+            containsRequestedPosition: ContainsRequestedPosition ?? containsRequestedPosition,
+            witness: Witness,
+            counterexampleWitness: CounterexampleWitness);
     }
 
     private static string GetFormulaKind(SmtFormula formula)

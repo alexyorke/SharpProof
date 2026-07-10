@@ -562,7 +562,14 @@ public sealed class SymbolicQueryService
             span.EndColumn,
             SymbolicProgramPointMetadata.GetContainingMethodName(node),
             SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()),
-            symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState));
+            symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState),
+            reachabilityWitness: SymbolicInputWitnessFactory.CreateReachability(
+                analysis.ReachabilityProof?.PathWitness,
+                analysis.PathConditions,
+                semanticModel,
+                node.SpanStart,
+                analysis.Reachability,
+                analysis.ReachabilityReason));
     }
 
     private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
@@ -1175,6 +1182,8 @@ public sealed class SymbolicQueryResult
         SpanStart = spanStart;
         SpanEnd = spanEnd;
         LineCount = lineCount;
+        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string ScopeKind { get; }
@@ -1214,6 +1223,10 @@ public sealed class SymbolicQueryResult
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
+
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     internal object InnerResult { get; }
 

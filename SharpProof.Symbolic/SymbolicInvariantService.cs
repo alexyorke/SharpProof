@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SearchLib.Purity;
 using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -312,7 +313,8 @@ internal sealed class SymbolicInvariantService
                 SymbolicReachability.Unreachable,
                 stateProof.Info.Reason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                sourceNode);
+                sourceNode,
+                stateProof.RawResult);
 
         if (formulas.Count == 0)
         {
@@ -324,7 +326,8 @@ internal sealed class SymbolicInvariantService
                     MapReachability(stateProof.Info.Status),
                     stateProof.Info.Reason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                    sourceNode);
+                    sourceNode,
+                    stateProof.RawResult);
 
             return new SymbolicProgramPointAnalysis(
                 spanStart,
@@ -350,7 +353,8 @@ internal sealed class SymbolicInvariantService
             proof == null ? SymbolicReachability.NotChecked : MapReachability(proof.Info.Status),
             proof?.Info.Reason ?? "reachability_not_checked",
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
-            sourceNode);
+            sourceNode,
+            proof?.RawResult);
     }
 
     private static bool HasPathStateFacts(SymbolicState pathState)
@@ -446,7 +450,8 @@ internal sealed class SymbolicProgramPointAnalysis
         SymbolicReachability reachability,
         string reachabilityReason,
         SymbolicSmtDiagnostics? smtDiagnostics,
-        SyntaxNode sourceNode)
+        SyntaxNode sourceNode,
+        PurityProofResult? reachabilityProof = null)
     {
         SpanStart = spanStart;
         PathConditions = pathConditions;
@@ -456,6 +461,7 @@ internal sealed class SymbolicProgramPointAnalysis
         MergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions);
         Reachability = reachability;
         ReachabilityReason = reachabilityReason;
+        ReachabilityProof = reachabilityProof;
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
     }
 
@@ -474,6 +480,8 @@ internal sealed class SymbolicProgramPointAnalysis
     public SymbolicReachability Reachability { get; }
 
     public string ReachabilityReason { get; }
+
+    internal PurityProofResult? ReachabilityProof { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 }

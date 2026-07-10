@@ -268,3 +268,18 @@ SharpProof.Symbolic.SymbolicWitnessStatus.Approximate = 2 -> SharpProof.Symbolic
 SharpProof.Symbolic.SymbolicWitnessStatus.Exact = 1 -> SharpProof.Symbolic.SymbolicWitnessStatus
 SharpProof.Symbolic.SymbolicWitnessStatus.None = 0 -> SharpProof.Symbolic.SymbolicWitnessStatus
 SharpProof.Symbolic.SymbolicWitnessStatus.Unsupported = 3 -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicConditionProofResult.CounterexampleWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
+SharpProof.Symbolic.SymbolicConditionProofResult.Witness.get -> SharpProof.Symbolic.SymbolicInputWitness!
+SharpProof.Symbolic.SymbolicFileQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicFileQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
+SharpProof.Symbolic.SymbolicLineQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicLineQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
+SharpProof.Symbolic.SymbolicRuntimeHazard.TriggerWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
+SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.TriggerWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
+SharpProof.Symbolic.SymbolicSourceQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicSourceQueryResult.ReachabilityWitness.get -> SharpProof.Symbolic.SymbolicInputWitness!
+SharpProof.Symbolic.SymbolicSpanQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicSpanQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
+SharpProof.Symbolic.SymbolicQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!

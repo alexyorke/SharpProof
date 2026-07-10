@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
+using SearchLib.Purity;
 using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -377,6 +378,20 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var lineColumn =
             SymbolicSourceLocation.GetLineAndColumn(syntaxTree, candidate.Site.SpanStart, cancellationToken);
         var sourceSpan = SymbolicSourceLocation.GetNodeSourceSpan(syntaxTree, candidate.Site.Span, cancellationToken);
+        var triggerProof = analysis.Reachability == SymbolicReachability.Unreachable ||
+                           !smtAnalysis.Options.IsEnabled
+            ? null
+            : SymbolicReachabilityService.ClassifyBranchReachability(
+                analysis.PathConditions,
+                triggerCondition,
+                smtAnalysis);
+        var triggerWitness = CreateTriggerWitness(
+            analysis,
+            triggerCondition,
+            triggerProof,
+            semanticModel,
+            candidate.Site.SpanStart,
+            reason);
 
         return new SymbolicRuntimeHazard(
             syntaxTree.FilePath,
@@ -407,7 +422,29 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             analysis.Reachability,
             analysis.ReachabilityReason,
             proofInfo,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            SymbolicSmtDiagnostics.FromService(smtAnalysis),
+            triggerWitness);
+    }
+
+    private static SymbolicInputWitness CreateTriggerWitness(
+        SymbolicProgramPointAnalysis analysis,
+        SmtFormula triggerCondition,
+        PurityProofResult? triggerProof,
+        SemanticModel semanticModel,
+        int position,
+        string reason)
+    {
+        if (analysis.Reachability == SymbolicReachability.Unreachable ||
+            triggerProof?.ImpurityFeasibility == Feasibility.Unsatisfiable)
+            return SymbolicInputWitnessFactory.None(reason);
+
+        return SymbolicInputWitnessFactory.Create(
+            triggerProof?.TriggerWitness,
+            analysis.PathConditions.Concat(new[] { triggerCondition }),
+            semanticModel,
+            position,
+            SymbolicWitnessStatus.Unsupported,
+            triggerProof?.Reason ?? reason);
     }
 
     private static bool TryRefineThrowNullCandidate(
@@ -584,6 +621,8 @@ public sealed class SymbolicRuntimeHazardQueryResult
         Line = line;
         Hazards = hazards ?? throw new ArgumentNullException(nameof(hazards));
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        TriggerWitnesses = Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(TriggerWitnesses);
     }
 
     public string FilePath { get; }
@@ -601,6 +640,10 @@ public sealed class SymbolicRuntimeHazardQueryResult
     public int HazardCount => Hazards.Count;
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public IReadOnlyList<SymbolicInputWitness> TriggerWitnesses { get; }
+
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactRuntimeHazardQueryResult ToCompactResult(
         SymbolicCompactRuntimeHazardQueryOptions? options = null)
@@ -636,7 +679,8 @@ public sealed class SymbolicRuntimeHazard
         SymbolicReachability reachability,
         string reachabilityReason,
         SymbolicProofInfo? proofInfo,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
+        SymbolicSmtDiagnostics? smtDiagnostics = null,
+        SymbolicInputWitness? triggerWitness = null)
     {
         FilePath = filePath;
         Kind = kind;
@@ -663,6 +707,8 @@ public sealed class SymbolicRuntimeHazard
         SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
         Reachability = reachability;
         ReachabilityReason = reachabilityReason;
+        TriggerWitness = triggerWitness ?? SymbolicInputWitnessFactory.Unsupported(
+            "runtime_hazard_trigger_witness_unavailable");
         Proof = CreateProofInfo(status, statusReason, category, triggerCondition, kind, proofInfo);
         InvariantInfo = new SymbolicInvariantInfo(
             MergedInvariantText,
@@ -728,6 +774,8 @@ public sealed class SymbolicRuntimeHazard
     public string ReachabilityReason { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicInputWitness TriggerWitness { get; }
 
     public string GetDisplayStatusReason()
     {

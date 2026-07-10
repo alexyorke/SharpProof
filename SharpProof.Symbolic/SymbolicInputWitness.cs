@@ -336,6 +336,31 @@ public sealed class SymbolicInputWitness
 
 internal static class SymbolicInputWitnessFactory
 {
+    internal static SymbolicInputWitness CreateReachability(
+        SmtSatisfyingWitness? witness,
+        IEnumerable<SmtFormula> pathConditions,
+        SemanticModel? semanticModel,
+        int position,
+        SymbolicReachability reachability,
+        string reason)
+    {
+        var conditions = pathConditions?.ToArray() ?? Array.Empty<SmtFormula>();
+        if (reachability == SymbolicReachability.Unreachable) return None(reason);
+
+        if (reachability == SymbolicReachability.Reachable &&
+            conditions.Length == 0 &&
+            witness == null)
+            return Unconstrained();
+
+        return Create(
+            witness,
+            conditions,
+            semanticModel,
+            position,
+            SymbolicWitnessStatus.Unsupported,
+            string.IsNullOrWhiteSpace(reason) ? "reachability_witness_unavailable" : reason);
+    }
+
     internal static SymbolicInputWitness Create(
         SmtSatisfyingWitness? witness,
         IEnumerable<SmtFormula> formulas,
@@ -382,6 +407,19 @@ internal static class SymbolicInputWitnessFactory
             Array.Empty<SymbolicSatisfyingAssignment>(),
             new SymbolicInputDomainSummary(
                 SymbolicWitnessStatus.None,
+                reason,
+                Array.Empty<SymbolicInputDomain>(),
+                0));
+    }
+
+    internal static SymbolicInputWitness Unsupported(string reason)
+    {
+        return new SymbolicInputWitness(
+            SymbolicWitnessStatus.Unsupported,
+            reason,
+            Array.Empty<SymbolicSatisfyingAssignment>(),
+            new SymbolicInputDomainSummary(
+                SymbolicWitnessStatus.Unsupported,
                 reason,
                 Array.Empty<SymbolicInputDomain>(),
                 0));
