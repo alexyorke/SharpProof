@@ -102,6 +102,33 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task CapabilityUnknownDiagnostic_IncludesStableTaxonomyProperties()
+    {
+        var diagnostics = await GetDiagnosticsAsync(@"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod(dynamic value)
+    {
+        value.ToString();
+    }
+}");
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.CapabilityUnknownId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+                Is.EqualTo("capability.dynamic_dispatch"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+                Is.EqualTo(SymbolicUnknownReasonCategory.DynamicDispatch.ToString()));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+                Is.EqualTo(SymbolicUnknownReasonSource.Capability.ToString()));
+        });
+    }
+
+    [Test]
     public async Task AllowedCapabilities_UnknownBits_ReportInvalidContractArgument()
     {
         var test = @"

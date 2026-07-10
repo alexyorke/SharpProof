@@ -300,6 +300,17 @@ internal static class SymbolicUnknownReasonTaxonomy
                 "runtime_hazard.unsupported_formula_fallback",
                 rawReason);
 
+        if (proofReason is SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown)
+            return Create(
+                SymbolicUnknownReasonSource.RuntimeHazard,
+                status == SymbolicRuntimeHazardStatus.Unsupported
+                    ? SymbolicUnknownReasonCategory.UnsupportedOperation
+                    : SymbolicUnknownReasonCategory.Unknown,
+                status == SymbolicRuntimeHazardStatus.Unsupported
+                    ? "runtime_hazard.unsupported"
+                    : "runtime_hazard.unknown",
+                rawReason);
+
         return ChangeSource(ForProof(proofReason, rawReason), SymbolicUnknownReasonSource.RuntimeHazard,
             "runtime_hazard");
     }

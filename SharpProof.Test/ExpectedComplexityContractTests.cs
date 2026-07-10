@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 using static SharpProof.Test.AnalyzerTestHost;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
@@ -116,7 +117,16 @@ public static class C
 
         var diagnostics = await GetComplexityDiagnosticsAsync(test);
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
-        Assert.That(diagnostic.GetMessage(), Does.Contain("UnsupportedWhileLoop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.GetMessage(), Does.Contain("UnsupportedWhileLoop"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+                Is.EqualTo("complexity.unsupported_while_loop"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+                Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedSyntax.ToString()));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+                Is.EqualTo(SymbolicUnknownReasonSource.Complexity.ToString()));
+        });
     }
 
     [Test]

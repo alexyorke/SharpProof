@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -36,6 +37,12 @@ public class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardTriggerProperty], Is.Not.Empty);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardProofBackendProperty], Is.Not.Empty);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty], Is.Not.Empty);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Is.EqualTo("runtime_hazard.unknown"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Is.EqualTo(SymbolicUnknownReasonCategory.Unknown.ToString()));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Is.EqualTo(SymbolicUnknownReasonSource.RuntimeHazard.ToString()));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselineSymbolProperty], Is.Not.Empty);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselinePathProperty], Is.Not.Empty);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BaselineOperationKindProperty],

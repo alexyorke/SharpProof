@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using SharpProof.Symbolic;
 using static SharpProof.Test.AnalyzerTestHost;
 using InMemoryAdditionalText = SharpProof.Test.AnalyzerTestHost.InMemoryAdditionalText;
 
@@ -12109,6 +12110,14 @@ public class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackConfidenceProperty], Is.EqualTo("low"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.BclFallbackReasonProperty],
+            Is.EqualTo("value_return_no_ref_or_out"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+            Is.EqualTo("purity.library_model_fallback"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+            Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedLibraryModel.ToString()));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+            Is.EqualTo(SymbolicUnknownReasonSource.Purity.ToString()));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonRawProperty],
             Is.EqualTo("value_return_no_ref_or_out"));
 
         var fallbackDiagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.BclFallbackGuessId);
