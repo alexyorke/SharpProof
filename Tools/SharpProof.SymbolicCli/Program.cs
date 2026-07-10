@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
@@ -29,26 +30,26 @@ try
     if (options.RuntimeHazards)
         result = new SymbolicQueryService().QueryRuntimeHazards(
             new SymbolicRuntimeHazardRequest(
-                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateSourceInput(),
                 options.CreateRuntimeHazardTarget(),
                 options.CreateQueryOptions(smtAnalysis, false),
                 options.CreateRuntimeHazardOptions()));
     else if (options.Complexity)
         result = new SymbolicQueryService().QueryComplexity(
             new SymbolicComplexityRequest(
-                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateSourceInput(),
                 options.CreateComplexityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else if (options.Capabilities)
         result = new SymbolicQueryService().QueryCapabilities(
             new SymbolicCapabilityRequest(
-                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateSourceInput(),
                 options.CreateCapabilityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else
         result = new SymbolicQueryService()
             .Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromFile(options.FilePath),
+                options.CreateSourceInput(),
                 options.CreateQueryTarget(),
                 options.CreateQueryOptions(smtAnalysis, true)))
             .InnerResult;
@@ -267,7 +268,7 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
 static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService smtAnalysis)
 {
     var service = new SymbolicQueryService();
-    var source = SymbolicSourceInput.FromFile(options.FilePath!);
+    var source = options.CreateSourceInput();
     var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
     var pointTarget = options.Position.HasValue
         ? SymbolicQueryTarget.Position(options.Position.Value)
@@ -909,6 +910,18 @@ internal sealed class SymbolicCliOptions
                                                       Include facts established by completed declaration/assignment statements on queried lines.
                                   --position <n>      0-based absolute source position to query.
                                   --reference <path>  Metadata reference path. Can be repeated.
+                                  --language-version <version>
+                                                      C# language version, such as 12, latest, or preview. Default: preview.
+                                  --define <symbol>   Preprocessor symbol. Can be repeated.
+                                  --nullable <mode>   Nullable context: disable, enable, warnings, or annotations. Default: disable.
+                                  --allow-unsafe      Allow unsafe C# in the standalone compilation.
+                                  --documentation-mode <mode>
+                                                      Documentation mode: none, parse, or diagnose. Default: parse.
+                                  --platform <value>  Compilation platform, such as AnyCpu, x64, x86, Arm, or Arm64. Default: AnyCpu.
+                                  --optimization <value>
+                                                      Optimization level: debug or release. Default: debug.
+                                  --assembly-name <name>
+                                                      Assembly identity name for the standalone compilation.
                                   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
                                   --program-point-kind <kind>
                                                       Keep only Statement, Expression, or Other program points. Can be repeated.
@@ -1026,6 +1039,22 @@ internal sealed class SymbolicCliOptions
     public bool PostLineInvariants { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
+
+    public LanguageVersion LanguageVersion { get; private set; } = LanguageVersion.Preview;
+
+    public List<string> PreprocessorSymbols { get; } = new();
+
+    public NullableContextOptions NullableContext { get; private set; } = NullableContextOptions.Disable;
+
+    public bool AllowUnsafe { get; private set; }
+
+    public DocumentationMode DocumentationMode { get; private set; } = DocumentationMode.Parse;
+
+    public Platform Platform { get; private set; } = Platform.AnyCpu;
+
+    public OptimizationLevel OptimizationLevel { get; private set; } = OptimizationLevel.Debug;
+
+    public string? AssemblyName { get; private set; }
 
     public List<string> NodeKinds { get; } = new();
 
@@ -1240,6 +1269,34 @@ internal sealed class SymbolicCliOptions
                 case "-r":
                     options.ReferencePaths.Add(ReadString(args, ref index, arg));
                     break;
+                case "--language-version":
+                case "--lang-version":
+                    options.LanguageVersion = ReadLanguageVersion(args, ref index, arg);
+                    break;
+                case "--define":
+                case "-d":
+                    options.PreprocessorSymbols.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--nullable":
+                    options.NullableContext = ReadNullableContext(args, ref index, arg);
+                    break;
+                case "--allow-unsafe":
+                case "--unsafe":
+                    options.AllowUnsafe = true;
+                    break;
+                case "--documentation-mode":
+                    options.DocumentationMode = ReadDocumentationMode(args, ref index, arg);
+                    break;
+                case "--platform":
+                    options.Platform = ReadPlatform(args, ref index, arg);
+                    break;
+                case "--optimization":
+                case "--optimize":
+                    options.OptimizationLevel = ReadOptimizationLevel(args, ref index, arg);
+                    break;
+                case "--assembly-name":
+                    options.AssemblyName = ReadString(args, ref index, arg);
+                    break;
                 case "--node-kind":
                     options.NodeKinds.Add(ReadString(args, ref index, arg));
                     break;
@@ -1394,6 +1451,8 @@ internal sealed class SymbolicCliOptions
         if (!options.ShowHelp)
         {
             NormalizeStringList(options.InvariantTargets);
+            NormalizeStringList(options.PreprocessorSymbols);
+            _ = options.CreateCompilationProfile();
 
             if (options.CompactSummaryOnly)
             {
@@ -1613,6 +1672,26 @@ internal sealed class SymbolicCliOptions
         return options;
     }
 
+    public SymbolicSourceCompilationProfile CreateCompilationProfile()
+    {
+        return new SymbolicSourceCompilationProfile(
+            LanguageVersion,
+            PreprocessorSymbols,
+            NullableContext,
+            AllowUnsafe,
+            DocumentationMode,
+            Platform,
+            OptimizationLevel,
+            AssemblyName);
+    }
+
+    public SymbolicSourceInput CreateSourceInput()
+    {
+        return SymbolicSourceInput.FromFile(
+            FilePath ?? throw new InvalidOperationException("A source file is required."),
+            CreateCompilationProfile());
+    }
+
     public SymbolicSourceQueryFilter CreateResultFilter()
     {
         return new SymbolicSourceQueryFilter(
@@ -1792,6 +1871,58 @@ internal sealed class SymbolicCliOptions
         if (parsed < 0) throw new ArgumentException(optionName + " requires a non-negative integer value.");
 
         return parsed;
+    }
+
+    private static LanguageVersion ReadLanguageVersion(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (LanguageVersionFacts.TryParse(value, out var languageVersion)) return languageVersion;
+
+        throw new ArgumentException(optionName + " requires a recognized C# language version.");
+    }
+
+    private static NullableContextOptions ReadNullableContext(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim().ToLowerInvariant();
+        return value switch
+        {
+            "disable" or "disabled" => NullableContextOptions.Disable,
+            "enable" or "enabled" => NullableContextOptions.Enable,
+            "warnings" => NullableContextOptions.Warnings,
+            "annotations" => NullableContextOptions.Annotations,
+            _ => throw new ArgumentException(
+                optionName + " must be disable, enable, warnings, or annotations.")
+        };
+    }
+
+    private static DocumentationMode ReadDocumentationMode(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<DocumentationMode>(value, true, out var mode) &&
+            Enum.IsDefined(typeof(DocumentationMode), mode))
+            return mode;
+
+        throw new ArgumentException(optionName + " must be none, parse, or diagnose.");
+    }
+
+    private static Platform ReadPlatform(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<Platform>(value, true, out var platform) &&
+            Enum.IsDefined(typeof(Platform), platform))
+            return platform;
+
+        throw new ArgumentException(optionName + " requires a recognized Roslyn platform value.");
+    }
+
+    private static OptimizationLevel ReadOptimizationLevel(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<OptimizationLevel>(value, true, out var optimizationLevel) &&
+            Enum.IsDefined(typeof(OptimizationLevel), optimizationLevel))
+            return optimizationLevel;
+
+        throw new ArgumentException(optionName + " must be debug or release.");
     }
 
     private static SmtAnalysisMode ReadSmtMode(string[] args, ref int index, string optionName)
