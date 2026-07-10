@@ -38,6 +38,9 @@ internal static class EffectSummaryCli
         if (options.Resume && string.IsNullOrWhiteSpace(options.ProgressPath))
             throw new ArgumentException("--resume requires --progress.");
 
+        if (options.WriteArtifactSpecDependencyManifests)
+            return WriteArtifactSpecDependencyManifests(options);
+
         if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
             return RunArtifactSpec(options.ArtifactSpecPath!, options.ProgressPath, options.Resume);
 
@@ -45,6 +48,87 @@ internal static class EffectSummaryCli
 
         WriteDocument(BuildDocument(options), options.OutputPath);
         return 0;
+    }
+
+    private static int WriteArtifactSpecDependencyManifests(CliOptions options)
+    {
+        var artifactSpecPath = Path.GetFullPath(options.ArtifactSpecPath!);
+        var artifactSpecDirectory = Path.GetDirectoryName(artifactSpecPath)
+                                    ?? throw new InvalidOperationException(
+                                        $"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
+        var document = ArtifactSpecDocument.Load(artifactSpecPath);
+        var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var inputs = new HashSet<string>(pathComparer)
+        {
+            artifactSpecPath,
+            Path.GetFullPath(typeof(EffectSummaryCli).Assembly.Location)
+        };
+        var outputs = new HashSet<string>(pathComparer);
+
+        foreach (var artifact in document.Artifacts)
+        {
+            var artifactOptions = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
+            foreach (var assemblyPath in ResolveInputAssemblies(artifactOptions))
+                inputs.Add(Path.GetFullPath(assemblyPath));
+
+            if (!string.IsNullOrWhiteSpace(artifactOptions.SourceSummaryPath))
+                inputs.Add(Path.GetFullPath(artifactOptions.SourceSummaryPath!));
+
+            var outputPath = ResolveDependencyOutputPath(
+                artifact.OutputPath,
+                options.DependencyOutputRoot,
+                artifactSpecDirectory);
+            if (!outputs.Add(outputPath))
+                throw new InvalidOperationException(
+                    $"Artifact spec '{artifactSpecPath}' maps more than one artifact to output '{outputPath}'.");
+        }
+
+        WriteManifestIfChanged(options.InputManifestPath!, inputs);
+        WriteManifestIfChanged(options.OutputManifestPath!, outputs);
+        return 0;
+    }
+
+    private static string ResolveDependencyOutputPath(
+        string? artifactOutputPath,
+        string? outputRoot,
+        string artifactSpecDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(artifactOutputPath))
+            throw new ArgumentException("Artifact spec entries require OutputPath.");
+
+        if (Path.IsPathRooted(artifactOutputPath))
+        {
+            if (!string.IsNullOrWhiteSpace(outputRoot))
+                throw new InvalidOperationException(
+                    "Artifact spec OutputPath values must be relative when --dependency-output-root is used.");
+
+            return Path.GetFullPath(artifactOutputPath);
+        }
+
+        var baseDirectory = string.IsNullOrWhiteSpace(outputRoot)
+            ? artifactSpecDirectory
+            : Path.GetFullPath(outputRoot);
+        return Path.GetFullPath(Path.Combine(baseDirectory, artifactOutputPath));
+    }
+
+    private static void WriteManifestIfChanged(string manifestPath, IEnumerable<string> paths)
+    {
+        var normalizedPath = Path.GetFullPath(manifestPath);
+        var content = string.Join(
+                          "\n",
+                          paths
+                              .Select(Path.GetFullPath)
+                              .Distinct(OperatingSystem.IsWindows()
+                                  ? StringComparer.OrdinalIgnoreCase
+                                  : StringComparer.Ordinal)
+                              .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)) +
+                      "\n";
+        if (File.Exists(normalizedPath) &&
+            string.Equals(File.ReadAllText(normalizedPath), content, StringComparison.Ordinal))
+            return;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(normalizedPath)!);
+        File.WriteAllText(normalizedPath, content, new UTF8Encoding(false));
     }
 
     private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
@@ -377,6 +461,14 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine(
             "  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.");
         Console.Error.WriteLine(
+            "  --artifact-spec-dependencies <path> Resolve artifact inputs and outputs without generating summaries.");
+        Console.Error.WriteLine(
+            "  --input-manifest <path>    Write resolved dependency input paths, one per line.");
+        Console.Error.WriteLine(
+            "  --output-manifest <path>   Write resolved dependency output paths, one per line.");
+        Console.Error.WriteLine(
+            "  --dependency-output-root <path> Rebase relative artifact outputs for dependency manifests.");
+        Console.Error.WriteLine(
             "  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
         Console.Error.WriteLine(
             "  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
@@ -425,6 +517,16 @@ internal sealed class CliOptions
     public List<string> ExcludedSymbolPrefixes { get; } = new();
 
     public string? ArtifactSpecPath { get; private set; }
+
+    public bool WriteArtifactSpecDependencyManifests { get; private set; }
+
+    public string? InputManifestPath { get; private set; }
+
+    public string? OutputManifestPath { get; private set; }
+
+    public string? DependencyOutputRoot { get; private set; }
+
+    public string? SourceSummaryPath { get; private set; }
 
     public string Framework { get; private set; } = "net8.0";
 
@@ -481,6 +583,19 @@ internal sealed class CliOptions
                     break;
                 case "--artifact-spec":
                     options.ArtifactSpecPath = ReadRequiredValue(args, ref i, arg);
+                    break;
+                case "--artifact-spec-dependencies":
+                    options.ArtifactSpecPath = ReadRequiredValue(args, ref i, arg);
+                    options.WriteArtifactSpecDependencyManifests = true;
+                    break;
+                case "--input-manifest":
+                    options.InputManifestPath = ReadRequiredValue(args, ref i, arg);
+                    break;
+                case "--output-manifest":
+                    options.OutputManifestPath = ReadRequiredValue(args, ref i, arg);
+                    break;
+                case "--dependency-output-root":
+                    options.DependencyOutputRoot = ReadRequiredValue(args, ref i, arg);
                     break;
                 case "--framework":
                     options.Framework = ReadRequiredValue(args, ref i, arg);
@@ -614,8 +729,11 @@ internal sealed class CliOptions
 
         if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
         {
+            options.SourceSummaryPath = ResolveArtifactSpecInputPath(
+                artifact.SourceSummaryPath!,
+                artifactSpecDirectory);
             var sourceSymbols = ArtifactSpecSymbolSource.LoadSymbols(
-                ResolveArtifactSpecInputPath(artifact.SourceSummaryPath!, artifactSpecDirectory),
+                options.SourceSummaryPath,
                 options.ExcludedSymbolPrefixes,
                 options.SymbolPrefixes);
             options.ExactSymbols.AddRange(sourceSymbols.Symbols);
@@ -664,6 +782,24 @@ internal sealed class CliOptions
     private void Validate()
     {
         if (MaxExceptionEdges <= 0) throw new ArgumentException("MaxExceptionEdges must be greater than zero.");
+
+        if (!WriteArtifactSpecDependencyManifests)
+        {
+            if (InputManifestPath != null || OutputManifestPath != null || DependencyOutputRoot != null)
+                throw new ArgumentException(
+                    "--input-manifest, --output-manifest, and --dependency-output-root require --artifact-spec-dependencies.");
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(InputManifestPath) || string.IsNullOrWhiteSpace(OutputManifestPath))
+            throw new ArgumentException(
+                "--artifact-spec-dependencies requires --input-manifest and --output-manifest.");
+
+        if (AssemblyPaths.Count != 0 || !string.IsNullOrWhiteSpace(ShardOutputPath) ||
+            !string.IsNullOrWhiteSpace(OutputPath) || !string.IsNullOrWhiteSpace(ProgressPath) || Resume)
+            throw new ArgumentException(
+                "--artifact-spec-dependencies cannot be combined with generation, sharding, output, progress, or resume options.");
     }
 
     private static bool HasPackageAssembly(ArtifactSpecEntry artifact)

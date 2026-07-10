@@ -6092,6 +6092,90 @@ public partial class EffectSummaryToolTests
     }
 
     [Test]
+    public async Task EffectSummaryTool_ArtifactSpecDependencies_WriteStableResolvedManifests()
+    {
+        var workingDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "effect-summary-artifact-dependencies-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workingDirectory);
+
+        const string source = "public static class DependencyFixture { public static int Value() => 42; }";
+        await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryDependencyFixture", source);
+        var sourceSummaryPath = Path.Combine(workingDirectory, "source-summary.json");
+        await File.WriteAllTextAsync(
+            sourceSummaryPath,
+            """
+            {
+              "GeneratedPurityCatalog": {
+                "Entries": [
+                  {
+                    "Symbol": "DependencyFixture.Value()",
+                    "ExactSymbolKey": "DependencyFixture.Value()->int"
+                  }
+                ]
+              }
+            }
+            """);
+
+        var outputRoot = Path.Combine(workingDirectory, "generated");
+        var inputManifestPath = Path.Combine(workingDirectory, "inputs.txt");
+        var outputManifestPath = Path.Combine(workingDirectory, "outputs.txt");
+        var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+        var artifactSpecJson = JsonSerializer.Serialize(
+            new
+            {
+                SchemaVersion = 1,
+                Artifacts = new[]
+                {
+                    new
+                    {
+                        OutputPath = "DependencyFixture.SharpProof.EffectSummary.json",
+                        SourceSummaryPath = sourceSummaryPath,
+                        AssemblyPaths = new[] { fixture.AssemblyPath },
+                        Limit = 5
+                    }
+                }
+            },
+            new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+        var arguments = new[]
+        {
+            "--artifact-spec-dependencies", artifactSpecPath,
+            "--input-manifest", inputManifestPath,
+            "--output-manifest", outputManifestPath,
+            "--dependency-output-root", outputRoot
+        };
+        await RunEffectSummaryToolAsync(arguments);
+
+        var inputPaths = await File.ReadAllLinesAsync(inputManifestPath);
+        var outputPaths = await File.ReadAllLinesAsync(outputManifestPath);
+        Assert.That(inputPaths, Does.Contain(Path.GetFullPath(artifactSpecPath)));
+        Assert.That(inputPaths, Does.Contain(Path.GetFullPath(fixture.AssemblyPath)));
+        Assert.That(inputPaths, Does.Contain(Path.GetFullPath(sourceSummaryPath)));
+        Assert.That(inputPaths, Does.Contain(Path.GetFullPath(GetEffectSummaryToolDllPath())));
+        Assert.That(
+            outputPaths,
+            Is.EqualTo(new[]
+            {
+                Path.GetFullPath(Path.Combine(outputRoot, "DependencyFixture.SharpProof.EffectSummary.json"))
+            }));
+        Assert.That(await File.ReadAllTextAsync(inputManifestPath), Does.Not.Contain("\r"));
+        Assert.That(await File.ReadAllTextAsync(outputManifestPath), Does.Not.Contain("\r"));
+        Assert.That(File.ReadAllBytes(inputManifestPath).Take(3),
+            Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
+
+        var fixedTimestamp = new DateTime(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(inputManifestPath, fixedTimestamp);
+        File.SetLastWriteTimeUtc(outputManifestPath, fixedTimestamp);
+
+        await RunEffectSummaryToolAsync(arguments);
+
+        Assert.That(File.GetLastWriteTimeUtc(inputManifestPath), Is.EqualTo(fixedTimestamp));
+        Assert.That(File.GetLastWriteTimeUtc(outputManifestPath), Is.EqualTo(fixedTimestamp));
+    }
+
+    [Test]
     public async Task EffectSummaryTool_ArtifactSpec_Resolves_NuGetPackageAssembly()
     {
         var workingDirectory = Path.Combine(
