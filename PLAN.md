@@ -53,11 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Add a standalone source-query compilation profile for non-MSBuild API and CLI
-  calls, covering language version, preprocessor symbols, nullable context,
-  unsafe allowance, documentation mode, platform, optimization, and assembly
-  identity, so single-file queries can intentionally match the user's compiler
-  settings before the heavier `--project` path is needed.
 - Move CLI-only compact projections for capability, complexity, runtime-hazard,
   and future `explain` results into `SharpProof.Symbolic` public DTOs with
   shared schema tests, instead of keeping invariant compact output in the
