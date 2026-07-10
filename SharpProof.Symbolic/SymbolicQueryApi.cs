@@ -38,6 +38,7 @@ public sealed class SymbolicQueryService
         if (request == null) throw new ArgumentNullException(nameof(request));
 
         var options = request.Options ?? SymbolicQueryOptions.Default;
+        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         var result = QueryCore(request.Source, request.Target, options, cancellationToken);
         return options.Filter == null || options.Filter.IsEmpty
             ? result
@@ -60,6 +61,7 @@ public sealed class SymbolicQueryService
         if (options.SmtAnalysis == null)
             throw new ArgumentException("Condition proof requests require SMT analysis.", nameof(request));
 
+        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         var source = request.Source;
         switch (source.Kind)
         {
@@ -168,6 +170,7 @@ public sealed class SymbolicQueryService
         if (options.SmtAnalysis == null)
             throw new ArgumentException("Runtime hazard queries require SMT analysis.", nameof(request));
 
+        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         var hazardOptions = request.HazardOptions ?? SymbolicRuntimeHazardQueryOptions.Default;
         var source = request.Source;
         var target = request.Target;
@@ -208,10 +211,12 @@ public sealed class SymbolicQueryService
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
 
+        var options = request.Options ?? SymbolicQueryOptions.Default;
+        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         return _complexityService.Query(
             request.Source,
             request.Target,
-            request.Options ?? SymbolicQueryOptions.Default,
+            options,
             cancellationToken);
     }
 
@@ -221,10 +226,12 @@ public sealed class SymbolicQueryService
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
 
+        var options = request.Options ?? SymbolicQueryOptions.Default;
+        using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         return _capabilityService.Query(
             request.Source,
             request.Target,
-            request.Options ?? SymbolicQueryOptions.Default,
+            options,
             cancellationToken);
     }
 
@@ -846,7 +853,27 @@ public sealed class SymbolicQueryOptions
         bool includeExpressionProgramPoints = false,
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceQueryFilter? filter = null)
+        : this(
+            SymbolicAnalysisLimits.Default,
+            references,
+            smtAnalysis,
+            impliedConditions,
+            includeExpressionProgramPoints,
+            includeCurrentStatementCompletionFacts,
+            filter)
     {
+    }
+
+    private SymbolicQueryOptions(
+        SymbolicAnalysisLimits analysisLimits,
+        IEnumerable<MetadataReference>? references = null,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false,
+        SymbolicSourceQueryFilter? filter = null)
+    {
+        AnalysisLimits = analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
         References = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
         SmtAnalysis = smtAnalysis;
         ImpliedConditions = impliedConditions?
@@ -856,6 +883,20 @@ public sealed class SymbolicQueryOptions
         IncludeExpressionProgramPoints = includeExpressionProgramPoints;
         IncludeCurrentStatementCompletionFacts = includeCurrentStatementCompletionFacts;
         Filter = filter;
+    }
+
+    public SymbolicAnalysisLimits AnalysisLimits { get; }
+
+    public SymbolicQueryOptions WithAnalysisLimits(SymbolicAnalysisLimits analysisLimits)
+    {
+        return new SymbolicQueryOptions(
+            analysisLimits,
+            References,
+            SmtAnalysis,
+            ImpliedConditions,
+            IncludeExpressionProgramPoints,
+            IncludeCurrentStatementCompletionFacts,
+            Filter);
     }
 
     public ImmutableArray<MetadataReference> References { get; }
@@ -1161,6 +1202,8 @@ public sealed class SymbolicQueryResult
         ScopeKind = scopeKind ?? throw new ArgumentNullException(nameof(scopeKind));
         InnerResult = innerResult ?? throw new ArgumentNullException(nameof(innerResult));
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            ProgramPoints.Select(static point => point.AnalysisTruncation));
         ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
         MergedInvariant = mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
         MergedPathFacts = mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
@@ -1203,6 +1246,8 @@ public sealed class SymbolicQueryResult
     public int? LineCount { get; }
 
     public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public int ProgramPointCount => ProgramPoints.Count;
 

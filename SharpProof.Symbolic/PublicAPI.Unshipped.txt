@@ -362,3 +362,16 @@ SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.Events.get -> System.Collecti
 SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.IsTruncated.get -> bool
 static readonly SharpProof.Symbolic.SymbolicAnalysisLimits.Default -> SharpProof.Symbolic.SymbolicAnalysisLimits!
 static readonly SharpProof.Symbolic.SymbolicAnalysisTruncationInfo.None -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicQueryOptions.AnalysisLimits.get -> SharpProof.Symbolic.SymbolicAnalysisLimits!
+SharpProof.Symbolic.SymbolicQueryOptions.WithAnalysisLimits(SharpProof.Symbolic.SymbolicAnalysisLimits! analysisLimits) -> SharpProof.Symbolic.SymbolicQueryOptions!
+SharpProof.Symbolic.SymbolicSourceQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicFileQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicLineQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicSpanQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicConditionProofResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicCompactQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicRuntimeHazard.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!
+SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.AnalysisTruncation.get -> SharpProof.Symbolic.SymbolicAnalysisTruncationInfo!

@@ -15,6 +15,7 @@ internal sealed class SymbolicInvariantService
         CancellationToken cancellationToken = default,
         bool includeCurrentStatementCompletionFacts = false)
     {
+        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         IReadOnlyList<SmtFormula> formulas = CollectInvariantsAt(
             site,
             semanticModel,
@@ -23,7 +24,7 @@ internal sealed class SymbolicInvariantService
         var facts = FormatFacts(formulas);
         var mergedInvariantText = FormatMergedInvariant(formulas);
 
-        return new SymbolicInvariantSnapshot(site.SpanStart, facts, mergedInvariantText);
+        return new SymbolicInvariantSnapshot(site.SpanStart, facts, mergedInvariantText, limitScope.Snapshot());
     }
 
     public SymbolicProgramPointAnalysis AnalyzeAt(
@@ -34,6 +35,7 @@ internal sealed class SymbolicInvariantService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicState? initialState = null)
     {
+        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         IReadOnlyList<SmtFormula> formulas = CollectInvariantsAt(
             site,
             semanticModel,
@@ -52,7 +54,13 @@ internal sealed class SymbolicInvariantService
                 includeCurrentStatementCompletionFacts,
                 initialState));
         formulas = MergeEncodedStatePathConditions(formulas, pathState);
-        return CreateAnalysis(site.SpanStart, formulas, pathState, smtAnalysis, site);
+        return CreateAnalysis(
+            site.SpanStart,
+            formulas,
+            pathState,
+            smtAnalysis,
+            site,
+            limitScope.Snapshot());
     }
 
     public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
@@ -61,6 +69,7 @@ internal sealed class SymbolicInvariantService
         SmtAnalysisService? smtAnalysis = null,
         CancellationToken cancellationToken = default)
     {
+        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
         IReadOnlyList<SmtFormula> formulas = SymbolicReachabilityService.CollectForInitialEntryPathConditions(
             forStatement,
             semanticModel,
@@ -71,7 +80,13 @@ internal sealed class SymbolicInvariantService
             cancellationToken);
         formulas = MergeEncodedStatePathConditions(formulas, pathState);
 
-        return CreateAnalysis(forStatement.SpanStart, formulas, pathState, smtAnalysis, forStatement);
+        return CreateAnalysis(
+            forStatement.SpanStart,
+            formulas,
+            pathState,
+            smtAnalysis,
+            forStatement,
+            limitScope.Snapshot());
     }
 
     private static IReadOnlyList<SmtFormula> MergeEncodedStatePathConditions(
@@ -296,7 +311,8 @@ internal sealed class SymbolicInvariantService
         IReadOnlyList<SmtFormula> formulas,
         SymbolicState pathState,
         SmtAnalysisService? smtAnalysis,
-        SyntaxNode sourceNode)
+        SyntaxNode sourceNode,
+        SymbolicAnalysisTruncationInfo truncation)
     {
         if (formulas.Count == 0 &&
             pathState.IsContradictory)
@@ -314,7 +330,8 @@ internal sealed class SymbolicInvariantService
                 stateProof.Info.Reason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 sourceNode,
-                stateProof.RawResult);
+                stateProof.RawResult,
+                truncation);
 
         if (formulas.Count == 0)
         {
@@ -327,7 +344,8 @@ internal sealed class SymbolicInvariantService
                     stateProof.Info.Reason,
                     SymbolicSmtDiagnostics.FromService(smtAnalysis),
                     sourceNode,
-                    stateProof.RawResult);
+                    stateProof.RawResult,
+                    truncation);
 
             return new SymbolicProgramPointAnalysis(
                 spanStart,
@@ -336,7 +354,8 @@ internal sealed class SymbolicInvariantService
                 SymbolicReachability.Reachable,
                 "no_path_conditions",
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                sourceNode);
+                sourceNode,
+                truncation: truncation);
         }
 
         var proof = smtAnalysis == null
@@ -354,7 +373,8 @@ internal sealed class SymbolicInvariantService
             proof?.Info.Reason ?? "reachability_not_checked",
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
             sourceNode,
-            proof?.RawResult);
+            proof?.RawResult,
+            truncation);
     }
 
     private static bool HasPathStateFacts(SymbolicState pathState)
@@ -379,11 +399,13 @@ internal sealed class SymbolicInvariantSnapshot
     internal SymbolicInvariantSnapshot(
         int spanStart,
         IReadOnlyList<string> facts,
-        string mergedInvariantText)
+        string mergedInvariantText,
+        SymbolicAnalysisTruncationInfo? truncation = null)
     {
         SpanStart = spanStart;
         Facts = facts ?? throw new ArgumentNullException(nameof(facts));
         MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
+        Truncation = truncation ?? SymbolicAnalysisTruncationInfo.None;
     }
 
     public int SpanStart { get; }
@@ -391,6 +413,8 @@ internal sealed class SymbolicInvariantSnapshot
     public IReadOnlyList<string> Facts { get; }
 
     public string MergedInvariantText { get; }
+
+    public SymbolicAnalysisTruncationInfo Truncation { get; }
 }
 
 public sealed class SymbolicInvariantFactSummary
@@ -451,7 +475,8 @@ internal sealed class SymbolicProgramPointAnalysis
         string reachabilityReason,
         SymbolicSmtDiagnostics? smtDiagnostics,
         SyntaxNode sourceNode,
-        PurityProofResult? reachabilityProof = null)
+        PurityProofResult? reachabilityProof = null,
+        SymbolicAnalysisTruncationInfo? truncation = null)
     {
         SpanStart = spanStart;
         PathConditions = pathConditions;
@@ -463,6 +488,7 @@ internal sealed class SymbolicProgramPointAnalysis
         ReachabilityReason = reachabilityReason;
         ReachabilityProof = reachabilityProof;
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        Truncation = truncation ?? SymbolicAnalysisTruncationInfo.None;
     }
 
     public int SpanStart { get; }
@@ -484,6 +510,8 @@ internal sealed class SymbolicProgramPointAnalysis
     internal PurityProofResult? ReachabilityProof { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicAnalysisTruncationInfo Truncation { get; }
 }
 
 public sealed class SymbolicSmtDiagnostics

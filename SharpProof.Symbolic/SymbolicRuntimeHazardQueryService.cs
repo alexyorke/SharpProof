@@ -423,7 +423,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             analysis.ReachabilityReason,
             proofInfo,
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
-            triggerWitness);
+            triggerWitness,
+            analysis.Truncation);
     }
 
     private static SymbolicInputWitness CreateTriggerWitness(
@@ -620,6 +621,8 @@ public sealed class SymbolicRuntimeHazardQueryResult
         ScopeEnd = scopeEnd;
         Line = line;
         Hazards = hazards ?? throw new ArgumentNullException(nameof(hazards));
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            Hazards.Select(static hazard => hazard.AnalysisTruncation));
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         TriggerWitnesses = Hazards.Select(static hazard => hazard.TriggerWitness).ToArray();
         InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(TriggerWitnesses);
@@ -638,6 +641,8 @@ public sealed class SymbolicRuntimeHazardQueryResult
     public IReadOnlyList<SymbolicRuntimeHazard> Hazards { get; }
 
     public int HazardCount => Hazards.Count;
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
@@ -680,7 +685,8 @@ public sealed class SymbolicRuntimeHazard
         string reachabilityReason,
         SymbolicProofInfo? proofInfo,
         SymbolicSmtDiagnostics? smtDiagnostics = null,
-        SymbolicInputWitness? triggerWitness = null)
+        SymbolicInputWitness? triggerWitness = null,
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         FilePath = filePath;
         Kind = kind;
@@ -721,6 +727,7 @@ public sealed class SymbolicRuntimeHazard
             SymbolicInvariantMergeKind.Conjunction,
             PathConditionCount);
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
     }
 
     public string FilePath { get; }
@@ -780,6 +787,8 @@ public sealed class SymbolicRuntimeHazard
     public string ReachabilityReason { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public SymbolicInputWitness TriggerWitness { get; }
 

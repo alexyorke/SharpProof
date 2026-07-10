@@ -242,6 +242,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
         IReadOnlyDictionary<string, int> categoryCounts,
         SymbolicCompactRuntimeHazardStatusSummary analysisSummary,
         IReadOnlyList<SymbolicCompactRuntimeHazard> hazards,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
         SymbolicCompactRuntimeHazardOutputTruncation truncation,
         SymbolicCompactRuntimeHazardSmtDiagnostics smtDiagnostics)
     {
@@ -257,6 +258,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
         CategoryCounts = categoryCounts;
         AnalysisSummary = analysisSummary;
         Hazards = hazards;
+        AnalysisTruncation = analysisTruncation;
         Truncation = truncation;
         SmtDiagnostics = smtDiagnostics;
     }
@@ -303,6 +305,8 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
 
     public IReadOnlyList<SymbolicCompactRuntimeHazard> Hazards { get; }
 
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+
     public SymbolicCompactRuntimeHazardOutputTruncation Truncation { get; }
 
     public SymbolicCompactRuntimeHazardSmtDiagnostics SmtDiagnostics { get; }
@@ -332,6 +336,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             CountBy(result.Hazards, static hazard => hazard.Category),
             SymbolicCompactRuntimeHazardStatusSummary.FromHazards(result.Hazards, result.SmtDiagnostics),
             hazards,
+            result.AnalysisTruncation,
             new SymbolicCompactRuntimeHazardOutputTruncation(
                 result.Hazards.Count > hazards.Length,
                 hazards.Any(static hazard => hazard.Truncation.PathConditions)),
@@ -458,6 +463,7 @@ public sealed class SymbolicCompactRuntimeHazard
         SymbolicReachability reachability,
         string reachabilityReason,
         SymbolicUnknownReasonInfo unknownReasonInfo,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
         SymbolicCompactRuntimeHazardItemTruncation truncation)
     {
         Kind = kind;
@@ -485,6 +491,7 @@ public sealed class SymbolicCompactRuntimeHazard
         Reachability = reachability;
         ReachabilityReason = reachabilityReason;
         UnknownReasonInfo = unknownReasonInfo;
+        AnalysisTruncation = analysisTruncation;
         Truncation = truncation;
     }
 
@@ -538,6 +545,8 @@ public sealed class SymbolicCompactRuntimeHazard
 
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+
     public SymbolicCompactRuntimeHazardItemTruncation Truncation { get; }
 
     public static SymbolicCompactRuntimeHazard FromHazard(
@@ -577,6 +586,7 @@ public sealed class SymbolicCompactRuntimeHazard
             hazard.Reachability,
             hazard.ReachabilityReason,
             hazard.UnknownReasonInfo,
+            hazard.AnalysisTruncation,
             new SymbolicCompactRuntimeHazardItemTruncation(hazard.PathConditions.Count > pathConditions.Length));
     }
 }

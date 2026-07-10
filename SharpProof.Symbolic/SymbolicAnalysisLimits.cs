@@ -183,6 +183,40 @@ public sealed class SymbolicAnalysisTruncationInfo
     public bool IsTruncated => Events.Count != 0;
 
     public IReadOnlyList<SymbolicAnalysisTruncationEvent> Events { get; }
+
+    internal static SymbolicAnalysisTruncationInfo Combine(
+        IEnumerable<SymbolicAnalysisTruncationInfo> truncations)
+    {
+        if (truncations == null) throw new ArgumentNullException(nameof(truncations));
+
+        var events = new List<SymbolicAnalysisTruncationEvent>();
+        foreach (var truncation in truncations)
+        {
+            if (truncation == null) continue;
+
+            foreach (var item in truncation.Events)
+            {
+                var existingIndex = events.FindIndex(existing =>
+                    existing.Kind == item.Kind &&
+                    existing.SourceSpanStart == item.SourceSpanStart &&
+                    string.Equals(existing.Provenance, item.Provenance, StringComparison.Ordinal));
+                if (existingIndex < 0)
+                {
+                    events.Add(item);
+                    continue;
+                }
+
+                if (item.Observed > events[existingIndex].Observed) events[existingIndex] = item;
+            }
+        }
+
+        return events.Count == 0
+            ? None
+            : new SymbolicAnalysisTruncationInfo(events
+                .OrderBy(static item => item.SourceSpanStart ?? int.MaxValue)
+                .ThenBy(static item => item.Code, StringComparer.Ordinal)
+                .ToArray());
+    }
 }
 
 internal static class SymbolicAnalysisLimitContext

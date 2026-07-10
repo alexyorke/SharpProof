@@ -1068,7 +1068,7 @@ internal sealed class SymbolicSourceQueryService
             query.Analysis,
             conditionText,
             smtAnalysis,
-            cancellationToken);
+            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
     }
 
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
@@ -1102,7 +1102,7 @@ internal sealed class SymbolicSourceQueryService
             query.Analysis,
             conditionText,
             smtAnalysis,
-            cancellationToken);
+            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
     }
 
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
@@ -1143,7 +1143,7 @@ internal sealed class SymbolicSourceQueryService
             query.Analysis,
             conditionText,
             symbolicCondition,
-            smtAnalysis);
+            smtAnalysis).WithAnalysisTruncation(query.Analysis.Truncation);
     }
 
     private ProgramPointQueryContext AnalyzeProgramPoint(
@@ -1220,7 +1220,7 @@ internal sealed class SymbolicSourceQueryService
                 analysis,
                 condition,
                 smtAnalysis,
-                cancellationToken))
+                cancellationToken).WithAnalysisTruncation(analysis.Truncation))
             .ToArray();
         return proofs;
     }
@@ -1792,7 +1792,8 @@ internal sealed class SymbolicSourceQueryService
                 query.SemanticModel,
                 query.Position,
                 query.Analysis.Reachability,
-                query.Analysis.ReachabilityReason));
+                query.Analysis.ReachabilityReason),
+            query.Analysis.Truncation);
     }
 
     private sealed class ProgramPointQueryContext
@@ -1866,6 +1867,8 @@ public sealed class SymbolicLineQueryResult
         FilePath = filePath;
         Line = line;
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            ProgramPoints.Select(static point => point.AnalysisTruncation));
         var factSummary =
             SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
         Facts = factSummary.Facts;
@@ -1903,6 +1906,8 @@ public sealed class SymbolicLineQueryResult
     public int Line { get; }
 
     public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public IReadOnlyList<string> Facts { get; }
 
@@ -1983,6 +1988,8 @@ public sealed class SymbolicSpanQueryResult
         EndLine = endLine;
         EndColumn = endColumn;
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            ProgramPoints.Select(static point => point.AnalysisTruncation));
         ProgramPointCount = ProgramPoints.Count;
         LinesWithProgramPoints = ProgramPoints
             .Select(static point => point.Line)
@@ -2041,6 +2048,8 @@ public sealed class SymbolicSpanQueryResult
     public int ProgramPointCount { get; }
 
     public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public IReadOnlyList<string> Facts { get; }
 
@@ -2115,6 +2124,8 @@ public sealed class SymbolicFileQueryResult
         LinesWithProgramPoints = Lines.Count;
         ProgramPointCount = Lines.Sum(static line => line.ProgramPoints.Count);
         var programPoints = Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            programPoints.Select(static point => point.AnalysisTruncation));
         var factSummary =
             SymbolicInvariantService.MergeInvariantFacts(programPoints.Select(static point => point.Facts));
         ObservedFacts = factSummary.Facts;
@@ -2156,6 +2167,8 @@ public sealed class SymbolicFileQueryResult
     public int ProgramPointCount { get; }
 
     public IReadOnlyList<SymbolicLineQueryResult> Lines { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
@@ -3354,6 +3367,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         IReadOnlyList<SymbolicCompactLineResult> lines,
         IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
         SymbolicCompactOutputTruncation truncation,
         int? requestedLine = null,
         int? requestedColumn = null,
@@ -3397,6 +3411,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         Lines = lines ?? throw new ArgumentNullException(nameof(lines));
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
         SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+        AnalysisTruncation = analysisTruncation ?? throw new ArgumentNullException(nameof(analysisTruncation));
         AnalysisSummary = SymbolicCompactAnalysisSummary.From(
             InvariantQuery,
             ProgramPointSummary,
@@ -3499,6 +3514,8 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
     public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
 
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+
     public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
 
     public SymbolicCompactOutputTruncation Truncation { get; }
@@ -3564,6 +3581,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             Array.Empty<SymbolicCompactLineResult>(),
             programPoints,
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            result.AnalysisTruncation,
             SymbolicCompactOutputTruncation.Combine(
                 new SymbolicCompactOutputTruncation(
                     false,
@@ -3625,6 +3643,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             Array.Empty<SymbolicCompactLineResult>(),
             lineResult.ProgramPoints,
             lineResult.SmtDiagnostics,
+            result.AnalysisTruncation,
             lineResult.Truncation);
     }
 
@@ -3694,6 +3713,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             Array.Empty<SymbolicCompactLineResult>(),
             programPoints,
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            result.AnalysisTruncation,
             truncation);
     }
 
@@ -3768,6 +3788,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             lineResults,
             Array.Empty<SymbolicCompactProgramPointResult>(),
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            result.AnalysisTruncation,
             truncation);
     }
 }
@@ -6870,7 +6891,8 @@ public sealed class SymbolicSourceQueryResult
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null,
         IReadOnlyList<SymbolicFactInfo>? symbolicFacts = null,
-        SymbolicInputWitness? reachabilityWitness = null)
+        SymbolicInputWitness? reachabilityWitness = null,
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         FilePath = filePath;
         Line = line;
@@ -6918,6 +6940,7 @@ public sealed class SymbolicSourceQueryResult
             Invariant.MergeKind,
             Invariant.ConditionCount);
         SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
         InvariantQuery = SymbolicInvariantQueryView.FromPoint(this);
     }
 
@@ -6984,6 +7007,8 @@ public sealed class SymbolicSourceQueryResult
     public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
 
@@ -7349,7 +7374,8 @@ public sealed class SymbolicConditionProofResult
         int? requestedPositionDistance = null,
         bool? containsRequestedPosition = null,
         SymbolicInputWitness? witness = null,
-        SymbolicInputWitness? counterexampleWitness = null)
+        SymbolicInputWitness? counterexampleWitness = null,
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         Condition = condition ?? string.Empty;
         TruthValue = truthValue;
@@ -7402,6 +7428,7 @@ public sealed class SymbolicConditionProofResult
             : SymbolicInputWitnessFactory.Unsupported("condition_witness_unavailable"));
         CounterexampleWitness = counterexampleWitness ??
                                 SymbolicInputWitnessFactory.None("counterexample_not_available");
+        AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
         Proof = new SymbolicProofInfo(
             MapProofStatus(TruthValue),
             ResolveProofBackend(TruthValue, IsSolverBacked),
@@ -7476,6 +7503,8 @@ public sealed class SymbolicConditionProofResult
 
     public SymbolicInputWitness CounterexampleWitness { get; }
 
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+
     public string GetDisplayReason()
     {
         return SymbolicReasonDisplay.Format(Reason);
@@ -7529,7 +7558,42 @@ public sealed class SymbolicConditionProofResult
             requestedPositionDistance: RequestedPositionDistance ?? requestedPositionDistance,
             containsRequestedPosition: ContainsRequestedPosition ?? containsRequestedPosition,
             witness: Witness,
-            counterexampleWitness: CounterexampleWitness);
+            counterexampleWitness: CounterexampleWitness,
+            analysisTruncation: AnalysisTruncation);
+    }
+
+    internal SymbolicConditionProofResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
+    {
+        return new SymbolicConditionProofResult(
+            Condition,
+            TruthValue,
+            Reason,
+            target: Target,
+            formulaKind: FormulaKind,
+            valueKind: ValueKind,
+            formulaText: FormulaText,
+            isSolverBacked: IsSolverBacked,
+            filePath: FilePath,
+            line: Line,
+            column: Column,
+            position: Position,
+            nodeSpanStart: NodeSpanStart,
+            nodeSpanEnd: NodeSpanEnd,
+            nodeStartLine: NodeStartLine,
+            nodeStartColumn: NodeStartColumn,
+            nodeEndLine: NodeEndLine,
+            nodeEndColumn: NodeEndColumn,
+            nodeKind: NodeKind,
+            methodName: MethodName,
+            programPointKind: ProgramPointKind,
+            requestedLine: RequestedLine,
+            requestedColumn: RequestedColumn,
+            requestedPosition: RequestedPosition,
+            requestedPositionDistance: RequestedPositionDistance,
+            containsRequestedPosition: ContainsRequestedPosition,
+            witness: Witness,
+            counterexampleWitness: CounterexampleWitness,
+            analysisTruncation: truncation);
     }
 
     private static string GetFormulaKind(SmtFormula formula)

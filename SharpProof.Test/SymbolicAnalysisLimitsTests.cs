@@ -145,4 +145,37 @@ public sealed class SymbolicAnalysisLimitsTests
                 SymbolicAnalysisLimitKind.GuardFactsPerTargetPerState
             }));
     }
+
+    [Test]
+    public void QueryOptions_ExposeProgramPointTruncationInFullAndCompactResults()
+    {
+        const string source = """
+                              public sealed class Sample
+                              {
+                                  public void Visit()
+                                  {
+                                      foreach (var value in new[] { 1, 2, 3 })
+                                      {
+                                          _ = value;
+                                      }
+
+                                      _ = 0;
+                                  }
+                              }
+                              """;
+        var limits = SymbolicAnalysisLimits.Default.WithOverrides(maxFiniteForeachElementFacts: 1);
+        var options = new SymbolicQueryOptions().WithAnalysisLimits(limits);
+
+        var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromText(source, "Sample.cs"),
+            SymbolicQueryTarget.AllLines(),
+            options));
+
+        Assert.That(options.AnalysisLimits, Is.SameAs(limits));
+        Assert.That(result.AnalysisTruncation.IsTruncated, Is.True);
+        Assert.That(
+            result.AnalysisTruncation.Events.Select(static item => item.Code),
+            Does.Contain("analysis_limit.foreach_element_facts"));
+        Assert.That(result.ToCompactResult().AnalysisTruncation.IsTruncated, Is.True);
+    }
 }
