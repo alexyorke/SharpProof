@@ -56,6 +56,14 @@ hazards, and `Math.Clamp` preserves ordered constant, equal, or type-extremum
 bounds. Floating-point overloads and clamp bounds whose order is not
 intrinsically proven stay on the conservative compatibility path.
 
+Runtime-hazard trigger facts are carried as typed
+`SymbolicExceptionPreconditionAtom` IR. Formula-shaped compatibility inputs are
+projected when the candidate is created. An input that cannot be represented in
+typed IR becomes an `Unsupported` fact, returns `Unknown` with
+`unsupported_typed_projection`, and renders source-like evidence as
+`unknown(...)`. Formula provenance is metadata only; it is not proof control
+flow.
+
 Unknown candidates stay opt-in in analyzer builds. Set
 `sharpproof_runtime_hazard_mode = unknowns` for informational `SP0033` only,
 `sites-and-unknowns` for warning-level proven sites plus informational unknowns,

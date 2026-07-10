@@ -3166,6 +3166,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(coverageDoc, Does.Contain("`Math.Max`"));
         Assert.That(coverageDoc, Does.Contain("`Math.Abs`"));
         Assert.That(coverageDoc, Does.Contain("`Math.Clamp`"));
+        Assert.That(coverageDoc, Does.Contain("`SymbolicExceptionPreconditionAtom`"));
+        Assert.That(coverageDoc, Does.Contain("`unsupported_typed_projection`"));
+        Assert.That(coverageDoc, Does.Contain("renders source-like evidence as"));
+        Assert.That(coverageDoc, Does.Contain("`unknown(...)`"));
+        Assert.That(coverageDoc, Does.Contain("Formula provenance is metadata only"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0033`"));
