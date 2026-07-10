@@ -553,7 +553,7 @@ namespace SharpProof.Symbolic
 
             if (IsFallbackDerivedTriggerPrecondition(triggerPrecondition))
             {
-                return (SymbolicRuntimeHazardStatus.Unsupported, "unsupported_formula_fallback", null);
+                return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_formula_fallback", null);
             }
 
             if (triggerPrecondition != null &&
@@ -847,7 +847,7 @@ namespace SharpProof.Symbolic
             {
                 return new SymbolicProofInfo(
                     MapProofStatus(status),
-                    ResolveProofBackend(status),
+                    ResolveProofBackend(status, statusReason),
                     ResolveUnknownReason(status, statusReason),
                     statusReason,
                     cacheHit: false,
@@ -871,9 +871,12 @@ namespace SharpProof.Symbolic
                 kind.ToString());
         }
 
-        private static SymbolicProofBackend ResolveProofBackend(SymbolicRuntimeHazardStatus status)
+        private static SymbolicProofBackend ResolveProofBackend(
+            SymbolicRuntimeHazardStatus status,
+            string statusReason)
         {
-            return status == SymbolicRuntimeHazardStatus.Unsupported
+            return status == SymbolicRuntimeHazardStatus.Unsupported ||
+                string.Equals(statusReason, "unsupported_formula_fallback", StringComparison.Ordinal)
                 ? SymbolicProofBackend.None
                 : SymbolicProofBackend.Smt;
         }

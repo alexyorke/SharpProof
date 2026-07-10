@@ -95,14 +95,6 @@ Neither `SharpProof.Test` nor `SharpProof.ToolingTest` has any `[SetUp]`, `[Tear
 
 ---
 
-## 13. Formula-backup path silently demotes to `Unsupported`
-
-**Files:** Trigger construction methods in `SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs`
-
-When `TryCreateNumericZeroCondition` fails IR lowering, the formula-fallback path (e.g. `TryTranslateZeroCondition`) produces a trigger with `.formula-fallback` provenance. The trigger is then classified as `Unsupported` by `ClassifyTriggerCore`. This means a real divide-by-zero hazard goes unreported (silent false negative) rather than being flagged as unknown.
-
----
-
 ## 14. `AnalyzerTestHost.TrustedPlatformReferences` is lazily loaded but never cleared
 
 **File:** `SharpProof.Test/AnalyzerTestHost.cs`
@@ -169,7 +161,7 @@ This `partial class` split across 6+ files translates C# syntax to SMT formulas.
 
 **Primary file:** `SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs`
 
-Each `.formula-fallback` provenance represents a code path where the analyzer gave up on IR-based lowering and fell back to a translated formula. The formula-fallback triggers are classified as `Unsupported`, meaning **the runtime hazard is silently not reported** for any code pattern that hits one of these fallbacks. This is not a hypothetical — it is the design of the fallback path.
+Each `.formula-fallback` provenance represents a code path where IR-based lowering gave way to a translated formula. These triggers are exposed as conservative `Unknown` results with `UnsupportedIrEncoding` proof metadata and their exact provenance when unproven candidates are requested. They remain useful IR-migration inventory, but they no longer masquerade as unsupported query modes.
 
 Full list of 16 unique fallback provenances:
 

@@ -4060,7 +4060,7 @@ public class TestClass
         }
 
         [Test]
-        public void ClassifyTriggerCore_RejectsFormulaFallbackHazardPreconditions()
+        public void ClassifyTriggerCore_ReportsFormulaFallbackHazardPreconditionsAsUnknown()
         {
             var syntaxTree = CSharpSyntaxTree.ParseText("class C { void M(int value) { } }");
             var node = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -4096,7 +4096,7 @@ public class TestClass
                 fallbackTrigger,
                 smtAnalysis);
 
-            Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unsupported));
+            Assert.That(status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(reason, Is.EqualTo("unsupported_formula_fallback"));
             Assert.That(proof, Is.Null);
         }
@@ -4145,12 +4145,12 @@ public class TestClass
         }
 
         [Test]
-        public void UnsupportedRuntimeHazard_MapsToExplicitPublicProofMetadata()
+        public void FormulaFallbackRuntimeHazard_MapsToConservativePublicProofMetadata()
         {
             var hazard = new SymbolicRuntimeHazard(
                 "Hazards.cs",
                 SymbolicRuntimeHazardKind.DivideByZero,
-                SymbolicRuntimeHazardStatus.Unsupported,
+                SymbolicRuntimeHazardStatus.Unknown,
                 "unsupported_formula_fallback",
                 "System.DivideByZeroException",
                 "definite_divide_by_zero",
@@ -4174,7 +4174,7 @@ public class TestClass
                 proofInfo: null,
                 smtDiagnostics: SymbolicSmtDiagnostics.NotConfigured);
 
-            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unsupported));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
             Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
             Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.None));
             Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));

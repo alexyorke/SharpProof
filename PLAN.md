@@ -55,9 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Runtime Hazard Coverage
-- Track and burn down the remaining runtime-hazard `.formula-fallback`
-  provenances until each one is either an IR exception-precondition fact or a
-  visible conservative unknown with useful evidence.
 - Promote known runtime-hazard limitations into dedicated backlog items and
   tests: failed `as` conversions as reusable negative type facts, richer
   dynamic binder modeling, array covariance stores through aliases or merged
