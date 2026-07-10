@@ -89,6 +89,11 @@ function Convert-ToGeneratedExamplesMarkdown {
 
         $sourceText = Normalize-Text (Get-Content -LiteralPath $sourceFile -Raw)
         $outputText = Normalize-Text (Get-Content -LiteralPath $outputFile -Raw)
+        if ($example.PSObject.Properties.Name -contains "DiagnosticId" -and
+            -not [string]::IsNullOrWhiteSpace($example.DiagnosticId)) {
+            [void]$builder.AppendLine(('<a id="{0}"></a>' -f $example.DiagnosticId.ToLowerInvariant()))
+            [void]$builder.AppendLine()
+        }
         [void]$builder.AppendLine("### $($example.Title)")
         [void]$builder.AppendLine()
         [void]$builder.AppendLine($example.Summary)

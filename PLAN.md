@@ -170,10 +170,6 @@ grouped by their original feature area.
   `explain --sarif`, and optional markdown reports, that composes invariant,
   reachability, runtime-hazard, capability, complexity, and diagnostic
   cross-links into one bounded result for IDEs, CI bots, and issue attachments.
-- Add descriptor-metadata conformance tests for rule categories, default
-  severities, `isEnabledByDefault`, `helpLinkUri`, `customTags`, release-file
-  entries, and package-visible rule metadata so editor, CI, SARIF, and NuGet
-  consumers see the same rule taxonomy.
 - Generate a complete analyzer configuration reference from `ConfigKeys` and
   parser defaults, including valid values, default values, per-tree versus
   global scope, related diagnostics, and sample EditorConfig/global

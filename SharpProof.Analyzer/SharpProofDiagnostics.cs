@@ -34,7 +34,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString PurityNotVerifiedMessageFormat = "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure";
         private static readonly LocalizableString PurityNotVerifiedDescription = "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the symbolic proof evidence.";
 
-        public static readonly DiagnosticDescriptor PurityNotVerifiedRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor PurityNotVerifiedRule = CreateDescriptor(
             id: PurityNotVerifiedId,
             title: PurityNotVerifiedTitle,
             messageFormat: PurityNotVerifiedMessageFormat,
@@ -48,7 +48,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString BclFallbackGuessMessageFormat = "BCL purity fallback for '{0}': {1} ({2})";
         private static readonly LocalizableString BclFallbackGuessDescription = "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available. Enable with sharpproof_emit_explanations or sharpproof_report_bcl_fallback_guesses.";
 
-        public static readonly DiagnosticDescriptor BclFallbackGuessRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor BclFallbackGuessRule = CreateDescriptor(
             id: BclFallbackGuessId,
             title: BclFallbackGuessTitle,
             messageFormat: BclFallbackGuessMessageFormat,
@@ -65,7 +65,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString AllocationInZeroAllocationMethodMessageFormat = "Method '{1}' is marked [ZeroAllocations], but operation '{0}' allocates";
         private static readonly LocalizableString AllocationInZeroAllocationMethodDescription = "Reports direct source-visible allocation sites inside methods annotated with [ZeroAllocations].";
 
-        public static readonly DiagnosticDescriptor AllocationInZeroAllocationMethodRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor AllocationInZeroAllocationMethodRule = CreateDescriptor(
             id: AllocationInZeroAllocationMethodId,
             title: AllocationInZeroAllocationMethodTitle,
             messageFormat: AllocationInZeroAllocationMethodMessageFormat,
@@ -79,7 +79,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString PurityExplanationMessageFormat = "Purity analysis for '{0}': {1}";
         private static readonly LocalizableString PurityExplanationDescription = "Provides structured explanation data for a purity diagnostic.";
 
-        public static readonly DiagnosticDescriptor PurityExplanationRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor PurityExplanationRule = CreateDescriptor(
             id: PurityExplanationId,
             title: PurityExplanationTitle,
             messageFormat: PurityExplanationMessageFormat,
@@ -98,7 +98,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
         private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with sharpproof_report_exceptions = true or sharpproof_runtime_hazard_mode = summaries/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
 
-        public static readonly DiagnosticDescriptor ExceptionSummaryRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor ExceptionSummaryRule = CreateDescriptor(
             id: ExceptionSummaryId,
             title: ExceptionSummaryTitle,
             messageFormat: ExceptionSummaryMessageFormat,
@@ -112,7 +112,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString UncaughtExceptionSiteMessageFormat = "Operation '{0}' may throw uncaught exceptions: {1}";
         private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with sharpproof_checked_exceptions = true or sharpproof_runtime_hazard_mode = sites/all. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the runtime hazard evidence.";
 
-        public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = CreateDescriptor(
             id: UncaughtExceptionSiteId,
             title: UncaughtExceptionSiteTitle,
             messageFormat: UncaughtExceptionSiteMessageFormat,
@@ -126,7 +126,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedZeroAllocationsAttributeMessageFormat = "The [ZeroAllocations] attribute can only be applied to method declarations";
         private static readonly LocalizableString MisplacedZeroAllocationsAttributeDescription = "[ZeroAllocations] configures analyzer behavior for a method and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule = CreateDescriptor(
             id: MisplacedZeroAllocationsAttributeId,
             title: MisplacedZeroAllocationsAttributeTitle,
             messageFormat: MisplacedZeroAllocationsAttributeMessageFormat,
@@ -144,7 +144,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString CapabilityViolationMessageFormat = "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' requires capabilities: {2}";
         private static readonly LocalizableString CapabilityViolationDescription = "Reports source-visible operations or proven transitive callees that exceed the method's declared allowed capability set.";
 
-        public static readonly DiagnosticDescriptor CapabilityViolationRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor CapabilityViolationRule = CreateDescriptor(
             id: CapabilityViolationId,
             title: CapabilityViolationTitle,
             messageFormat: CapabilityViolationMessageFormat,
@@ -158,7 +158,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString CapabilityUnknownMessageFormat = "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}";
         private static readonly LocalizableString CapabilityUnknownDescription = "Reports operations whose capability set could not be conservatively proven under the current capability analysis. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the capability proof evidence.";
 
-        public static readonly DiagnosticDescriptor CapabilityUnknownRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor CapabilityUnknownRule = CreateDescriptor(
             id: CapabilityUnknownId,
             title: CapabilityUnknownTitle,
             messageFormat: CapabilityUnknownMessageFormat,
@@ -172,7 +172,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeMessageFormat = "The [AllowedCapabilities] attribute can only be applied to method declarations";
         private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeDescription = "[AllowedCapabilities] configures capability-contract analysis for a method and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule = CreateDescriptor(
             id: MisplacedAllowedCapabilitiesAttributeId,
             title: MisplacedAllowedCapabilitiesAttributeTitle,
             messageFormat: MisplacedAllowedCapabilitiesAttributeMessageFormat,
@@ -190,7 +190,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString EnsuresNotProvenMessageFormat = "Method '{1}' is marked [Ensures], but return site '{0}' does not prove postcondition '{2}'";
         private static readonly LocalizableString EnsuresNotProvenDescription = "Reports return sites that contradict a declared [Ensures] postcondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence for each return site.";
 
-        public static readonly DiagnosticDescriptor EnsuresNotProvenRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor EnsuresNotProvenRule = CreateDescriptor(
             id: EnsuresNotProvenId,
             title: EnsuresNotProvenTitle,
             messageFormat: EnsuresNotProvenMessageFormat,
@@ -204,7 +204,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString EnsuresUnsupportedMessageFormat = "Method '{1}' is marked [Ensures], but postcondition '{0}' could not be verified: {2}";
         private static readonly LocalizableString EnsuresUnsupportedDescription = "Reports [Ensures] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
 
-        public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor EnsuresUnsupportedRule = CreateDescriptor(
             id: EnsuresUnsupportedId,
             title: EnsuresUnsupportedTitle,
             messageFormat: EnsuresUnsupportedMessageFormat,
@@ -218,7 +218,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedEnsuresAttributeMessageFormat = "The [Ensures] attribute can only be applied to method-like declarations";
         private static readonly LocalizableString MisplacedEnsuresAttributeDescription = "[Ensures] configures symbolic postcondition analysis for a method-like declaration and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule = CreateDescriptor(
             id: MisplacedEnsuresAttributeId,
             title: MisplacedEnsuresAttributeTitle,
             messageFormat: MisplacedEnsuresAttributeMessageFormat,
@@ -235,7 +235,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString ComplexityExceededMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but inferred complexity '{2}' exceeds the declared bound";
         private static readonly LocalizableString ComplexityExceededDescription = "Reports methods whose inferred bounded complexity is stronger than the declared [ExpectedComplexity] contract allows. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity proof evidence.";
 
-        public static readonly DiagnosticDescriptor ComplexityExceededRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor ComplexityExceededRule = CreateDescriptor(
             id: ComplexityExceededId,
             title: ComplexityExceededTitle,
             messageFormat: ComplexityExceededMessageFormat,
@@ -249,7 +249,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString ComplexityCouldNotBeVerifiedMessageFormat = "Method '{0}' is marked [ExpectedComplexity({1})], but the declared bound could not be verified conservatively: {2}";
         private static readonly LocalizableString ComplexityCouldNotBeVerifiedDescription = "Reports [ExpectedComplexity] contracts that could not be verified because the inferred complexity is unknown, unsupported, or incomparable with the declared bound. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the complexity analysis details.";
 
-        public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor ComplexityCouldNotBeVerifiedRule = CreateDescriptor(
             id: ComplexityCouldNotBeVerifiedId,
             title: ComplexityCouldNotBeVerifiedTitle,
             messageFormat: ComplexityCouldNotBeVerifiedMessageFormat,
@@ -263,7 +263,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedExpectedComplexityAttributeMessageFormat = "The [ExpectedComplexity] attribute can only be applied to method-like declarations";
         private static readonly LocalizableString MisplacedExpectedComplexityAttributeDescription = "[ExpectedComplexity] configures complexity-contract analysis for a method-like declaration and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule = CreateDescriptor(
             id: MisplacedExpectedComplexityAttributeId,
             title: MisplacedExpectedComplexityAttributeTitle,
             messageFormat: MisplacedExpectedComplexityAttributeMessageFormat,
@@ -280,7 +280,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString InvalidContractArgumentMessageFormat = "SharpProof contract '{0}' has invalid argument '{1}': {2}";
         private static readonly LocalizableString InvalidContractArgumentDescription = "Reports malformed SharpProof contract arguments, such as empty [Ensures] conditions, undefined [ExpectedComplexity] values, unknown [AllowedCapabilities] bits, and non-exception [AllowedExceptions] types.";
 
-        public static readonly DiagnosticDescriptor InvalidContractArgumentRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor InvalidContractArgumentRule = CreateDescriptor(
             id: InvalidContractArgumentId,
             title: InvalidContractArgumentTitle,
             messageFormat: InvalidContractArgumentMessageFormat,
@@ -297,7 +297,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString InvalidAnalyzerConfigurationMessageFormat = "SharpProof analyzer option '{0}' has invalid value '{1}': {2}";
         private static readonly LocalizableString InvalidAnalyzerConfigurationDescription = "Reports invalid sharpproof_* analyzer configuration values that would otherwise fall back to defaults silently.";
 
-        public static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = CreateDescriptor(
             id: InvalidAnalyzerConfigurationId,
             title: InvalidAnalyzerConfigurationTitle,
             messageFormat: InvalidAnalyzerConfigurationMessageFormat,
@@ -314,7 +314,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString UnrecognizedAttributeIdentityMessageFormat = "Attribute '{0}' looks like a SharpProof contract, but type '{1}' is not in an accepted SharpProof attribute namespace";
         private static readonly LocalizableString UnrecognizedAttributeIdentityDescription = "Reports attributes whose simple name matches a SharpProof contract attribute but whose containing namespace is neither SharpProof.Attributes nor an opt-in source-stub namespace.";
 
-        public static readonly DiagnosticDescriptor UnrecognizedAttributeIdentityRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor UnrecognizedAttributeIdentityRule = CreateDescriptor(
             id: UnrecognizedAttributeIdentityId,
             title: UnrecognizedAttributeIdentityTitle,
             messageFormat: UnrecognizedAttributeIdentityMessageFormat,
@@ -333,7 +333,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString RequiresNotProvenMessageFormat = "Call to '{0}' does not prove precondition '{1}'";
         private static readonly LocalizableString RequiresNotProvenDescription = "Reports calls whose current path facts contradict a declared [Requires] precondition. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the proof evidence.";
 
-        public static readonly DiagnosticDescriptor RequiresNotProvenRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor RequiresNotProvenRule = CreateDescriptor(
             id: RequiresNotProvenId,
             title: RequiresNotProvenTitle,
             messageFormat: RequiresNotProvenMessageFormat,
@@ -347,7 +347,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString RequiresUnsupportedMessageFormat = "Precondition '{1}' for '{0}' could not be verified: {2}";
         private static readonly LocalizableString RequiresUnsupportedDescription = "Reports [Requires] contracts that could not be parsed, lowered, or proven within the supported bounded proof surface. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the unprovable contract details.";
 
-        public static readonly DiagnosticDescriptor RequiresUnsupportedRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor RequiresUnsupportedRule = CreateDescriptor(
             id: RequiresUnsupportedId,
             title: RequiresUnsupportedTitle,
             messageFormat: RequiresUnsupportedMessageFormat,
@@ -361,7 +361,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedRequiresAttributeMessageFormat = "The [Requires] attribute can only be applied to method-like declarations";
         private static readonly LocalizableString MisplacedRequiresAttributeDescription = "[Requires] configures symbolic precondition analysis for a method-like declaration and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = CreateDescriptor(
             id: MisplacedRequiresAttributeId,
             title: MisplacedRequiresAttributeTitle,
             messageFormat: MisplacedRequiresAttributeMessageFormat,
@@ -378,7 +378,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString ExceptionContractViolationMessageFormat = "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}";
         private static readonly LocalizableString ExceptionContractViolationDescription = "Reports operations whose escaping exceptions violate [DoesNotThrow] or [AllowedExceptions] contracts. Use `SharpProof.SymbolicCli explain --file <path> --line <number>` to inspect the exception proof evidence.";
 
-        public static readonly DiagnosticDescriptor ExceptionContractViolationRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor ExceptionContractViolationRule = CreateDescriptor(
             id: ExceptionContractViolationId,
             title: ExceptionContractViolationTitle,
             messageFormat: ExceptionContractViolationMessageFormat,
@@ -392,7 +392,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedExceptionContractAttributeMessageFormat = "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations";
         private static readonly LocalizableString MisplacedExceptionContractAttributeDescription = "[DoesNotThrow] and [AllowedExceptions] configure symbolic exception-contract analysis for method-like declarations and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = CreateDescriptor(
             id: MisplacedExceptionContractAttributeId,
             title: MisplacedExceptionContractAttributeTitle,
             messageFormat: MisplacedExceptionContractAttributeMessageFormat,
@@ -407,7 +407,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedAttributeMessageFormat = "The [EnforcePure] attribute can only be applied to method declarations";
         private static readonly LocalizableString MisplacedAttributeDescription = "[EnforcePure] should only be used on methods to indicate they require purity analysis.";
 
-        public static readonly DiagnosticDescriptor MisplacedAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedAttributeRule = CreateDescriptor(
             id: MisplacedAttributeId,
             title: MisplacedAttributeTitle,
             messageFormat: MisplacedAttributeMessageFormat,
@@ -422,7 +422,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MissingEnforcePureAttributeMessageFormat = "Method '{0}' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.";
         private static readonly LocalizableString MissingEnforcePureAttributeDescription = "This method seems to only contain operations considered pure, but it lacks the [EnforcePure] attribute. Adding the attribute helps ensure its purity is maintained and communicates intent.";
 
-        public static readonly DiagnosticDescriptor MissingEnforcePureAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MissingEnforcePureAttributeRule = CreateDescriptor(
             id: MissingEnforcePureAttributeId,
             title: MissingEnforcePureAttributeTitle,
             messageFormat: MissingEnforcePureAttributeMessageFormat,
@@ -437,7 +437,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString ConflictingPurityAttributesMessageFormat = "Method '{0}' has conflicting purity attributes applied";
         private static readonly LocalizableString ConflictingPurityAttributesDescription = "Apply one purity contract to a method. Combining enforcing, trusted-external, and explicit-impure attributes is contradictory or confusing.";
 
-        public static readonly DiagnosticDescriptor ConflictingPurityAttributesRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor ConflictingPurityAttributesRule = CreateDescriptor(
             id: ConflictingPurityAttributesId,
             title: ConflictingPurityAttributesTitle,
             messageFormat: ConflictingPurityAttributesMessageFormat,
@@ -452,7 +452,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString AllowSyncWithoutPurityMessageFormat = "Method '{0}' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]";
         private static readonly LocalizableString AllowSyncWithoutPurityDescription = "[AllowSynchronization] only affects methods participating in purity analysis. Apply [EnforcePure] or [Pure] for it to have effect.";
 
-        public static readonly DiagnosticDescriptor AllowSynchronizationWithoutPurityAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor AllowSynchronizationWithoutPurityAttributeRule = CreateDescriptor(
             id: AllowSynchronizationWithoutPurityAttributeId,
             title: AllowSyncWithoutPurityTitle,
             messageFormat: AllowSyncWithoutPurityMessageFormat,
@@ -467,7 +467,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString MisplacedAllowSynchronizationMessageFormat = "The [AllowSynchronization] attribute can only be applied to method declarations";
         private static readonly LocalizableString MisplacedAllowSynchronizationDescription = "[AllowSynchronization] configures analyzer behavior for a method and should not be used on non-method declarations.";
 
-        public static readonly DiagnosticDescriptor MisplacedAllowSynchronizationAttributeRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor MisplacedAllowSynchronizationAttributeRule = CreateDescriptor(
             id: MisplacedAllowSynchronizationAttributeId,
             title: MisplacedAllowSynchronizationTitle,
             messageFormat: MisplacedAllowSynchronizationMessageFormat,
@@ -482,7 +482,7 @@ namespace SharpProof.Analyzer
         private static readonly LocalizableString RedundantAllowSynchronizationMessageFormat = "Method '{0}' is marked with [AllowSynchronization] but contains no synchronization constructs";
         private static readonly LocalizableString RedundantAllowSynchronizationDescription = "Remove [AllowSynchronization] when the method does not use synchronization (e.g., lock).";
 
-        public static readonly DiagnosticDescriptor RedundantAllowSynchronizationRule = new DiagnosticDescriptor(
+        public static readonly DiagnosticDescriptor RedundantAllowSynchronizationRule = CreateDescriptor(
             id: RedundantAllowSynchronizationId,
             title: RedundantAllowSynchronizationTitle,
             messageFormat: RedundantAllowSynchronizationMessageFormat,
@@ -490,5 +490,26 @@ namespace SharpProof.Analyzer
             defaultSeverity: DiagnosticSeverity.Info,
             isEnabledByDefault: true,
             description: RedundantAllowSynchronizationDescription);
+
+        private static DiagnosticDescriptor CreateDescriptor(
+            string id,
+            LocalizableString title,
+            LocalizableString messageFormat,
+            string category,
+            DiagnosticSeverity defaultSeverity,
+            bool isEnabledByDefault,
+            LocalizableString description)
+        {
+            return new DiagnosticDescriptor(
+                id,
+                title,
+                messageFormat,
+                category,
+                defaultSeverity,
+                isEnabledByDefault,
+                description,
+                helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#" + id.ToLowerInvariant(),
+                customTags: new[] { WellKnownDiagnosticTags.Telemetry });
+        }
     }
 }

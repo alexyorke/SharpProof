@@ -2980,11 +2980,11 @@ namespace SharpProof.Test
             Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
             Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0031`"));
             Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0031"));
-            Assert.That(shippedReleaseNotes, Does.Contain("## Version 0.1.0-preview.1"));
+            Assert.That(shippedReleaseNotes, Does.Contain("## Release 0.1.0"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));
             Assert.That(shippedReleaseNotes, Does.Contain("SP0017"));
-            Assert.That(shippedReleaseNotes, Does.Contain("--capabilities"));
-            Assert.That(shippedReleaseNotes, Does.Contain("--complexity"));
+            Assert.That(shippedReleaseNotes, Does.Contain("SP0021"));
+            Assert.That(shippedReleaseNotes, Does.Not.Contain("### Enhancements"));
         }
 
         [Test]

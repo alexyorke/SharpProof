@@ -14,6 +14,8 @@ changes, the generator and the tests force this page to stay in sync.
 The catalog intentionally includes at least one example for every public rule
 from `SP0002` through `SP0031`.
 
+<a id="sp0002"></a>
+
 ### SP0002 - Purity not verified
 
 The analyzer rejects ambient clock reads inside `[EnforcePure]` methods.
@@ -42,6 +44,8 @@ Expected analyzer diagnostics:
 SP0002 Error docs/readme-examples/purity-clock/input.cs:7:16 Method 'ReadClock' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
 ```
 
+<a id="sp0003"></a>
+
 ### SP0003 - Misplaced [EnforcePure]
 
 Placement diagnostics stay separate from purity proof results.
@@ -66,6 +70,8 @@ Expected analyzer diagnostics:
 SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure] attribute can only be applied to method declarations
 ```
 
+<a id="sp0004"></a>
+
 ### SP0004 - Missing [EnforcePure]
 
 Pure-looking methods can be suggested for explicit purity contracts.
@@ -89,6 +95,8 @@ Expected analyzer diagnostics:
 ```text
 SP0004 Warning docs/readme-examples/sp0004-missing-enforce-pure/input.cs:3:16 Method 'Add' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.
 ```
+
+<a id="sp0005"></a>
 
 ### SP0005 - Conflicting purity attributes
 
@@ -120,6 +128,8 @@ SP0002 Error docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:
 SP0005 Warning docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:8:16 Method 'Value' has conflicting purity attributes applied
 ```
 
+<a id="sp0006"></a>
+
 ### SP0006 - [AllowSynchronization] without a purity contract
 
 Synchronization exceptions only make sense on methods participating in purity analysis.
@@ -147,6 +157,8 @@ Expected analyzer diagnostics:
 SP0006 Warning docs/readme-examples/sp0006-allow-sync-without-purity/input.cs:7:17 Method 'Work' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]
 ```
 
+<a id="sp0007"></a>
+
 ### SP0007 - Misplaced [AllowSynchronization]
 
 Placement errors for synchronization allowances are explicit.
@@ -170,6 +182,8 @@ Expected analyzer diagnostics:
 ```text
 SP0007 Error docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs:4:2 The [AllowSynchronization] attribute can only be applied to method declarations
 ```
+
+<a id="sp0008"></a>
 
 ### SP0008 - Redundant [AllowSynchronization]
 
@@ -199,6 +213,8 @@ Expected analyzer diagnostics:
 ```text
 SP0008 Info docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs:8:16 Method 'Add' is marked with [AllowSynchronization] but contains no synchronization constructs
 ```
+
+<a id="sp0009"></a>
 
 ### SP0009 - Purity explanation
 
@@ -230,6 +246,8 @@ SP0002 Error docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Method
 SP0009 Info docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Purity analysis for 'Log': catalog_hit at static System.Console.WriteLine(string?)
 ```
 
+<a id="sp0010"></a>
+
 ### SP0010 - Exception summary
 
 Method-level exception summaries can be emitted independently of point hazards.
@@ -254,6 +272,8 @@ Expected analyzer diagnostics:
 ```text
 SP0010 Info docs/readme-examples/sp0010-exception-summary/input.cs:4:16 Method 'Divide' can throw: System.DivideByZeroException
 ```
+
+<a id="sp0011"></a>
 
 ### SP0011 - Operation-site runtime hazard
 
@@ -307,6 +327,8 @@ SMT:
   Cache entries: 1
 ```
 
+<a id="sp0012"></a>
+
 ### SP0012 - BCL fallback guess
 
 When stronger evidence is missing, SharpProof can emit an explicitly non-authoritative BCL fallback guess.
@@ -334,6 +356,8 @@ Expected analyzer diagnostics:
 SP0002 Error docs/readme-examples/sp0012-bcl-fallback-guess/input.cs:6:16 Method 'TestMethod' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
 SP0012 Info docs/readme-examples/sp0012-bcl-fallback-guess/input.cs:6:16 BCL purity fallback for 'TestMethod': probably_pure (member returns a value-like result without ref or out parameters)
 ```
+
+<a id="sp0013"></a>
 
 ### SP0013 - Allocation in [ZeroAllocations] body
 
@@ -363,6 +387,8 @@ Expected analyzer diagnostics:
 SP0013 Warning docs/readme-examples/zero-allocations/input.cs:9:16 Method 'Create' is marked [ZeroAllocations], but operation 'new object()' allocates
 ```
 
+<a id="sp0014"></a>
+
 ### SP0014 - Misplaced [ZeroAllocations]
 
 Placement rules also apply to zero-allocation contracts.
@@ -386,6 +412,8 @@ Expected analyzer diagnostics:
 ```text
 SP0014 Error docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs:4:2 The [ZeroAllocations] attribute can only be applied to method declarations
 ```
+
+<a id="sp0015"></a>
 
 ### SP0015 - Disallowed capability use
 
@@ -416,6 +444,8 @@ Expected analyzer diagnostics:
 SP0015 Warning docs/readme-examples/sp0015-capability-violation/input.cs:10:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'Console.WriteLine("hello")' requires capabilities: IO, Console
 ```
 
+<a id="sp0016"></a>
+
 ### SP0016 - Capability contract not fully verified
 
 Unknown or unsupported capability cases stay conservative instead of being silently accepted.
@@ -444,6 +474,8 @@ Expected analyzer diagnostics:
 SP0016 Warning docs/readme-examples/sp0016-capability-unknown/input.cs:9:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'value.ToString()' could not be capability-verified: DynamicDispatch
 ```
 
+<a id="sp0017"></a>
+
 ### SP0017 - Misplaced [AllowedCapabilities]
 
 Capability contract placement is validated independently of capability reasoning.
@@ -468,6 +500,8 @@ Expected analyzer diagnostics:
 ```text
 SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method declarations
 ```
+
+<a id="sp0018"></a>
 
 ### SP0018 - Postcondition not proven
 
@@ -496,6 +530,8 @@ Expected analyzer diagnostics:
 ```text
 SP0018 Warning docs/readme-examples/sp0018-ensures-failing-return/input.cs:9:16 Method 'Identity' is marked [Ensures], but return site '0' does not prove postcondition 'result > 0'
 ```
+
+<a id="sp0019"></a>
 
 ### SP0019 - Postcondition could not be verified
 
@@ -526,6 +562,8 @@ Expected analyzer diagnostics:
 SP0019 Warning docs/readme-examples/sp0019-ensures-unsupported/input.cs:6:6 Method 'Value' is marked [Ensures], but postcondition 'local > 0' could not be verified: local variables are not supported in [Ensures] conditions
 ```
 
+<a id="sp0020"></a>
+
 ### SP0020 - Misplaced [Ensures]
 
 Postconditions are restricted to method-like declarations.
@@ -550,6 +588,8 @@ Expected analyzer diagnostics:
 ```text
 SP0020 Error docs/readme-examples/sp0020-misplaced-ensures/input.cs:6:6 The [Ensures] attribute can only be applied to method-like declarations
 ```
+
+<a id="sp0021"></a>
 
 ### SP0021 - Expected complexity exceeded
 
@@ -588,6 +628,8 @@ Expected analyzer diagnostics:
 SP0021 Warning docs/readme-examples/sp0021-complexity-exceeded/input.cs:7:23 Method 'SumPairs' is marked [ExpectedComplexity(O(n))], but inferred complexity 'O(n^2)' exceeds the declared bound
 ```
 
+<a id="sp0022"></a>
+
 ### SP0022 - Expected complexity could not be verified
 
 Unsupported or unbounded loop shapes stay conservative instead of being treated as verified.
@@ -618,6 +660,8 @@ Expected analyzer diagnostics:
 SP0022 Warning docs/readme-examples/sp0022-complexity-unknown/input.cs:8:23 Method 'Work' is marked [ExpectedComplexity(O(n))], but the declared bound could not be verified conservatively: ExternalCallee
 ```
 
+<a id="sp0023"></a>
+
 ### SP0023 - Misplaced [ExpectedComplexity]
 
 Expected complexity contracts are restricted to method-like declarations.
@@ -642,6 +686,8 @@ Expected analyzer diagnostics:
 ```text
 SP0023 Error docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs:6:6 The [ExpectedComplexity] attribute can only be applied to method-like declarations
 ```
+
+<a id="sp0024"></a>
 
 ### SP0024 - Invalid contract argument
 
@@ -671,6 +717,8 @@ Expected analyzer diagnostics:
 SP0024 Error docs/readme-examples/sp0024-invalid-contract-argument/input.cs:6:6 SharpProof contract '[Ensures]' has invalid argument '""': condition must not be empty
 ```
 
+<a id="sp0025"></a>
+
 ### SP0025 - Invalid analyzer configuration
 
 Invalid `sharpproof_*` analyzer option values are reported instead of silently falling back to defaults.
@@ -690,6 +738,8 @@ Expected analyzer diagnostics:
 ```text
 SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, default, deep, aggressive, or a boolean value
 ```
+
+<a id="sp0026"></a>
 
 ### SP0026 - Unrecognized attribute identity
 
@@ -726,6 +776,8 @@ Expected analyzer diagnostics:
 SP0026 Warning docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs:13:6 Attribute 'EnforcePureAttribute' looks like a SharpProof contract, but type 'ExternalContracts.EnforcePureAttribute' is not in an accepted SharpProof attribute namespace
 ```
 
+<a id="sp0027"></a>
+
 ### SP0027 - Precondition not proven
 
 Calls to methods with `[Requires]` must prove the declared precondition at the call site.
@@ -756,6 +808,8 @@ Expected analyzer diagnostics:
 SP0027 Warning docs/readme-examples/sp0027-requires-not-proven/input.cs:11:16 Call to 'Calculator.Identity(int)' does not prove precondition 'value > 0'
 ```
 
+<a id="sp0028"></a>
+
 ### SP0028 - Precondition could not be verified
 
 Unsupported `[Requires]` conditions remain conservative and report why verification stopped.
@@ -781,6 +835,8 @@ Expected analyzer diagnostics:
 SP0028 Warning docs/readme-examples/sp0028-requires-unsupported/input.cs:6:6 Precondition 'result > 0' for 'Calculator.Identity(int)' could not be verified: result placeholder is not supported in [Requires] conditions
 ```
 
+<a id="sp0029"></a>
+
 ### SP0029 - Misplaced [Requires]
 
 Preconditions are restricted to method-like declarations.
@@ -805,6 +861,8 @@ Expected analyzer diagnostics:
 ```text
 SP0029 Error docs/readme-examples/sp0029-misplaced-requires/input.cs:6:6 The [Requires] attribute can only be applied to method-like declarations
 ```
+
+<a id="sp0030"></a>
 
 ### SP0030 - Exception contract violation
 
@@ -834,6 +892,8 @@ Expected analyzer diagnostics:
 ```text
 SP0030 Warning docs/readme-examples/sp0030-exception-contract-violation/input.cs:10:9 Method 'Run' is marked [DoesNotThrow], but operation 'throw new InvalidOperationException();' can throw disallowed exceptions: System.InvalidOperationException
 ```
+
+<a id="sp0031"></a>
 
 ### SP0031 - Misplaced exception contract
 

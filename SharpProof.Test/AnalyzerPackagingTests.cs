@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -456,6 +457,38 @@ namespace TestNamespace {
 
             Assert.That(string.IsNullOrWhiteSpace(developmentDependencyValue), Is.True,
                 "The public SharpProof analyzer package should not ship developmentDependency metadata.");
+        }
+
+        [Test]
+        public void BuiltAnalyzerPackage_ShouldContainCurrentAnalyzerAssemblyBytes_WhenPackageExists()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packageVersion = ReadPackageVersion(
+                Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
+                "PackageVersion");
+            var packagePath = Path.Combine(
+                repositoryRoot,
+                "SharpProof.Package",
+                "bin",
+                "Release",
+                $"SharpProof.{packageVersion}.nupkg");
+            if (!File.Exists(packagePath))
+            {
+                Assert.Inconclusive("Build the package before verifying package contents.");
+            }
+
+            using var archive = ZipFile.OpenRead(packagePath);
+            var analyzerEntry = archive.Entries.Single(entry =>
+                string.Equals(
+                    entry.FullName.Replace('\\', '/'),
+                    "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+                    StringComparison.Ordinal));
+            using var analyzerStream = analyzerEntry.Open();
+            var packagedHash = SHA256.HashData(analyzerStream);
+            var builtHash = SHA256.HashData(File.ReadAllBytes(
+                typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly.Location));
+
+            Assert.That(packagedHash, Is.EqualTo(builtHash));
         }
 
         public static IEnumerable<ConsumerPackageScenario> BuiltAnalyzerPackageScenarios()
