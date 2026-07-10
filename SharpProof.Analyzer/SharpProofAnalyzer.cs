@@ -86,6 +86,9 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
 
                     foreach (var additionalFileIssue in additionalFileIssues)
                         endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(additionalFileIssue));
+
+                    foreach (var compatibilityIssue in session.EffectSummaryCompatibilityReporter.GetIssues())
+                        endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(compatibilityIssue));
                 }
                 finally
                 {
@@ -190,7 +193,8 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
         var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.AdditionalFilePathProperty, path)
-            .Add(SharpProofDiagnostics.AdditionalFileReasonProperty, issue.Reason);
+            .Add(SharpProofDiagnostics.AdditionalFileReasonProperty, issue.Reason)
+            .Add(SharpProofDiagnostics.AdditionalFileReasonCodeProperty, issue.ReasonCode);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.InvalidAdditionalFileRule,

@@ -642,6 +642,42 @@ internal sealed class SummaryAssemblyIdentity
                    StringComparison.OrdinalIgnoreCase);
     }
 
+    public EffectSummaryCompatibility GetCompatibility(ActualAssemblyIdentity? actualAssemblyIdentity)
+    {
+        if (!IsComplete)
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_incomplete_assembly_identity",
+                "its assembly identity is incomplete");
+
+        if (actualAssemblyIdentity == null)
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_assembly_identity_unavailable",
+                "the current assembly identity could not be resolved");
+
+        if (!string.Equals(AssemblyName, actualAssemblyIdentity.AssemblyName, StringComparison.Ordinal))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_assembly_name_mismatch",
+                $"assembly name '{AssemblyName}' does not match '{actualAssemblyIdentity.AssemblyName}'");
+
+        if (!string.Equals(
+                AssemblySha256,
+                actualAssemblyIdentity.AssemblySha256,
+                StringComparison.OrdinalIgnoreCase))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_assembly_hash_mismatch",
+                "its assembly SHA-256 does not match the current assembly");
+
+        if (!string.Equals(
+                ModuleVersionId,
+                actualAssemblyIdentity.ModuleVersionId,
+                StringComparison.OrdinalIgnoreCase))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_module_version_mismatch",
+                $"module version '{ModuleVersionId}' does not match '{actualAssemblyIdentity.ModuleVersionId}'");
+
+        return EffectSummaryCompatibility.Compatible;
+    }
+
     public static SummaryAssemblyIdentity? FromJson(JsonElement assemblyElement)
     {
         var assemblyName = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "AssemblyName");
@@ -696,6 +732,41 @@ internal sealed class SummaryMethodIdentity
 
         return string.Equals(MethodBodySha256, actualMethodIdentity.MethodBodySha256,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    public EffectSummaryCompatibility GetCompatibility(ActualMethodIdentity? actualMethodIdentity)
+    {
+        if (string.IsNullOrWhiteSpace(MetadataToken))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_incomplete_method_identity",
+                "its method metadata token is missing");
+
+        if (actualMethodIdentity == null)
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_method_identity_unavailable",
+                "the current method identity could not be resolved");
+
+        if (!string.Equals(MetadataToken, actualMethodIdentity.MetadataToken, StringComparison.OrdinalIgnoreCase))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_metadata_token_mismatch",
+                $"metadata token '{MetadataToken}' does not match '{actualMethodIdentity.MetadataToken}'");
+
+        if (!actualMethodIdentity.HasMethodBody) return EffectSummaryCompatibility.Compatible;
+
+        if (string.IsNullOrWhiteSpace(MethodBodySha256))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_incomplete_method_identity",
+                "its method-body SHA-256 is missing");
+
+        if (!string.Equals(
+                MethodBodySha256,
+                actualMethodIdentity.MethodBodySha256,
+                StringComparison.OrdinalIgnoreCase))
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_method_body_hash_mismatch",
+                "its method-body SHA-256 does not match the current method body");
+
+        return EffectSummaryCompatibility.Compatible;
     }
 
     public static SummaryMethodIdentity? FromJson(JsonElement methodElement)

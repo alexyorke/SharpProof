@@ -14,16 +14,17 @@ internal static class BuiltInEffectSummaryLoader
     internal static void LoadAdditionalSummaryJsonDocuments(
         AnalyzerOptions options,
         CancellationToken cancellationToken,
-        Action<string> addJson)
+        Action<string, string> addJson)
     {
         foreach (var additionalFile in options.AdditionalFiles)
         {
-            if (!IsSummaryFile(additionalFile.Path)) continue;
+            var path = additionalFile.Path ?? string.Empty;
+            if (!IsSummaryFile(path)) continue;
 
             var text = additionalFile.GetText(cancellationToken)?.ToString();
             if (text == null || string.IsNullOrWhiteSpace(text)) continue;
 
-            addJson(text);
+            addJson(path, text);
         }
     }
 

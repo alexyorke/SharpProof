@@ -19,6 +19,7 @@ internal sealed class AnalyzerSession : IDisposable
         Configuration = AnalyzerConfiguration.FromOptions(options);
         AttributePolicy = SharpProofAttributeIdentityPolicy.Create(Configuration.AttributeStubNamespaces);
         Baseline = DiagnosticBaseline.FromOptions(options, cancellationToken);
+        EffectSummaryCompatibilityReporter = new EffectSummaryCompatibilityReporter();
 
         _purityService = new Lazy<CompilationPurityService>(
             () => new CompilationPurityService(
@@ -29,11 +30,11 @@ internal sealed class AnalyzerSession : IDisposable
 
         ExceptionSummaryCatalog = Features.Includes(AnalyzerFeatures.Exceptions) &&
                                   Configuration.EnableEffectSummaryJson
-            ? ExceptionSummaryCatalog.FromOptions(options, cancellationToken)
+            ? ExceptionSummaryCatalog.FromOptions(options, cancellationToken, EffectSummaryCompatibilityReporter)
             : ExceptionSummaryCatalog.Empty;
         GeneratedPurityCatalog = Features.Includes(AnalyzerFeatures.Purity) &&
                                  Configuration.EnableEffectSummaryJson
-            ? GeneratedPurityCatalog.FromOptions(options, cancellationToken)
+            ? GeneratedPurityCatalog.FromOptions(options, cancellationToken, EffectSummaryCompatibilityReporter)
             : null;
     }
 
@@ -44,6 +45,8 @@ internal sealed class AnalyzerSession : IDisposable
     internal SharpProofAttributeIdentityPolicy AttributePolicy { get; }
 
     internal DiagnosticBaseline Baseline { get; }
+
+    internal EffectSummaryCompatibilityReporter EffectSummaryCompatibilityReporter { get; }
 
     internal ExceptionSummaryCatalog ExceptionSummaryCatalog { get; }
 

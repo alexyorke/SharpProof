@@ -35,7 +35,10 @@ internal sealed class GeneratedPurityCatalog
 
     public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? BuiltInCatalog.Value;
 
-    public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
+    public static GeneratedPurityCatalog FromOptions(
+        AnalyzerOptions options,
+        CancellationToken cancellationToken,
+        EffectSummaryCompatibilityReporter compatibilityReporter)
     {
         if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return BuiltInCatalog.Value;
 
@@ -43,7 +46,12 @@ internal sealed class GeneratedPurityCatalog
         BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
             options,
             cancellationToken,
-            json => AddParsedEntries(entriesBySymbol, json, AdditionalSummarySourcePriority));
+            (path, json) => AddParsedEntries(
+                entriesBySymbol,
+                json,
+                AdditionalSummarySourcePriority,
+                path,
+                compatibilityReporter));
 
         return CreateCatalog(entriesBySymbol);
     }
@@ -52,7 +60,7 @@ internal sealed class GeneratedPurityCatalog
     {
         var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
         BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(json =>
-            AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority));
+            AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority, null, null));
         return CreateCatalog(entriesBySymbol);
     }
 
@@ -276,11 +284,17 @@ internal sealed class GeneratedPurityCatalog
     private static void AddParsedEntries(
         Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
         string json,
-        int sourcePriority)
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
         try
         {
-            foreach (var entry in ParseEntries(json, sourcePriority))
+            foreach (var entry in ParseEntries(
+                         json,
+                         sourcePriority,
+                         sourcePath,
+                         compatibilityReporter))
             {
                 if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
                 {
@@ -296,7 +310,11 @@ internal sealed class GeneratedPurityCatalog
         }
     }
 
-    private static IEnumerable<SummaryEntry> ParseEntries(string json, int sourcePriority)
+    private static IEnumerable<SummaryEntry> ParseEntries(
+        string json,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalogElement) &&
@@ -317,7 +335,9 @@ internal sealed class GeneratedPurityCatalog
                     purityEntry,
                     SummaryAssemblyIdentity.FromJson(entryElement),
                     SummaryMethodIdentity.FromJson(entryElement),
-                    sourcePriority);
+                    sourcePriority,
+                    sourcePath,
+                    compatibilityReporter);
             }
 
             yield break;
@@ -348,7 +368,9 @@ internal sealed class GeneratedPurityCatalog
                     purityEntry,
                     assemblyIdentity,
                     SummaryMethodIdentity.FromJson(methodElement),
-                    sourcePriority);
+                    sourcePriority,
+                    sourcePath,
+                    compatibilityReporter);
             }
         }
     }
@@ -523,13 +545,17 @@ internal sealed class GeneratedPurityCatalog
             PurityEntry classification,
             SummaryAssemblyIdentity? assemblyIdentity,
             SummaryMethodIdentity? methodIdentity,
-            int sourcePriority)
+            int sourcePriority,
+            string? sourcePath,
+            EffectSummaryCompatibilityReporter? compatibilityReporter)
         {
             Symbol = symbol;
             Classification = classification;
             AssemblyIdentity = assemblyIdentity;
             MethodIdentity = methodIdentity;
             SourcePriority = sourcePriority;
+            SourcePath = sourcePath;
+            CompatibilityReporter = compatibilityReporter;
         }
 
         public string Symbol { get; }
@@ -537,6 +563,8 @@ internal sealed class GeneratedPurityCatalog
         public SummaryAssemblyIdentity? AssemblyIdentity { get; }
         public SummaryMethodIdentity? MethodIdentity { get; }
         public int SourcePriority { get; }
+        private string? SourcePath { get; }
+        private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
 
         public bool IsTrustedFor(
             IMethodSymbol methodSymbol,
@@ -552,19 +580,40 @@ internal sealed class GeneratedPurityCatalog
             ActualAssemblyIdentity? actualAssemblyIdentity,
             ActualMethodIdentity? actualMethodIdentity)
         {
-            if (AssemblyIdentity == null ||
-                !AssemblyIdentity.IsComplete ||
-                MethodIdentity == null ||
-                actualAssemblyIdentity == null ||
-                actualMethodIdentity == null ||
-                !AssemblyIdentity.Matches(actualAssemblyIdentity) ||
-                !MethodIdentity.MatchesMetadataToken(actualMethodIdentity))
+            var assemblyCompatibility = AssemblyIdentity?.GetCompatibility(actualAssemblyIdentity) ??
+                                        EffectSummaryCompatibility.Incompatible(
+                                            "effect_summary_incomplete_assembly_identity",
+                                            "its assembly identity is missing");
+            if (!assemblyCompatibility.IsCompatible)
+            {
+                ReportIncompatibility(assemblyCompatibility);
                 return false;
+            }
+
+            var methodCompatibility = MethodIdentity?.GetCompatibility(actualMethodIdentity) ??
+                                      EffectSummaryCompatibility.Incompatible(
+                                          "effect_summary_incomplete_method_identity",
+                                          "its method identity is missing");
+            if (!methodCompatibility.IsCompatible)
+            {
+                if (SourcePriority == BuiltInSummarySourcePriority &&
+                    MethodIdentity?.MatchesMetadataToken(actualMethodIdentity) == true)
+                    return true;
+
+                ReportIncompatibility(methodCompatibility);
+                return false;
+            }
 
             if (SourcePriority == BuiltInSummarySourcePriority) return true;
 
-            return MethodIdentity.IsCompleteEnoughFor(actualMethodIdentity) &&
-                   MethodIdentity.Matches(actualMethodIdentity);
+            return true;
+        }
+
+        private void ReportIncompatibility(EffectSummaryCompatibility compatibility)
+        {
+            if (SourcePriority != AdditionalSummarySourcePriority || CompatibilityReporter == null) return;
+
+            CompatibilityReporter.Report(SourcePath ?? string.Empty, Symbol, compatibility);
         }
     }
 

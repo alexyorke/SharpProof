@@ -300,4 +300,7 @@ internal static class AnalyzerAdditionalFileValidator
     }
 }
 
-internal readonly record struct AnalyzerAdditionalFileIssue(string Path, string Reason);
+internal readonly record struct AnalyzerAdditionalFileIssue(
+    string Path,
+    string Reason,
+    string ReasonCode = "invalid_additional_file");

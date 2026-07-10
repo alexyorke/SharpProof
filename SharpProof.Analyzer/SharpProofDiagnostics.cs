@@ -91,6 +91,7 @@ public static class SharpProofDiagnostics
     public const string InvalidAdditionalFileId = "SP0032";
     public const string AdditionalFilePathProperty = "sharpproof.additional_file.path";
     public const string AdditionalFileReasonProperty = "sharpproof.additional_file.reason";
+    public const string AdditionalFileReasonCodeProperty = "sharpproof.additional_file.reason_code";
 
     public const string UnrecognizedAttributeIdentityId = "SP0026";
     public const string AttributeIdentityNameProperty = "sharpproof.attribute_identity.name";

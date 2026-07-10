@@ -165,6 +165,90 @@ public sealed class TestClass
             Does.Contain("unsupported effect-summary SchemaVersion '99'"));
     }
 
+    [TestCase(
+        "AssemblySha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "effect_summary_assembly_hash_mismatch")]
+    [TestCase(
+        "ModuleVersionId",
+        "00000000-0000-0000-0000-000000000000",
+        "effect_summary_module_version_mismatch")]
+    [TestCase("MetadataToken", "0x06000001", "effect_summary_metadata_token_mismatch")]
+    [TestCase(
+        "MethodBodySha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "effect_summary_method_body_hash_mismatch")]
+    public async Task StaleEffectSummaryEntry_ReportsPreciseSp0032(
+        string propertyName,
+        string staleValue,
+        string expectedReasonCode)
+    {
+        var summary = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+            typeof(string).Assembly.Location,
+            "System.String.get_Length()",
+            "pure",
+            "[]");
+        summary = ReplaceJsonStringProperty(summary, propertyName, staleValue);
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class TestClass
+            {
+                [EnforcePure]
+                public int Length(string value) => value.Length;
+            }
+            """,
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "stale.SharpProof.EffectSummary.json",
+                    summary)));
+
+        var diagnostic = diagnostics.Single(item =>
+            item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
+            item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty] == expectedReasonCode);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFilePathProperty],
+            Is.EqualTo("stale.SharpProof.EffectSummary.json"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("get_Length"));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("was ignored because"));
+    }
+
+    [Test]
+    public async Task MatchingEffectSummaryEntry_DoesNotReportStaleSp0032()
+    {
+        var summary = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+            typeof(string).Assembly.Location,
+            "System.String.get_Length()",
+            "pure",
+            "[]");
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class TestClass
+            {
+                [EnforcePure]
+                public int Length(string value) => value.Length;
+            }
+            """,
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "matching.SharpProof.EffectSummary.json",
+                    summary)));
+
+        Assert.That(
+            diagnostics.Any(item =>
+                item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
+                item.Properties.ContainsKey(SharpProofDiagnostics.AdditionalFileReasonCodeProperty) &&
+                item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty]!.StartsWith(
+                    "effect_summary_",
+                    StringComparison.Ordinal)),
+            Is.False);
+    }
+
     [Test]
     public async Task PartiallyMalformedBaselineAdditionalFile_ReportsSp0032()
     {
@@ -187,6 +271,16 @@ public sealed class TestClass
         var registeredKeys = GetRegisteredOptionKeys();
 
         Assert.That(registeredKeys, Is.EquivalentTo(configKeys));
+    }
+
+    private static string ReplaceJsonStringProperty(string json, string propertyName, string value)
+    {
+        var pattern = "(\\\"" + Regex.Escape(propertyName) + "\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")";
+        return Regex.Replace(
+            json,
+            pattern,
+            match => match.Groups[1].Value + value + match.Groups[2].Value,
+            RegexOptions.CultureInvariant);
     }
 
     [Test]
