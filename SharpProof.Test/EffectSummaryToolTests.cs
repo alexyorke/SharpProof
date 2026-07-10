@@ -6043,6 +6043,11 @@ public partial class EffectSummaryToolTests
         using var versionSummary = JsonDocument.Parse(await File.ReadAllTextAsync(versionOutputPath));
         using var environmentSummary = JsonDocument.Parse(await File.ReadAllTextAsync(environmentOutputPath));
 
+        var versionAssemblySource = versionSummary.RootElement.GetProperty("Assemblies")[0]
+            .GetProperty("ArtifactSource");
+        Assert.That(versionAssemblySource.GetProperty("Kind").GetString(), Is.EqualTo("framework"));
+        Assert.That(versionAssemblySource.GetProperty("Framework").GetString(), Is.EqualTo("net8.0"));
+
         Assert.That(
             versionSummary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6052,6 +6057,11 @@ public partial class EffectSummaryToolTests
                     "System.Version..ctor(int, int)",
                     StringComparison.Ordinal)),
             Is.True);
+        var versionCatalogSource = versionSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+            .GetProperty("Entries")[0]
+            .GetProperty("ArtifactSource");
+        Assert.That(versionCatalogSource.GetProperty("Kind").GetString(), Is.EqualTo("framework"));
+        Assert.That(versionCatalogSource.GetProperty("Framework").GetString(), Is.EqualTo("net8.0"));
         Assert.That(
             versionSummary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6137,6 +6147,18 @@ public partial class EffectSummaryToolTests
         using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
         var methods = summary.RootElement.GetProperty("Assemblies")[0].GetProperty("Methods").EnumerateArray()
             .ToArray();
+
+        var assemblySource = summary.RootElement.GetProperty("Assemblies")[0].GetProperty("ArtifactSource");
+        Assert.That(assemblySource.GetProperty("Kind").GetString(), Is.EqualTo("package"));
+        Assert.That(assemblySource.GetProperty("PackageId").GetString(), Is.EqualTo("System.Collections.Immutable"));
+        Assert.That(assemblySource.GetProperty("PackageVersion").GetString(), Is.EqualTo("9.0"));
+        Assert.That(
+            assemblySource.GetProperty("PackageAssemblyRelativePath").GetString(),
+            Is.EqualTo("lib/net8.0/System.Collections.Immutable.dll"));
+        var catalogSource = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+            .GetProperty("Entries")[0]
+            .GetProperty("ArtifactSource");
+        Assert.That(catalogSource.GetProperty("Kind").GetString(), Is.EqualTo("package"));
 
         Assert.That(
             Path.GetFileName(summary.RootElement.GetProperty("Assemblies")[0].GetProperty("AssemblyPath").GetString()),

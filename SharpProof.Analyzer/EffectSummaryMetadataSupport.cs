@@ -899,11 +899,16 @@ internal sealed class MethodBodyHashProvider
 
 internal sealed class ActualAssemblyIdentity
 {
-    public ActualAssemblyIdentity(string assemblyName, string assemblySha256, string moduleVersionId)
+    public ActualAssemblyIdentity(
+        string assemblyName,
+        string assemblySha256,
+        string moduleVersionId,
+        string? assemblyPath = null)
     {
         AssemblyName = assemblyName;
         AssemblySha256 = assemblySha256;
         ModuleVersionId = moduleVersionId;
+        AssemblyPath = assemblyPath;
     }
 
     public string AssemblyName { get; }
@@ -911,6 +916,8 @@ internal sealed class ActualAssemblyIdentity
     public string AssemblySha256 { get; }
 
     public string ModuleVersionId { get; }
+
+    public string? AssemblyPath { get; }
 
     public static ActualAssemblyIdentity? FromFile(string path)
     {
@@ -925,7 +932,7 @@ internal sealed class ActualAssemblyIdentity
         var moduleVersionId = metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid).ToString("D");
         var assemblySha256 = ComputeSha256(path);
 
-        return new ActualAssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
+        return new ActualAssemblyIdentity(assemblyName, assemblySha256, moduleVersionId, Path.GetFullPath(path));
     }
 
     private static string ComputeSha256(string path)

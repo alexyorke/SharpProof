@@ -335,6 +335,7 @@ internal sealed class GeneratedPurityCatalog
                     purityEntry,
                     SummaryAssemblyIdentity.FromJson(entryElement),
                     SummaryMethodIdentity.FromJson(entryElement),
+                    EffectSummaryArtifactSource.FromJson(entryElement),
                     sourcePriority,
                     sourcePath,
                     compatibilityReporter);
@@ -350,6 +351,7 @@ internal sealed class GeneratedPurityCatalog
         foreach (var assemblyElement in assembliesElement.EnumerateArray())
         {
             var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
+            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
             if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
                 methodsElement.ValueKind != JsonValueKind.Array)
                 continue;
@@ -368,6 +370,7 @@ internal sealed class GeneratedPurityCatalog
                     purityEntry,
                     assemblyIdentity,
                     SummaryMethodIdentity.FromJson(methodElement),
+                    artifactSource,
                     sourcePriority,
                     sourcePath,
                     compatibilityReporter);
@@ -545,6 +548,7 @@ internal sealed class GeneratedPurityCatalog
             PurityEntry classification,
             SummaryAssemblyIdentity? assemblyIdentity,
             SummaryMethodIdentity? methodIdentity,
+            EffectSummaryArtifactSource? artifactSource,
             int sourcePriority,
             string? sourcePath,
             EffectSummaryCompatibilityReporter? compatibilityReporter)
@@ -553,6 +557,7 @@ internal sealed class GeneratedPurityCatalog
             Classification = classification;
             AssemblyIdentity = assemblyIdentity;
             MethodIdentity = methodIdentity;
+            ArtifactSource = artifactSource;
             SourcePriority = sourcePriority;
             SourcePath = sourcePath;
             CompatibilityReporter = compatibilityReporter;
@@ -562,6 +567,7 @@ internal sealed class GeneratedPurityCatalog
         public PurityEntry Classification { get; }
         public SummaryAssemblyIdentity? AssemblyIdentity { get; }
         public SummaryMethodIdentity? MethodIdentity { get; }
+        private EffectSummaryArtifactSource? ArtifactSource { get; }
         public int SourcePriority { get; }
         private string? SourcePath { get; }
         private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
@@ -587,6 +593,14 @@ internal sealed class GeneratedPurityCatalog
             if (!assemblyCompatibility.IsCompatible)
             {
                 ReportIncompatibility(assemblyCompatibility);
+                return false;
+            }
+
+            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
+                                              EffectSummaryCompatibility.Compatible;
+            if (!artifactSourceCompatibility.IsCompatible)
+            {
+                ReportIncompatibility(artifactSourceCompatibility);
                 return false;
             }
 

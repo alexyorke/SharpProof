@@ -295,7 +295,10 @@ internal static class EffectSummaryCli
                 options.IncludeCallees,
                 options.MaxDepth,
                 options.IncludeTransitiveRoots,
-                options.MaxExceptionEdges))
+                options.MaxExceptionEdges) with
+            {
+                ArtifactSource = options.GetArtifactSource(path)
+            })
             .ToArray();
 
         if (options.ExcludedSymbolPrefixes.Count > 0)
@@ -455,6 +458,16 @@ internal sealed class CliOptions
 
     public bool ShowHelp { get; private set; }
 
+    private bool IsFromArtifactSpec { get; set; }
+
+    private string? PackageAssemblyPath { get; set; }
+
+    private string? PackageId { get; set; }
+
+    private string? PackageVersion { get; set; }
+
+    private string? PackageAssemblyRelativePath { get; set; }
+
     public static CliOptions Parse(string[] args)
     {
         var options = new CliOptions();
@@ -554,11 +567,17 @@ internal sealed class CliOptions
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
             IncludeBclFallbackInventory =
                 artifact.IncludeBclFallbackInventory ?? defaults?.IncludeBclFallbackInventory ?? false,
-            AllRuntimeAssemblies = artifact.AllRuntimeAssemblies ?? defaults?.AllRuntimeAssemblies ?? false
+            AllRuntimeAssemblies = artifact.AllRuntimeAssemblies ?? defaults?.AllRuntimeAssemblies ?? false,
+            IsFromArtifactSpec = true,
+            PackageId = artifact.PackageId?.Trim(),
+            PackageVersion = artifact.PackageVersion?.Trim(),
+            PackageAssemblyRelativePath = artifact.PackageAssemblyRelativePath?.Trim()
         };
 
         var explicitAssemblyPaths = artifact.AssemblyPaths ?? Array.Empty<string>();
         var hasPackageAssembly = HasPackageAssembly(artifact);
+        var packageAssemblyPath = hasPackageAssembly ? ResolveNuGetPackageAssemblyPath(artifact) : null;
+        options.PackageAssemblyPath = packageAssemblyPath;
         var hasExplicitRuntimeAssembly = !string.IsNullOrWhiteSpace(artifact.RuntimeAssemblyName);
         if (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly &&
             (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
@@ -568,7 +587,7 @@ internal sealed class CliOptions
             options.AssemblyPaths.AddRange(ResolveArtifactSpecAssemblyPaths(artifact.AssemblyPaths,
                 artifactSpecDirectory));
 
-        if (hasPackageAssembly) options.AssemblyPaths.Add(ResolveNuGetPackageAssemblyPath(artifact));
+        if (packageAssemblyPath != null) options.AssemblyPaths.Add(packageAssemblyPath);
 
         if (options.AssemblyPaths.Count > 1)
         {
@@ -581,7 +600,7 @@ internal sealed class CliOptions
                     : Array.Empty<string>())
                 .Concat(explicitAssemblyPaths)
                 .Concat(
-                    hasPackageAssembly ? new[] { ResolveNuGetPackageAssemblyPath(artifact) } : Array.Empty<string>())
+                    packageAssemblyPath != null ? new[] { packageAssemblyPath } : Array.Empty<string>())
                 .Select(Path.GetFullPath)
                 .Distinct(pathComparer));
         }
@@ -608,6 +627,38 @@ internal sealed class CliOptions
         options.Validate();
 
         return options;
+    }
+
+    internal EffectSummaryArtifactSource? GetArtifactSource(string assemblyPath)
+    {
+        if (!IsFromArtifactSpec) return null;
+
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var normalizedAssemblyPath = Path.GetFullPath(assemblyPath);
+        if (!string.IsNullOrWhiteSpace(PackageAssemblyPath) &&
+            string.Equals(
+                normalizedAssemblyPath,
+                Path.GetFullPath(PackageAssemblyPath!),
+                pathComparison))
+            return new EffectSummaryArtifactSource(
+                "package",
+                null,
+                PackageId,
+                PackageVersion,
+                PackageAssemblyRelativePath);
+
+        if (AllRuntimeAssemblies || AssemblyPaths.Count == 0)
+            return new EffectSummaryArtifactSource("framework", Framework, null, null, null);
+
+        var runtimeAssemblyPath = RuntimeAssemblyResolver.Resolve(Framework, RuntimeAssemblyName);
+        return string.Equals(
+            normalizedAssemblyPath,
+            Path.GetFullPath(runtimeAssemblyPath),
+            pathComparison)
+            ? new EffectSummaryArtifactSource("framework", Framework, null, null, null)
+            : null;
     }
 
     private void Validate()
@@ -4930,8 +4981,17 @@ internal sealed record AssemblyEffectReport(
     int EmittedMethodCount,
     MethodEffectSummary[] Methods)
 {
+    public EffectSummaryArtifactSource? ArtifactSource { get; init; }
+
     [JsonIgnore] public MethodEffectSummary[] ClassificationMethods { get; init; } = Array.Empty<MethodEffectSummary>();
 }
+
+internal sealed record EffectSummaryArtifactSource(
+    string Kind,
+    string? Framework,
+    string? PackageId,
+    string? PackageVersion,
+    string? PackageAssemblyRelativePath);
 
 internal sealed record MethodEffectSummary(
     string Symbol,

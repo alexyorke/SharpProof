@@ -215,6 +215,7 @@ internal sealed class ExceptionSummaryCatalog
         foreach (var assemblyElement in assembliesElement.EnumerateArray())
         {
             var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
+            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
             if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
                 methodsElement.ValueKind != JsonValueKind.Array)
                 continue;
@@ -262,6 +263,7 @@ internal sealed class ExceptionSummaryCatalog
                     exceptionFacts,
                     assemblyIdentity,
                     SummaryMethodIdentity.FromJson(methodElement),
+                    artifactSource,
                     sourcePriority,
                     sourcePath,
                     compatibilityReporter);
@@ -610,6 +612,7 @@ internal sealed class ExceptionSummaryCatalog
             ImmutableArray<SummaryExceptionFact> exceptionFacts,
             SummaryAssemblyIdentity? assemblyIdentity,
             SummaryMethodIdentity? methodIdentity,
+            EffectSummaryArtifactSource? artifactSource,
             int sourcePriority,
             string? sourcePath,
             EffectSummaryCompatibilityReporter? compatibilityReporter)
@@ -619,6 +622,7 @@ internal sealed class ExceptionSummaryCatalog
             ExceptionFacts = exceptionFacts;
             AssemblyIdentity = assemblyIdentity;
             MethodIdentity = methodIdentity;
+            ArtifactSource = artifactSource;
             SourcePriority = sourcePriority;
             SourcePath = sourcePath;
             CompatibilityReporter = compatibilityReporter;
@@ -633,6 +637,7 @@ internal sealed class ExceptionSummaryCatalog
         public SummaryAssemblyIdentity? AssemblyIdentity { get; }
 
         public SummaryMethodIdentity? MethodIdentity { get; }
+        private EffectSummaryArtifactSource? ArtifactSource { get; }
 
         public int SourcePriority { get; }
         private string? SourcePath { get; }
@@ -652,6 +657,14 @@ internal sealed class ExceptionSummaryCatalog
             if (!assemblyCompatibility.IsCompatible)
             {
                 ReportIncompatibility(assemblyCompatibility);
+                return false;
+            }
+
+            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
+                                              EffectSummaryCompatibility.Compatible;
+            if (!artifactSourceCompatibility.IsCompatible)
+            {
+                ReportIncompatibility(artifactSourceCompatibility);
                 return false;
             }
 

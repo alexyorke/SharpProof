@@ -249,6 +249,42 @@ public sealed class TestClass
             Is.False);
     }
 
+    [TestCase("net8.0", false)]
+    [TestCase("net7.0", true)]
+    public async Task EffectSummaryArtifactFrameworkSource_ReportsOnlyWhenStale(
+        string framework,
+        bool expectStaleDiagnostic)
+    {
+        var summary = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+            typeof(string).Assembly.Location,
+            "System.String.get_Length()",
+            "pure",
+            "[]");
+        summary = AddArtifactFrameworkSource(summary, framework);
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class TestClass
+            {
+                [EnforcePure]
+                public int Length(string value) => value.Length;
+            }
+            """,
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "framework.SharpProof.EffectSummary.json",
+                    summary)));
+
+        Assert.That(
+            diagnostics.Any(item =>
+                item.Id == SharpProofDiagnostics.InvalidAdditionalFileId &&
+                item.Properties[SharpProofDiagnostics.AdditionalFileReasonCodeProperty] ==
+                "effect_summary_framework_source_mismatch"),
+            Is.EqualTo(expectStaleDiagnostic));
+    }
+
     [Test]
     public async Task PartiallyMalformedBaselineAdditionalFile_ReportsSp0032()
     {
@@ -281,6 +317,15 @@ public sealed class TestClass
             pattern,
             match => match.Groups[1].Value + value + match.Groups[2].Value,
             RegexOptions.CultureInvariant);
+    }
+
+    private static string AddArtifactFrameworkSource(string json, string framework)
+    {
+        return json.Replace(
+            "\"AssemblyPath\":",
+            $"\"ArtifactSource\": {{ \"Kind\": \"framework\", \"Framework\": \"{framework}\" }},\n" +
+            "                       \"AssemblyPath\":",
+            StringComparison.Ordinal);
     }
 
     [Test]
