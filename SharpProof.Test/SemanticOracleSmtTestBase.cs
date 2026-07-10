@@ -308,6 +308,7 @@ public sealed class NotNullIfNotNullIndexer
             return AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
                 ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
+                frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
                 concurrentAnalysis: true);
         }
 

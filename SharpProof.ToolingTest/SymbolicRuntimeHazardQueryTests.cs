@@ -11,6 +11,7 @@ using SearchLib.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public sealed class SymbolicRuntimeHazardQueryTests
     {
         [Test]

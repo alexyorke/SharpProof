@@ -10,6 +10,7 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public sealed class SymbolicSourceQueryLineTests
     {
         [Test]
