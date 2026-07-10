@@ -43,7 +43,15 @@ internal static partial class SymbolicIrLowerer
             new KnownApiTermLoweringDescriptor(
                 SpecialType.System_Array,
                 nameof(Array.GetUpperBound),
-                TryLowerArrayBoundInvocation));
+                TryLowerArrayBoundInvocation),
+            new KnownApiTermLoweringDescriptor(
+                "System.Math",
+                nameof(Math.Min),
+                TryLowerIntegralMathMinMaxInvocation),
+            new KnownApiTermLoweringDescriptor(
+                "System.Math",
+                nameof(Math.Max),
+                TryLowerIntegralMathMinMaxInvocation));
 
     private static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,

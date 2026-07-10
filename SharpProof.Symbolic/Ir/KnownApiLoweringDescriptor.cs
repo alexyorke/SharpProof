@@ -53,7 +53,19 @@ internal sealed class KnownApiTermLoweringDescriptor
         Handler = handler;
     }
 
+    public KnownApiTermLoweringDescriptor(
+        string containingTypeMetadataName,
+        string methodName,
+        KnownApiTermLoweringHandler handler)
+    {
+        ContainingTypeMetadataName = containingTypeMetadataName;
+        MethodName = methodName;
+        Handler = handler;
+    }
+
     public SpecialType ContainingTypeSpecialType { get; }
+
+    public string? ContainingTypeMetadataName { get; }
 
     public string MethodName { get; }
 
@@ -61,7 +73,13 @@ internal sealed class KnownApiTermLoweringDescriptor
 
     public bool Matches(IMethodSymbol method)
     {
-        return string.Equals(method.Name, MethodName, StringComparison.Ordinal) &&
-               method.ContainingType?.OriginalDefinition.SpecialType == ContainingTypeSpecialType;
+        if (!string.Equals(method.Name, MethodName, StringComparison.Ordinal)) return false;
+
+        return ContainingTypeMetadataName == null
+            ? method.ContainingType?.OriginalDefinition.SpecialType == ContainingTypeSpecialType
+            : string.Equals(
+                method.ContainingType?.ToDisplayString(),
+                ContainingTypeMetadataName,
+                StringComparison.Ordinal);
     }
 }

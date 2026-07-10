@@ -725,6 +725,59 @@ public sealed class SymbolicIrTests
         Assert.That(((SymbolicLengthTerm)atom.Left).Value, Is.TypeOf<SymbolicStringConcatTerm>());
     }
 
+    [TestCase("Min", true)]
+    [TestCase("Max", false)]
+    public void KnownApiLowering_IntegralMathMinMaxUsesTypedConditionalTerm(
+        string methodName,
+        bool isMinimum)
+    {
+        var context = CreateExpressionContext(
+            "int left, int right",
+            $"System.Math.{methodName}(left, right) == left");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+        var conditional = (SymbolicConditionalTerm)term;
+
+        Assert.That(
+            AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator,
+            Is.EqualTo(isMinimum
+                ? SymbolicRelationOperator.LessThanOrEqual
+                : SymbolicRelationOperator.GreaterThanOrEqual));
+        Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
+        Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicVariableTerm>());
+        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+        Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+    }
+
+    [Test]
+    public void KnownApiLowering_IntegralMathMinMapsNamedArgumentsByParameter()
+    {
+        var context = CreateExpressionContext(
+            "int left, int right",
+            "System.Math.Min(val2: right, val1: left) == left");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        var conditional = (SymbolicConditionalTerm)term;
+        var comparison = AssertFactCondition<SymbolicRelationAtom>(conditional.Condition);
+
+        Assert.That(((SymbolicVariableTerm)comparison.Left).Name, Does.StartWith("left#"));
+        Assert.That(((SymbolicVariableTerm)comparison.Right).Name, Does.StartWith("right#"));
+    }
+
+    [Test]
+    public void KnownApiLowering_FloatingMathMinStaysOnLegacyPath()
+    {
+        var context = CreateExpressionContext(
+            "double left, double right",
+            "System.Math.Min(left, right) == left");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
+    }
+
     [Test]
     public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm()
     {
