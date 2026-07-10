@@ -27,6 +27,9 @@ bounded proof question into normal build diagnostics.
   self-referential `ref` parameter updates can be proven against those
   snapshots when the symbolic state preserves the entry relation.
   Failures produce `SP0018`; unsupported conditions produce `SP0019`.
+  Parameter, result, and member nullness also consume the shared Roslyn and
+  `System.Diagnostics.CodeAnalysis` contract model described in
+  [shared nullable-flow facts](nullable-flow-facts.md).
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
   in the annotated method-like body. Violations produce `SP0013`.
 - `[AllowedCapabilities(...)]`: restrict proven side-effect capabilities such
@@ -68,6 +71,12 @@ The broad-usage attributes and their placement diagnostics are:
 Attributes whose supported target set is already stable and compiler-enforceable
 remain narrowed in metadata, such as `[AllowSynchronization]`,
 `[PureExternal]`, and `[Impure]`.
+
+CodeAnalysis nullable attributes are compiler contracts rather than SharpProof
+attributes, but their facts are shared across analyzer families. `AllowNull`,
+`DisallowNull`, `MaybeNull`, `NotNull`, their conditional variants, member
+postconditions, and non-returning contracts are summarized in
+[the nullable-flow contract guide](nullable-flow-facts.md).
 
 ## Attribute Identity
 

@@ -58,6 +58,11 @@ their existing enums and raw reason strings. See the
 [unknown-reason taxonomy](unknown-reasons.md) before branching on solver,
 capability, complexity, hazard, purity, or contract failures.
 
+Nullness proofs use the same Roslyn flow state and CodeAnalysis attribute
+contracts across condition, reachability, runtime-hazard, purity, and
+`[Ensures]` queries. See [shared nullable-flow facts](nullable-flow-facts.md)
+for precedence, mutation invalidation, and trust boundaries.
+
 Every current query family now exposes its compact projection from the public
 library, not from CLI-only model classes:
 

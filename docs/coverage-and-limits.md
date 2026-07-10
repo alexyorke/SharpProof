@@ -30,6 +30,10 @@ The analyzer combines:
   explicitly approximate; unsupported model shapes remain visible.
 - Ownership and mutation reasoning are local; there is no full Rust-style borrow
   checker yet.
+- Nullable-flow facts combine Roslyn flow state with the supported CodeAnalysis
+  contracts through one [shared fact model](nullable-flow-facts.md). Attributes
+  are trusted contracts; they do not verify that an annotated implementation
+  keeps its promise.
 - Runtime hazards are source-visible and bounded, not a guarantee that every
   possible runtime exception is modeled.
 - Known runtime-hazard coverage gaps have explicit acceptance criteria and
