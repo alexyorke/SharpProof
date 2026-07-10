@@ -129,6 +129,35 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_ReportsTypedCoalesceThrowExpression()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public object TestMethod(object? value)
+    {
+        return value ?? throw new InvalidOperationException();
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value ?? throw new InvalidOperationException();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DirectThrow }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        Assert.That(hazard.Category, Is.EqualTo("direct_throw"));
+        Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.ThrowExpression.ToString()));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_ProvesGuardedDivideByZero()
     {
         const string source = @"
@@ -1388,6 +1417,35 @@ public class TestClass
         var hazard = AssertSingleHazard(result);
         Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
         Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+    }
+
+    [Test]
+    public void KnownLimitation_DynamicBinderMissingMemberOnNonNullReceiver_HasNoBinderHazard()
+    {
+        const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = new object();
+        return value.Missing;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Missing;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+        var nullBindingCandidate = AssertSingleHazard(result);
+        Assert.That(nullBindingCandidate.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+        Assert.That(nullBindingCandidate.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(result.Hazards, Has.None.Matches<SymbolicRuntimeHazard>(hazard =>
+            hazard.Status == SymbolicRuntimeHazardStatus.Proven));
     }
 
     [Test]
@@ -3793,6 +3851,42 @@ public class TestClass
             new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
 
         Assert.That(result.Hazards, Is.Empty);
+    }
+
+    [Test]
+    public void KnownLimitation_ArrayCovarianceStoreAcrossMergedIdentities_RemainsUnknown()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(bool useStrings)
+    {
+        object[] values;
+        if (useStrings)
+            values = new string[1];
+        else
+            values = new Uri[1];
+
+        values[0] = new object();
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "values[0] = new object();",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.ArrayTypeMismatch }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArrayTypeMismatch));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArrayTypeMismatchException"));
+        Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
     }
 
     [Test]
