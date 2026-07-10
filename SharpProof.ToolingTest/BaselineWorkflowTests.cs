@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Symbolic;
 using SharpProof.Tools.Baseline;
 
 namespace SharpProof.ToolingTest;
@@ -23,14 +25,48 @@ public sealed class BaselineWorkflowTests
         Assert.That(baseline.Diagnostics[0].OperationKind, Is.EqualTo("Invocation"));
         Assert.That(baseline.Diagnostics[0].Contract, Is.EqualTo("[EnforcePure]"));
         Assert.That(baseline.Diagnostics[0].EvidenceKey, Is.EqualTo("impure-call"));
+        Assert.That(baseline.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(baseline.EvidenceSchemaCompatibility,
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        Assert.That(baseline.Diagnostics[0].EvidenceSchemaVersion,
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(baseline.Diagnostics[0].EvidenceSchemaCompatibility,
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
 
         var json = SharpProofBaseline.ToJson(baseline);
         Assert.That(json, Does.Contain(@"""diagnostics"""));
         Assert.That(json, Does.Contain(@"""symbol"": ""M:Sample.Impure"""));
+        using var jsonDocument = JsonDocument.Parse(json);
+        Assert.That(jsonDocument.RootElement.GetProperty("evidenceSchemaVersion").GetInt32(),
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(jsonDocument.RootElement.GetProperty("evidenceSchemaCompatibility").GetString(),
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+        Assert.That(jsonDocument.RootElement.GetProperty("diagnostics")[0]
+                .GetProperty("evidenceSchemaVersion").GetInt32(),
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
 
         var reparsed = SharpProofBaseline.ParseBaselineJson(json);
         Assert.That(reparsed.Diagnostics, Has.Length.EqualTo(1));
         Assert.That(reparsed.Diagnostics[0].Symbol, Is.EqualTo("M:Sample.Impure"));
+    }
+
+    [Test]
+    public void ParseBaselineJson_UpgradesLegacyEvidenceAndRejectsFutureSchema()
+    {
+        const string legacy =
+            "{\"version\":1,\"diagnostics\":[{\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"}]}";
+        var parsed = SharpProofBaseline.ParseBaselineJson(legacy);
+
+        Assert.That(parsed.Diagnostics, Has.Length.EqualTo(1));
+        Assert.That(parsed.Diagnostics[0].EvidenceSchemaVersion,
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+
+        const string future =
+            "{\"evidenceSchemaVersion\":99,\"evidenceSchemaCompatibility\":\"future\"," +
+            "\"diagnostics\":[{\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"}]}";
+        Assert.That(
+            () => SharpProofBaseline.ParseBaselineJson(future),
+            Throws.TypeOf<NotSupportedException>().With.Message.Contains("evidenceSchemaVersion '99'"));
     }
 
     [Test]
@@ -153,7 +189,9 @@ public sealed class BaselineWorkflowTests
             ""sharpproof.baseline.path"": """ + path + @""",
             ""sharpproof.baseline.operation_kind"": ""Invocation"",
             ""sharpproof.baseline.contract"": ""[EnforcePure]"",
-            ""sharpproof.baseline.evidence_key"": ""impure-call""
+            ""sharpproof.baseline.evidence_key"": ""impure-call"",
+            ""sharpproof.evidence.schema_version"": ""1"",
+            ""sharpproof.evidence.schema_compatibility"": ""additive-v1""
           }
         }
       ]

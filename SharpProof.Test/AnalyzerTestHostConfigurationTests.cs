@@ -332,6 +332,23 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task UnsupportedBaselineEvidenceSchema_ReportsSp0032()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "SharpProof.Baseline.json",
+                    "{\"version\":1,\"diagnostics\":[{\"id\":\"SP0002\"," +
+                    "\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"," +
+                    "\"evidenceSchemaVersion\":99,\"evidenceSchemaCompatibility\":\"future\"}]}")));
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("unsupported baseline entry evidenceSchemaVersion '99'"));
+    }
+
+    [Test]
     public void AnalyzerConfigurationOptionRegistry_CoversEveryConfigKey()
     {
         var configKeys = GetConfigKeys();

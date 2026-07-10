@@ -49,6 +49,15 @@ internal static class AnalyzerAdditionalFileValidator
                 return;
             }
 
+            if (!ValidateEvidenceSchemasRecursively(
+                    additionalFile,
+                    document.RootElement,
+                    "evidenceSchemaVersion",
+                    "evidenceSchemaCompatibility",
+                    "baseline entry",
+                    issues))
+                return;
+
             var counts = CountBaselineEntries(document.RootElement);
             if (counts.CandidateCount == 0)
                 AddIssue(issues, additionalFile, "baseline contains no diagnostic entries");
@@ -175,9 +184,12 @@ internal static class AnalyzerAdditionalFileValidator
         string surfaceName,
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
     {
-        if (!element.TryGetProperty(versionPropertyName, out var versionElement)) return true;
+        var hasVersion = element.TryGetProperty(versionPropertyName, out var versionElement);
+        var hasCompatibility = element.TryGetProperty(compatibilityPropertyName, out var compatibilityElement);
+        if (!hasVersion && !hasCompatibility) return true;
 
-        if (versionElement.ValueKind != JsonValueKind.Number ||
+        if (!hasVersion ||
+            versionElement.ValueKind != JsonValueKind.Number ||
             !versionElement.TryGetInt32(out var version))
         {
             AddIssue(issues, additionalFile, surfaceName + " has a non-numeric " + versionPropertyName);
@@ -196,7 +208,7 @@ internal static class AnalyzerAdditionalFileValidator
 
         if (version == SharpProofEvidenceSchema.LegacyUnversionedVersion) return true;
 
-        if (!element.TryGetProperty(compatibilityPropertyName, out var compatibilityElement) ||
+        if (!hasCompatibility ||
             compatibilityElement.ValueKind != JsonValueKind.String ||
             !string.Equals(
                 compatibilityElement.GetString(),
@@ -210,6 +222,54 @@ internal static class AnalyzerAdditionalFileValidator
                 SharpProofEvidenceSchema.CompatibilityPolicy + "'");
             return false;
         }
+
+        return true;
+    }
+
+    private static bool ValidateEvidenceSchemasRecursively(
+        AdditionalText additionalFile,
+        JsonElement element,
+        string versionPropertyName,
+        string compatibilityPropertyName,
+        string surfaceName,
+        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                if (!ValidateEvidenceSchemasRecursively(
+                        additionalFile,
+                        item,
+                        versionPropertyName,
+                        compatibilityPropertyName,
+                        surfaceName,
+                        issues))
+                    return false;
+
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object) return true;
+
+        if (!ValidateEvidenceSchema(
+                additionalFile,
+                element,
+                versionPropertyName,
+                compatibilityPropertyName,
+                surfaceName,
+                issues))
+            return false;
+
+        foreach (var property in element.EnumerateObject())
+            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object &&
+                !ValidateEvidenceSchemasRecursively(
+                    additionalFile,
+                    property.Value,
+                    versionPropertyName,
+                    compatibilityPropertyName,
+                    surfaceName,
+                    issues))
+                return false;
 
         return true;
     }

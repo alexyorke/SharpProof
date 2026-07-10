@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 
@@ -120,6 +121,7 @@ internal sealed class DiagnosticBaseline
         try
         {
             using var document = JsonDocument.Parse(json, BaselineJsonOptions);
+            if (!HasReadCompatibleEvidenceSchema(document.RootElement)) return builder.ToImmutable();
             AddEntries(document.RootElement, baseDirectory, builder);
         }
         catch (JsonException)
@@ -127,6 +129,60 @@ internal sealed class DiagnosticBaseline
         }
 
         return builder.ToImmutable();
+    }
+
+    private static bool HasReadCompatibleEvidenceSchema(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+            return element.EnumerateArray().All(HasReadCompatibleEvidenceSchema);
+
+        if (element.ValueKind != JsonValueKind.Object) return true;
+
+        var hasVersion = TryGetPropertyIgnoreCase(element, "evidenceSchemaVersion", out var versionElement);
+        var hasCompatibility = TryGetPropertyIgnoreCase(
+            element,
+            "evidenceSchemaCompatibility",
+            out var compatibilityElement);
+        if (hasVersion || hasCompatibility)
+        {
+            if (!hasVersion ||
+                versionElement.ValueKind != JsonValueKind.Number ||
+                !versionElement.TryGetInt32(out var version) ||
+                !SharpProofEvidenceSchema.IsReadCompatible(version))
+                return false;
+
+            if (version != SharpProofEvidenceSchema.LegacyUnversionedVersion &&
+                (!hasCompatibility ||
+                 compatibilityElement.ValueKind != JsonValueKind.String ||
+                 !string.Equals(
+                     compatibilityElement.GetString(),
+                     SharpProofEvidenceSchema.CompatibilityPolicy,
+                     StringComparison.Ordinal)))
+                return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object &&
+                !HasReadCompatibleEvidenceSchema(property.Value))
+                return false;
+
+        return true;
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonElement element,
+        string propertyName,
+        out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+
+        value = default;
+        return false;
     }
 
     private static void AddEntries(

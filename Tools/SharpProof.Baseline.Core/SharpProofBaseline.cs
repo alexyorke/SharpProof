@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof.Schema;
 
 namespace SharpProof.Tools.Baseline;
 
@@ -9,6 +11,12 @@ public sealed record BaselineDocument(
     ImmutableArray<BaselineEntry> Diagnostics)
 {
     [JsonPropertyName("version")] public int Version { get; init; } = 1;
+
+    [JsonPropertyName("evidenceSchemaVersion")]
+    public int EvidenceSchemaVersion { get; init; } = ProofEvidenceSchemaContract.CurrentVersion;
+
+    [JsonPropertyName("evidenceSchemaCompatibility")]
+    public string EvidenceSchemaCompatibility { get; init; } = ProofEvidenceSchemaContract.CompatibilityPolicy;
 }
 
 public sealed record BaselineEntry(
@@ -24,7 +32,11 @@ public sealed record BaselineEntry(
     [property: JsonPropertyName("operationKind")]
     string? OperationKind = null,
     [property: JsonPropertyName("evidenceKey")]
-    string? EvidenceKey = null);
+    string? EvidenceKey = null,
+    [property: JsonPropertyName("evidenceSchemaVersion")]
+    int EvidenceSchemaVersion = ProofEvidenceSchemaContract.CurrentVersion,
+    [property: JsonPropertyName("evidenceSchemaCompatibility")]
+    string EvidenceSchemaCompatibility = ProofEvidenceSchemaContract.CompatibilityPolicy);
 
 public sealed record BaselineExplanation(
     BaselineEntry Entry,
@@ -44,6 +56,9 @@ public static class SharpProofBaseline
     public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
     public const string BaselineContractProperty = "sharpproof.baseline.contract";
     public const string BaselineEvidenceKeyProperty = "sharpproof.baseline.evidence_key";
+    public const string EvidenceSchemaVersionProperty = ProofEvidenceSchemaContract.DiagnosticVersionProperty;
+    public const string EvidenceSchemaCompatibilityProperty =
+        ProofEvidenceSchemaContract.DiagnosticCompatibilityProperty;
 
     private static readonly JsonDocumentOptions JsonOptions = new()
     {
@@ -89,6 +104,11 @@ public static class SharpProofBaseline
 
         var entries = ImmutableArray.CreateBuilder<BaselineEntry>();
         using var document = JsonDocument.Parse(json, JsonOptions);
+        ValidateEvidenceSchemas(
+            document.RootElement,
+            "evidenceSchemaVersion",
+            "evidenceSchemaCompatibility",
+            "baseline");
         AddBaselineEntries(document.RootElement, entries);
         return new BaselineDocument(Deduplicate(entries));
     }
@@ -247,6 +267,12 @@ public static class SharpProofBaseline
             properties.ValueKind != JsonValueKind.Object)
             return null;
 
+        ValidateEvidenceSchemas(
+            properties,
+            EvidenceSchemaVersionProperty,
+            EvidenceSchemaCompatibilityProperty,
+            "SARIF diagnostic");
+
         var symbol = GetEvidenceProperty(properties, BaselineSymbolProperty);
         if (string.IsNullOrWhiteSpace(symbol)) return null;
 
@@ -369,6 +395,89 @@ public static class SharpProofBaseline
                rule.ValueKind == JsonValueKind.Object
             ? GetStringProperty(rule, "id")
             : null;
+    }
+
+    private static void ValidateEvidenceSchemas(
+        JsonElement element,
+        string versionPropertyName,
+        string compatibilityPropertyName,
+        string surfaceName)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                ValidateEvidenceSchemas(item, versionPropertyName, compatibilityPropertyName, surfaceName);
+            return;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object) return;
+
+        var hasVersion = TryGetPropertyIgnoreCase(element, versionPropertyName, out var versionElement);
+        var hasCompatibility = TryGetPropertyIgnoreCase(
+            element,
+            compatibilityPropertyName,
+            out var compatibilityElement);
+        if (hasVersion || hasCompatibility)
+        {
+            if (!hasVersion || !TryReadSchemaVersion(versionElement, out var version))
+                throw new NotSupportedException(surfaceName + " has an invalid " + versionPropertyName + ".");
+
+            if (!ProofEvidenceSchemaContract.IsReadCompatible(version))
+                throw new NotSupportedException(
+                    $"Unsupported {surfaceName} {versionPropertyName} '{version}'; supported versions are " +
+                    $"{ProofEvidenceSchemaContract.MinimumReadCompatibleVersion}-" +
+                    $"{ProofEvidenceSchemaContract.CurrentVersion}.");
+
+            if (version != ProofEvidenceSchemaContract.LegacyUnversionedVersion &&
+                (!hasCompatibility ||
+                 compatibilityElement.ValueKind != JsonValueKind.String ||
+                 !string.Equals(
+                     compatibilityElement.GetString(),
+                     ProofEvidenceSchemaContract.CompatibilityPolicy,
+                     StringComparison.Ordinal)))
+                throw new NotSupportedException(
+                    surfaceName + " " + compatibilityPropertyName + " must be '" +
+                    ProofEvidenceSchemaContract.CompatibilityPolicy + "'.");
+        }
+
+        foreach (var property in element.EnumerateObject())
+            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
+                ValidateEvidenceSchemas(
+                    property.Value,
+                    versionPropertyName,
+                    compatibilityPropertyName,
+                    surfaceName);
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonElement element,
+        string propertyName,
+        out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryReadSchemaVersion(JsonElement element, out int version)
+    {
+        if (element.ValueKind == JsonValueKind.Number) return element.TryGetInt32(out version);
+
+        if (element.ValueKind == JsonValueKind.String)
+            return int.TryParse(
+                element.GetString(),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out version);
+
+        version = default;
+        return false;
     }
 
     private static string? GetEvidenceProperty(JsonElement properties, string propertyName)
