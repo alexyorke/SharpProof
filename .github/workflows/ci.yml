@@ -26,6 +26,10 @@ jobs:
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
 
+      - name: Verify generated analyzer configuration reference
+        shell: pwsh
+        run: .\scripts\Generate-ConfigurationReference.ps1 -Verify
+
       - name: Validate shipping projects warning-free
         shell: pwsh
         run: .\scripts\Invoke-SharpProofReleaseValidation.ps1 -Configuration Release -NoRestore

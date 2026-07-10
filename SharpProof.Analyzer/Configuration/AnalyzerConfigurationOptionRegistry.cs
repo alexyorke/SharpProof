@@ -97,7 +97,7 @@ namespace SharpProof.Analyzer.Configuration
                 ConfigKeys.RuntimeHazardMode,
                 AnalyzerConfigurationScope.GlobalAndTree,
                 AnalyzerConfigurationValueKind.RuntimeHazardMode,
-                "off",
+                "none",
                 "Controls SP0010 and SP0011 runtime-hazard reporting.",
                 ImmutableArray.Create("none", "sites", "summaries", "all")),
             new AnalyzerConfigurationOption(

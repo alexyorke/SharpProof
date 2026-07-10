@@ -121,11 +121,36 @@ public sealed class TestClass
         public void AnalyzerConfigurationOptionRegistry_IsReflectedInContractsDocumentation()
         {
             var contractsDoc = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "contracts.md"));
+            var referenceDoc = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "configuration-reference.md"));
             var missingKeys = GetRegisteredOptionKeys()
-                .Where(key => !contractsDoc.Contains(key, StringComparison.Ordinal))
+                .Where(key => !contractsDoc.Contains(key, StringComparison.Ordinal) &&
+                              !referenceDoc.Contains("| `" + key + "` |", StringComparison.Ordinal))
                 .ToArray();
 
             Assert.That(missingKeys, Is.Empty);
+        }
+
+        [Test]
+        public void AnalyzerConfigurationReference_ContainsGeneratedMetadataAndSamples()
+        {
+            var referenceDoc = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "configuration-reference.md"));
+
+            Assert.That(
+                referenceDoc,
+                Does.Contain("Generated from ConfigKeys.cs and AnalyzerConfigurationOptionRegistry.cs"));
+            Assert.That(referenceDoc, Does.Contain("is_global = true"));
+            Assert.That(referenceDoc, Does.Contain("[src/**/*.cs]"));
+            Assert.That(referenceDoc, Does.Contain("Global-only"));
+            Assert.That(referenceDoc, Does.Contain("Global and per-tree"));
+            Assert.That(referenceDoc, Does.Contain("SP0025 for invalid values"));
+
+            foreach (var key in GetRegisteredOptionKeys())
+            {
+                Assert.That(
+                    referenceDoc,
+                    Does.Contain("| `" + key + "` |"),
+                    "The generated configuration reference is missing " + key + ".");
+            }
         }
 
         [Test]

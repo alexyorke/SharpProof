@@ -161,6 +161,7 @@ JSON automation.
 ## Deeper Docs
 
 - [Contracts and analyzer diagnostics](docs/contracts.md)
+- [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)

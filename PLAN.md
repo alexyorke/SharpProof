@@ -170,10 +170,6 @@ grouped by their original feature area.
   `explain --sarif`, and optional markdown reports, that composes invariant,
   reachability, runtime-hazard, capability, complexity, and diagnostic
   cross-links into one bounded result for IDEs, CI bots, and issue attachments.
-- Generate a complete analyzer configuration reference from `ConfigKeys` and
-  parser defaults, including valid values, default values, per-tree versus
-  global scope, related diagnostics, and sample EditorConfig/global
-  AnalyzerConfig entries, then verify README and docs snippets against it.
 - Audit the NuGet analyzer layout against current analyzer packaging
   conventions, especially the native Z3 payload: decide on RID/platform-specific
   native assets or a graceful SMT-disabled fallback, then add Windows, Linux,
