@@ -55,10 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Runtime Hazard Coverage
-- Promote known runtime-hazard limitations into dedicated backlog items and
-  tests: richer dynamic binder modeling, array covariance stores through
-  merged array identities, and broader throw-expression flow beyond proven
-  `throw null` cases.
 - Expand runtime-hazard modeling for common BCL patterns such as
   collection-count guards and nullable/value-task/async result shapes.
 - Add a mode that reports unknown runtime-hazard candidates from the analyzer,
