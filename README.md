@@ -594,6 +594,26 @@ query modes such as `--runtime-hazards`, `--capabilities`, `--complexity`,
 `--check-reachability`, and `--implies` remain available for focused output and
 JSON automation.
 
+For applications and tooling that need direct queries, install the supported
+library package:
+
+```powershell
+dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
+```
+
+```csharp
+using SharpProof.Symbolic;
+
+var result = new SymbolicQueryService().Query(
+    new SymbolicQueryRequest(
+        SymbolicSourceInput.FromText(sourceText, "Example.cs"),
+        SymbolicQueryTarget.Point(line: 42)));
+```
+
+The package includes XML documentation, nullable API annotations, portable
+Source Link symbols, and an executable sample under
+`samples/SharpProof.Symbolic`.
+
 ## What It Can Prove Today
 
 - Analyzer contracts:

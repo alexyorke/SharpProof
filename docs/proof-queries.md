@@ -32,6 +32,12 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 
 ## .NET API Workflow
 
+Install the supported public library package:
+
+```powershell
+dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
+```
+
 Use `SymbolicQueryService` as the public entrypoint:
 
 - `Query(...)` for invariants, reachability, and implication checks
@@ -41,6 +47,28 @@ Use `SymbolicQueryService` as the public entrypoint:
 
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
 and unknown reasons. Raw SMT terms are not the primary public abstraction.
+
+The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
+XML documentation, nullable annotations, and portable PDBs containing Source
+Link metadata. The packaged `samples/SharpProof.Symbolic` console project shows
+the minimal source-text query workflow. `SearchLib.dll` is bundled only as a
+runtime implementation dependency; consumers should build against the
+`SharpProof.Symbolic` namespace instead of referencing `SearchLib` directly.
+
+## Compatibility Baselines
+
+`SharpProof.Symbolic/PublicAPI.Shipped.txt` is the supported API baseline.
+Builds fail when a shipped API is removed or changed, or when a new public API
+is added without being recorded. During development, intentional additions go
+in `PublicAPI.Unshipped.txt`; release preparation promotes them to the shipped
+baseline.
+
+`SharpProof.Symbolic/PackageBaseline.json` records the package identity,
+version, dependencies, target framework, and required assets. Packaging tests
+compare both the project and built `.nupkg` against it, then restore the package
+into a disposable console application and run the packaged sample. Intentional
+package-contract changes therefore require an explicit baseline and version
+review.
 
 ## Evidence Policy
 
