@@ -11,13 +11,6 @@ namespace SharpProof.Symbolic;
 
 internal static partial class SymbolicProgramPointFacts
 {
-    private const int MaxMergedIfElseFacts = 16;
-    private const int MaxMergedSwitchFacts = 32;
-    private const int MaxMergedTryFacts = 16;
-    private const int MaxTryCompletionBranches = 8;
-    private const int MaxFiniteForeachElementFacts = 8;
-    private const int MaxScopedBlockCompletionStatements = 32;
-    private const int MaxStructuralNullStateDepth = 4;
     private const string ImplicitThisVariableName = "this";
 
     internal static List<SmtFormula> CollectPriorAssignmentFacts(
@@ -4738,7 +4731,17 @@ internal static partial class SymbolicProgramPointFacts
         var processedStatementCount = 0;
         foreach (var statement in block.Statements)
         {
-            if (processedStatementCount >= MaxScopedBlockCompletionStatements) return;
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+            if (processedStatementCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+                    limit,
+                    block.Statements.Count,
+                    block,
+                    "program_point.completed_block_state");
+                return;
+            }
 
             processedStatementCount++;
             AddPriorStatementStateFacts(
@@ -4762,7 +4765,17 @@ internal static partial class SymbolicProgramPointFacts
         var processedStatementCount = 0;
         foreach (var statement in block.Statements)
         {
-            if (processedStatementCount >= MaxScopedBlockCompletionStatements) return;
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+            if (processedStatementCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+                    limit,
+                    block.Statements.Count,
+                    block,
+                    "program_point.completed_scoped_block");
+                return;
+            }
 
             processedStatementCount++;
             AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockFacts);
@@ -4800,7 +4813,12 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
-        AddIdenticalCompletedBranchFacts(completedBranches, semanticModel, cancellationToken, facts);
+        AddIdenticalCompletedBranchFacts(
+            completedBranches,
+            tryStatement,
+            semanticModel,
+            cancellationToken,
+            facts);
     }
 
     private static List<CompletedBranchFacts> CollectCompletedTryBranches(
@@ -4819,7 +4837,17 @@ internal static partial class SymbolicProgramPointFacts
 
         foreach (var catchClause in tryStatement.Catches)
         {
-            if (completedBranches.Count >= MaxTryCompletionBranches) return completedBranches;
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxTryCompletionBranches;
+            if (completedBranches.Count >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryCompletionBranches,
+                    limit,
+                    completedBranches.Count + 1,
+                    tryStatement,
+                    "program_point.try_completion_branches");
+                return completedBranches;
+            }
 
             AddCompletedCatchBranch(
                 completedBranches,
@@ -4885,7 +4913,17 @@ internal static partial class SymbolicProgramPointFacts
         var processedStatementCount = 0;
         foreach (var statement in block.Statements)
         {
-            if (processedStatementCount >= MaxScopedBlockCompletionStatements) return;
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+            if (processedStatementCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+                    limit,
+                    block.Statements.Count,
+                    block,
+                    "program_point.completed_block_formula");
+                return;
+            }
 
             processedStatementCount++;
             AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
@@ -4907,7 +4945,17 @@ internal static partial class SymbolicProgramPointFacts
         var processedStatementCount = 0;
         foreach (var statement in finallyBlock.Statements)
         {
-            if (processedStatementCount >= MaxScopedBlockCompletionStatements) return;
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxScopedBlockCompletionStatements;
+            if (processedStatementCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.ScopedBlockCompletionStatements,
+                    limit,
+                    finallyBlock.Statements.Count,
+                    finallyBlock,
+                    "program_point.completed_finally_block");
+                return;
+            }
 
             processedStatementCount++;
             AddPriorStatementFacts(statement, semanticModel, cancellationToken, finallyFacts);
@@ -4952,6 +5000,7 @@ internal static partial class SymbolicProgramPointFacts
 
     private static void AddIdenticalCompletedBranchFacts(
         IReadOnlyList<CompletedBranchFacts> completedBranches,
+        TryStatementSyntax tryStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         ICollection<SmtFormula> facts)
@@ -4976,9 +5025,20 @@ internal static partial class SymbolicProgramPointFacts
             var key = GetFormulaKey(fact);
             if (!commonKeys.Contains(key) || !existingKeys.Add(key)) continue;
 
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedTryFacts;
+            if (addedCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryFactMerge,
+                    limit,
+                    addedCount + 1,
+                    tryStatement,
+                    "program_point.try_fact_merge");
+                return;
+            }
+
             facts.Add(fact);
             addedCount++;
-            if (addedCount >= MaxMergedTryFacts) return;
         }
     }
 
@@ -5808,6 +5868,7 @@ internal static partial class SymbolicProgramPointFacts
             facts.ToArray(),
             trueCondition,
             falseCondition,
+            ifStatement,
             facts);
     }
 
@@ -5856,6 +5917,7 @@ internal static partial class SymbolicProgramPointFacts
             currentFacts,
             trueCondition,
             falseCondition,
+            ifStatement,
             facts);
     }
 
@@ -5883,6 +5945,7 @@ internal static partial class SymbolicProgramPointFacts
         IEnumerable<SmtFormula> commonFacts,
         SmtFormula trueCondition,
         SmtFormula falseCondition,
+        IfStatementSyntax ifStatement,
         ICollection<SmtFormula> facts)
     {
         var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
@@ -5915,9 +5978,20 @@ internal static partial class SymbolicProgramPointFacts
                 var mergedKey = GetFormulaKey(mergedFact);
                 if (!existingKeys.Add(mergedKey)) continue;
 
+                var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedIfElseFacts;
+                if (mergedFactCount >= limit)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.IfElseFactMerge,
+                        limit,
+                        mergedFactCount + 1,
+                        ifStatement,
+                        "program_point.if_else_fact_merge");
+                    return;
+                }
+
                 facts.Add(mergedFact);
                 mergedFactCount++;
-                if (mergedFactCount >= MaxMergedIfElseFacts) return;
             }
         }
     }
@@ -6050,7 +6124,7 @@ internal static partial class SymbolicProgramPointFacts
 
         AddIdenticalSwitchBranchFacts(branches, facts);
         if (branches.All(static branch => !branch.ConditionSymbolsMutated))
-            AddConditionalSwitchBranchFacts(branches, facts.ToArray(), facts);
+            AddConditionalSwitchBranchFacts(branches, facts.ToArray(), switchStatement, facts);
     }
 
     private static bool SwitchStatementHasDefaultOrExhaustiveBooleanLabels(
@@ -6278,6 +6352,7 @@ internal static partial class SymbolicProgramPointFacts
     private static void AddConditionalSwitchBranchFacts(
         IReadOnlyList<SwitchBranchFacts> branches,
         IEnumerable<SmtFormula> commonFacts,
+        SwitchStatementSyntax switchStatement,
         ICollection<SmtFormula> facts)
     {
         var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
@@ -6309,9 +6384,20 @@ internal static partial class SymbolicProgramPointFacts
             var mergedKey = GetFormulaKey(mergedFact);
             if (!existingKeys.Add(mergedKey)) continue;
 
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
+            if (mergedFactCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    limit,
+                    mergedFactCount + 1,
+                    switchStatement,
+                    "program_point.switch_fact_merge");
+                return;
+            }
+
             facts.Add(mergedFact);
             mergedFactCount++;
-            if (mergedFactCount >= MaxMergedSwitchFacts) return;
         }
     }
 
@@ -7489,9 +7575,21 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         if (initializerExpressions is not { } expressions ||
-            expressions.Count == 0 ||
-            expressions.Count > MaxFiniteForeachElementFacts)
+            expressions.Count == 0)
         {
+            elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+            return false;
+        }
+
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxFiniteForeachElementFacts;
+        if (expressions.Count > limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.ForeachElementFacts,
+                limit,
+                expressions.Count,
+                expressionSyntax,
+                "program_point.foreach_element_facts");
             elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
             return false;
         }
@@ -7747,9 +7845,21 @@ internal static partial class SymbolicProgramPointFacts
         CollectionExpressionSyntax collectionExpression,
         out ImmutableArray<ExpressionSyntax> elementExpressions)
     {
-        if (collectionExpression.Elements.Count == 0 ||
-            collectionExpression.Elements.Count > MaxFiniteForeachElementFacts)
+        if (collectionExpression.Elements.Count == 0)
         {
+            elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+            return false;
+        }
+
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxFiniteForeachElementFacts;
+        if (collectionExpression.Elements.Count > limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.ForeachElementFacts,
+                limit,
+                collectionExpression.Elements.Count,
+                collectionExpression,
+                "program_point.foreach_collection_element_facts");
             elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
             return false;
         }
@@ -9371,9 +9481,20 @@ internal static partial class SymbolicProgramPointFacts
                 !existingKeys.Add(GetFormulaKey(armFact)))
                 continue;
 
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
+            if (addedCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    limit,
+                    addedCount + 1,
+                    switchExpression,
+                    "program_point.switch_expression_fact_merge");
+                return;
+            }
+
             facts.Add(armFact);
             addedCount++;
-            if (addedCount >= MaxMergedSwitchFacts) return;
         }
     }
 
@@ -9837,7 +9958,17 @@ internal static partial class SymbolicProgramPointFacts
         out SmtFormula formula)
     {
         formula = null!;
-        if (depth > MaxStructuralNullStateDepth) return false;
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxStructuralNullStateDepth;
+        if (depth > limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.StructuralNullStateDepth,
+                limit,
+                depth,
+                expression,
+                "program_point.structural_null_state_depth");
+            return false;
+        }
 
         expression = UnwrapExpression(expression);
         if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true, Value: null })
@@ -9957,8 +10088,19 @@ internal static partial class SymbolicProgramPointFacts
         out SmtFormula formula)
     {
         formula = null!;
-        if (depth >= MaxStructuralNullStateDepth ||
-            !TryCreateReferenceValueFormula(
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxStructuralNullStateDepth;
+        if (depth >= limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.StructuralNullStateDepth,
+                limit,
+                depth + 1,
+                conditionalAccess,
+                "program_point.conditional_access_null_state_depth");
+            return false;
+        }
+
+        if (!TryCreateReferenceValueFormula(
                 conditionalAccess.Expression,
                 semanticModel,
                 cancellationToken,
