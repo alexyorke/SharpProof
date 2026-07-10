@@ -13,7 +13,7 @@ through `SharpProof.Symbolic.SharpProofEvidenceSchema`.
 
 | Surface | Structural version | Evidence fields |
 | --- | --- | --- |
-| Compact symbolic JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
+| Compact symbolic JSON (`ISymbolicCompactResult`) | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
 | Analyzer diagnostic properties | Roslyn diagnostic descriptor/version | `sharpproof.evidence.schema_version`, `sharpproof.evidence.schema_compatibility` |
 | Effect summaries | `SchemaVersion` | `EvidenceSchemaVersion`, `EvidenceSchemaCompatibility` |
 | Diagnostic baseline documents and entries | `version` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |

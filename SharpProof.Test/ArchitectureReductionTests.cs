@@ -3218,6 +3218,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(proofQueriesDoc, Does.Contain("`--platform`"));
         Assert.That(proofQueriesDoc, Does.Contain("`--optimization`"));
         Assert.That(proofQueriesDoc, Does.Contain("`--assembly-name`"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactCapabilityResult"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactComplexityResult"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryResult"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryOptions"));
+        Assert.That(proofQueriesDoc, Does.Contain("ISymbolicCompactResult"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0033`"));

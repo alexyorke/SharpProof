@@ -48,6 +48,26 @@ Use `SymbolicQueryService` as the public entrypoint:
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
 and unknown reasons. Raw SMT terms are not the primary public abstraction.
 
+Every current query family now exposes its compact projection from the public
+library, not from CLI-only model classes:
+
+- invariant point, line, span, and file results use their existing
+  `ToCompactResult(...)` and `ToInvariantQueryResult(...)` methods
+- `SymbolicCapabilityResult.ToCompactResult()` returns
+  `SymbolicCompactCapabilityResult`
+- `SymbolicComplexityResult.ToCompactResult()` returns
+  `SymbolicCompactComplexityResult`
+- `SymbolicRuntimeHazardQueryResult.ToCompactResult(...)` returns
+  `SymbolicCompactRuntimeHazardQueryResult`; use
+  `SymbolicCompactRuntimeHazardQueryOptions` to bound hazards and path
+  conditions while retaining untruncated totals
+
+All of these implement `ISymbolicCompactResult`, which pins `Kind`, the
+format-specific `SchemaVersion`, and the shared evidence schema fields. New
+compact query families, including a future machine-readable `explain` result,
+should implement that same interface. Serialize with lower-camel-case property
+names and string enums to match CLI `--compact-json` output.
+
 The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
 XML documentation, nullable annotations, and portable PDBs containing Source
 Link metadata. The packaged `samples/SharpProof.Symbolic` console project shows
