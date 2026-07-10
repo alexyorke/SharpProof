@@ -633,7 +633,10 @@ namespace TestNamespace {
             })
             .Where(file =>
                 file.Content.Contains("ReviewedRuntimeArtifactSpec.json", StringComparison.Ordinal) ||
-                file.Content.Contains("SharpProof.EffectSummary.json", StringComparison.Ordinal))
+                System.Text.RegularExpressions.Regex.IsMatch(
+                    file.Content,
+                    @"(?<![A-Za-z0-9_.-])SharpProof\.EffectSummary\.json",
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant))
             .Select(file => file.Path.Substring(repositoryRoot.Length).TrimStart(Path.DirectorySeparatorChar))
             .ToArray();
 
@@ -1365,7 +1368,7 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void SymbolicCli_ShouldUseSymbolicLibrary_NotAnalyzerProject()
+    public void SymbolicCli_ShouldReferenceSymbolicLibrary_AndAnalyzerForBuildDiagnostics()
     {
         var repositoryRoot = FindRepositoryRoot();
         var cliProjectPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli",
@@ -1379,7 +1382,7 @@ namespace TestNamespace {
             .ToArray();
 
         Assert.That(projectReferences, Does.Contain(@"..\..\SharpProof.Symbolic\SharpProof.Symbolic.csproj"));
-        Assert.That(projectReferences, Does.Not.Contain(@"..\..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"));
+        Assert.That(projectReferences, Does.Contain(@"..\..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"));
     }
 
     [Test]
