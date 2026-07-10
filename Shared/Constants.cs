@@ -24,8 +24,8 @@ public static class Constants
 
     );
 
-    public static readonly HashSet<string> KnownImpureMethods = new HashSet<string>(StringComparer.Ordinal)
-    {
+    public static readonly ImmutableHashSet<string> KnownImpureMethods = ImmutableHashSet.Create(
+        StringComparer.Ordinal,
 
         "System.Array.AsReadOnly<T>(T[])",
         "System.Collections.ArrayList.Adapter(System.Collections.IList)",
@@ -151,7 +151,7 @@ public static class Constants
         "System.Collections.Generic.Dictionary<TKey, TValue>.Values.CopyTo(TValue[], int)",
         "System.ComponentModel.EventHandlerList.AddHandler(object, System.Delegate)",
         "System.HashCode.Add<T>(T)",
-        "System.Text.Json.JsonSerializer.Serialize",
+        "System.Text.Json.JsonSerializer.Serialize"
 
 
 
@@ -179,11 +179,11 @@ public static class Constants
 
 
 
-    };
+    );
 
-    public static readonly HashSet<string> KnownFreshOwnedArrayReturningMembers = new HashSet<string>(StringComparer.Ordinal)
-    {
-    };
+    public static readonly ImmutableHashSet<string> KnownFreshOwnedArrayReturningMembers =
+        ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
-    public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal);
+    public static readonly ImmutableHashSet<string> KnownPureBCLMembers =
+        ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 }

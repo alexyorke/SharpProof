@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace SharpProof.Analyzer.Engine;
@@ -335,7 +336,7 @@ internal static class BclPurityFallbackHeuristics
         return GetKnownPrimitiveOrValueAliases().Contains(typeName);
     }
 
-    private static HashSet<string> GetKnownPrimitiveOrValueAliases()
+    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases()
     {
         return KnownPrimitiveOrValueAliases.Value;
     }
@@ -377,42 +378,39 @@ internal static class BclPurityFallbackHeuristics
 
     private static class KnownPrimitiveOrValueAliases
     {
-        public static readonly HashSet<string> Value = new HashSet<string>(
-            new[]
-            {
-                "bool",
-                "byte",
-                "char",
-                "decimal",
-                "double",
-                "float",
-                "int",
-                "long",
-                "nint",
-                "nuint",
-                "sbyte",
-                "short",
-                "uint",
-                "ulong",
-                "ushort",
-                "void",
-                "System.Boolean",
-                "System.Byte",
-                "System.Char",
-                "System.Decimal",
-                "System.Double",
-                "System.Int16",
-                "System.Int32",
-                "System.Int64",
-                "System.IntPtr",
-                "System.SByte",
-                "System.Single",
-                "System.UInt16",
-                "System.UInt32",
-                "System.UInt64",
-                "System.UIntPtr",
-                "System.Void",
-            },
-            StringComparer.Ordinal);
+        public static readonly ImmutableHashSet<string> Value = ImmutableHashSet.Create(
+            StringComparer.Ordinal,
+            "bool",
+            "byte",
+            "char",
+            "decimal",
+            "double",
+            "float",
+            "int",
+            "long",
+            "nint",
+            "nuint",
+            "sbyte",
+            "short",
+            "uint",
+            "ulong",
+            "ushort",
+            "void",
+            "System.Boolean",
+            "System.Byte",
+            "System.Char",
+            "System.Decimal",
+            "System.Double",
+            "System.Int16",
+            "System.Int32",
+            "System.Int64",
+            "System.IntPtr",
+            "System.SByte",
+            "System.Single",
+            "System.UInt16",
+            "System.UInt32",
+            "System.UInt64",
+            "System.UIntPtr",
+            "System.Void");
     }
 }

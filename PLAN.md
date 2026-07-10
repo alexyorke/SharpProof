@@ -386,10 +386,6 @@ grouped by their original feature area.
   percentages, top unknown or probably-impure members, manual-catalog comparison
   deltas, and explicit root-seed review queues for environment, culture, time,
   randomness, process, filesystem, threading, native, and reflection roots.
-- Make manual catalog data immutable and analyzer-safe: replace public mutable
-  `HashSet<string>` catalog tables with immutable or frozen read-only sets, and
-  add architecture tests that prevent analyzer-visible static collections from
-  being mutated during concurrent analysis.
 - Extend effect-summary documents beyond purity and thrown exceptions to carry
   imported capability, allocation, complexity, and runtime-hazard summaries that
   symbolic queries can consume conservatively when source is unavailable.
