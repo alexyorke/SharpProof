@@ -53,6 +53,7 @@ namespace SharpProof.Analyzer
                                   SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
                                   SharpProofDiagnostics.InvalidContractArgumentRule,
                                   SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
+                                  SharpProofDiagnostics.InvalidAdditionalFileRule,
                                   SharpProofDiagnostics.UnrecognizedAttributeIdentityRule,
                                   SharpProofDiagnostics.RequiresNotProvenRule,
                                   SharpProofDiagnostics.RequiresUnsupportedRule,
@@ -67,6 +68,9 @@ namespace SharpProof.Analyzer
 
             context.RegisterCompilationStartAction(startContext =>
             {
+                var additionalFileIssues = Configuration.AnalyzerAdditionalFileValidator.Validate(
+                    startContext.Options,
+                    startContext.CancellationToken);
                 var session = new AnalyzerSession(
                     startContext.Compilation,
                     startContext.Options,
@@ -84,6 +88,11 @@ namespace SharpProof.Analyzer
                             {
                                 endContext.ReportDiagnostic(diagnostic);
                             }
+                        }
+
+                        foreach (var additionalFileIssue in additionalFileIssues)
+                        {
+                            endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(additionalFileIssue));
                         }
                     }
                     finally
@@ -189,6 +198,22 @@ namespace SharpProof.Analyzer
                     invalidConfigurationValue.Value,
                     invalidConfigurationValue.Reason,
                 });
+        }
+
+        private static Diagnostic CreateInvalidAdditionalFileDiagnostic(
+            Configuration.AnalyzerAdditionalFileIssue issue)
+        {
+            var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
+            var properties = ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.AdditionalFilePathProperty, path)
+                .Add(SharpProofDiagnostics.AdditionalFileReasonProperty, issue.Reason);
+
+            return Diagnostic.Create(
+                SharpProofDiagnostics.InvalidAdditionalFileRule,
+                Location.None,
+                additionalLocations: null,
+                properties: properties,
+                messageArgs: new object[] { path, issue.Reason });
         }
     }
 }

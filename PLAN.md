@@ -124,10 +124,6 @@ grouped by their original feature area.
   ignored because assembly identity, module version, method token, method-body
   hash, or the artifact spec's framework/package source no longer matches the
   current compilation.
-- Report diagnostics on malformed, empty, unsupported-version, or partially
-  ignored supplied `AdditionalFiles`, including `SharpProof.Baseline.json` and
-  `*.SharpProof.EffectSummary.json`, instead of silently dropping bad JSON or
-  invalid entries during compilation-start parsing.
 - Make effect-summary generation memory-bounded and resumable for
   `--all-runtime-assemblies`, `--include-callees`, and unbounded `--max-depth`
   runs: stream or shard per-assembly output, record progress, and bound thrown

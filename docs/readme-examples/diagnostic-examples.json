@@ -328,5 +328,16 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0032-invalid-analyzer-input",
+    "DiagnosticId": "SP0032",
+    "Title": "SP0032 - Invalid analyzer input file",
+    "Summary": "Malformed or partially ignored analyzer AdditionalFiles are reported instead of silently dropped.",
+    "SourcePath": "docs/readme-examples/sp0032-invalid-analyzer-input/input.cs",
+    "OutputPath": "docs/readme-examples/sp0032-invalid-analyzer-input/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

@@ -43,3 +43,4 @@ dotnet_diagnostic.SP0028.severity = warning
 dotnet_diagnostic.SP0029.severity = error
 dotnet_diagnostic.SP0030.severity = error
 dotnet_diagnostic.SP0031.severity = error
+dotnet_diagnostic.SP0032.severity = error

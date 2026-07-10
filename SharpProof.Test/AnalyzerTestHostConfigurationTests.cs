@@ -54,7 +54,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task InvalidEffectSummaryJson_IsIgnored()
+        public async Task InvalidEffectSummaryJson_ReportsSp0032()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using SharpProof.Attributes;
@@ -74,7 +74,8 @@ public class TestClass
                         "SharpProof.EffectSummary.json",
                         "{ invalid json")));
 
-            Assert.That(diagnostics, Is.Empty);
+            var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty], Is.EqualTo("malformed effect-summary JSON"));
         }
 
         [Test]
@@ -107,6 +108,64 @@ public sealed class TestClass
             Assert.That(configurationDiagnostics[0].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Does.Contain("expected one of"));
             Assert.That(configurationDiagnostics[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Is.EqualTo("expected a positive integer"));
             Assert.That(configurationDiagnostics[2].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty], Is.EqualTo("expected a boolean value"));
+        }
+
+        [Test]
+        public async Task MalformedEffectSummaryAdditionalFile_ReportsSp0032()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                "public sealed class TestClass { }",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "runtime.SharpProof.EffectSummary.json",
+                        "{ invalid json")));
+
+            var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFilePathProperty], Is.EqualTo("runtime.SharpProof.EffectSummary.json"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty], Is.EqualTo("malformed effect-summary JSON"));
+            Assert.That(diagnostic.GetMessage(), Does.Contain("malformed effect-summary JSON"));
+        }
+
+        [Test]
+        public async Task EmptyBaselineAdditionalFile_ReportsSp0032()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                "public sealed class TestClass { }",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "SharpProof.Baseline.json",
+                        "  ")));
+
+            var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty], Is.EqualTo("file is empty"));
+        }
+
+        [Test]
+        public async Task UnsupportedEffectSummarySchema_ReportsSp0032()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                "public sealed class TestClass { }",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "SharpProof.EffectSummary.json",
+                        "{\"SchemaVersion\":99,\"Assemblies\":[]}")));
+
+            var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty], Does.Contain("unsupported effect-summary SchemaVersion '99'"));
+        }
+
+        [Test]
+        public async Task PartiallyMalformedBaselineAdditionalFile_ReportsSp0032()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                "public sealed class TestClass { }",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "SharpProof.Baseline.json",
+                        "[{\"id\":\"SP0002\",\"symbol\":\"M:TestClass.Method\",\"path\":\"input.cs\"},{\"id\":\"SP0002\"}]")));
+
+            var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty], Does.Contain("partially ignored"));
         }
 
         [Test]

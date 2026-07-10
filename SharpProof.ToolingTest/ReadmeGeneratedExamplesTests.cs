@@ -212,6 +212,18 @@ namespace System.Experimental
                 ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "turbo"));
         }
 
+        [ReadmeExample("sp0032-invalid-analyzer-input")]
+        [Test]
+        public async Task Sp0032_InvalidAnalyzerInputExample_MatchesSnapshot()
+        {
+            await VerifyAnalyzerExampleAsync(
+                "sp0032-invalid-analyzer-input",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "SharpProof.EffectSummary.json",
+                        "{ invalid json")));
+        }
+
         [ReadmeExample("sp0026-unrecognized-attribute-identity")]
         [Test]
         public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
@@ -354,14 +366,15 @@ namespace System.Experimental
         private static async Task VerifyAnalyzerExampleAsync(
             string exampleId,
             ImmutableDictionary<string, string>? globalOptions = null,
-            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
+            ImmutableArray<AdditionalText>? additionalFiles = null)
         {
             var source = ReadmeExampleFixture.LoadExampleSource(exampleId);
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
                 globalOptions,
                 allowUnsafe: false,
-                additionalFiles: null,
+                additionalFiles: additionalFiles,
                 sourcePath: ReadmeExampleFixture.GetRelativeExamplePath(exampleId, "input.cs"),
                 autoEnableEffectSummaryJsonForAdditionalFiles: true,
                 frameworkReferences: null,

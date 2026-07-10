@@ -1704,6 +1704,19 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/Configuration/AnalyzerAdditionalFileValidator.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "AnalyzerAdditionalFileIssue",
+                                                  "AnalyzerAdditionalFileValidator",
+                                                  "BaselineEntryCounts"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [

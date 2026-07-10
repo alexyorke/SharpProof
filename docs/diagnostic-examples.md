@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0031`.
+from `SP0002` through `SP0032`.
 
 <a id="sp0002"></a>
 
@@ -918,4 +918,26 @@ Expected analyzer diagnostics:
 
 ```text
 SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations
+```
+
+<a id="sp0032"></a>
+
+### SP0032 - Invalid analyzer input file
+
+Malformed or partially ignored analyzer AdditionalFiles are reported instead of silently dropped.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0032_InvalidAnalyzerInputExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0032-invalid-analyzer-input/input.cs`):
+
+```csharp
+public sealed class Demo
+{
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0032 Warning <no-location>:1:1 SharpProof analyzer input file 'SharpProof.EffectSummary.json' is invalid: malformed effect-summary JSON
 ```

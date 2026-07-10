@@ -306,6 +306,22 @@ namespace SharpProof.Analyzer
             isEnabledByDefault: true,
             description: InvalidAnalyzerConfigurationDescription);
 
+        public const string InvalidAdditionalFileId = "SP0032";
+        public const string AdditionalFilePathProperty = "sharpproof.additional_file.path";
+        public const string AdditionalFileReasonProperty = "sharpproof.additional_file.reason";
+        private static readonly LocalizableString InvalidAdditionalFileTitle = "Invalid SharpProof Analyzer Additional File";
+        private static readonly LocalizableString InvalidAdditionalFileMessageFormat = "SharpProof analyzer input file '{0}' is invalid: {1}";
+        private static readonly LocalizableString InvalidAdditionalFileDescription = "Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles instead of silently dropping their data.";
+
+        public static readonly DiagnosticDescriptor InvalidAdditionalFileRule = CreateDescriptor(
+            id: InvalidAdditionalFileId,
+            title: InvalidAdditionalFileTitle,
+            messageFormat: InvalidAdditionalFileMessageFormat,
+            category: "Configuration",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: InvalidAdditionalFileDescription);
+
         public const string UnrecognizedAttributeIdentityId = "SP0026";
         public const string AttributeIdentityNameProperty = "sharpproof.attribute_identity.name";
         public const string AttributeIdentityNamespaceProperty = "sharpproof.attribute_identity.namespace";

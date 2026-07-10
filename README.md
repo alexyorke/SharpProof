@@ -600,7 +600,7 @@ JSON automation.
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
   `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0031`.
+  and related diagnostics from `SP0002` through `SP0032`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
