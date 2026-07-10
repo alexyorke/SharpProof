@@ -55,9 +55,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Grow the IR known-API lowering table beyond the current small set of string,
-  object, regex, and range/index helpers, prioritizing APIs that unblock
-  contracts and runtime-hazard proofs.
 - Keep reducing legacy formula-shaped compatibility paths by moving useful
   facts into typed symbolic IR, typed path conditions, and source-like public
   result DTOs.
