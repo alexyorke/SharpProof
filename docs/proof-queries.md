@@ -55,6 +55,56 @@ the minimal source-text query workflow. `SearchLib.dll` is bundled only as a
 runtime implementation dependency; consumers should build against the
 `SharpProof.Symbolic` namespace instead of referencing `SearchLib` directly.
 
+## Standalone Compilation Profiles
+
+File and source-text queries can intentionally match the compiler settings of
+the source they inspect. Create a `SymbolicSourceCompilationProfile` and attach
+it to `SymbolicSourceInput`; the same profile flows through invariant, proof,
+runtime-hazard, capability, and complexity queries:
+
+```csharp
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.Symbolic;
+
+var profile = new SymbolicSourceCompilationProfile(
+    languageVersion: LanguageVersion.CSharp12,
+    preprocessorSymbols: new[] { "FEATURE_X" },
+    nullableContext: NullableContextOptions.Enable,
+    allowUnsafe: true,
+    documentationMode: DocumentationMode.Diagnose,
+    platform: Platform.X64,
+    optimizationLevel: OptimizationLevel.Release,
+    assemblyName: "Example.Analysis");
+
+var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Example.cs");
+var result = new SymbolicQueryService().Query(
+    new SymbolicQueryRequest(input, SymbolicQueryTarget.AllLines()));
+```
+
+The CLI exposes the same settings:
+
+```powershell
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines --language-version 12 --define FEATURE_X --nullable enable --allow-unsafe --documentation-mode diagnose --platform x64 --optimization release --assembly-name Example.Analysis --compact-json
+```
+
+| Profile setting | CLI option | Default |
+| --- | --- | --- |
+| C# language version | `--language-version` | `preview` |
+| Preprocessor symbols | repeated `--define` | none |
+| Nullable context | `--nullable` | `disable` |
+| Unsafe allowance | `--allow-unsafe` | off |
+| Documentation mode | `--documentation-mode` | `parse` |
+| Platform | `--platform` | `AnyCpu` |
+| Optimization | `--optimization` | `debug` |
+| Assembly identity name | `--assembly-name` | query-mode default |
+
+Profiles apply only when SharpProof creates a standalone compilation for file
+or text input. `FromSyntaxTree(...)` and `FromNode(...)` retain the caller's
+existing Roslyn parse and compilation options; SharpProof does not overwrite
+them. Metadata references remain controlled separately through
+`SymbolicQueryOptions` or repeated CLI `--reference` values.
+
 ## Compatibility Baselines
 
 `SharpProof.Symbolic/PublicAPI.Shipped.txt` is the supported API baseline.

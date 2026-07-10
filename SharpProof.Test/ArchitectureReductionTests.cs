@@ -3048,6 +3048,7 @@ public sealed class ArchitectureReductionTests
         var complexityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
         var coverageDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md"));
         var evidenceSchemaDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "evidence-schema.md"));
+        var proofQueriesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "proof-queries.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
@@ -3180,6 +3181,16 @@ public sealed class ArchitectureReductionTests
         Assert.That(evidenceSchemaDoc, Does.Contain("Effect summaries"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Diagnostic baseline documents and entries"));
         Assert.That(evidenceSchemaDoc, Does.Contain("SharpProofEvidenceSchema.IsReadCompatible"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicSourceCompilationProfile"));
+        Assert.That(proofQueriesDoc, Does.Contain("SymbolicSourceInput.FromTextWithProfile"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--language-version`"));
+        Assert.That(proofQueriesDoc, Does.Contain("repeated `--define`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--nullable`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--allow-unsafe`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--documentation-mode`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--platform`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--optimization`"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--assembly-name`"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0033`"));
