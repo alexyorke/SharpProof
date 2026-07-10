@@ -232,7 +232,7 @@ Run against a specific assembly:
 dotnet run --project Tools\SharpProof.EffectSummary -- --assembly "C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.28\System.Private.CoreLib.dll" --output artifacts\effect-summary\corelib-net8.json
 ```
 
-The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build.
+The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build. Its shared proof fields also carry the separate [proof/evidence schema and compatibility policy](evidence-schema.md).
 
 Outputs produced from an artifact spec also preserve their input provenance.
 Each assembly report, and each flattened generated-purity entry derived from

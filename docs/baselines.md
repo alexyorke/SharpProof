@@ -4,6 +4,11 @@ SharpProof can suppress known analyzer diagnostics through an additional file
 named `SharpProof.Baseline.json`. The baseline workflow tool creates and
 maintains that file from current diagnostics.
 
+Generated documents and entries carry the shared
+[`evidenceSchemaVersion` compatibility contract](evidence-schema.md). Legacy
+unversioned entries remain readable during the preview and are upgraded when
+the baseline tool writes a new file.
+
 Generate a baseline from a SARIF log:
 
 ```powershell

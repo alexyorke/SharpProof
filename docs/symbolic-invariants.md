@@ -83,6 +83,11 @@ dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lin
 
 Use `--compact-json` when a tool needs a smaller stable shape instead of the full public object graph:
 
+Compact results carry the shared proof/evidence version separately from their
+own structural schema. See the
+[proof/evidence compatibility policy](evidence-schema.md) before persisting or
+strictly validating these fields.
+
 ```powershell
 dotnet run --project Tools/SharpProof.SymbolicCli -- --file Example.cs --all-lines --check-reachability --implies "index >= 0" --compact-json --max-lines 25 --max-points 100 --max-facts 20 --max-conditions 20 --max-proofs 20
 ```

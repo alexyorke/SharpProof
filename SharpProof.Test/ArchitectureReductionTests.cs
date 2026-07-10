@@ -3047,6 +3047,7 @@ public sealed class ArchitectureReductionTests
         var capabilityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
         var complexityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
         var coverageDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md"));
+        var evidenceSchemaDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "evidence-schema.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
@@ -3136,6 +3137,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/diagnostic-examples.md"));
         Assert.That(readme, Does.Contain("docs/contracts.md"));
         Assert.That(readme, Does.Contain("docs/proof-queries.md"));
+        Assert.That(readme, Does.Contain("docs/evidence-schema.md"));
         Assert.That(readme, Does.Contain("docs/coverage-and-limits.md"));
         Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
         Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
@@ -3155,6 +3157,7 @@ public sealed class ArchitectureReductionTests
                 "Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API"));
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "evidence-schema.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md")), Is.True);
         Assert.That(capabilityDoc, Does.Contain("SP0015"));
         Assert.That(capabilityDoc, Does.Contain("SP0016"));
@@ -3171,6 +3174,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(coverageDoc, Does.Contain("renders source-like evidence as"));
         Assert.That(coverageDoc, Does.Contain("`unknown(...)`"));
         Assert.That(coverageDoc, Does.Contain("Formula provenance is metadata only"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("`additive-v1` Compatibility Policy"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("Compact symbolic JSON"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("Analyzer diagnostic properties"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("Effect summaries"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("Diagnostic baseline documents and entries"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("SharpProofEvidenceSchema.IsReadCompatible"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0033`"));
