@@ -63,7 +63,8 @@ internal static class MethodExpectedComplexityAnalyzer
                 attributeLocation,
                 "complexity query failed: " + ex.Message,
                 context.CancellationToken,
-                context.Node.SyntaxTree);
+                context.Node.SyntaxTree,
+                SymbolicUnknownReasonTaxonomy.ForComplexityFailure(ex.Message));
             if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
 
             return;
@@ -94,7 +95,8 @@ internal static class MethodExpectedComplexityAnalyzer
                     attributeLocation,
                     classification.Reason,
                     context.CancellationToken,
-                    context.Node.SyntaxTree);
+                    context.Node.SyntaxTree,
+                    result.UnknownReasonDetails.FirstOrDefault());
                 if (!baseline.IsSuppressed(unknownDiagnostic)) context.ReportDiagnostic(unknownDiagnostic);
 
                 return;
@@ -307,7 +309,8 @@ internal static class MethodExpectedComplexityAnalyzer
         Location? attributeLocation,
         string reason,
         CancellationToken cancellationToken,
-        SyntaxTree syntaxTree)
+        SyntaxTree syntaxTree,
+        SymbolicUnknownReasonInfo? unknownReasonInfo)
     {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
         var properties = BaselineDiagnosticProperties.Add(
@@ -319,12 +322,15 @@ internal static class MethodExpectedComplexityAnalyzer
             "ExpectedComplexity",
             declaredComplexity.Text,
             "unknown:" + declaredComplexity.Text + ":" + reason);
+        properties = UnknownReasonDiagnosticProperties.Add(
+            properties,
+            unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason));
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,
             declaredComplexity.Text,
             "unknown",
-            reason);
+            (unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason)).Code);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,

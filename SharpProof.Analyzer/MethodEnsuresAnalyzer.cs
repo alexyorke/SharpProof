@@ -621,6 +621,11 @@ internal static class MethodEnsuresAnalyzer
             proof.Proof.Status +
             "|" +
             proof.Reason);
+        var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
+            proof.Reason,
+            proof.Proof.UnknownReason);
+        if (unknownReasonInfo.IsUnknown)
+            properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
         properties = ExplainDiagnosticProperties.Add(
             properties,
             completionSite.Location,
@@ -656,6 +661,9 @@ internal static class MethodEnsuresAnalyzer
             "EnsuresUnsupported",
             condition,
             "unsupported:" + condition + "@" + FormatLocationKey(location) + "|" + reason);
+        properties = UnknownReasonDiagnosticProperties.Add(
+            properties,
+            SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,

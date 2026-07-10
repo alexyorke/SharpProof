@@ -21,6 +21,12 @@ public static class SharpProofDiagnostics
     public const string ExplainContractProperty = "sharpproof.explain.contract";
     public const string ExplainProofStatusProperty = "sharpproof.explain.proof_status";
     public const string ExplainUnknownReasonProperty = "sharpproof.explain.unknown_reason";
+    public const string UnknownReasonCodeProperty = "sharpproof.unknown.code";
+    public const string UnknownReasonCategoryProperty = "sharpproof.unknown.category";
+    public const string UnknownReasonSourceProperty = "sharpproof.unknown.source";
+    public const string UnknownReasonRawProperty = "sharpproof.unknown.raw_reason";
+    public const string UnknownReasonRetryableProperty = "sharpproof.unknown.retryable";
+    public const string UnknownReasonConfigurationRelatedProperty = "sharpproof.unknown.configuration_related";
 
     public const string PurityNotVerifiedId = "SP0002";
     public const string ImpurityCategoryProperty = "sharpproof.impurity.category";

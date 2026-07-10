@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 using static SharpProof.Test.AnalyzerTestHost;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
@@ -805,8 +806,17 @@ public sealed class TestClass
     }
 }");
 
-        Assert.That(SingleDiagnostic(diagnostics, SharpProofDiagnostics.EnsuresUnsupportedId).GetMessage(),
-            Does.Contain("result is not available"));
+        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.EnsuresUnsupportedId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.GetMessage(), Does.Contain("result is not available"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCodeProperty],
+                Is.EqualTo("ensures.unsupported_condition"));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonCategoryProperty],
+                Is.EqualTo(SymbolicUnknownReasonCategory.UnsupportedSyntax.ToString()));
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.UnknownReasonSourceProperty],
+                Is.EqualTo(SymbolicUnknownReasonSource.Ensures.ToString()));
+        });
     }
 
     [Test]

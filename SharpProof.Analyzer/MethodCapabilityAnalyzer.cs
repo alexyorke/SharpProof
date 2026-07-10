@@ -92,12 +92,14 @@ internal static class MethodCapabilityAnalyzer
                 context.Node.SyntaxTree,
                 "CapabilityUnknown",
                 evidenceKey: "unknown:" + result.UnknownReasons[0]);
+            var unknownReasonInfo = result.UnknownReasonDetails[0];
+            properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
             properties = ExplainDiagnosticProperties.Add(
                 properties,
                 location,
                 "[AllowedCapabilities]",
                 "unknown",
-                result.UnknownReasons[0].ToString());
+                unknownReasonInfo.Code);
             var diagnostic = Diagnostic.Create(
                 SharpProofDiagnostics.CapabilityUnknownRule,
                 location,
@@ -156,6 +158,7 @@ internal static class MethodCapabilityAnalyzer
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString())
             .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
+        properties = UnknownReasonDiagnosticProperties.Add(properties, site.UnknownReasonInfo);
         var location = Location.Create(
             methodSymbol.Locations.First().SourceTree!,
             new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
@@ -174,7 +177,7 @@ internal static class MethodCapabilityAnalyzer
             location,
             "[AllowedCapabilities]",
             "unknown",
-            site.UnknownReason.ToString());
+            site.UnknownReasonInfo.Code);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.CapabilityUnknownRule,

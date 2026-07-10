@@ -59,6 +59,7 @@ public sealed class SymbolicCapabilitySite
         IsTransitive = isTransitive;
         IsUnknown = isUnknown;
         UnknownReason = unknownReason;
+        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapability(unknownReason);
         SourceSpanStart = sourceSpanStart;
         SourceSpanLength = sourceSpanLength;
         SourceLine = sourceLine;
@@ -82,6 +83,8 @@ public sealed class SymbolicCapabilitySite
     public bool IsUnknown { get; }
 
     public SymbolicCapabilityUnknownReason UnknownReason { get; }
+
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 
     public int SourceSpanStart { get; }
 
@@ -124,6 +127,9 @@ public sealed class SymbolicCapabilityResult
         CapabilityText = capabilityText ?? string.Empty;
         Sites = sites ?? Array.Empty<SymbolicCapabilitySite>();
         UnknownReasons = unknownReasons ?? Array.Empty<SymbolicCapabilityUnknownReason>();
+        UnknownReasonDetails = UnknownReasons
+            .Select(SymbolicUnknownReasonTaxonomy.ForCapability)
+            .ToArray();
     }
 
     public string FilePath { get; }
@@ -153,6 +159,8 @@ public sealed class SymbolicCapabilityResult
     public IReadOnlyList<SymbolicCapabilitySite> Sites { get; }
 
     public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
+
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
 
     public bool HasUnknowns => UnknownReasons.Count != 0 || Sites.Any(static site => site.IsUnknown);
 

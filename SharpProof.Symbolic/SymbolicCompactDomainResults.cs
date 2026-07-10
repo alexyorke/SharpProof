@@ -26,6 +26,7 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
         SymbolicComplexityInfo complexity,
         IReadOnlyList<SymbolicComplexityDriverInfo> drivers,
         IReadOnlyList<SymbolicComplexityUnknownReason> unknownReasons,
+        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries)
     {
         FilePath = filePath;
@@ -40,6 +41,7 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
         Complexity = complexity;
         Drivers = drivers;
         UnknownReasons = unknownReasons;
+        UnknownReasonDetails = unknownReasonDetails;
         CalleeSummaries = calleeSummaries;
     }
 
@@ -75,6 +77,8 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
 
     public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
 
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
+
     public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
 
     public static SymbolicCompactComplexityResult FromResult(SymbolicComplexityResult result)
@@ -94,6 +98,7 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
             result.Complexity,
             result.Drivers,
             result.UnknownReasons,
+            result.UnknownReasonDetails,
             result.CalleeSummaries);
     }
 }
@@ -114,6 +119,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
         string capabilityText,
         bool hasUnknowns,
         IReadOnlyList<SymbolicCapabilityUnknownReason> unknownReasons,
+        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicCapabilitySite> sites)
     {
         FilePath = filePath;
@@ -129,6 +135,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
         CapabilityText = capabilityText;
         HasUnknowns = hasUnknowns;
         UnknownReasons = unknownReasons;
+        UnknownReasonDetails = unknownReasonDetails;
         Sites = sites;
     }
 
@@ -166,6 +173,8 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
 
     public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
 
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
+
     public IReadOnlyList<SymbolicCapabilitySite> Sites { get; }
 
     public static SymbolicCompactCapabilityResult FromResult(SymbolicCapabilityResult result)
@@ -186,6 +195,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
             result.CapabilityText,
             result.HasUnknowns,
             result.UnknownReasons,
+            result.UnknownReasonDetails,
             result.Sites);
     }
 }
@@ -447,6 +457,7 @@ public sealed class SymbolicCompactRuntimeHazard
         IReadOnlyList<string> pathConditions,
         SymbolicReachability reachability,
         string reachabilityReason,
+        SymbolicUnknownReasonInfo unknownReasonInfo,
         SymbolicCompactRuntimeHazardItemTruncation truncation)
     {
         Kind = kind;
@@ -473,6 +484,7 @@ public sealed class SymbolicCompactRuntimeHazard
         PathConditions = pathConditions;
         Reachability = reachability;
         ReachabilityReason = reachabilityReason;
+        UnknownReasonInfo = unknownReasonInfo;
         Truncation = truncation;
     }
 
@@ -524,6 +536,8 @@ public sealed class SymbolicCompactRuntimeHazard
 
     public string ReachabilityReason { get; }
 
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
+
     public SymbolicCompactRuntimeHazardItemTruncation Truncation { get; }
 
     public static SymbolicCompactRuntimeHazard FromHazard(
@@ -562,6 +576,7 @@ public sealed class SymbolicCompactRuntimeHazard
             pathConditions,
             hazard.Reachability,
             hazard.ReachabilityReason,
+            hazard.UnknownReasonInfo,
             new SymbolicCompactRuntimeHazardItemTruncation(hazard.PathConditions.Count > pathConditions.Length));
     }
 }

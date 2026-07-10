@@ -82,6 +82,7 @@ public sealed class SymbolicProofInfo
         Backend = backend;
         UnknownReason = unknownReason;
         Reason = reason ?? string.Empty;
+        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForProof(unknownReason, Reason);
         CacheHit = cacheHit;
         Budget = budget;
         Target = target ?? string.Empty;
@@ -96,6 +97,8 @@ public sealed class SymbolicProofInfo
     public SymbolicUnknownReason UnknownReason { get; }
 
     public string Reason { get; }
+
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 
     public bool CacheHit { get; }
 

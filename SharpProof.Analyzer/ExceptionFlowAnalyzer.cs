@@ -159,6 +159,7 @@ internal static partial class ExceptionFlowAnalyzer
                 .Add(SharpProofDiagnostics.RuntimeHazardProofBackendProperty, hazard.Proof.Backend.ToString())
                 .Add(SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty,
                     hazard.Proof.UnknownReason.ToString());
+            properties = UnknownReasonDiagnosticProperties.Add(properties, hazard.UnknownReasonInfo);
             properties = BaselineDiagnosticProperties.Add(
                 properties,
                 methodSymbol,
@@ -170,7 +171,7 @@ internal static partial class ExceptionFlowAnalyzer
                 location,
                 "runtime hazard candidate",
                 hazard.Proof.Status.ToString(),
-                hazard.Proof.UnknownReason.ToString());
+                hazard.UnknownReasonInfo.Code);
 
             var diagnostic = Diagnostic.Create(
                 SharpProofDiagnostics.UnknownRuntimeHazardRule,

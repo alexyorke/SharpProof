@@ -283,3 +283,44 @@ SharpProof.Symbolic.SymbolicSpanQueryResult.InputDomainSummary.get -> SharpProof
 SharpProof.Symbolic.SymbolicSpanQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
 SharpProof.Symbolic.SymbolicQueryResult.InputDomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
 SharpProof.Symbolic.SymbolicQueryResult.ReachabilityWitnesses.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputWitness!>!
+SharpProof.Symbolic.SymbolicCapabilityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
+SharpProof.Symbolic.SymbolicCapabilitySite.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
+SharpProof.Symbolic.SymbolicComplexityCalleeInfo.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
+SharpProof.Symbolic.SymbolicComplexityResult.UnknownReasonDetails.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicUnknownReasonInfo!>!
+SharpProof.Symbolic.SymbolicProofInfo.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
+SharpProof.Symbolic.SymbolicRuntimeHazard.UnknownReasonInfo.get -> SharpProof.Symbolic.SymbolicUnknownReasonInfo!
+SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.AnalysisUnavailable = 14 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.Cancellation = 12 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.DynamicDispatch = 4 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.ExternalBoundary = 5 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.InvalidInput = 13 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.NativeSolverFailure = 10 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.None = 0 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.RecursiveAnalysis = 6 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverBudget = 8 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverDisabled = 7 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverEncodingFailure = 11 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.SolverTimeout = 9 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.Unknown = 15 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedLibraryModel = 3 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedOperation = 2 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonCategory.UnsupportedSyntax = 1 -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonInfo
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.Category.get -> SharpProof.Symbolic.SymbolicUnknownReasonCategory
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.Code.get -> string!
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsConfigurationRelated.get -> bool
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsRetryable.get -> bool
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.IsUnknown.get -> bool
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.RawReason.get -> string!
+SharpProof.Symbolic.SymbolicUnknownReasonInfo.Source.get -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.Capability = 1 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.Complexity = 2 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.Ensures = 5 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.Proof = 0 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.Purity = 4 -> SharpProof.Symbolic.SymbolicUnknownReasonSource
+SharpProof.Symbolic.SymbolicUnknownReasonSource.RuntimeHazard = 3 -> SharpProof.Symbolic.SymbolicUnknownReasonSource

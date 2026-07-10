@@ -315,7 +315,7 @@ internal static class MethodPurityAnalyzer
 
     private static string? GetPurityUnknownReason(PurityAnalysisEngine.PurityEvidence evidence)
     {
-        if (!string.IsNullOrWhiteSpace(evidence.BclFallbackReason)) return evidence.BclFallbackReason;
+        if (evidence.UnknownReasonInfo.IsUnknown) return evidence.UnknownReasonInfo.Code;
 
         return string.IsNullOrWhiteSpace(evidence.Category) ? null : evidence.Category;
     }

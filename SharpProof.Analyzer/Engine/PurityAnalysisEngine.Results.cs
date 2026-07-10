@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -78,6 +79,8 @@ internal partial class PurityAnalysisEngine
         public string BclFallbackGuess { get; }
         public string BclFallbackConfidence { get; }
         public string BclFallbackReason { get; }
+        public SymbolicUnknownReasonInfo UnknownReasonInfo =>
+            SymbolicUnknownReasonTaxonomy.ForPurity(Category, BclFallbackReason);
 
         private PurityEvidence(
             string category,
@@ -195,7 +198,10 @@ internal partial class PurityAnalysisEngine
             AddIfPresent(builder, SharpProofDiagnostics.BclFallbackGuessProperty, BclFallbackGuess);
             AddIfPresent(builder, SharpProofDiagnostics.BclFallbackConfidenceProperty, BclFallbackConfidence);
             AddIfPresent(builder, SharpProofDiagnostics.BclFallbackReasonProperty, BclFallbackReason);
-            return builder.ToImmutable();
+            var properties = builder.ToImmutable();
+            return UnknownReasonInfo.IsUnknown
+                ? UnknownReasonDiagnosticProperties.Add(properties, UnknownReasonInfo)
+                : properties;
         }
 
         public string ToSummary()

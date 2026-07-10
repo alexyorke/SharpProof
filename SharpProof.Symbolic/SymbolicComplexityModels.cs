@@ -99,6 +99,7 @@ public sealed class SymbolicComplexityCalleeInfo
         Kind = kind;
         IsConservative = isConservative;
         UnknownReason = unknownReason;
+        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForComplexity(unknownReason);
     }
 
     public string MethodDisplayName { get; }
@@ -110,6 +111,8 @@ public sealed class SymbolicComplexityCalleeInfo
     public bool IsConservative { get; }
 
     public SymbolicComplexityUnknownReason UnknownReason { get; }
+
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 }
 
 public sealed class SymbolicComplexityResult
@@ -143,6 +146,9 @@ public sealed class SymbolicComplexityResult
         Complexity = complexity ?? throw new ArgumentNullException(nameof(complexity));
         Drivers = drivers ?? Array.Empty<SymbolicComplexityDriverInfo>();
         UnknownReasons = unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>();
+        UnknownReasonDetails = UnknownReasons
+            .Select(SymbolicUnknownReasonTaxonomy.ForComplexity)
+            .ToArray();
         CalleeSummaries = calleeSummaries ?? Array.Empty<SymbolicComplexityCalleeInfo>();
     }
 
@@ -171,6 +177,8 @@ public sealed class SymbolicComplexityResult
     public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
 
     public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
+
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
 
     public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
 

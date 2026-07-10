@@ -710,6 +710,10 @@ public sealed class SymbolicRuntimeHazard
         TriggerWitness = triggerWitness ?? SymbolicInputWitnessFactory.Unsupported(
             "runtime_hazard_trigger_witness_unavailable");
         Proof = CreateProofInfo(status, statusReason, category, triggerCondition, kind, proofInfo);
+        UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForRuntimeHazard(
+            status,
+            StatusReason,
+            Proof.UnknownReason);
         InvariantInfo = new SymbolicInvariantInfo(
             MergedInvariantText,
             SymbolicFacts,
@@ -766,6 +770,8 @@ public sealed class SymbolicRuntimeHazard
     public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
 
     public SymbolicProofInfo Proof { get; }
+
+    public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 
     public SymbolicInvariantInfo InvariantInfo { get; }
 
