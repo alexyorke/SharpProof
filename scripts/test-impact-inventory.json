@@ -137,7 +137,7 @@
                                 "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  211,
+                                "fixtureCount":  212,
                                 "tokens":  [
                                                "SharpProofAnalyzer"
                                            ]
@@ -537,6 +537,10 @@
                          {
                              "name":  "ConcurrencyOperationsTests",
                              "path":  "SharpProof.Test/ConcurrencyOperationsTests.cs"
+                         },
+                         {
+                             "name":  "ConfigurationProfileTests",
+                             "path":  "SharpProof.Test/ConfigurationProfileTests.cs"
                          },
                          {
                              "name":  "ConsoleTests",
@@ -1711,7 +1715,7 @@
                                                   "AnalyzerConfigurationScope",
                                                   "AnalyzerConfigurationValueKind"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "AnalyzerConfigurationOptionRegistry"
                                                  ]
@@ -3457,9 +3461,10 @@
                                                   "Scope",
                                                   "SummaryEntry"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  6,
                             "referencedTokens":  [
-                                                     "GeneratedPurityCatalog"
+                                                     "GeneratedPurityCatalog",
+                                                     "Scope"
                                                  ]
                         },
                         {
@@ -3582,7 +3587,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAnalyzer"
                                               ],
-                            "referencingFixtureCount":  211,
+                            "referencingFixtureCount":  212,
                             "referencedTokens":  [
                                                      "SharpProofAnalyzer"
                                                  ]
@@ -5282,12 +5287,13 @@
                                     "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
-                                                                 "AnalyzerTestHostConfigurationTests"
+                                                                 "AnalyzerTestHostConfigurationTests",
+                                                                 "ConfigurationProfileTests"
                                                              ],
                                     "tokens":  [
                                                    "AnalyzerConfigurationOptionRegistry"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Configuration/ConfigKeys.cs",
@@ -6747,15 +6753,17 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ConfigurationProfileTests",
                                                                  "ConstantsTests",
                                                                  "DiagnosticEvidenceTests",
                                                                  "EffectSummarySymbolKeyFactoryTests",
                                                                  "EffectSummaryToolTests"
                                                              ],
                                     "tokens":  [
-                                                   "GeneratedPurityCatalog"
+                                                   "GeneratedPurityCatalog",
+                                                   "Scope"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  6
                                 },
                                 {
                                     "path":  "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",

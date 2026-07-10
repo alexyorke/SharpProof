@@ -1,0 +1,49 @@
+# SharpProof audit profile. Copy as .globalconfig.
+is_global = true
+
+sharpproof_purity_profile = balanced
+sharpproof_enable_effect_summary_json = true
+sharpproof_smt_mode = deep
+
+[*.cs]
+sharpproof_suggest_missing_enforce_pure = true
+sharpproof_suggest_missing_enforce_pure_scope = all
+sharpproof_suggest_missing_enforce_pure_exclude_generated = false
+sharpproof_suggest_missing_enforce_pure_exclude_tests = false
+sharpproof_suggest_missing_enforce_pure_min_complexity = 0
+sharpproof_emit_explanations = true
+sharpproof_report_bcl_fallback_guesses = true
+sharpproof_runtime_hazard_mode = all
+sharpproof_report_exceptions = true
+sharpproof_checked_exceptions = true
+
+dotnet_diagnostic.SP0002.severity = warning
+dotnet_diagnostic.SP0003.severity = warning
+dotnet_diagnostic.SP0004.severity = suggestion
+dotnet_diagnostic.SP0005.severity = warning
+dotnet_diagnostic.SP0006.severity = warning
+dotnet_diagnostic.SP0007.severity = warning
+dotnet_diagnostic.SP0008.severity = suggestion
+dotnet_diagnostic.SP0009.severity = suggestion
+dotnet_diagnostic.SP0010.severity = suggestion
+dotnet_diagnostic.SP0011.severity = warning
+dotnet_diagnostic.SP0012.severity = suggestion
+dotnet_diagnostic.SP0013.severity = warning
+dotnet_diagnostic.SP0014.severity = warning
+dotnet_diagnostic.SP0015.severity = warning
+dotnet_diagnostic.SP0016.severity = warning
+dotnet_diagnostic.SP0017.severity = warning
+dotnet_diagnostic.SP0018.severity = warning
+dotnet_diagnostic.SP0019.severity = warning
+dotnet_diagnostic.SP0020.severity = warning
+dotnet_diagnostic.SP0021.severity = warning
+dotnet_diagnostic.SP0022.severity = warning
+dotnet_diagnostic.SP0023.severity = warning
+dotnet_diagnostic.SP0024.severity = warning
+dotnet_diagnostic.SP0025.severity = warning
+dotnet_diagnostic.SP0026.severity = warning
+dotnet_diagnostic.SP0027.severity = warning
+dotnet_diagnostic.SP0028.severity = warning
+dotnet_diagnostic.SP0029.severity = warning
+dotnet_diagnostic.SP0030.severity = warning
+dotnet_diagnostic.SP0031.severity = warning

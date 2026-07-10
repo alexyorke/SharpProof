@@ -619,6 +619,7 @@ JSON automation.
 ## Deeper Docs
 
 - [Contracts and analyzer diagnostics](docs/contracts.md)
+- [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
 - [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)

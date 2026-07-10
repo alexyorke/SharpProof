@@ -230,10 +230,6 @@ grouped by their original feature area.
   an analysis run, with exact symbol, source of trust, configured value or
   attribute, and whether a stronger generated summary or direct contract
   overrode it.
-- Ship ready-to-copy `.editorconfig` and `.globalconfig` profiles for
-  migration, audit, CI, and strict adoption modes, including recommended
-  `dotnet_diagnostic.SP*.severity` entries and `sharpproof_*` option defaults
-  so teams can adopt SharpProof incrementally without hand-authoring every key.
 - Add an explicit generated-code analysis policy: keep generated files quiet by
   default, but allow opt-in analysis of contract-bearing generated or
   source-generator output, and report why a generated member was skipped when

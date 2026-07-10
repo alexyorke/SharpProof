@@ -1545,6 +1545,14 @@ try
 
     foreach ($path in $changedFiles)
     {
+        if ($path -match '^config/profiles/')
+        {
+            $before = @($testClasses | Sort-Object)
+            Add-TestClasses $testClasses @('ConfigurationProfileTests')
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'SharpProof adoption profile change' $before $testClasses
+            continue
+        }
+
         if ($path -match '^(README\.md|REMAINING_ANALYZER_BACKLOG\.md)$|^docs/')
         {
             $ignoredFiles.Add($path)

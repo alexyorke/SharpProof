@@ -269,6 +269,21 @@ namespace SharpProof.Test
             Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Production metrics script change"));
         }
 
+        [Test]
+        public async Task ListOnlyJson_SelectsProfileConformanceForConfigurationProfile()
+        {
+            const string changedFile = "config/profiles/sharpproof-ci.globalconfig";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Main"));
+            Assert.That(GetStringArray(root, "selectedTestFixtures"), Is.EquivalentTo(new[] { "ConfigurationProfileTests" }));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SharpProof adoption profile change"));
+        }
+
         [TestCase("scripts/test-impact-inventory.json")]
         [TestCase("scripts/test-impact-modules.json")]
         public async Task ListOnlyJson_SelectsSelectorTestsForImpactMetadata(string changedFile)
