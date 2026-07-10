@@ -7001,8 +7001,57 @@ public sealed class ArchitectureReductionTests
         Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(legacyIndex, Is.GreaterThan(irIndex));
         Assert.That(nestedHelperSource, Does.Contain("AddIrNotNullWhenInvocationBranchFacts("));
-        Assert.That(nestedHelperSource, Does.Contain("TryGetIrNotNullWhenValue("));
+        Assert.That(nestedHelperSource, Does.Contain("NullableFlowFacts.GetParameterOutputState("));
+        Assert.That(nestedHelperSource, Does.Contain("NullableFlowFactState.NotNull"));
         Assert.That(nestedHelperSource, Does.Contain("TryCreateIrNotNullWhenArgumentFormula("));
+    }
+
+    [Test]
+    public void NullableFlowFacts_OwnsCodeAnalysisAttributeMetadataAcrossProofConsumers()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var nullableFlowSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "NullableFlowFacts.cs"));
+        var attributeNames = new[]
+        {
+            "AllowNullAttribute",
+            "DisallowNullAttribute",
+            "MaybeNullAttribute",
+            "NotNullAttribute",
+            "MaybeNullWhenAttribute",
+            "NotNullWhenAttribute",
+            "NotNullIfNotNullAttribute",
+            "MemberNotNullAttribute",
+            "MemberNotNullWhenAttribute",
+            "DoesNotReturnAttribute",
+            "DoesNotReturnIfAttribute"
+        };
+
+        foreach (var attributeName in attributeNames)
+            Assert.That(
+                nullableFlowSource,
+                Does.Contain("System.Diagnostics.CodeAnalysis." + attributeName));
+
+        var consumerPaths = new[]
+        {
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicProgramPointFacts.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicReachabilityService.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Smt", "CSharpConditionToFormula.Patterns.cs"),
+            Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "ExceptionFlowAnalyzer.PathFacts.NormalCompletion.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Analyzer", "MethodEnsuresAnalyzer.cs")
+        };
+
+        foreach (var consumerPath in consumerPaths)
+        {
+            var consumerSource = ReadFileCached(consumerPath);
+            Assert.That(consumerSource, Does.Contain("NullableFlowFacts."));
+            Assert.That(consumerSource, Does.Not.Contain("System.Diagnostics.CodeAnalysis."));
+        }
     }
 
     [Test]
