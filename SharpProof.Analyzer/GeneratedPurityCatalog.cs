@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -529,8 +528,7 @@ namespace SharpProof.Analyzer
             if (!string.IsNullOrWhiteSpace(implementationPath))
             {
                 var path = implementationPath!;
-                if (File.Exists(path) &&
-                    IdentityResolver.TryResolveMethodIdentityFromPath(methodKeys, path, out var implementationIdentity))
+                if (IdentityResolver.TryResolveMethodIdentityFromPath(methodKeys, path, out var implementationIdentity))
                 {
                     var assemblyIdentity = IdentityResolver.GetAssemblyIdentity(path);
                     if (TryMatchTrustedEntry(methodKeys, assemblyIdentity, implementationIdentity, out classification))

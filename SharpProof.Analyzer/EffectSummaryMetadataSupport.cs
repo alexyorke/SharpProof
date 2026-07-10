@@ -12,6 +12,13 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 
+// RS1035 exception: Roslyn exposes metadata references but not the PE method-body
+// bytes or full-image hashes required to validate generated effect summaries.
+// This adapter is the single, audited boundary that reads trusted reference and
+// runtime assembly paths for identity and IL-body-hash validation. Keep analyzer
+// file I/O isolated here and covered by architecture tests.
+#pragma warning disable RS1035
+
 namespace SharpProof.Analyzer
 {
     internal static class SummaryMetadataNames
@@ -954,3 +961,5 @@ namespace SharpProof.Analyzer
         }
     }
 }
+
+#pragma warning restore RS1035

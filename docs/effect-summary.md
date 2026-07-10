@@ -144,6 +144,18 @@ Built-in analyzer summaries are regenerated into `obj` during build/test and the
 
 The analyzer can also consume generated exception summaries when the JSON is supplied explicitly as an additional file named `SharpProof.EffectSummary.json` or `*.SharpProof.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
 
+### Analyzer-host metadata boundary
+
+Roslyn metadata references expose assembly and method metadata, but they do not
+expose the PE method-body bytes or full-image hashes needed to validate every
+generated summary row. The analyzer therefore keeps the small set of
+`RS1035`-annotated file reads required for identity and IL-body-hash validation
+inside `EffectSummaryMetadataSupport.cs`. The paths come from Roslyn metadata
+references or the trusted runtime assembly resolver; no other analyzer source
+may perform `File` or `Directory` I/O. An architecture test keeps this
+exception isolated while the rest of the analyzer remains compliant with
+Roslyn's host restrictions.
+
 With `sharpproof_report_exceptions = true`, `sharpproof_checked_exceptions = true`, or `sharpproof_runtime_hazard_mode = summaries/sites/all`, `SP0010` and `SP0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. Runtime-hazard mode is a clearer opt-in for ordinary-method failure checks: `sites` emits `SP0011`, `summaries` emits `SP0010`, and `all` emits both. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
 
 The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation. That means `SP0010` can summarize what a method may let escape, while `SP0011` can still warn on the exact uncaught call or property-access site that propagates the exception.

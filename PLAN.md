@@ -174,10 +174,6 @@ grouped by their original feature area.
   conventions, especially the native Z3 payload: decide on RID/platform-specific
   native assets or a graceful SMT-disabled fallback, then add Windows, Linux,
   and macOS package-consumer coverage.
-- Remove the analyzer project's `RS1035` suppression by auditing host-banned
-  APIs, especially filesystem, environment, reflection, and assembly-loading
-  calls used for effect summaries, then route remaining analyzer inputs through
-  supported Roslyn mechanisms or document and test intentional exceptions.
 - Add analyzer-host concurrency and cancellation stress tests for
   `EnableConcurrentExecution`, shared `CompilationPurityService` and SMT state,
   `AsyncLocal` catalogs, baselines, and effect-summary caches so parallel IDE

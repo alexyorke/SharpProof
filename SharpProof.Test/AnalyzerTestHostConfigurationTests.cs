@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
@@ -202,6 +203,32 @@ public sealed class TestClass
                 .ToArray();
 
             Assert.That(offenders, Is.Empty);
+        }
+
+        [Test]
+        public void AnalyzerHostFileIo_IsolatedToDocumentedEffectSummaryBoundary()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
+            var supportPath = Path.Combine(analyzerDirectory, "EffectSummaryMetadataSupport.cs");
+            var supportSource = File.ReadAllText(supportPath);
+            var projectSource = File.ReadAllText(Path.Combine(analyzerDirectory, "SharpProof.Analyzer.csproj"));
+            var effectSummaryDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
+
+            var fileIoFiles = Directory
+                .EnumerateFiles(analyzerDirectory, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+                               !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                .Where(path => Regex.IsMatch(File.ReadAllText(path), @"\b(?:File|Directory)\s*\."))
+                .Select(path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'))
+                .ToArray();
+
+            Assert.That(projectSource, Does.Not.Contain("RS1035"));
+            Assert.That(fileIoFiles, Is.EqualTo(new[] { "SharpProof.Analyzer/EffectSummaryMetadataSupport.cs" }));
+            Assert.That(supportSource, Does.Contain("#pragma warning disable RS1035"));
+            Assert.That(supportSource, Does.Contain("file I/O isolated here"));
+            Assert.That(effectSummaryDoc, Does.Contain("RS1035"));
+            Assert.That(effectSummaryDoc, Does.Contain("Roslyn metadata references"));
         }
 
         [Test]
