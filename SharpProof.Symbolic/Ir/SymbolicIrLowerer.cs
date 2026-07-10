@@ -144,6 +144,10 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        if (TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
+            TryLowerTerm(completedResultExpression, context, out term))
+            return true;
+
         if (TryLowerSupportedConversionTerm(expression, context, out term)) return true;
 
         if (expression is ThisExpressionSyntax)

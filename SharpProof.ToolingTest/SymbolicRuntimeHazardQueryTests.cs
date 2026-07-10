@@ -1610,6 +1610,92 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedTaskAwait()
+    {
+        const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod()
+    {
+        int? value = await Task.FromResult<int?>(null);
+        return value.Value;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Value;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullableValueFromCompletedValueTaskResult()
+    {
+        const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = new ValueTask<int?>((int?)null).Result;
+        return value.Value;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Value;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[]
+                { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazards_ProvesNullDereferenceFromCompletedTaskGetResult()
+    {
+        const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string? value = Task.FromResult<string?>(null).GetAwaiter().GetResult();
+        return value.Length;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Length;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
     {
         const string source = @"

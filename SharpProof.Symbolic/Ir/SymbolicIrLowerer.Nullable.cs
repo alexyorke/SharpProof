@@ -60,6 +60,13 @@ internal static partial class SymbolicIrLowerer
             return false;
         }
 
+        if (TryGetKnownCompletedAsyncResultExpression(
+                nullableExpression,
+                context,
+                out var completedResultExpression) &&
+            TryLowerNullableHasValueTerm(completedResultExpression, context, out term))
+            return true;
+
         if (TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
         {
             term = new SymbolicNullableHasValueTerm(context.GetVariableName(symbol));
@@ -356,6 +363,13 @@ internal static partial class SymbolicIrLowerer
             term = null!;
             return false;
         }
+
+        if (TryGetKnownCompletedAsyncResultExpression(
+                nullableExpression,
+                context,
+                out var completedResultExpression) &&
+            TryLowerNullableValueTerm(completedResultExpression, context, out term))
+            return true;
 
         if (TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
         {
