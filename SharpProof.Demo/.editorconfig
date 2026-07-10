@@ -5,4 +5,3 @@ dotnet_diagnostic.SP0002.severity = warning
 dotnet_diagnostic.SP0004.severity = suggestion
 dotnet_diagnostic.SP0003.severity = none
 
-

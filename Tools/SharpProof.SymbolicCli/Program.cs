@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
@@ -16,13 +17,16 @@ try
         return options.ShowHelp ? 0 : 64;
     }
 
+    using var inputContext = await SymbolicCliInputContext.CreateAsync(options);
+    options.ApplyProjectConfiguration(inputContext.ProjectContext);
+
     using var smtAnalysis = options.RequiresSmt
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
     if (options.Explain)
     {
-        PrintExplainResult(options, smtAnalysis!);
+        await PrintExplainResultAsync(options, inputContext, smtAnalysis!);
         return 0;
     }
 
@@ -30,26 +34,26 @@ try
     if (options.RuntimeHazards)
         result = new SymbolicQueryService().QueryRuntimeHazards(
             new SymbolicRuntimeHazardRequest(
-                options.CreateSourceInput(),
+                inputContext.SourceInput,
                 options.CreateRuntimeHazardTarget(),
                 options.CreateQueryOptions(smtAnalysis, false),
                 options.CreateRuntimeHazardOptions()));
     else if (options.Complexity)
         result = new SymbolicQueryService().QueryComplexity(
             new SymbolicComplexityRequest(
-                options.CreateSourceInput(),
+                inputContext.SourceInput,
                 options.CreateComplexityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else if (options.Capabilities)
         result = new SymbolicQueryService().QueryCapabilities(
             new SymbolicCapabilityRequest(
-                options.CreateSourceInput(),
+                inputContext.SourceInput,
                 options.CreateCapabilityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else
         result = new SymbolicQueryService()
             .Query(new SymbolicQueryRequest(
-                options.CreateSourceInput(),
+                inputContext.SourceInput,
                 options.CreateQueryTarget(),
                 options.CreateQueryOptions(smtAnalysis, true)))
             .InnerResult;
@@ -268,10 +272,13 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
     if (result.SmtDiagnostics.IsConfigured) PrintSmtDiagnostics(result.SmtDiagnostics);
 }
 
-static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService smtAnalysis)
+static async Task PrintExplainResultAsync(
+    SymbolicCliOptions options,
+    SymbolicCliInputContext inputContext,
+    SmtAnalysisService smtAnalysis)
 {
     var service = new SymbolicQueryService();
-    var source = options.CreateSourceInput();
+    var source = inputContext.SourceInput;
     var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
     var pointTarget = options.Position.HasValue
         ? SymbolicQueryTarget.Position(options.Position.Value)
@@ -282,6 +289,23 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
     Console.WriteLine(options.Position.HasValue
         ? $"Target: position {options.Position.Value}"
         : $"Target: line {options.Line}, column {options.Column}");
+
+    if (inputContext.ProjectContext is { } projectContext)
+    {
+        Console.WriteLine($"Project: {projectContext.ProjectName}");
+        Console.WriteLine($"Project file: {projectContext.ProjectFilePath}");
+        if (projectContext.SolutionFilePath != null)
+            Console.WriteLine($"Solution file: {projectContext.SolutionFilePath}");
+        Console.WriteLine($"Analyzer config files: {projectContext.AnalyzerConfigPaths.Count}");
+        Console.WriteLine($"Additional files: {projectContext.AdditionalFilePaths.Count}");
+        Console.WriteLine($"Baseline loaded: {projectContext.HasBaseline}");
+        Console.WriteLine($"Effect summaries: {projectContext.EffectSummaryFileCount}");
+        Console.WriteLine($"Workspace diagnostics: {inputContext.WorkspaceDiagnostics.Length}");
+        foreach (var diagnostic in inputContext.WorkspaceDiagnostics.Take(5))
+            Console.WriteLine("  - " + diagnostic);
+
+        await PrintProjectAnalyzerDiagnosticsAsync(options, projectContext);
+    }
 
     var pointResult = service
         .Query(new SymbolicQueryRequest(source, pointTarget, queryOptions))
@@ -349,6 +373,60 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
         Console.WriteLine();
         PrintSmtDiagnostics(finalPoint.SmtDiagnostics);
     }
+}
+
+static async Task PrintProjectAnalyzerDiagnosticsAsync(
+    SymbolicCliOptions options,
+    SharpProofProjectAnalysisContext context)
+{
+    var diagnostics = await context.GetAnalyzerDiagnosticsAsync();
+    var relevant = diagnostics
+        .Where(diagnostic =>
+            diagnostic.Location == Location.None ||
+            ReferenceEquals(diagnostic.Location.SourceTree, context.SyntaxTree))
+        .Select(diagnostic => new
+        {
+            Diagnostic = diagnostic,
+            IsTarget = IsTargetDiagnostic(diagnostic, options, context.SyntaxTree)
+        })
+        .OrderByDescending(static item => item.IsTarget)
+        .ThenBy(static item => item.Diagnostic.Location.SourceSpan.Start)
+        .ThenBy(static item => item.Diagnostic.Id, StringComparer.Ordinal)
+        .ToArray();
+
+    Console.WriteLine();
+    Console.WriteLine("Build diagnostics");
+    Console.WriteLine($"File/project diagnostics: {relevant.Length}");
+    Console.WriteLine($"Target diagnostics: {relevant.Count(static item => item.IsTarget)}");
+    foreach (var item in relevant.Take(20))
+    {
+        var location = item.Diagnostic.Location == Location.None
+            ? "project"
+            : FormatDiagnosticLocation(item.Diagnostic.Location);
+        var targetMarker = item.IsTarget ? " target" : string.Empty;
+        Console.WriteLine(
+            $"  - {item.Diagnostic.Id} {item.Diagnostic.Severity} {location}{targetMarker}: " +
+            item.Diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+}
+
+static bool IsTargetDiagnostic(Diagnostic diagnostic, SymbolicCliOptions options, SyntaxTree syntaxTree)
+{
+    if (!ReferenceEquals(diagnostic.Location.SourceTree, syntaxTree)) return false;
+
+    var span = diagnostic.Location.SourceSpan;
+    if (options.Position.HasValue)
+        return span.Contains(options.Position.Value) || span.End == options.Position.Value;
+
+    var requestedLine = options.Line - 1;
+    var lineSpan = diagnostic.Location.GetLineSpan().Span;
+    return lineSpan.Start.Line <= requestedLine && lineSpan.End.Line >= requestedLine;
+}
+
+static string FormatDiagnosticLocation(Location location)
+{
+    var lineSpan = location.GetLineSpan();
+    return $"{lineSpan.Path}:{lineSpan.StartLinePosition.Line + 1}:{lineSpan.StartLinePosition.Character + 1}";
 }
 
 static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
@@ -922,10 +1000,19 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-                                Usage: SharpProof.SymbolicCli [explain] --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
+                                Usage: SharpProof.SymbolicCli [explain] --file <path> [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
 
                                 Options:
                                   --file <path>       C# source file to query.
+                                  --project <path>    Load the source through its MSBuild project, including references, parse/compilation options, analyzer config, and AdditionalFiles.
+                                  --solution <path>   Load the source through an MSBuild solution. Use --project-name when more than one project compiles the file.
+                                  --project-name <name>
+                                                      Select a project by project name, assembly name, or project file name.
+                                  --configuration <name>
+                                                      Set the MSBuild Configuration property while loading a project or solution.
+                                  --framework <tfm>   Set the MSBuild TargetFramework property while loading a project or solution.
+                                  --msbuild-property <name=value>
+                                                      Set an additional MSBuild property. Can be repeated.
                                   explain             Print a contract-oriented explanation for one line or position by composing invariant, hazard, capability, and complexity queries.
                                   --line <n>          1-based source line to query.
                                   --column <n>        1-based source column to query. With --line-invariants, selects the nearest program point on the line.
@@ -1060,6 +1147,18 @@ internal sealed class SymbolicCliOptions
 
     public string? FilePath { get; private set; }
 
+    public string? ProjectPath { get; private set; }
+
+    public string? SolutionPath { get; private set; }
+
+    public string? ProjectName { get; private set; }
+
+    public Dictionary<string, string> MSBuildProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsProjectAware => ProjectPath != null || SolutionPath != null;
+
+    private bool StandaloneCompilationOptionsSpecified { get; set; }
+
     public int Line { get; private set; }
 
     public int Column { get; private set; } = 1;
@@ -1178,6 +1277,8 @@ internal sealed class SymbolicCliOptions
 
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
 
+    private bool SmtModeSpecified { get; set; }
+
     public int? SmtTimeoutMs { get; private set; }
 
     public int? SmtMethodBudgetMs { get; private set; }
@@ -1189,10 +1290,20 @@ internal sealed class SymbolicCliOptions
     public int SmtTransientRetryCount { get; private set; } =
         SmtSolverLifecycleOptions.Default.MaxTransientRetries;
 
+    private bool SmtTransientRetryCountSpecified { get; set; }
+
     public bool SmtRecycleContextOnTransientFailure { get; private set; } =
         SmtSolverLifecycleOptions.Default.RecycleContextOnTransientFailure;
 
+    private bool SmtRecycleContextOnTransientFailureSpecified { get; set; }
+
     public bool SmtDisposeContextOnExit { get; private set; }
+
+    private bool SmtDisposeContextOnExitSpecified { get; set; }
+
+    private SmtAnalysisOptions? ProjectSmtOptions { get; set; }
+
+    private SymbolicAnalysisLimits? ProjectAnalysisLimits { get; set; }
 
     private Dictionary<string, int> AnalysisLimitOverrides { get; } = new(StringComparer.Ordinal);
 
@@ -1283,6 +1394,25 @@ internal sealed class SymbolicCliOptions
                 case "--file":
                     options.FilePath = ReadString(args, ref index, arg);
                     break;
+                case "--project":
+                    options.ProjectPath = ReadString(args, ref index, arg);
+                    break;
+                case "--solution":
+                    options.SolutionPath = ReadString(args, ref index, arg);
+                    break;
+                case "--project-name":
+                    options.ProjectName = ReadString(args, ref index, arg);
+                    break;
+                case "--configuration":
+                    options.MSBuildProperties["Configuration"] = ReadString(args, ref index, arg);
+                    break;
+                case "--framework":
+                case "--target-framework":
+                    options.MSBuildProperties["TargetFramework"] = ReadString(args, ref index, arg);
+                    break;
+                case "--msbuild-property":
+                    options.AddMSBuildProperty(ReadString(args, ref index, arg), arg);
+                    break;
                 case "--line":
                     options.Line = ReadPositiveInt(args, ref index, arg);
                     break;
@@ -1329,34 +1459,43 @@ internal sealed class SymbolicCliOptions
                 case "--reference":
                 case "-r":
                     options.ReferencePaths.Add(ReadString(args, ref index, arg));
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--language-version":
                 case "--lang-version":
                     options.LanguageVersion = ReadLanguageVersion(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--define":
                 case "-d":
                     options.PreprocessorSymbols.Add(ReadString(args, ref index, arg));
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--nullable":
                     options.NullableContext = ReadNullableContext(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--allow-unsafe":
                 case "--unsafe":
                     options.AllowUnsafe = true;
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--documentation-mode":
                     options.DocumentationMode = ReadDocumentationMode(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--platform":
                     options.Platform = ReadPlatform(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--optimization":
                 case "--optimize":
                     options.OptimizationLevel = ReadOptimizationLevel(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--assembly-name":
                     options.AssemblyName = ReadString(args, ref index, arg);
+                    options.StandaloneCompilationOptionsSpecified = true;
                     break;
                 case "--node-kind":
                     options.NodeKinds.Add(ReadString(args, ref index, arg));
@@ -1491,6 +1630,7 @@ internal sealed class SymbolicCliOptions
                     break;
                 case "--smt-mode":
                     options.SmtMode = ReadSmtMode(args, ref index, arg);
+                    options.SmtModeSpecified = true;
                     break;
                 case "--smt-timeout-ms":
                     options.SmtTimeoutMs = ReadPositiveInt(args, ref index, arg);
@@ -1506,12 +1646,15 @@ internal sealed class SymbolicCliOptions
                     break;
                 case "--smt-transient-retries":
                     options.SmtTransientRetryCount = ReadNonNegativeInt(args, ref index, arg);
+                    options.SmtTransientRetryCountSpecified = true;
                     break;
                 case "--smt-keep-context-on-transient-failure":
                     options.SmtRecycleContextOnTransientFailure = false;
+                    options.SmtRecycleContextOnTransientFailureSpecified = true;
                     break;
                 case "--smt-dispose-context-on-exit":
                     options.SmtDisposeContextOnExit = true;
+                    options.SmtDisposeContextOnExitSpecified = true;
                     break;
                 case "--analysis-limit":
                     options.AddAnalysisLimitOverride(ReadString(args, ref index, arg), arg);
@@ -1571,7 +1714,28 @@ internal sealed class SymbolicCliOptions
 
             if (options.FilePath == null) throw new ArgumentException("--file is required.");
 
-            if (!File.Exists(options.FilePath)) throw new ArgumentException("--file does not exist.");
+            if (options.ProjectPath != null && options.SolutionPath != null)
+                throw new ArgumentException("--project cannot be combined with --solution.");
+
+            if (!options.IsProjectAware && !File.Exists(options.FilePath))
+                throw new ArgumentException("--file does not exist.");
+
+            if (options.ProjectPath != null && !File.Exists(options.ProjectPath))
+                throw new ArgumentException("--project does not exist: " + options.ProjectPath);
+
+            if (options.SolutionPath != null && !File.Exists(options.SolutionPath))
+                throw new ArgumentException("--solution does not exist: " + options.SolutionPath);
+
+            if (!options.IsProjectAware && options.ProjectName != null)
+                throw new ArgumentException("--project-name requires --project or --solution.");
+
+            if (!options.IsProjectAware && options.MSBuildProperties.Count != 0)
+                throw new ArgumentException(
+                    "--configuration, --framework, and --msbuild-property require --project or --solution.");
+
+            if (options.IsProjectAware && options.StandaloneCompilationOptionsSpecified)
+                throw new ArgumentException(
+                    "Standalone compilation options cannot be combined with --project or --solution; configure the project instead.");
 
             if (options.Position.HasValue && options.Line != 0)
                 throw new ArgumentException("--position cannot be combined with --line.");
@@ -1760,9 +1924,18 @@ internal sealed class SymbolicCliOptions
 
     public SymbolicSourceInput CreateSourceInput()
     {
+        if (IsProjectAware)
+            throw new InvalidOperationException("Project-aware source input must be loaded through MSBuild.");
+
         return SymbolicSourceInput.FromFile(
             FilePath ?? throw new InvalidOperationException("A source file is required."),
             CreateCompilationProfile());
+    }
+
+    public void ApplyProjectConfiguration(SharpProofProjectAnalysisContext? context)
+    {
+        ProjectSmtOptions = context?.SmtOptions;
+        ProjectAnalysisLimits = context?.AnalysisLimits;
     }
 
     public SymbolicSourceQueryFilter CreateResultFilter()
@@ -1789,16 +1962,28 @@ internal sealed class SymbolicCliOptions
 
     public SmtAnalysisOptions CreateSmtOptions()
     {
-        return SmtAnalysisOptions.ForMode(SmtMode)
+        var projectOptions = ProjectSmtOptions;
+        var mode = SmtModeSpecified ? SmtMode : projectOptions?.Mode ?? SmtMode;
+        var defaults = projectOptions != null && projectOptions.Mode == mode
+            ? projectOptions
+            : SmtAnalysisOptions.ForMode(mode);
+        var lifecycleDefaults = defaults.Lifecycle;
+        return defaults
             .WithOverrides(
                 SmtTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(SmtTimeoutMs.Value) : null,
                 SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
                 SmtMaxPathConditions,
                 SmtMaxExpressionNodes)
             .WithLifecycle(new SmtSolverLifecycleOptions(
-                SmtTransientRetryCount,
-                SmtRecycleContextOnTransientFailure,
-                SmtDisposeContextOnExit));
+                SmtTransientRetryCountSpecified
+                    ? SmtTransientRetryCount
+                    : lifecycleDefaults.MaxTransientRetries,
+                SmtRecycleContextOnTransientFailureSpecified
+                    ? SmtRecycleContextOnTransientFailure
+                    : lifecycleDefaults.RecycleContextOnTransientFailure,
+                SmtDisposeContextOnExitSpecified
+                    ? SmtDisposeContextOnExit
+                    : lifecycleDefaults.DisposeCurrentThreadContextOnServiceDispose));
     }
 
     public SymbolicQueryOptions CreateQueryOptions(
@@ -1817,7 +2002,7 @@ internal sealed class SymbolicCliOptions
 
     public SymbolicAnalysisLimits CreateAnalysisLimits()
     {
-        var defaults = SymbolicAnalysisLimits.Default;
+        var defaults = ProjectAnalysisLimits ?? SymbolicAnalysisLimits.Default;
         return new SymbolicAnalysisLimits(
             GetAnalysisLimit("merged-if-else-facts", defaults.MaxMergedIfElseFacts),
             GetAnalysisLimit("merged-switch-facts", defaults.MaxMergedSwitchFacts),
@@ -1994,6 +2179,20 @@ internal sealed class SymbolicCliOptions
             throw new ArgumentException(optionName + " requires <name>=<positive-integer>.");
 
         AnalysisLimitOverrides[name] = limit;
+    }
+
+    private void AddMSBuildProperty(string value, string optionName)
+    {
+        var separator = value.IndexOf('=');
+        if (separator <= 0)
+            throw new ArgumentException(optionName + " requires <name>=<value>.");
+
+        var name = value[..separator].Trim();
+        var propertyValue = value[(separator + 1)..].Trim();
+        if (name.Length == 0 || propertyValue.Length == 0)
+            throw new ArgumentException(optionName + " requires <name>=<value>.");
+
+        MSBuildProperties[name] = propertyValue;
     }
 
     private int GetAnalysisLimit(string name, int fallback)

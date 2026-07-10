@@ -2764,6 +2764,56 @@ public class TestClass
     }
 
     [Test]
+    public async Task SymbolicCli_ProjectExplain_LoadsBuildContextAndAnalyzerInputs()
+    {
+        var sourcePath = Path.Combine("SharpProof.Demo", "Program.cs");
+        var projectPath = Path.Combine("SharpProof.Demo", "SharpProof.Demo.csproj");
+
+        var (exitCode, standardOutput, standardError) = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "explain",
+            "--file",
+            sourcePath,
+            "--project",
+            projectPath,
+            "--line",
+            "39");
+
+        Assert.That(exitCode, Is.Zero, standardError);
+        Assert.That(standardOutput, Does.Contain("Project: SharpProof.Demo"));
+        Assert.That(standardOutput, Does.Contain("Additional files: 2"));
+        Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
+        Assert.That(standardOutput, Does.Contain("Effect summaries: 1"));
+        Assert.That(standardOutput, Does.Contain("Build diagnostics"));
+        Assert.That(standardOutput, Does.Contain("SP0004 Warning"));
+        Assert.That(standardOutput, Does.Contain("Query timeout ms: 321"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_SolutionExplain_SelectsNamedProject()
+    {
+        var sourcePath = Path.Combine("SharpProof.Demo", "Program.cs");
+
+        var (exitCode, standardOutput, standardError) = await SymbolicCliTestHost.RunOutOfProcessAsync(
+            "explain",
+            "--file",
+            sourcePath,
+            "--solution",
+            "SharpProof.sln",
+            "--project-name",
+            "SharpProof.Demo",
+            "--line",
+            "39",
+            "--smt-mode",
+            "off");
+
+        Assert.That(exitCode, Is.Zero, standardError);
+        Assert.That(standardOutput, Does.Contain("Project: SharpProof.Demo"));
+        Assert.That(standardOutput, Does.Contain("Solution file:"));
+        Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
+        Assert.That(standardOutput, Does.Contain("Build diagnostics"));
+    }
+
+    [Test]
     public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
     {
         var source = @"

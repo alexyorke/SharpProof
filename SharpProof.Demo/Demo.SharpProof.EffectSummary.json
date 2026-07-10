@@ -1,0 +1,12 @@
+{
+  "SchemaVersion": 1,
+  "GeneratedPurityCatalog": {
+    "Entries": [
+      {
+        "Symbol": "System.String.get_Length()",
+        "Classification": "pure",
+        "Categories": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "diagnostics": [
+    {
+      "id": "SP0002",
+      "symbol": "M:SharpProof.Demo.Nonexistent.Member",
+      "path": "Nonexistent.cs"
+    }
+  ]
+}
