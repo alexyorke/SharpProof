@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Add stable unknown-reason taxonomies for capability, complexity, runtime
-  hazard, purity, and `[Ensures]` results so users can distinguish unsupported
-  syntax, unsupported library modeling, solver budget, timeout, cancellation,
-  and native solver failures.
 - Centralize nullable-flow facts from Roslyn null-state analysis and
   `System.Diagnostics.CodeAnalysis` attributes such as `AllowNull`,
   `DisallowNull`, `MaybeNull`, `NotNull`, `MaybeNullWhen`, `NotNullWhen`,
