@@ -32,7 +32,7 @@ namespace SharpProof.Test
                 TestCode = source,
             };
 
-            AddSharpProofReferences(test);
+            AddSharpProofReferences(test, source);
             test.ExpectedDiagnostics.AddRange(expected);
             await test.RunAsync(CancellationToken.None);
         }
@@ -67,7 +67,7 @@ namespace SharpProof.Test
             if (codeActionEquivalenceKey != null)
                 test.CodeActionEquivalenceKey = codeActionEquivalenceKey;
 
-            AddSharpProofReferences(test);
+            AddSharpProofReferences(test, source);
             test.ExpectedDiagnostics.AddRange(expected);
             await test.RunAsync(CancellationToken.None);
         }
@@ -75,14 +75,16 @@ namespace SharpProof.Test
         private static string NormalizeLineEndings(string text)
             => text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", System.Environment.NewLine);
 
-        private static void AddSharpProofReferences(Test test)
+        private static void AddSharpProofReferences(Test test, string source)
         {
-            test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.AnalyzerReference);
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
-            test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.PureAttributeReference);
-            test.TestState.AnalyzerConfigFiles.Add((
-                "/.globalconfig",
-                "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n"));
+            var globalConfigText = "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n";
+            if (AnalyzerTestHost.HasFileLevelMissingPuritySuppression(source))
+            {
+                globalConfigText += "sharpproof_suggest_missing_enforce_pure = false\n";
+            }
+
+            test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", globalConfigText));
         }
     }
 }

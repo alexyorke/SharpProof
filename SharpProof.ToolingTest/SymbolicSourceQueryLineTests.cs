@@ -2582,7 +2582,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -2646,7 +2646,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -2714,7 +2714,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -2820,7 +2820,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start-line",
@@ -2884,7 +2884,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -3003,7 +3003,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start",
@@ -3058,7 +3058,7 @@ public class TestClass
             {
                 var spanStart = FindPosition(source, "if (copy > 0)");
                 var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--span-start-line",
@@ -3217,7 +3217,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -3287,7 +3287,7 @@ public class TestClass
             try
             {
                 var firstReturnLine = FindLine(source, "return value + 1;");
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -3375,7 +3375,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--all-lines",
@@ -3438,7 +3438,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -3473,7 +3473,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3518,7 +3518,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3594,7 +3594,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var compactResult = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var compactResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3618,7 +3618,7 @@ public class TestClass
                 Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
                 Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
 
-                var fullJsonResult = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3637,7 +3637,7 @@ public class TestClass
                 Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
                 Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(), Is.EqualTo("direct_throw"));
 
-                var textResult = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var textResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3684,7 +3684,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var compactResult = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var compactResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3706,7 +3706,7 @@ public class TestClass
                 Assert.That(compactHazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
                 Assert.That(compactHazard.GetProperty("operationText").GetString(), Does.Contain("/ divisor"));
 
-                var fullJsonResult = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3749,7 +3749,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3788,7 +3788,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3829,7 +3829,7 @@ public class TestClass
             File.WriteAllText(sourcePath, source);
             try
             {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var result = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3859,7 +3859,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var statusWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var statusWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3870,7 +3870,7 @@ public class TestClass
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var exceptionTypeWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var exceptionTypeWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3881,7 +3881,7 @@ public class TestClass
                 Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-exception-type"));
                 Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var categoryWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var categoryWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3892,7 +3892,7 @@ public class TestClass
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var failOnHazardWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var failOnHazardWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3902,7 +3902,7 @@ public class TestClass
                 Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--fail-on-hazard"));
                 Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var nonProvenStatusWithoutCandidates = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var nonProvenStatusWithoutCandidates = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--runtime-hazards",
@@ -3929,7 +3929,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var jsonAndCompact = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3939,7 +3939,7 @@ public class TestClass
                 Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
 
-                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3949,7 +3949,7 @@ public class TestClass
                 Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
 
-                var negativeMaxPoints = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3960,7 +3960,7 @@ public class TestClass
                 Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
                 Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
 
-                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3969,7 +3969,7 @@ public class TestClass
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var postLineWithoutLineMode = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var postLineWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -3978,7 +3978,7 @@ public class TestClass
                 Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
                 Assert.That(postLineWithoutLineMode.StandardError, Does.Contain("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
-                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--position",
@@ -4004,7 +4004,7 @@ public class TestClass
             File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
             try
             {
-                var zeroLine = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var zeroLine = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",
@@ -4012,7 +4012,7 @@ public class TestClass
                 Assert.That(zeroLine.ExitCode, Is.EqualTo(64));
                 Assert.That(zeroLine.StandardError, Does.Contain("requires a positive integer value"));
 
-                var negativeColumn = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                var negativeColumn = await SymbolicCliTestHost.RunAsync(
                     "--file",
                     sourcePath,
                     "--line",

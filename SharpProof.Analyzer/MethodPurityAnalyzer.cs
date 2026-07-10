@@ -178,6 +178,17 @@ namespace SharpProof.Analyzer
             }
 
 
+            var effectiveMissingPuritySuggestions = AnalyzerConfiguration.GetMissingPuritySuggestionOptions(
+                context.Options,
+                context.Node.SyntaxTree,
+                missingPuritySuggestions);
+
+            if (!hasPurityEnforcementAttribute &&
+                (hasImpureAttribute || !effectiveMissingPuritySuggestions.IsEnabled))
+            {
+                return;
+            }
+
             var enforceOrPureAttributeSymbol = GetEffectivePurityAttributeSymbol(enforcePureAttributeSymbol, pureAttributeSymbol);
             PurityAnalysisEngine.PurityAnalysisResult purityResult = purityService.GetPurity(
                 methodSymbol,
@@ -187,10 +198,6 @@ namespace SharpProof.Analyzer
                 context.CancellationToken);
             bool isPure = purityResult.IsPure;
 
-            var effectiveMissingPuritySuggestions = AnalyzerConfiguration.GetMissingPuritySuggestionOptions(
-                context.Options,
-                context.Node.SyntaxTree,
-                missingPuritySuggestions);
             var effectiveEmitExplanations = AnalyzerConfiguration.GetEmitExplanations(
                 context.Options,
                 context.Node.SyntaxTree,

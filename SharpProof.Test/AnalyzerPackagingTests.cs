@@ -238,12 +238,39 @@ namespace TestNamespace {
                 .LastOrDefault();
             Assert.That(generatedSummaryArtifactSpecPath, Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json"));
 
+            var generatedSummaryStampPath = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityGenerationStampPath", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(
+                generatedSummaryStampPath,
+                Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\generation.$(NETCoreSdkVersion).stamp"));
+
+            var buildTarget = document
+                .Descendants()
+                .Single(element =>
+                    string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
+                    string.Equals(element.Attribute("Name")?.Value, "BuildBuiltInEffectSummaryTool", StringComparison.Ordinal));
+            var stageBuilds = buildTarget
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "MSBuild", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageBuilds, Has.Length.EqualTo(1));
+            Assert.That(stageBuilds[0].Attribute("Projects")?.Value, Is.EqualTo("$(GeneratedPurityToolProjectPath)"));
+            Assert.That(stageBuilds[0].Attribute("Targets")?.Value, Is.EqualTo("Build"));
+
             var stageTarget = document
                 .Descendants()
                 .Single(element =>
                     string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
                     string.Equals(element.Attribute("Name")?.Value, "GenerateBuiltInEffectSummaries", StringComparison.Ordinal));
             Assert.That(stageTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
+            Assert.That(stageTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("BuildBuiltInEffectSummaryTool"));
+            Assert.That(
+                stageTarget.Attribute("Inputs")?.Value,
+                Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath);$(GeneratedPurityToolDllPath)"));
+            Assert.That(stageTarget.Attribute("Outputs")?.Value, Is.EqualTo("$(GeneratedPurityGenerationStampPath)"));
 
             var stageCopies = stageTarget
                 .Descendants()
@@ -268,13 +295,11 @@ namespace TestNamespace {
             Assert.That(stageDirectories, Has.Length.EqualTo(1));
             Assert.That(stageDirectories[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
 
-            var stageBuilds = stageTarget
+            var unexpectedStageBuilds = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "MSBuild", StringComparison.Ordinal))
                 .ToArray();
-            Assert.That(stageBuilds, Has.Length.EqualTo(1));
-            Assert.That(stageBuilds[0].Attribute("Projects")?.Value, Is.EqualTo("$(GeneratedPurityToolProjectPath)"));
-            Assert.That(stageBuilds[0].Attribute("Targets")?.Value, Is.EqualTo("Build"));
+            Assert.That(unexpectedStageBuilds, Is.Empty);
 
             var stageExecs = stageTarget
                 .Descendants()
@@ -284,6 +309,13 @@ namespace TestNamespace {
             Assert.That(
                 stageExecs[0].Attribute("Command")?.Value,
                 Is.EqualTo("dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec \"$(GeneratedPurityArtifactSpecPath)\""));
+
+            var stampWrite = stageTarget
+                .Descendants()
+                .Single(element => string.Equals(element.Name.LocalName, "WriteLinesToFile", StringComparison.Ordinal));
+            Assert.That(stampWrite.Attribute("File")?.Value, Is.EqualTo("$(GeneratedPurityGenerationStampPath)"));
+            Assert.That(stampWrite.Attribute("Lines")?.Value, Is.EqualTo("$(NETCoreSdkVersion)"));
+            Assert.That(stampWrite.Attribute("Overwrite")?.Value, Is.EqualTo("true"));
 
             var includeTarget = document
                 .Descendants()

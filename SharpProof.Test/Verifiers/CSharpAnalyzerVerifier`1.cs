@@ -30,12 +30,14 @@ namespace SharpProof.Test
                 TestCode = source,
             };
 
-            test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.AnalyzerReference);
             test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
-            test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.PureAttributeReference);
-            test.TestState.AnalyzerConfigFiles.Add((
-                "/.globalconfig",
-                "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n"));
+            var globalConfigText = "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n";
+            if (AnalyzerTestHost.HasFileLevelMissingPuritySuppression(source))
+            {
+                globalConfigText += "sharpproof_suggest_missing_enforce_pure = false\n";
+            }
+
+            test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", globalConfigText));
 
             test.ExpectedDiagnostics.AddRange(expected);
             return test.RunAsync(CancellationToken.None);

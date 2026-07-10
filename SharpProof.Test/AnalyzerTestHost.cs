@@ -37,6 +37,36 @@ namespace SharpProof.Test
         private static readonly Lazy<ImmutableArray<MetadataReference>> MinimalFrameworkReferencesWithEnforcePure =
             new Lazy<ImmutableArray<MetadataReference>>(CreateMinimalFrameworkReferencesWithEnforcePure);
 
+        private static readonly Lazy<CSharpCompilation> TrustedPlatformCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                TrustedPlatformReferencesWithEnforcePure.Value,
+                DefaultCompilationOptions));
+
+        private static readonly Lazy<CSharpCompilation> TrustedPlatformUnsafeCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                TrustedPlatformReferencesWithEnforcePure.Value,
+                UnsafeCompilationOptions));
+
+        private static readonly Lazy<CSharpCompilation> MinimalFrameworkCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                MinimalFrameworkReferences.Value,
+                DefaultCompilationOptions));
+
+        private static readonly Lazy<CSharpCompilation> MinimalFrameworkUnsafeCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                MinimalFrameworkReferences.Value,
+                UnsafeCompilationOptions));
+
+        private static readonly Lazy<CSharpCompilation> MinimalFrameworkWithEnforcePureCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                MinimalFrameworkReferencesWithEnforcePure.Value,
+                DefaultCompilationOptions));
+
+        private static readonly Lazy<CSharpCompilation> MinimalFrameworkWithEnforcePureUnsafeCompilationTemplate =
+            new Lazy<CSharpCompilation>(() => CreateCompilationTemplate(
+                MinimalFrameworkReferencesWithEnforcePure.Value,
+                UnsafeCompilationOptions));
+
         private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
             new Lazy<MetadataReference>(() => MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
 
@@ -56,6 +86,8 @@ namespace SharpProof.Test
             new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
                 new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+
+        private const string SuggestMissingEnforcePureOption = "sharpproof_suggest_missing_enforce_pure";
 
         internal readonly record struct ConditionContext(
             SemanticModel SemanticModel,
@@ -125,14 +157,15 @@ namespace SharpProof.Test
                 references = references.AddRange(additionalMetadataReferences.Value);
             }
 
-            var compilation = CSharpCompilation.Create(
+            var compilationOptions = allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions;
+            var compilation = CreateCompilation(
                 compilationName,
-                new[] { syntaxTree },
                 references,
-                allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions);
+                compilationOptions,
+                syntaxTree);
 
             var analyzerOptions = CreateAnalyzerOptions(
-                globalOptions,
+                ApplyFileLevelDiagnosticOptions(source, globalOptions),
                 additionalFiles,
                 autoEnableEffectSummaryJsonForAdditionalFiles);
 
@@ -180,6 +213,27 @@ namespace SharpProof.Test
             return new AnalyzerOptions(
                 analyzerAdditionalFiles,
                 new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
+        }
+
+        internal static bool HasFileLevelMissingPuritySuppression(string source)
+        {
+            return source.AsSpan().TrimStart().StartsWith(
+                "#pragma warning disable SP0004".AsSpan(),
+                StringComparison.Ordinal);
+        }
+
+        private static ImmutableDictionary<string, string>? ApplyFileLevelDiagnosticOptions(
+            string source,
+            ImmutableDictionary<string, string>? globalOptions)
+        {
+            if (!HasFileLevelMissingPuritySuppression(source) ||
+                globalOptions?.ContainsKey(SuggestMissingEnforcePureOption) == true)
+            {
+                return globalOptions;
+            }
+
+            return (globalOptions ?? ImmutableDictionary<string, string>.Empty)
+                .Add(SuggestMissingEnforcePureOption, "false");
         }
 
         public static Diagnostic SingleDiagnostic(
@@ -319,11 +373,11 @@ public static class ConditionHost
         private static ConditionContext CreateConditionContextCore(string source)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
-            var compilation = CSharpCompilation.Create(
+            var compilation = CreateCompilation(
                 "ConditionHost",
-                new[] { syntaxTree },
                 GetMinimalFrameworkReferences(),
-                DefaultCompilationOptions);
+                DefaultCompilationOptions,
+                syntaxTree);
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var returnExpression = syntaxTree.GetRoot()
@@ -403,11 +457,11 @@ public static class ConditionHost
             }
 
             var options = compilationOptions ?? (allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions);
-            var compilation = CSharpCompilation.Create(
+            var compilation = CreateCompilation(
                 compilationName,
-                new[] { syntaxTree },
                 references,
-                options);
+                options,
+                syntaxTree);
 
             return new SourceContext(
                 compilation,
@@ -441,11 +495,11 @@ public static class ConditionHost
         private static ConditionImplicationContext CreateConditionImplicationContextCore(string source)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions);
-            var compilation = CSharpCompilation.Create(
+            var compilation = CreateCompilation(
                 "ConditionHost",
-                new[] { syntaxTree },
                 GetMinimalFrameworkReferences(),
-                DefaultCompilationOptions);
+                DefaultCompilationOptions,
+                syntaxTree);
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var variables = syntaxTree.GetRoot()
@@ -578,6 +632,66 @@ public static class ConditionHost
             }
 
             return references.Add(EnforcePureAttributeReference.Value);
+        }
+
+        private static CSharpCompilation CreateCompilation(
+            string assemblyName,
+            ImmutableArray<MetadataReference> references,
+            CSharpCompilationOptions options,
+            SyntaxTree syntaxTree)
+        {
+            var template = GetCompilationTemplate(references, options);
+            if (template != null)
+            {
+                return template.Value
+                    .WithAssemblyName(assemblyName)
+                    .AddSyntaxTrees(syntaxTree);
+            }
+
+            return CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                references,
+                options);
+        }
+
+        private static Lazy<CSharpCompilation>? GetCompilationTemplate(
+            ImmutableArray<MetadataReference> references,
+            CSharpCompilationOptions options)
+        {
+            var allowUnsafe = options.AllowUnsafe;
+            if (references == TrustedPlatformReferencesWithEnforcePure.Value)
+            {
+                return allowUnsafe
+                    ? TrustedPlatformUnsafeCompilationTemplate
+                    : TrustedPlatformCompilationTemplate;
+            }
+
+            if (references == MinimalFrameworkReferences.Value)
+            {
+                return allowUnsafe
+                    ? MinimalFrameworkUnsafeCompilationTemplate
+                    : MinimalFrameworkCompilationTemplate;
+            }
+
+            if (references == MinimalFrameworkReferencesWithEnforcePure.Value)
+            {
+                return allowUnsafe
+                    ? MinimalFrameworkWithEnforcePureUnsafeCompilationTemplate
+                    : MinimalFrameworkWithEnforcePureCompilationTemplate;
+            }
+
+            return null;
+        }
+
+        private static CSharpCompilation CreateCompilationTemplate(
+            ImmutableArray<MetadataReference> references,
+            CSharpCompilationOptions options)
+        {
+            return CSharpCompilation.Create(
+                "AnalyzerTestHost.Template",
+                references: references,
+                options: options);
         }
 
         private static string CreateGlobalOptionsCacheKey(ImmutableDictionary<string, string> analyzerGlobalOptions)
