@@ -134,6 +134,18 @@ dotnet run --project Tools\SharpProof.EffectSummary -- --artifact-spec SharpProo
 The progress record is tied to the artifact-spec SHA-256 and is deleted after
 all outputs complete, so a changed spec cannot silently reuse stale progress.
 
+For large multi-assembly runs, use per-assembly sharding to keep only one
+assembly report in memory at a time. Shard filenames include a stable input-path
+hash, and the progress fingerprint also includes each assembly's content hash
+and analysis options:
+
+```powershell
+dotnet run --project Tools\SharpProof.EffectSummary -- --all-runtime-assemblies --include-callees --max-depth -1 --transitive-roots --shard-output artifacts\effect-summary\net8-shards --progress artifacts\effect-summary\net8-shards.progress.json --resume
+```
+
+Each shard is a normal versioned effect-summary document containing one
+`Assemblies` entry, so consumers can ingest or replace shards independently.
+
 Use `--max-depth -1` when a filtered slice must keep the full reachable same-assembly callee closure instead of a bounded prefix.
 
 Propagate root candidate labels through same-assembly calls:

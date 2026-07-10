@@ -8,6 +8,61 @@ namespace SharpProof.Test;
 public sealed class EffectSummaryScalabilityTests
 {
     [Test]
+    public async Task EffectSummaryTool_ShardOutputWritesOneDocumentPerAssembly()
+    {
+        const string source = """
+using System;
+
+public static class ShardFixture
+{
+    public static void Root() => Throw();
+
+    public static void Throw() => throw new InvalidOperationException();
+}
+""";
+
+        await using var firstFixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryShardOne",
+            source);
+        await using var secondFixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryShardTwo",
+            source);
+        var outputDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "effect-summary-shards-" + Guid.NewGuid().ToString("N"));
+        var progressPath = Path.Combine(outputDirectory, "shard-progress.json");
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--assembly",
+            firstFixture.AssemblyPath,
+            "--assembly",
+            secondFixture.AssemblyPath,
+            "--include-callees",
+            "--max-depth",
+            "-1",
+            "--transitive-roots",
+            "--max-exception-edges",
+            "2",
+            "--shard-output",
+            outputDirectory,
+            "--progress",
+            progressPath);
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        var shardPaths = Directory
+            .EnumerateFiles(outputDirectory, "*.SharpProof.EffectSummary.json", SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.That(shardPaths, Has.Length.EqualTo(2));
+        Assert.That(File.Exists(progressPath), Is.False);
+
+        foreach (var shardPath in shardPaths)
+        {
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(shardPath));
+            Assert.That(summary.RootElement.GetProperty("Assemblies").GetArrayLength(), Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task EffectSummaryTool_ResumesCompletedArtifactSpecOutputs()
     {
         const string source = """

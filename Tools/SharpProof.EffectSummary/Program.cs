@@ -6,6 +6,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -22,9 +23,21 @@ internal static class EffectSummaryCli
             return 0;
         }
 
-        if (!string.IsNullOrWhiteSpace(options.ProgressPath) && string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
+        if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath) && !string.IsNullOrWhiteSpace(options.ShardOutputPath))
         {
-            throw new ArgumentException("--progress requires --artifact-spec.");
+            throw new ArgumentException("--artifact-spec and --shard-output cannot be combined.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ShardOutputPath) && !string.IsNullOrWhiteSpace(options.OutputPath))
+        {
+            throw new ArgumentException("--shard-output cannot be combined with --output.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ProgressPath) &&
+            string.IsNullOrWhiteSpace(options.ArtifactSpecPath) &&
+            string.IsNullOrWhiteSpace(options.ShardOutputPath))
+        {
+            throw new ArgumentException("--progress requires --artifact-spec or --shard-output.");
         }
 
         if (options.Resume && string.IsNullOrWhiteSpace(options.ProgressPath))
@@ -35,6 +48,11 @@ internal static class EffectSummaryCli
         if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
         {
             return RunArtifactSpec(options.ArtifactSpecPath!, options.ProgressPath, options.Resume);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ShardOutputPath))
+        {
+            return RunSharded(options);
         }
 
         WriteDocument(BuildDocument(options), options.OutputPath);
@@ -85,6 +103,145 @@ internal static class EffectSummaryCli
         return 0;
     }
 
+    private static int RunSharded(CliOptions options)
+    {
+        var assemblyPaths = ResolveInputAssemblies(options);
+        var outputDirectory = Path.GetFullPath(options.ShardOutputPath!);
+        Directory.CreateDirectory(outputDirectory);
+
+        var normalizedProgressPath = string.IsNullOrWhiteSpace(options.ProgressPath)
+            ? null
+            : Path.GetFullPath(options.ProgressPath);
+        var inputFingerprint = ComputeShardedInputFingerprint(options, assemblyPaths);
+        var completedOutputPaths = normalizedProgressPath == null || !options.Resume
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : LoadShardedProgress(normalizedProgressPath, inputFingerprint);
+
+        foreach (var assemblyPath in assemblyPaths)
+        {
+            var outputPath = GetShardOutputPath(outputDirectory, assemblyPath);
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
+            {
+                continue;
+            }
+
+            completedOutputPaths.Remove(outputPath);
+            WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
+            completedOutputPaths.Add(outputPath);
+            if (normalizedProgressPath != null)
+            {
+                SaveShardedProgress(normalizedProgressPath, inputFingerprint, completedOutputPaths);
+            }
+        }
+
+        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath))
+        {
+            File.Delete(normalizedProgressPath);
+        }
+
+        return 0;
+    }
+
+    private static string GetShardOutputPath(string outputDirectory, string assemblyPath)
+    {
+        var assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
+        if (string.IsNullOrWhiteSpace(assemblyName))
+        {
+            assemblyName = "assembly";
+        }
+
+        var invalidFileNameCharacters = Path.GetInvalidFileNameChars();
+        var safeAssemblyName = new string(
+            assemblyName
+                .Select(character => invalidFileNameCharacters.Contains(character) ? '_' : character)
+                .ToArray());
+        var pathHash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(assemblyPath))))
+            .ToLowerInvariant()[..12];
+        return Path.Combine(
+            outputDirectory,
+            $"{safeAssemblyName}.{pathHash}.SharpProof.EffectSummary.json");
+    }
+
+    private static string ComputeShardedInputFingerprint(CliOptions options, IReadOnlyList<string> assemblyPaths)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            Assemblies = assemblyPaths.Select(path => new
+            {
+                Path = Path.GetFullPath(path),
+                Sha256 = ComputeFileSha256(path),
+            }),
+            options.Limit,
+            SymbolPrefixes = options.SymbolPrefixes,
+            ExactSymbols = options.ExactSymbols,
+            ExactSymbolKeys = options.ExactSymbolKeys,
+            ExcludedSymbolPrefixes = options.ExcludedSymbolPrefixes,
+            options.IncludeCallees,
+            options.MaxDepth,
+            options.MaxExceptionEdges,
+            options.IncludeTransitiveRoots,
+            options.IncludePurityClassification,
+            options.CompareManualCatalogs,
+            options.IncludeBclFallbackInventory,
+        });
+        return ComputeSha256(payload);
+    }
+
+    private static HashSet<string> LoadShardedProgress(string progressPath, string inputFingerprint)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
+        var root = document.RootElement;
+        if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
+            schemaVersionElement.ValueKind != JsonValueKind.Number ||
+            schemaVersionElement.GetInt32() != 1)
+        {
+            throw new InvalidOperationException($"Unsupported sharded effect-summary progress schema in '{progressPath}'.");
+        }
+
+        var recordedFingerprint = root.TryGetProperty("InputFingerprint", out var fingerprintElement)
+            ? fingerprintElement.GetString()
+            : null;
+        if (!string.Equals(recordedFingerprint, inputFingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
+        }
+
+        var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
+            completedElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var pathElement in completedElement.EnumerateArray())
+            {
+                var path = pathElement.GetString();
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    completedOutputPaths.Add(Path.GetFullPath(path));
+                }
+            }
+        }
+
+        return completedOutputPaths;
+    }
+
+    private static void SaveShardedProgress(
+        string progressPath,
+        string inputFingerprint,
+        IEnumerable<string> completedOutputPaths)
+    {
+        SaveProgressJson(
+            progressPath,
+            new ShardedEffectSummaryProgressDocument
+            {
+                SchemaVersion = 1,
+                InputFingerprint = inputFingerprint,
+                CompletedOutputPaths = completedOutputPaths
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+            });
+    }
+
     private static HashSet<string> LoadCompletedArtifactOutputs(string progressPath, string artifactSpecSha256)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
@@ -127,15 +284,21 @@ internal static class EffectSummaryCli
         string artifactSpecSha256,
         IEnumerable<string> completedOutputPaths)
     {
+        SaveProgressJson(
+            progressPath,
+            new ArtifactSpecProgressDocument
+            {
+                SchemaVersion = 1,
+                ArtifactSpecSha256 = artifactSpecSha256,
+                CompletedOutputPaths = completedOutputPaths
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+            });
+    }
+
+    private static void SaveProgressJson(string progressPath, object progress)
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(progressPath)!);
-        var progress = new ArtifactSpecProgressDocument
-        {
-            SchemaVersion = 1,
-            ArtifactSpecSha256 = artifactSpecSha256,
-            CompletedOutputPaths = completedOutputPaths
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-        };
         var temporaryPath = progressPath + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
@@ -162,9 +325,17 @@ internal static class EffectSummaryCli
         return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
     }
 
-    private static EffectSummaryDocument BuildDocument(CliOptions options)
+    private static string ComputeSha256(string value)
     {
-        var assemblies = ResolveInputAssemblies(options);
+        using var sha256 = SHA256.Create();
+        return Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    }
+
+    private static EffectSummaryDocument BuildDocument(
+        CliOptions options,
+        IReadOnlyList<string>? inputAssemblies = null)
+    {
+        var assemblies = inputAssemblies ?? ResolveInputAssemblies(options);
 
         var reports = assemblies
             .Select(path => AssemblyEffectSummarizer.Summarize(
@@ -260,6 +431,7 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
         Console.Error.WriteLine("  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
         Console.Error.WriteLine("  --all-runtime-assemblies   Inspect all System runtime assemblies for the target framework.");
+        Console.Error.WriteLine("  --shard-output <directory> Write one summary document per input assembly, retaining bounded per-assembly memory.");
         Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
         Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
         Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
@@ -307,6 +479,8 @@ internal sealed class CliOptions
     public int MaxExceptionEdges { get; private set; } = DefaultMaxExceptionEdges;
 
     public string? ProgressPath { get; private set; }
+
+    public string? ShardOutputPath { get; private set; }
 
     public bool Resume { get; private set; }
 
@@ -362,6 +536,9 @@ internal sealed class CliOptions
                     break;
                 case "--progress":
                     options.ProgressPath = ReadRequiredValue(args, ref i, arg);
+                    break;
+                case "--shard-output":
+                    options.ShardOutputPath = ReadRequiredValue(args, ref i, arg);
                     break;
                 case "--resume":
                     options.Resume = true;
@@ -764,6 +941,15 @@ internal sealed class ArtifactSpecProgressDocument
     public int SchemaVersion { get; set; }
 
     public string ArtifactSpecSha256 { get; set; } = string.Empty;
+
+    public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
+}
+
+internal sealed class ShardedEffectSummaryProgressDocument
+{
+    public int SchemaVersion { get; set; }
+
+    public string InputFingerprint { get; set; } = string.Empty;
 
     public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
 }

@@ -124,12 +124,6 @@ grouped by their original feature area.
   ignored because assembly identity, module version, method token, method-body
   hash, or the artifact spec's framework/package source no longer matches the
   current compilation.
-- Make effect-summary generation memory-bounded and resumable for
-  `--all-runtime-assemblies`, `--include-callees`, and unbounded `--max-depth`
-  runs: stream or shard per-assembly output, record progress, and bound thrown
-  exception edge traversal so large runtime analyses do not require holding the
-  full document graph in memory.
-
 #### Tooling, Packaging, And Verification
 - Add CI-visible package-consumer tests for all current public diagnostics, not
   only a subset, and include code-fix availability where supported by the
