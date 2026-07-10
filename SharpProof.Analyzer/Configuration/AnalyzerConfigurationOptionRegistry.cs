@@ -4,8 +4,13 @@ namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerConfigurationOptionRegistry
 {
-    private static readonly ImmutableDictionary<string, AnalyzerConfigurationOption> OptionsByKey =
-        All.ToImmutableDictionary(static option => option.Key, StringComparer.Ordinal);
+    private static ImmutableDictionary<string, AnalyzerConfigurationOption>? _optionsByKey;
+
+    // Computed lazily so it never reads All during static initialization: static initializers run
+    // in textual order, and member-ordering rules (fields before properties) can place this ahead
+    // of All, which would otherwise read a default ImmutableArray and throw in the type initializer.
+    private static ImmutableDictionary<string, AnalyzerConfigurationOption> OptionsByKey =>
+        _optionsByKey ??= All.ToImmutableDictionary(static option => option.Key, StringComparer.Ordinal);
 
     public static ImmutableArray<AnalyzerConfigurationOption> All { get; } = ImmutableArray.Create(
         new AnalyzerConfigurationOption(
