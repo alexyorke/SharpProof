@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion> 
     <ImplicitUsings>enable</ImplicitUsings> 
-    <NoWarn>$(NoWarn);RS2007;RS1035</NoWarn> 
+    <NoWarn>$(NoWarn);RS1035</NoWarn>
     <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
     <GeneratedPurityArtifactSpecSourcePath Condition="'$(GeneratedPurityArtifactSpecSourcePath)' == ''">$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecSourcePath>
     <GeneratedPurityArtifactSpecPath Condition="'$(GeneratedPurityArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecPath>

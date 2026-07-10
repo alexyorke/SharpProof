@@ -137,7 +137,7 @@
                                 "path":  "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Analyzer",
-                                "fixtureCount":  213,
+                                "fixtureCount":  214,
                                 "tokens":  [
                                                "SharpProofAnalyzer"
                                            ]
@@ -357,6 +357,10 @@
                          {
                              "name":  "AnalyzerPackagingTests",
                              "path":  "SharpProof.Test/AnalyzerPackagingTests.cs"
+                         },
+                         {
+                             "name":  "AnalyzerReleaseTrackingTests",
+                             "path":  "SharpProof.Test/AnalyzerReleaseTrackingTests.cs"
                          },
                          {
                              "name":  "AnalyzerStaticCollectionArchitectureTests",
@@ -3591,7 +3595,7 @@
                             "declaredTypes":  [
                                                   "SharpProofAnalyzer"
                                               ],
-                            "referencingFixtureCount":  213,
+                            "referencingFixtureCount":  214,
                             "referencedTokens":  [
                                                      "SharpProofAnalyzer"
                                                  ]
