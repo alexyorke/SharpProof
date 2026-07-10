@@ -137,6 +137,60 @@ public class TestClass
     }
 
     [Test]
+    public async Task NullableFlow_NotNullReturnMakesNullBranchUnreachableForPurity()
+    {
+        var test = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return Read() is null ? Impure() : 0;
+    }
+
+    [return: NotNull]
+    [Pure]
+    private static string? Read() => string.Empty;
+
+    [Impure]
+    private static int Impure() => 1;
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task NullableFlow_AllowNullKeepsNullBranchReachableForPurity()
+    {
+        var test = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod([AllowNull] string value)
+    {
+        return value is null ? Impure() : 0;
+    }
+
+    [Impure]
+    private static int Impure() => 1;
+}";
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+
+        Assert.That(
+            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.True);
+    }
+
+    [Test]
     public async Task ConditionalAccess_ImpossibleWhenNotNullWithImpureCall_NoDiagnostic()
     {
         var test = @"

@@ -713,8 +713,8 @@ internal static partial class CSharpConditionToFormula
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
                 argument.Parameter is not { IsParams: false } parameter ||
                 !IsSupportedNotNullWhenArgument(parameter, argument.Syntax as ArgumentSyntax) ||
-                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
-                notNullWhenValue != branchWhenTrue ||
+                NullableFlowFacts.GetParameterOutputState(parameter, branchWhenTrue) !=
+                NullableFlowFactState.NotNull ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !TryCreateNotNullWhenArgumentFormula(
                     argumentSyntax.Expression,

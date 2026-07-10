@@ -192,6 +192,72 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task Ensures_ParameterInputNullabilityContractsAreSharedWithProgramPointProofs()
+    {
+        var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using System.Diagnostics.CodeAnalysis;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public int Length([DisallowNull] string? value)
+    {
+        return value.Length;
+    }
+}";
+
+        Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
+    }
+
+    [Test]
+    public async Task Ensures_AllowNullOverridesNonNullableParameterEntryFact()
+    {
+        var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using System.Diagnostics.CodeAnalysis;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""value != null"")]
+    public int Length([AllowNull] string value)
+    {
+        return value == null ? 0 : value.Length;
+    }
+}";
+
+        Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task Ensures_NotNullReturnContractProvesResultNonNull()
+    {
+        var test = @"
+#nullable enable
+#pragma warning disable SP0004
+using System.Diagnostics.CodeAnalysis;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [return: NotNull]
+    [Ensures(""result != null"")]
+    public string? Value()
+    {
+        return Read();
+    }
+
+    private static string? Read() => null;
+}";
+
+        Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
+    }
+
+    [Test]
     public async Task Ensures_ResultComparedWithParameter_FailingReturnReportsSp0018()
     {
         var test = @"

@@ -137,6 +137,7 @@ internal static class MethodEnsuresAnalyzer
                 if (!TryRewriteConditionForCompletionSite(
                         contract.Condition,
                         completionSite,
+                        NullableFlowFacts.GetMethodReturnState(methodSymbol),
                         out var rewrittenCondition,
                         out _))
                 {
@@ -508,6 +509,7 @@ internal static class MethodEnsuresAnalyzer
     private static bool TryRewriteConditionForCompletionSite(
         string conditionText,
         CompletionSite completionSite,
+        NullableFlowFactState resultState,
         out string rewrittenCondition,
         out ExpressionSyntax rewrittenExpression)
     {
@@ -520,6 +522,9 @@ internal static class MethodEnsuresAnalyzer
             rewrittenExpression = conditionExpression;
             return true;
         }
+
+        if (resultState == NullableFlowFactState.NotNull)
+            conditionExpression = (ExpressionSyntax)new NullableResultContractRewriter().Visit(conditionExpression)!;
 
         var rewriter = new ResultPlaceholderRewriter((ExpressionSyntax)completionSite.ResultExpression.WithoutTrivia());
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
@@ -765,6 +770,65 @@ internal static class MethodEnsuresAnalyzer
                 return base.VisitIdentifierName(node);
 
             return _replacement.WithTriviaFrom(node);
+        }
+    }
+
+    private sealed class NullableResultContractRewriter : CSharpSyntaxRewriter
+    {
+        public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node)
+        {
+            if ((node.IsKind(SyntaxKind.EqualsExpression) ||
+                 node.IsKind(SyntaxKind.NotEqualsExpression)) &&
+                ((IsResult(node.Left) && IsNull(node.Right)) ||
+                 (IsNull(node.Left) && IsResult(node.Right))))
+                return SyntaxFactory.LiteralExpression(
+                        node.IsKind(SyntaxKind.NotEqualsExpression)
+                            ? SyntaxKind.TrueLiteralExpression
+                            : SyntaxKind.FalseLiteralExpression)
+                    .WithTriviaFrom(node);
+
+            return base.VisitBinaryExpression(node);
+        }
+
+        public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node)
+        {
+            if (!IsResult(node.Expression) || !TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
+                return base.VisitIsPatternExpression(node);
+
+            return SyntaxFactory.LiteralExpression(
+                    matchesNonNull ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)
+                .WithTriviaFrom(node);
+        }
+
+        private static bool IsResult(ExpressionSyntax expression)
+        {
+            return expression is IdentifierNameSyntax identifier &&
+                   string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal);
+        }
+
+        private static bool IsNull(ExpressionSyntax expression)
+        {
+            return expression.IsKind(SyntaxKind.NullLiteralExpression);
+        }
+
+        private static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
+        {
+            if (pattern is ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression })
+            {
+                matchesNonNull = false;
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+                TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
+            {
+                matchesNonNull = !nestedMatchesNonNull;
+                return true;
+            }
+
+            matchesNonNull = false;
+            return false;
         }
     }
 

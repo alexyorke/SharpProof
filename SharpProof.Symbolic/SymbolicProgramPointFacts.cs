@@ -27,6 +27,7 @@ internal static partial class SymbolicProgramPointFacts
         bool includeCurrentStatementCompletionFacts = false)
     {
         var facts = new List<SmtFormula>();
+        AddMethodEntryNullableFlowFacts(site, semanticModel, cancellationToken, facts);
         foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
         {
             if (IsLoopBodyBlock(containingBlock.Block))
@@ -100,6 +101,7 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicState? initialState)
     {
         var state = initialState ?? new SymbolicState();
+        AddMethodEntryNullableFlowStateFacts(ref state, site, semanticModel, cancellationToken);
         foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
         {
             if (IsLoopBodyBlock(containingBlock.Block))
@@ -2922,6 +2924,68 @@ internal static partial class SymbolicProgramPointFacts
         return state.Normalize();
     }
 
+    private static void AddMethodEntryNullableFlowFacts(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        ICollection<SmtFormula> facts)
+    {
+        foreach (var parameter in GetDefinitelyNotNullEntryParameters(
+                     site,
+                     semanticModel,
+                     cancellationToken))
+        {
+            if (!TryCreateSymbolSmtValue(parameter, out var parameterFormula) ||
+                parameterFormula.Kind != SmtValueKind.Reference)
+                continue;
+
+            AddUniqueFact(
+                facts,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    parameterFormula,
+                    new SmtNullConstant()));
+        }
+    }
+
+    private static void AddMethodEntryNullableFlowStateFacts(
+        ref SymbolicState state,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        foreach (var parameter in GetDefinitelyNotNullEntryParameters(
+                     site,
+                     semanticModel,
+                     cancellationToken))
+        {
+            if (!TryCreateSymbolTerm(parameter, out var parameterTerm) ||
+                parameterTerm.Kind != SmtValueKind.Reference)
+                continue;
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.NotEqual,
+                parameterTerm,
+                new SymbolicNullTerm(),
+                site,
+                "ir.path.method-entry.nullable-flow");
+        }
+    }
+
+    private static IEnumerable<IParameterSymbol> GetDefinitelyNotNullEntryParameters(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is not IMethodSymbol method)
+            yield break;
+
+        foreach (var parameter in method.Parameters)
+            if (NullableFlowFacts.GetParameterInputState(parameter) == NullableFlowFactState.NotNull)
+                yield return (IParameterSymbol)parameter.OriginalDefinition;
+    }
+
     private static SymbolicState CollectForInitializerStateNative(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -5005,14 +5069,20 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var argument in invocationOperation.Arguments)
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !NullableFlowFacts.HasNotNullPostcondition(parameter) ||
+                argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
-                !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
+                !ArgumentRefKindMatches(parameter, argumentSyntax) ||
+                !HasNotNullNormalCompletionPostcondition(parameter) ||
+                parameter.RefKind != RefKind.None &&
+                !IsUniqueOutputArgumentTarget(
+                    invocationOperation,
+                    argument,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             AddStableReferenceNonNullFact(argumentSyntax.Expression, statement, semanticModel, cancellationToken,
-                facts);
+                facts, parameter.RefKind != RefKind.None);
         }
     }
 
@@ -5031,10 +5101,16 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var argument in invocationOperation.Arguments)
         {
             if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
-                !NullableFlowFacts.HasNotNullPostcondition(parameter) ||
+                argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
-                !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
+                !ArgumentRefKindMatches(parameter, argumentSyntax) ||
+                !HasNotNullNormalCompletionPostcondition(parameter) ||
+                parameter.RefKind != RefKind.None &&
+                !IsUniqueOutputArgumentTarget(
+                    invocationOperation,
+                    argument,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             AddStableReferenceNonNullStateFact(
@@ -5043,8 +5119,58 @@ internal static partial class SymbolicProgramPointFacts
                 statement,
                 semanticModel,
                 cancellationToken,
-                "ir.path.normal-completion.parameter-not-null");
+                "ir.path.normal-completion.parameter-not-null",
+                parameter.RefKind != RefKind.None);
         }
+    }
+
+    private static bool HasNotNullNormalCompletionPostcondition(IParameterSymbol parameter)
+    {
+        return parameter.RefKind == RefKind.None
+            ? NullableFlowFacts.HasNotNullPostcondition(parameter)
+            : NullableFlowFacts.GetParameterOutputState(parameter) == NullableFlowFactState.NotNull;
+    }
+
+    private static bool ArgumentRefKindMatches(IParameterSymbol parameter, ArgumentSyntax argument)
+    {
+        return parameter.RefKind switch
+        {
+            RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
+            RefKind.Ref => argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword),
+            RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
+            _ => false
+        };
+    }
+
+    private static bool IsUniqueOutputArgumentTarget(
+        IInvocationOperation invocation,
+        IArgumentOperation argument,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (argument.Syntax is not ArgumentSyntax argumentSyntax ||
+            !NullableFlowFacts.TryGetArgumentTargetSymbol(
+                argumentSyntax.Expression,
+                semanticModel,
+                cancellationToken,
+                out var target))
+            return false;
+
+        foreach (var otherArgument in invocation.Arguments)
+        {
+            if (ReferenceEquals(argument, otherArgument) ||
+                otherArgument.Syntax is not ArgumentSyntax otherArgumentSyntax ||
+                !NullableFlowFacts.TryGetArgumentTargetSymbol(
+                    otherArgumentSyntax.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var otherTarget))
+                continue;
+
+            if (SymbolEqualityComparer.Default.Equals(target, otherTarget)) return false;
+        }
+
+        return true;
     }
 
     private static void AddTopLevelMemberNotNullNormalCompletionFacts(
@@ -5388,20 +5514,27 @@ internal static partial class SymbolicProgramPointFacts
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        ICollection<SmtFormula> facts)
+        ICollection<SmtFormula> facts,
+        bool allowArgumentMutation = false)
     {
-        if (!IsLocalOrParameterReference(expression, semanticModel, cancellationToken) ||
-            AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
-            return false;
-
-        if (SymbolicReachabilityService.TryCreateReferenceNullComparison(
+        if (!NullableFlowFacts.TryGetArgumentTargetSymbol(
                 expression,
                 semanticModel,
                 cancellationToken,
-                false,
-                out var notNullFact))
+                out var symbol) ||
+            !allowArgumentMutation &&
+            AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
+            return false;
+
+        if (TryCreateSymbolSmtValue(symbol, out var symbolFormula) &&
+            symbolFormula.Kind == SmtValueKind.Reference)
         {
-            AddUniqueFact(facts, notNullFact);
+            AddUniqueFact(
+                facts,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    symbolFormula,
+                    new SmtNullConstant()));
             return true;
         }
 
@@ -5414,18 +5547,28 @@ internal static partial class SymbolicProgramPointFacts
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string provenance)
+        string provenance,
+        bool allowArgumentMutation = false)
     {
-        if (!IsLocalOrParameterReference(expression, semanticModel, cancellationToken) ||
+        if (!NullableFlowFacts.TryGetArgumentTargetSymbol(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var symbol) ||
+            !allowArgumentMutation &&
             AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
             return false;
 
-        AddReferenceNullCondition(
+        if (!TryCreateSymbolTerm(symbol, out var symbolTerm) ||
+            symbolTerm.Kind != SmtValueKind.Reference)
+            return false;
+
+        AddRelationPathFact(
             ref state,
+            SymbolicRelationOperator.NotEqual,
+            symbolTerm,
+            new SymbolicNullTerm(),
             expression,
-            false,
-            semanticModel,
-            cancellationToken,
             provenance);
         return true;
     }

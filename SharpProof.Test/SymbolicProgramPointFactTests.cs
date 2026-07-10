@@ -613,6 +613,145 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
     }
 
+    [Test]
+    public void ProgramPointFacts_ParameterInputContractsRespectAllowAndDisallowNull()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    public int Disallowed([DisallowNull] string? value)
+    {
+        return value.Length;
+    }
+
+    public int Allowed([AllowNull] string value)
+    {
+        return value == null ? 0 : value.Length;
+    }
+}";
+
+        var disallowedMarker = FindMarker(source, "return value.Length;");
+        var allowedMarker = FindMarker(source, "return value == null");
+        var disallowedProof = ProveAtMarker(source, disallowedMarker, "value != null");
+        var allowedProof = ProveAtMarker(source, allowedMarker, "value != null");
+
+        Assert.That(
+            disallowedProof.TruthValue,
+            Is.EqualTo(SymbolicTruthValue.ProvenTrue),
+            disallowedProof.Reason);
+        Assert.That(
+            allowedProof.TruthValue,
+            Is.EqualTo(SymbolicTruthValue.Unknown),
+            allowedProof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_ReturnContractsOverrideDeclaredNullability()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Values
+{
+    [return: NotNull]
+    public static string? Always() => string.Empty;
+
+    [return: MaybeNull]
+    public static string Maybe() => null;
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var always = Values.Always();
+        var maybe = Values.Maybe();
+        return always.Length + (maybe == null ? 0 : maybe.Length);
+    }
+}";
+
+        var marker = FindMarker(source, "return always.Length");
+        var alwaysProof = ProveAtMarker(source, marker, "always != null");
+        var maybeProof = ProveAtMarker(source, marker, "maybe != null");
+
+        Assert.That(
+            alwaysProof.TruthValue,
+            Is.EqualTo(SymbolicTruthValue.ProvenTrue),
+            alwaysProof.Reason);
+        Assert.That(maybeProof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), maybeProof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_MaybeNullWhenPreservesNonNullOppositeBranch()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Values
+{
+    public static bool TryRead([MaybeNullWhen(false)] out string value)
+    {
+        value = string.Empty;
+        return true;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        if (Values.TryRead(out var value))
+        {
+            return value.Length;
+        }
+
+        return value == null ? 0 : value.Length;
+    }
+}";
+
+        var trueMarker = FindMarker(source, "return value.Length;");
+        var falseMarker = FindMarker(source, "return value == null");
+        var trueProof = ProveAtMarker(source, trueMarker, "value != null");
+        var falseProof = ProveAtMarker(source, falseMarker, "value != null");
+
+        Assert.That(trueProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), trueProof.Reason);
+        Assert.That(falseProof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), falseProof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_NonNullableOutParameterNormalCompletionProvesArgumentNonNull()
+    {
+        const string source = @"
+#nullable enable
+
+public static class Values
+{
+    public static void Read(out string value)
+    {
+        value = string.Empty;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        Values.Read(out var value);
+        return value.Length;
+    }
+}";
+
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
+
     [TestCase("ArgumentOutOfRangeException.ThrowIfNegative(value);", "value >= 0")]
     [TestCase("ArgumentOutOfRangeException.ThrowIfZero(value);", "value != 0")]
     [TestCase("ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);", "value > 0")]

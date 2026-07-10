@@ -555,6 +555,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         CancellationToken cancellationToken,
         out RuntimeHazardTrigger trigger)
     {
+        if (NullableFlowFacts.IsDefinitelyNotNullReferenceValue(
+                receiver,
+                semanticModel,
+                cancellationToken))
+        {
+            trigger = default;
+            return false;
+        }
+
         if (TryCreateIrRelationalExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.NullDereference,
                 receiver,

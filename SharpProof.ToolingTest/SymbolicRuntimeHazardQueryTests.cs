@@ -470,6 +470,68 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_PrunesNotNullReturnContractReceiver()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    [return: NotNull]
+    private static string? Read() => null;
+
+    public int TestMethod()
+    {
+        return Read().Length;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return Read().Length;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                includeUnprovenCandidates: true,
+                kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+        Assert.That(result.Hazards, Is.Empty);
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_RetainsMaybeNullReturnContractReceiver()
+    {
+        const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public class TestClass
+{
+    [return: MaybeNull]
+    private static string Read() => null;
+
+    public int TestMethod()
+    {
+        var value = Read();
+        return value.Length;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return value.Length;",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                includeUnprovenCandidates: true,
+                kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+        Assert.That(result.Hazards, Has.Count.EqualTo(1));
+        Assert.That(result.Hazards[0].Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_MemberReceiverNullDereferenceUsesIrPrecondition()
     {
         const string source = @"

@@ -631,8 +631,8 @@ internal static class SymbolicReachabilityService
                 argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
-                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
-                notNullWhenValue != branchWhenTrue ||
+                NullableFlowFacts.GetParameterOutputState(parameter, branchWhenTrue) !=
+                NullableFlowFactState.NotNull ||
                 !TryCreateIrNotNullWhenArgumentFormula(
                     argumentSyntax.Expression,
                     argumentSyntax.Expression,
@@ -1563,8 +1563,8 @@ internal static class SymbolicReachabilityService
                 argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !IsSupportedIrNotNullWhenArgument(parameter, argumentSyntax) ||
-                !NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
-                notNullWhenValue != branchWhenTrue ||
+                NullableFlowFacts.GetParameterOutputState(parameter, branchWhenTrue) !=
+                NullableFlowFactState.NotNull ||
                 !TryCreateIrNotNullWhenArgumentCondition(
                     argumentSyntax.Expression,
                     argumentSyntax.Expression,
@@ -1928,6 +1928,13 @@ internal static class SymbolicReachabilityService
         SmtAnalysisService? smtAnalysis,
         IEnumerable<SmtFormula>? pathConditions = null)
     {
+        if (NullableFlowFacts.TryEvaluateNullTest(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var nullableFlowTruth))
+            return nullableFlowTruth;
+
         var basePathConditions = pathConditions?.ToList() ?? new List<SmtFormula>();
         if (EvaluateConditionTruthWithIr(
                 expression,

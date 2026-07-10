@@ -104,6 +104,80 @@ internal static class NullableFlowFacts
         return GetExpressionState(expression, semanticModel, cancellationToken) == NullableFlowFactState.NotNull;
     }
 
+    internal static bool TryEvaluateNullTest(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out bool value)
+    {
+        expression = UnwrapParentheses(expression);
+        if (expression is PrefixUnaryExpressionSyntax negation &&
+            negation.IsKind(SyntaxKind.LogicalNotExpression) &&
+            TryEvaluateNullTest(negation.Operand, semanticModel, cancellationToken, out var operandValue))
+        {
+            value = !operandValue;
+            return true;
+        }
+
+        if (expression is BinaryExpressionSyntax binary &&
+            (binary.IsKind(SyntaxKind.EqualsExpression) ||
+             binary.IsKind(SyntaxKind.NotEqualsExpression)) &&
+            semanticModel.GetOperation(binary, cancellationToken) is IBinaryOperation { OperatorMethod: null })
+        {
+            var target = IsNullLiteral(binary.Left)
+                ? binary.Right
+                : IsNullLiteral(binary.Right)
+                    ? binary.Left
+                    : null;
+            if (target != null &&
+                GetExpressionState(target, semanticModel, cancellationToken) == NullableFlowFactState.NotNull)
+            {
+                value = binary.IsKind(SyntaxKind.NotEqualsExpression);
+                return true;
+            }
+        }
+
+        if (expression is IsPatternExpressionSyntax isPattern &&
+            TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
+            GetExpressionState(isPattern.Expression, semanticModel, cancellationToken) ==
+            NullableFlowFactState.NotNull)
+        {
+            value = matchesNonNull;
+            return true;
+        }
+
+        value = false;
+        return false;
+    }
+
+    internal static bool TryGetArgumentTargetSymbol(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ISymbol symbol)
+    {
+        expression = UnwrapParentheses(expression);
+        if (expression is DeclarationExpressionSyntax
+            {
+                Designation: SingleVariableDesignationSyntax designation
+            } &&
+            semanticModel.GetDeclaredSymbol(designation, cancellationToken) is ILocalSymbol declaredLocal)
+        {
+            symbol = declaredLocal.OriginalDefinition;
+            return true;
+        }
+
+        var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
+        if (candidate is ILocalSymbol or IParameterSymbol)
+        {
+            symbol = candidate;
+            return true;
+        }
+
+        symbol = null!;
+        return false;
+    }
+
     internal static NullableFlowFactState GetParameterInputState(IParameterSymbol parameter)
     {
         if (parameter == null) throw new ArgumentNullException(nameof(parameter));
@@ -550,5 +624,30 @@ internal static class NullableFlowFacts
         while (expression is ParenthesizedExpressionSyntax parenthesized) expression = parenthesized.Expression;
 
         return expression;
+    }
+
+    private static bool IsNullLiteral(ExpressionSyntax expression)
+    {
+        return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
+    }
+
+    private static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
+    {
+        if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression))
+        {
+            matchesNonNull = false;
+            return true;
+        }
+
+        if (pattern is UnaryPatternSyntax unaryPattern &&
+            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+            TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
+        {
+            matchesNonNull = !nestedMatchesNonNull;
+            return true;
+        }
+
+        matchesNonNull = false;
+        return false;
     }
 }
