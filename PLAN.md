@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Add SMT solver lifecycle and health controls for long-running analyzer hosts:
-  reset or retry after transient Z3 failures, expose when a service has become
-  permanently unavailable, and provide an intentional way to dispose or recycle
-  thread-local solver contexts without losing shared-query-cache benefits.
 - Triage `POTENTIAL_BUGS.md` into prioritized issues or regression tests, then
   delete or shrink entries once they are fixed, disproven, or intentionally
   accepted as conservative behavior.
