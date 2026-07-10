@@ -21,6 +21,9 @@ The analyzer combines:
 
 - Unsupported C# and library shapes can remain unknown or unproven.
 - Regex and string reasoning are partial.
+- Solver assignments are examples, not exhaustive input sets. Regex domains,
+  opaque non-null references, disjunctions, and alternative-path merges are
+  explicitly approximate; unsupported model shapes remain visible.
 - Ownership and mutation reasoning are local; there is no full Rust-style borrow
   checker yet.
 - Runtime hazards are source-visible and bounded, not a guarantee that every

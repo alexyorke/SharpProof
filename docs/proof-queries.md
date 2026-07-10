@@ -48,6 +48,11 @@ Use `SymbolicQueryService` as the public entrypoint:
 Public result objects expose source-like facts, proof outcomes, SMT diagnostics,
 and unknown reasons. Raw SMT terms are not the primary public abstraction.
 
+Reachability, implication, and runtime-hazard results also expose concrete
+solver assignments and conservative input-domain summaries. See
+[solver witnesses and input domains](input-witnesses.md) for the status model,
+query properties, aggregation rules, and full-JSON behavior.
+
 Every current query family now exposes its compact projection from the public
 library, not from CLI-only model classes:
 

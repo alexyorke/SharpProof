@@ -722,6 +722,7 @@ internal static class SymbolicInputDomainSynthesizer
     {
         private readonly HashSet<string> _contains = new(StringComparer.Ordinal);
         private readonly HashSet<string> _prefixes = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _predicateKeys = new(StringComparer.Ordinal);
         private readonly List<SymbolicDomainPredicate> _predicates = new();
         private readonly HashSet<string> _regexes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _suffixes = new(StringComparer.Ordinal);
@@ -835,6 +836,9 @@ internal static class SymbolicInputDomainSynthesizer
             SymbolicWitnessStatus status,
             string reason)
         {
+            var key = kind + "|" + isNegated + "|" + text + "|" + value;
+            if (!_predicateKeys.Add(key)) return;
+
             _predicates.Add(new SymbolicDomainPredicate(kind, text, value, isNegated, status, reason));
         }
 

@@ -38,6 +38,12 @@ The primary entrypoint is `SymbolicQueryService`:
 - `SymbolicCompactQueryOptions.SummaryOnly` is a preset for aggregate-only compact output. It keeps invariant, reachability, proof, and truncation metadata while omitting nested line and program-point arrays.
 - Compact program points include file path, line, column, absolute position, node span start/end/length, node start/end line and column, containing method name, program-point kind, direct merged invariant text, reachability and reachability reason, proof outcomes, and bounded proof details. This metadata remains available at the top level for a single point result even when `--max-points 0` suppresses nested program point arrays.
 - `SymbolicQueryResult` is the unified public result for point, line, span, and all-lines queries. It exposes program points, observed and conservative merged invariants, reachability, proof summaries, SMT diagnostics, and compact/invariant projections.
+- Program points expose `ReachabilityWitness` and `InputDomainSummary`; line,
+  span, file, and unified query results expose alternative
+  `ReachabilityWitnesses` and a conservatively merged domain summary.
+  Implication proofs and runtime hazards expose outcome/counterexample and
+  `path && trigger` witnesses respectively. The detailed precision contract is
+  documented in [solver witnesses and input domains](input-witnesses.md).
 
 Pass a bounded `SmtAnalysisService` to classify reachability or prove `--implies` conditions.
 If SMT is disabled, times out, exceeds budget, or cannot load its native solver, callers should treat the result as unknown rather than proven.
