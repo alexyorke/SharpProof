@@ -165,6 +165,37 @@ public sealed class TestClass
             Does.Contain("unsupported effect-summary SchemaVersion '99'"));
     }
 
+    [Test]
+    public async Task UnsupportedEffectSummaryEvidenceSchema_ReportsSp0032()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "SharpProof.EffectSummary.json",
+                    "{\"SchemaVersion\":1,\"EvidenceSchemaVersion\":99,\"Assemblies\":[]}")));
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("unsupported effect-summary EvidenceSchemaVersion '99'"));
+    }
+
+    [Test]
+    public async Task MismatchedEffectSummaryEvidenceCompatibility_ReportsSp0032()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "SharpProof.EffectSummary.json",
+                    "{\"SchemaVersion\":1,\"EvidenceSchemaVersion\":1," +
+                    "\"EvidenceSchemaCompatibility\":\"breaking\",\"Assemblies\":[]}")));
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+            Does.Contain("EvidenceSchemaCompatibility must be 'additive-v1'"));
+    }
+
     [TestCase(
         "AssemblySha256",
         "0000000000000000000000000000000000000000000000000000000000000000",

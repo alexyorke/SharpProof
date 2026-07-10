@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 
@@ -101,6 +102,15 @@ internal static class AnalyzerAdditionalFileValidator
                 return;
             }
 
+            if (!ValidateEvidenceSchema(
+                    additionalFile,
+                    root,
+                    "EvidenceSchemaVersion",
+                    "EvidenceSchemaCompatibility",
+                    "effect-summary",
+                    issues))
+                return;
+
             if (root.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalog) &&
                 generatedCatalog.ValueKind == JsonValueKind.Object)
             {
@@ -155,6 +165,53 @@ internal static class AnalyzerAdditionalFileValidator
         {
             AddIssue(issues, additionalFile, "malformed effect-summary JSON");
         }
+    }
+
+    private static bool ValidateEvidenceSchema(
+        AdditionalText additionalFile,
+        JsonElement element,
+        string versionPropertyName,
+        string compatibilityPropertyName,
+        string surfaceName,
+        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
+    {
+        if (!element.TryGetProperty(versionPropertyName, out var versionElement)) return true;
+
+        if (versionElement.ValueKind != JsonValueKind.Number ||
+            !versionElement.TryGetInt32(out var version))
+        {
+            AddIssue(issues, additionalFile, surfaceName + " has a non-numeric " + versionPropertyName);
+            return false;
+        }
+
+        if (!SharpProofEvidenceSchema.IsReadCompatible(version))
+        {
+            AddIssue(
+                issues,
+                additionalFile,
+                $"unsupported {surfaceName} {versionPropertyName} '{version}'; supported versions are " +
+                $"{SharpProofEvidenceSchema.MinimumReadCompatibleVersion}-{SharpProofEvidenceSchema.CurrentVersion}");
+            return false;
+        }
+
+        if (version == SharpProofEvidenceSchema.LegacyUnversionedVersion) return true;
+
+        if (!element.TryGetProperty(compatibilityPropertyName, out var compatibilityElement) ||
+            compatibilityElement.ValueKind != JsonValueKind.String ||
+            !string.Equals(
+                compatibilityElement.GetString(),
+                SharpProofEvidenceSchema.CompatibilityPolicy,
+                StringComparison.Ordinal))
+        {
+            AddIssue(
+                issues,
+                additionalFile,
+                surfaceName + " " + compatibilityPropertyName + " must be '" +
+                SharpProofEvidenceSchema.CompatibilityPolicy + "'");
+            return false;
+        }
+
+        return true;
     }
 
     private static void ValidateGeneratedPurityCatalog(

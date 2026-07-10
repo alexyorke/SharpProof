@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof.Schema;
 
 return EffectSummaryCli.Run(args);
 
@@ -5106,7 +5107,12 @@ internal sealed record EffectSummaryDocument(
     AssemblyEffectReport[] Assemblies,
     PurityClassificationReport? PurityReport,
     GeneratedPurityCatalogDocument? GeneratedPurityCatalog,
-    BclFallbackInventoryReport? BclFallbackInventory);
+    BclFallbackInventoryReport? BclFallbackInventory)
+{
+    public int EvidenceSchemaVersion => ProofEvidenceSchemaContract.CurrentVersion;
+
+    public string EvidenceSchemaCompatibility => ProofEvidenceSchemaContract.CompatibilityPolicy;
+}
 
 internal sealed record AssemblyEffectReport(
     string AssemblyName,
