@@ -158,3 +158,113 @@ static SharpProof.Symbolic.SymbolicCompactRuntimeHazard.FromHazard(SharpProof.Sy
 static SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.FromResult(SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! result, SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions? options = null) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult!
 static SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(SharpProof.Symbolic.SymbolicSmtDiagnostics! diagnostics) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics!
 static SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.FromHazards(System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicRuntimeHazard!>! hazards, SharpProof.Symbolic.SymbolicSmtDiagnostics! smtDiagnostics) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary!
+SharpProof.Symbolic.SymbolicDomainPredicate
+SharpProof.Symbolic.SymbolicDomainPredicate.IsNegated.get -> bool
+SharpProof.Symbolic.SymbolicDomainPredicate.Kind.get -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicate.Reason.get -> string!
+SharpProof.Symbolic.SymbolicDomainPredicate.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicDomainPredicate.Text.get -> string!
+SharpProof.Symbolic.SymbolicDomainPredicate.Value.get -> string?
+SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Alternative = 13 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.BooleanValue = 12 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.CollectionLength = 10 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Equality = 0 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.IndexBound = 11 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Inequality = 1 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Nullness = 3 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Range = 2 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.RegularExpression = 9 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.StringContains = 8 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.StringContent = 5 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.StringLength = 4 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.StringPrefix = 6 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.StringSuffix = 7 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicDomainPredicateKind.Unsupported = 14 -> SharpProof.Symbolic.SymbolicDomainPredicateKind
+SharpProof.Symbolic.SymbolicInputDomain
+SharpProof.Symbolic.SymbolicInputDomain.AlternativeCount.get -> int
+SharpProof.Symbolic.SymbolicInputDomain.CollectionLengthRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
+SharpProof.Symbolic.SymbolicInputDomain.DomainKind.get -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomain.ExactString.get -> string?
+SharpProof.Symbolic.SymbolicInputDomain.IntegerRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
+SharpProof.Symbolic.SymbolicInputDomain.IsIndex.get -> bool
+SharpProof.Symbolic.SymbolicInputDomain.Name.get -> string!
+SharpProof.Symbolic.SymbolicInputDomain.Nullness.get -> SharpProof.Symbolic.SymbolicNullness
+SharpProof.Symbolic.SymbolicInputDomain.Predicates.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicDomainPredicate!>!
+SharpProof.Symbolic.SymbolicInputDomain.Reason.get -> string!
+SharpProof.Symbolic.SymbolicInputDomain.RegularExpressions.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicInputDomain.RelatedCollection.get -> string?
+SharpProof.Symbolic.SymbolicInputDomain.RequiredPrefixes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicInputDomain.RequiredSubstrings.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicInputDomain.RequiredSuffixes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicInputDomain.Role.get -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputDomain.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicInputDomain.StringLengthRange.get -> SharpProof.Symbolic.SymbolicIntegerRange?
+SharpProof.Symbolic.SymbolicInputDomain.SymbolicNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicInputDomain.ValueKind.get -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Boolean = 1 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Collection = 5 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Index = 6 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Integer = 2 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Reference = 3 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.String = 4 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainKind.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputDomainKind
+SharpProof.Symbolic.SymbolicInputDomainSummary
+SharpProof.Symbolic.SymbolicInputDomainSummary.AlternativeCount.get -> int
+SharpProof.Symbolic.SymbolicInputDomainSummary.DomainCount.get -> int
+SharpProof.Symbolic.SymbolicInputDomainSummary.Domains.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicInputDomain!>!
+SharpProof.Symbolic.SymbolicInputDomainSummary.HasApproximation.get -> bool
+SharpProof.Symbolic.SymbolicInputDomainSummary.HasUnsupportedDomains.get -> bool
+SharpProof.Symbolic.SymbolicInputDomainSummary.Reason.get -> string!
+SharpProof.Symbolic.SymbolicInputDomainSummary.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.Derived = 5 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.Local = 2 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.Parameter = 1 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.Receiver = 3 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.ReceiverState = 4 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputRole.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputValueKind.Boolean = 1 -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputValueKind.Integer = 2 -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputValueKind.Reference = 3 -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputValueKind.String = 4 -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputValueKind.Unknown = 0 -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicInputWitness
+SharpProof.Symbolic.SymbolicInputWitness.AssignmentCount.get -> int
+SharpProof.Symbolic.SymbolicInputWitness.Assignments.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicSatisfyingAssignment!>!
+SharpProof.Symbolic.SymbolicInputWitness.DomainSummary.get -> SharpProof.Symbolic.SymbolicInputDomainSummary!
+SharpProof.Symbolic.SymbolicInputWitness.IsAvailable.get -> bool
+SharpProof.Symbolic.SymbolicInputWitness.Reason.get -> string!
+SharpProof.Symbolic.SymbolicInputWitness.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicIntegerRange
+SharpProof.Symbolic.SymbolicIntegerRange.ExactValue.get -> long?
+SharpProof.Symbolic.SymbolicIntegerRange.HasLowerBound.get -> bool
+SharpProof.Symbolic.SymbolicIntegerRange.HasUpperBound.get -> bool
+SharpProof.Symbolic.SymbolicIntegerRange.IsExact.get -> bool
+SharpProof.Symbolic.SymbolicIntegerRange.Maximum.get -> long?
+SharpProof.Symbolic.SymbolicIntegerRange.MaximumInclusive.get -> bool
+SharpProof.Symbolic.SymbolicIntegerRange.Minimum.get -> long?
+SharpProof.Symbolic.SymbolicIntegerRange.MinimumInclusive.get -> bool
+SharpProof.Symbolic.SymbolicNullness
+SharpProof.Symbolic.SymbolicNullness.NotNull = 2 -> SharpProof.Symbolic.SymbolicNullness
+SharpProof.Symbolic.SymbolicNullness.Null = 1 -> SharpProof.Symbolic.SymbolicNullness
+SharpProof.Symbolic.SymbolicNullness.Unknown = 0 -> SharpProof.Symbolic.SymbolicNullness
+SharpProof.Symbolic.SymbolicSatisfyingAssignment
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.BooleanValue.get -> bool?
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.IntegerValue.get -> long?
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.IsNull.get -> bool?
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.Reason.get -> string!
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.Role.get -> SharpProof.Symbolic.SymbolicInputRole
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.SourceName.get -> string!
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.Status.get -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.StringValue.get -> string?
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.SymbolicName.get -> string!
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.Value.get -> string!
+SharpProof.Symbolic.SymbolicSatisfyingAssignment.ValueKind.get -> SharpProof.Symbolic.SymbolicInputValueKind
+SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicWitnessStatus.Approximate = 2 -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicWitnessStatus.Exact = 1 -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicWitnessStatus.None = 0 -> SharpProof.Symbolic.SymbolicWitnessStatus
+SharpProof.Symbolic.SymbolicWitnessStatus.Unsupported = 3 -> SharpProof.Symbolic.SymbolicWitnessStatus
