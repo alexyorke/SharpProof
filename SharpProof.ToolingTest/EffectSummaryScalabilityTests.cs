@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -6,6 +7,91 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class EffectSummaryScalabilityTests
 {
+    [Test]
+    public async Task EffectSummaryTool_ResumesCompletedArtifactSpecOutputs()
+    {
+        const string source = """
+using System;
+
+public static class ResumableSummaryFixture
+{
+    public static void Root() => throw new InvalidOperationException();
+}
+""";
+
+        await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryResumableArtifactSpec",
+            source);
+        var specPath = Path.Combine(fixture.DirectoryPath, "artifact-spec.json");
+        var firstOutputPath = Path.Combine(fixture.DirectoryPath, "first.SharpProof.EffectSummary.json");
+        var secondOutputPath = Path.Combine(fixture.DirectoryPath, "second.SharpProof.EffectSummary.json");
+        var progressPath = Path.Combine(fixture.DirectoryPath, "artifact-progress.json");
+        var spec = new
+        {
+            SchemaVersion = 1,
+            Artifacts = new[]
+            {
+                new
+                {
+                    OutputPath = Path.GetFileName(firstOutputPath),
+                    AssemblyPaths = new[] { fixture.AssemblyPath },
+                    SymbolPrefixes = new[] { "ResumableSummaryFixture.Root" },
+                    IncludeTransitiveRoots = true,
+                },
+                new
+                {
+                    OutputPath = Path.GetFileName(secondOutputPath),
+                    AssemblyPaths = new[] { fixture.AssemblyPath },
+                    SymbolPrefixes = new[] { "ResumableSummaryFixture.Root" },
+                    IncludeTransitiveRoots = true,
+                },
+            },
+        };
+        await File.WriteAllTextAsync(specPath, JsonSerializer.Serialize(spec));
+
+        var initial = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--artifact-spec",
+            specPath,
+            "--progress",
+            progressPath);
+        Assert.That(initial.ExitCode, Is.EqualTo(0), initial.StandardError);
+        Assert.That(File.Exists(firstOutputPath), Is.True);
+        Assert.That(File.Exists(secondOutputPath), Is.True);
+        Assert.That(File.Exists(progressPath), Is.False);
+
+        var artifactSpecSha256 = Convert.ToHexString(
+                SHA256.HashData(await File.ReadAllBytesAsync(specPath)))
+            .ToLowerInvariant();
+        var firstOutputHash = await ComputeSha256Async(firstOutputPath);
+        await File.WriteAllTextAsync(
+            progressPath,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                ArtifactSpecSha256 = artifactSpecSha256,
+                CompletedOutputPaths = new[] { Path.GetFullPath(firstOutputPath) },
+            }));
+        File.Delete(secondOutputPath);
+
+        var resumed = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--artifact-spec",
+            specPath,
+            "--progress",
+            progressPath,
+            "--resume");
+        Assert.That(resumed.ExitCode, Is.EqualTo(0), resumed.StandardError);
+        Assert.That(File.Exists(secondOutputPath), Is.True);
+        Assert.That(File.Exists(progressPath), Is.False);
+        var resumedFirstOutputHash = await ComputeSha256Async(firstOutputPath);
+        Assert.That(resumedFirstOutputHash, Is.EqualTo(firstOutputHash));
+    }
+
+    private static async Task<string> ComputeSha256Async(string path)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await SHA256.HashDataAsync(stream));
+    }
+
     [Test]
     public async Task EffectSummaryTool_RejectsNonPositiveExceptionEdgeCap()
     {

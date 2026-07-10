@@ -22,20 +22,38 @@ internal static class EffectSummaryCli
             return 0;
         }
 
+        if (!string.IsNullOrWhiteSpace(options.ProgressPath) && string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
+        {
+            throw new ArgumentException("--progress requires --artifact-spec.");
+        }
+
+        if (options.Resume && string.IsNullOrWhiteSpace(options.ProgressPath))
+        {
+            throw new ArgumentException("--resume requires --progress.");
+        }
+
         if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
         {
-            return RunArtifactSpec(options.ArtifactSpecPath!);
+            return RunArtifactSpec(options.ArtifactSpecPath!, options.ProgressPath, options.Resume);
         }
 
         WriteDocument(BuildDocument(options), options.OutputPath);
         return 0;
     }
 
-    private static int RunArtifactSpec(string artifactSpecPath)
+    private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
     {
         var artifactSpecDirectory = Path.GetDirectoryName(Path.GetFullPath(artifactSpecPath))
             ?? throw new InvalidOperationException($"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
         var document = ArtifactSpecDocument.Load(artifactSpecPath);
+        var normalizedProgressPath = string.IsNullOrWhiteSpace(progressPath)
+            ? null
+            : Path.GetFullPath(progressPath);
+        var artifactSpecSha256 = ComputeFileSha256(artifactSpecPath);
+        var completedOutputPaths = normalizedProgressPath == null || !resume
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : LoadCompletedArtifactOutputs(normalizedProgressPath, artifactSpecSha256);
+
         foreach (var artifact in document.Artifacts)
         {
             var options = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
@@ -44,10 +62,104 @@ internal static class EffectSummaryCli
                 throw new ArgumentException("Artifact spec entries require OutputPath.");
             }
 
+            var outputPath = Path.GetFullPath(options.OutputPath!);
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
+            {
+                continue;
+            }
+
+            completedOutputPaths.Remove(outputPath);
             WriteDocument(BuildDocument(options), options.OutputPath);
+            completedOutputPaths.Add(outputPath);
+            if (normalizedProgressPath != null)
+            {
+                SaveArtifactSpecProgress(normalizedProgressPath, artifactSpecSha256, completedOutputPaths);
+            }
+        }
+
+        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath))
+        {
+            File.Delete(normalizedProgressPath);
         }
 
         return 0;
+    }
+
+    private static HashSet<string> LoadCompletedArtifactOutputs(string progressPath, string artifactSpecSha256)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(progressPath));
+        var root = document.RootElement;
+        if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
+            schemaVersionElement.ValueKind != JsonValueKind.Number ||
+            schemaVersionElement.GetInt32() != 1)
+        {
+            throw new InvalidOperationException($"Unsupported artifact-spec progress schema in '{progressPath}'.");
+        }
+
+        var recordedSpecHash = root.TryGetProperty("ArtifactSpecSha256", out var specHashElement)
+            ? specHashElement.GetString()
+            : null;
+        if (!string.Equals(recordedSpecHash, artifactSpecSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
+        }
+
+        var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
+            completedElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var pathElement in completedElement.EnumerateArray())
+            {
+                var path = pathElement.GetString();
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    completedOutputPaths.Add(Path.GetFullPath(path));
+                }
+            }
+        }
+
+        return completedOutputPaths;
+    }
+
+    private static void SaveArtifactSpecProgress(
+        string progressPath,
+        string artifactSpecSha256,
+        IEnumerable<string> completedOutputPaths)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(progressPath)!);
+        var progress = new ArtifactSpecProgressDocument
+        {
+            SchemaVersion = 1,
+            ArtifactSpecSha256 = artifactSpecSha256,
+            CompletedOutputPaths = completedOutputPaths
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+        };
+        var temporaryPath = progressPath + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            File.WriteAllText(
+                temporaryPath,
+                JsonSerializer.Serialize(
+                    progress,
+                    new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temporaryPath, progressPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static string ComputeFileSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var sha256 = SHA256.Create();
+        return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
     }
 
     private static EffectSummaryDocument BuildDocument(CliOptions options)
@@ -153,6 +265,8 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
         Console.Error.WriteLine("  --max-exception-edges <count> Maximum transitive thrown-exception edges retained per method. Default: 4096.");
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
+        Console.Error.WriteLine("  --progress <path>          Record completed artifact-spec outputs for resumable generation.");
+        Console.Error.WriteLine("  --resume                   Resume completed artifact-spec outputs recorded by --progress.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
         Console.Error.WriteLine("  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.");
         Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
@@ -191,6 +305,10 @@ internal sealed class CliOptions
     public int MaxDepth { get; private set; } = 1;
 
     public int MaxExceptionEdges { get; private set; } = DefaultMaxExceptionEdges;
+
+    public string? ProgressPath { get; private set; }
+
+    public bool Resume { get; private set; }
 
     public bool IncludeTransitiveRoots { get; private set; }
 
@@ -241,6 +359,12 @@ internal sealed class CliOptions
                     break;
                 case "--transitive-roots":
                     options.IncludeTransitiveRoots = true;
+                    break;
+                case "--progress":
+                    options.ProgressPath = ReadRequiredValue(args, ref i, arg);
+                    break;
+                case "--resume":
+                    options.Resume = true;
                     break;
                 case "--classify-purity":
                     options.IncludePurityClassification = true;
@@ -633,6 +757,15 @@ internal sealed class ArtifactSpecDocument
 
         return document;
     }
+}
+
+internal sealed class ArtifactSpecProgressDocument
+{
+    public int SchemaVersion { get; set; }
+
+    public string ArtifactSpecSha256 { get; set; } = string.Empty;
+
+    public string[] CompletedOutputPaths { get; set; } = Array.Empty<string>();
 }
 
 internal sealed class ArtifactSpecDefaults

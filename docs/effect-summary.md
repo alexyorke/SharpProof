@@ -123,6 +123,17 @@ Include same-assembly callees from the matched symbols:
 dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 1 --limit 50
 ```
 
+Artifact-spec runs can record completed output files and resume after an
+interrupted or failed later artifact. Keep the progress file beside other
+ignored build artifacts:
+
+```powershell
+dotnet run --project Tools\SharpProof.EffectSummary -- --artifact-spec SharpProof.Analyzer\BuiltInEffectSummaryArtifactSpec.json --progress artifacts\effect-summary\generation-progress.json --resume
+```
+
+The progress record is tied to the artifact-spec SHA-256 and is deleted after
+all outputs complete, so a changed spec cannot silently reuse stale progress.
+
 Use `--max-depth -1` when a filtered slice must keep the full reachable same-assembly callee closure instead of a bounded prefix.
 
 Propagate root candidate labels through same-assembly calls:
