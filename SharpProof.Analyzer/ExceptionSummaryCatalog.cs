@@ -43,6 +43,16 @@ internal sealed class ExceptionSummaryCatalog
 
     public static ExceptionSummaryCatalog FromOptions(
         AnalyzerOptions options,
+        CancellationToken cancellationToken)
+    {
+        return FromOptionsWithCompatibilityReporter(
+            options,
+            cancellationToken,
+            new EffectSummaryCompatibilityReporter());
+    }
+
+    internal static ExceptionSummaryCatalog FromOptionsWithCompatibilityReporter(
+        AnalyzerOptions options,
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter compatibilityReporter)
     {
@@ -660,8 +670,9 @@ internal sealed class ExceptionSummaryCatalog
                 return false;
             }
 
-            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
-                                              EffectSummaryCompatibility.Compatible;
+            var artifactSourceCompatibility = SourcePriority == AdditionalSummarySourcePriority
+                ? ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ?? EffectSummaryCompatibility.Compatible
+                : EffectSummaryCompatibility.Compatible;
             if (!artifactSourceCompatibility.IsCompatible)
             {
                 ReportIncompatibility(artifactSourceCompatibility);

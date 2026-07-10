@@ -30,11 +30,17 @@ internal sealed class AnalyzerSession : IDisposable
 
         ExceptionSummaryCatalog = Features.Includes(AnalyzerFeatures.Exceptions) &&
                                   Configuration.EnableEffectSummaryJson
-            ? ExceptionSummaryCatalog.FromOptions(options, cancellationToken, EffectSummaryCompatibilityReporter)
+            ? ExceptionSummaryCatalog.FromOptionsWithCompatibilityReporter(
+                options,
+                cancellationToken,
+                EffectSummaryCompatibilityReporter)
             : ExceptionSummaryCatalog.Empty;
         GeneratedPurityCatalog = Features.Includes(AnalyzerFeatures.Purity) &&
                                  Configuration.EnableEffectSummaryJson
-            ? GeneratedPurityCatalog.FromOptions(options, cancellationToken, EffectSummaryCompatibilityReporter)
+            ? GeneratedPurityCatalog.FromOptionsWithCompatibilityReporter(
+                options,
+                cancellationToken,
+                EffectSummaryCompatibilityReporter)
             : null;
     }
 
