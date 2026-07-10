@@ -114,13 +114,6 @@ grouped by their original feature area.
   delete or shrink entries once they are fixed, disproven, or intentionally
   accepted as conservative behavior.
 
-#### Effect Summary Pipeline
-- Make the built-in effect-summary MSBuild generation target incremental and
-  hermetic: declare inputs and outputs, skip regeneration when the artifact
-  spec, runtime assemblies, tool binary, and output resources are unchanged,
-  support an explicit inner-loop opt-out, and capture tool failures as
-  actionable build diagnostics instead of rebuilding summaries unconditionally.
-
 #### Tooling, Packaging, And Verification
 - Decide whether `SharpProof.Symbolic` is a supported public library package or
   an analyzer-private implementation assembly. If public, ship it as a real

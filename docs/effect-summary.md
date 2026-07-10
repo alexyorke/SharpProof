@@ -6,15 +6,24 @@ step toward evidence-based BCL and framework purity summaries.
 The analyzer now regenerates its built-in effect-summary JSON into `obj` during
 build/test from `SharpProof.Analyzer/BuiltInEffectSummaryArtifactSpec.json`
 and consumes those summaries only as embedded resources from the current build.
-Checked-in effect-summary JSON artifacts and the reviewed artifact spec are
-gone. Treat ad hoc outputs from this tool as disposable local calibration data.
+Checked-in effect-summary JSON artifacts are gone; the reviewed artifact spec
+remains as the reproducible input manifest. Treat ad hoc outputs from this tool
+as disposable local calibration data.
 
-The MSBuild target is incremental: its artifact-spec copy, generated summary
-resources, generation stamp, and tool binary participate in the target's input
-and output checks. For a fast inner loop that intentionally skips regeneration,
-pass `-p:SharpProofSkipGeneratedEffectSummaries=true`; the analyzer still builds,
-but no generated built-in summaries are embedded. If the generator fails, the
-target reports the artifact-spec and tool paths in the build error.
+The MSBuild target is incremental and hermetic. Before generation, the tool
+resolves deterministic LF/no-BOM input and output manifests. The declared
+inputs include the artifact spec, generator binary, runtime implementation
+assemblies, package assemblies, and any source-summary files; the declared
+outputs include every expected summary, the copied spec, and the generation
+stamp. Unchanged builds preserve manifest and stamp timestamps and skip summary
+regeneration. Missing outputs or newer inputs invalidate the target.
+
+For a fast inner loop that intentionally skips generation, pass
+`-p:SharpProofSkipGeneratedEffectSummaries=true`; the analyzer still builds,
+but no generated built-in summaries are embedded. Dependency resolution,
+generation, and empty-output failures use actionable MSBuild error codes
+`SPB0001`, `SPB0002`, and `SPB0003`, while leaving the previous complete output
+directory untouched.
 
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,
@@ -133,6 +142,14 @@ dotnet run --project Tools\SharpProof.EffectSummary -- --artifact-spec SharpProo
 
 The progress record is tied to the artifact-spec SHA-256 and is deleted after
 all outputs complete, so a changed spec cannot silently reuse stale progress.
+
+Build integrations can resolve the complete dependency surface without
+generating summaries. Relative artifact outputs are rebased under the supplied
+output root, and unchanged manifest contents are not rewritten:
+
+```powershell
+dotnet run --project Tools\SharpProof.EffectSummary -- --artifact-spec-dependencies SharpProof.Analyzer\BuiltInEffectSummaryArtifactSpec.json --input-manifest artifacts\effect-summary\inputs.txt --output-manifest artifacts\effect-summary\outputs.txt --dependency-output-root artifacts\effect-summary\generated
+```
 
 For large multi-assembly runs, use per-assembly sharding to keep only one
 assembly report in memory at a time. Shard filenames include a stable input-path
