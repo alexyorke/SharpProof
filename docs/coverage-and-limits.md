@@ -25,6 +25,9 @@ The analyzer combines:
   checker yet.
 - Runtime hazards are source-visible and bounded, not a guarantee that every
   possible runtime exception is modeled.
+- Known runtime-hazard coverage gaps have explicit acceptance criteria and
+  executable current-behavior regressions in
+  [the runtime-hazard backlog](runtime-hazard-backlog.md).
 - Complexity is asymptotic CPU-work classification for supported method shapes,
   not wall-clock timing, allocation complexity, or JIT/cache behavior.
 - External calls, dynamic dispatch, reflection-heavy flows, native interop, and
