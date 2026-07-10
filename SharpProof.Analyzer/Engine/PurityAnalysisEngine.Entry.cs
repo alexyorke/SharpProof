@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -13,6 +14,9 @@ internal partial class PurityAnalysisEngine
         IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var sourceNode = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        var limits = _purityService?.AnalysisLimits ?? SymbolicAnalysisLimitContext.Limits;
+        using var limitScope = SymbolicAnalysisLimitContext.Push(limits, sourceNode);
         var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEqualityComparer.Default);
         if (initialPurityCache != null)
@@ -36,7 +40,7 @@ internal partial class PurityAnalysisEngine
 
         purityCache[methodSymbol] = result;
 
-        return result;
+        return result.WithAnalysisTruncation(limitScope.Snapshot());
     }
 
 

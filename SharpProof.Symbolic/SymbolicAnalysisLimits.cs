@@ -225,9 +225,13 @@ internal static class SymbolicAnalysisLimitContext
 
     internal static SymbolicAnalysisLimits Limits => CurrentScope.Value?.Limits ?? SymbolicAnalysisLimits.Default;
 
-    internal static Scope Push(SymbolicAnalysisLimits? limits = null)
+    internal static Scope Push(SymbolicAnalysisLimits? limits = null, SyntaxNode? sourceNode = null)
     {
-        var scope = new Scope(CurrentScope.Value, limits ?? SymbolicAnalysisLimits.Default);
+        var parent = CurrentScope.Value;
+        var scope = new Scope(
+            parent,
+            limits ?? parent?.Limits ?? SymbolicAnalysisLimits.Default,
+            sourceNode?.SpanStart ?? parent?.DefaultSourceSpanStart);
         CurrentScope.Value = scope;
         return scope;
     }
@@ -248,13 +252,16 @@ internal static class SymbolicAnalysisLimitContext
         private readonly Scope? _parent;
         private bool _disposed;
 
-        internal Scope(Scope? parent, SymbolicAnalysisLimits limits)
+        internal Scope(Scope? parent, SymbolicAnalysisLimits limits, int? defaultSourceSpanStart)
         {
             _parent = parent;
             Limits = limits;
+            DefaultSourceSpanStart = defaultSourceSpanStart;
         }
 
         internal SymbolicAnalysisLimits Limits { get; }
+
+        internal int? DefaultSourceSpanStart { get; }
 
         internal SymbolicAnalysisTruncationInfo Snapshot()
         {
@@ -273,7 +280,7 @@ internal static class SymbolicAnalysisLimitContext
             SyntaxNode? sourceNode,
             string provenance)
         {
-            Record(kind, limit, observed, sourceNode?.SpanStart, provenance);
+            Record(kind, limit, observed, sourceNode?.SpanStart ?? DefaultSourceSpanStart, provenance);
         }
 
         private void Record(

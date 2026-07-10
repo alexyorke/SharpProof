@@ -522,6 +522,28 @@ public sealed class TestClass
         }
     }
 
+    [Test]
+    public void AnalysisLimitConfiguration_ParsesEveryPositiveOverride()
+    {
+        var options = ReadAnalysisLimits(
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_analysis_max_merged_if_else_facts", "1")
+                .Add("sharpproof_analysis_max_merged_switch_facts", "2")
+                .Add("sharpproof_analysis_max_merged_try_facts", "3")
+                .Add("sharpproof_analysis_max_try_completion_branches", "4")
+                .Add("sharpproof_analysis_max_finite_foreach_element_facts", "5")
+                .Add("sharpproof_analysis_max_scoped_block_completion_statements", "6")
+                .Add("sharpproof_analysis_max_structural_null_state_depth", "7")
+                .Add("sharpproof_analysis_max_merged_path_conditions", "8")
+                .Add("sharpproof_analysis_max_mergeable_facts_per_target_per_state", "9")
+                .Add("sharpproof_analysis_max_fact_choice_combinations_per_target", "10")
+                .Add("sharpproof_analysis_max_guard_facts_per_target_per_state", "11"));
+
+        Assert.That(
+            options,
+            Is.EqualTo(new AnalysisLimitsSnapshot(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)));
+    }
+
     private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
     {
         var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
@@ -542,6 +564,50 @@ public sealed class TestClass
             (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
             (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!);
     }
+
+    private static AnalysisLimitsSnapshot ReadAnalysisLimits(ImmutableDictionary<string, string> globalOptions)
+    {
+        var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+        var configurationType = typeof(SharpProofAnalyzer).Assembly
+            .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
+        var fromOptions = configurationType.GetMethod(
+            "FromOptions",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+        var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
+        var limits = configurationType.GetProperty("AnalysisLimits")!.GetValue(configuration)!;
+        var limitsType = limits.GetType();
+
+        int Read(string name)
+        {
+            return (int)limitsType.GetProperty(name)!.GetValue(limits)!;
+        }
+
+        return new AnalysisLimitsSnapshot(
+            Read("MaxMergedIfElseFacts"),
+            Read("MaxMergedSwitchFacts"),
+            Read("MaxMergedTryFacts"),
+            Read("MaxTryCompletionBranches"),
+            Read("MaxFiniteForeachElementFacts"),
+            Read("MaxScopedBlockCompletionStatements"),
+            Read("MaxStructuralNullStateDepth"),
+            Read("MaxMergedPathConditions"),
+            Read("MaxMergeableFactsPerTargetPerState"),
+            Read("MaxFactChoiceCombinationsPerTarget"),
+            Read("MaxGuardFactsPerTargetPerState"));
+    }
+
+    private readonly record struct AnalysisLimitsSnapshot(
+        int MaxMergedIfElseFacts,
+        int MaxMergedSwitchFacts,
+        int MaxMergedTryFacts,
+        int MaxTryCompletionBranches,
+        int MaxFiniteForeachElementFacts,
+        int MaxScopedBlockCompletionStatements,
+        int MaxStructuralNullStateDepth,
+        int MaxMergedPathConditions,
+        int MaxMergeableFactsPerTargetPerState,
+        int MaxFactChoiceCombinationsPerTarget,
+        int MaxGuardFactsPerTargetPerState);
 
     private static string[] GetConfigKeys()
     {

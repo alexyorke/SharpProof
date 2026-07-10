@@ -216,7 +216,8 @@ internal static class MethodEnsuresAnalyzer
                     contract.Condition,
                     completionSite.Location,
                     FormatUnknownReason(proof),
-                    contract.Location == null ? null : new[] { contract.Location });
+                    contract.Location == null ? null : new[] { contract.Location },
+                    proof.AnalysisTruncation);
                 if (!baseline.IsSuppressed(unsupportedDiagnostic)) context.ReportDiagnostic(unsupportedDiagnostic);
             }
         }
@@ -631,6 +632,7 @@ internal static class MethodEnsuresAnalyzer
             proof.Proof.UnknownReason);
         if (unknownReasonInfo.IsUnknown)
             properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
+        properties = AnalysisTruncationDiagnosticProperties.Add(properties, proof.AnalysisTruncation);
         properties = ExplainDiagnosticProperties.Add(
             properties,
             completionSite.Location,
@@ -654,7 +656,8 @@ internal static class MethodEnsuresAnalyzer
         string condition,
         Location? location,
         string reason,
-        IEnumerable<Location>? additionalLocations)
+        IEnumerable<Location>? additionalLocations,
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         var properties = AddBaselineProperties(
             ImmutableDictionary<string, string?>.Empty
@@ -669,6 +672,9 @@ internal static class MethodEnsuresAnalyzer
         properties = UnknownReasonDiagnosticProperties.Add(
             properties,
             SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
+        properties = AnalysisTruncationDiagnosticProperties.Add(
+            properties,
+            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,

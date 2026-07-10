@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer.Engine.Analysis;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -33,13 +34,25 @@ internal sealed class CompilationPurityService : IDisposable
         Compilation compilation,
         SmtAnalysisOptions smtOptions,
         SharpProofAttributeIdentityPolicy attributePolicy)
+        : this(compilation, smtOptions, attributePolicy, SymbolicAnalysisLimits.Default)
+    {
+    }
+
+    public CompilationPurityService(
+        Compilation compilation,
+        SmtAnalysisOptions smtOptions,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        SymbolicAnalysisLimits analysisLimits)
     {
         _compilation = compilation;
         AttributePolicy = attributePolicy ?? throw new ArgumentNullException(nameof(attributePolicy));
+        AnalysisLimits = analysisLimits ?? throw new ArgumentNullException(nameof(analysisLimits));
         SmtAnalysis = new SmtAnalysisService(smtOptions);
     }
 
     public SharpProofAttributeIdentityPolicy AttributePolicy { get; }
+
+    public SymbolicAnalysisLimits AnalysisLimits { get; }
 
     public SmtAnalysisService SmtAnalysis { get; }
 
@@ -82,15 +95,16 @@ internal sealed class CompilationPurityService : IDisposable
             if (_fixedPoint != null) return;
 
             _callGraph ??= CallGraphBuilder.Build(_compilation, GetSemanticModel, cancellationToken);
-            _fixedPoint = WorklistPuritySolver.Solve(
-                _callGraph,
-                _compilation,
-                enforcePureAttributeSymbol,
-                allowSynchronizationAttributeSymbol,
-                SmtAnalysis,
-                AttributePolicy,
-                GetSemanticModel,
-                cancellationToken);
+            using (SymbolicAnalysisLimitContext.Push(AnalysisLimits))
+                _fixedPoint = WorklistPuritySolver.Solve(
+                    _callGraph,
+                    _compilation,
+                    enforcePureAttributeSymbol,
+                    allowSynchronizationAttributeSymbol,
+                    SmtAnalysis,
+                    AttributePolicy,
+                    GetSemanticModel,
+                    cancellationToken);
         }
     }
 

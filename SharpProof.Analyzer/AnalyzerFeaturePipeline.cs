@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
@@ -13,6 +14,7 @@ internal static class AnalyzerFeaturePipeline
                    ? null
                    : GeneratedPurityCatalog.UseCurrent(session.GeneratedPurityCatalog))
         using (ImpurityCatalog.UseConfiguredOverrides(session.Configuration))
+        using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node))
         {
             var features = session.Features;
             if (features.Includes(AnalyzerFeatures.Purity))

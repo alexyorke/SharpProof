@@ -160,6 +160,7 @@ internal static partial class ExceptionFlowAnalyzer
                 .Add(SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty,
                     hazard.Proof.UnknownReason.ToString());
             properties = UnknownReasonDiagnosticProperties.Add(properties, hazard.UnknownReasonInfo);
+            properties = AnalysisTruncationDiagnosticProperties.Add(properties, hazard.AnalysisTruncation);
             properties = BaselineDiagnosticProperties.Add(
                 properties,
                 methodSymbol,

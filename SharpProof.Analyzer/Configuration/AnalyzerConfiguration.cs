@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Configuration;
@@ -24,6 +25,7 @@ internal class AnalyzerConfiguration
         bool enableEffectSummaryJson,
         string purityProfile,
         SmtAnalysisOptions smtOptions,
+        SymbolicAnalysisLimits analysisLimits,
         ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
     {
         ExtraKnownImpureMethods = extraImpureMethods;
@@ -41,6 +43,7 @@ internal class AnalyzerConfiguration
         EnableEffectSummaryJson = enableEffectSummaryJson;
         PurityProfile = purityProfile;
         SmtOptions = smtOptions;
+        AnalysisLimits = analysisLimits;
         InvalidConfigurationValues = invalidConfigurationValues;
     }
 
@@ -59,6 +62,7 @@ internal class AnalyzerConfiguration
     public bool EnableEffectSummaryJson { get; }
     public string PurityProfile { get; }
     public SmtAnalysisOptions SmtOptions { get; }
+    public SymbolicAnalysisLimits AnalysisLimits { get; }
     public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; }
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
@@ -99,6 +103,7 @@ internal class AnalyzerConfiguration
             enableEffectSummaryJson,
             GetPurityProfile(options),
             GetSmtOptions(options),
+            GetAnalysisLimits(options),
             invalidConfigurationValues);
     }
 
@@ -405,6 +410,41 @@ internal class AnalyzerConfiguration
             maxPathConditions,
             maxExpressionNodes,
             true);
+    }
+
+    private static SymbolicAnalysisLimits GetAnalysisLimits(AnalyzerOptions options)
+    {
+        var defaults = SymbolicAnalysisLimits.Default;
+        return new SymbolicAnalysisLimits(
+            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedIfElseFacts, defaults.MaxMergedIfElseFacts),
+            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedSwitchFacts, defaults.MaxMergedSwitchFacts),
+            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedTryFacts, defaults.MaxMergedTryFacts),
+            GetPositiveInt(options, ConfigKeys.AnalysisMaxTryCompletionBranches, defaults.MaxTryCompletionBranches),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxFiniteForeachElementFacts,
+                defaults.MaxFiniteForeachElementFacts),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxScopedBlockCompletionStatements,
+                defaults.MaxScopedBlockCompletionStatements),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxStructuralNullStateDepth,
+                defaults.MaxStructuralNullStateDepth),
+            GetPositiveInt(options, ConfigKeys.AnalysisMaxMergedPathConditions, defaults.MaxMergedPathConditions),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxMergeableFactsPerTargetPerState,
+                defaults.MaxMergeableFactsPerTargetPerState),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxFactChoiceCombinationsPerTarget,
+                defaults.MaxFactChoiceCombinationsPerTarget),
+            GetPositiveInt(
+                options,
+                ConfigKeys.AnalysisMaxGuardFactsPerTargetPerState,
+                defaults.MaxGuardFactsPerTargetPerState));
     }
 
     private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)

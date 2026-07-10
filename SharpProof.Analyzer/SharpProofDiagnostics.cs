@@ -27,6 +27,9 @@ public static class SharpProofDiagnostics
     public const string UnknownReasonRawProperty = "sharpproof.unknown.raw_reason";
     public const string UnknownReasonRetryableProperty = "sharpproof.unknown.retryable";
     public const string UnknownReasonConfigurationRelatedProperty = "sharpproof.unknown.configuration_related";
+    public const string AnalysisTruncatedProperty = "sharpproof.analysis.truncated";
+    public const string AnalysisLimitCodesProperty = "sharpproof.analysis.limit_codes";
+    public const string AnalysisLimitEventsProperty = "sharpproof.analysis.limit_events";
 
     public const string PurityNotVerifiedId = "SP0002";
     public const string ImpurityCategoryProperty = "sharpproof.impurity.category";

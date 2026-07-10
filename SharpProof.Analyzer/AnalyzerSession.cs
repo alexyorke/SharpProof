@@ -25,7 +25,8 @@ internal sealed class AnalyzerSession : IDisposable
             () => new CompilationPurityService(
                 compilation,
                 Configuration.SmtOptions,
-                AttributePolicy),
+                AttributePolicy,
+                Configuration.AnalysisLimits),
             LazyThreadSafetyMode.ExecutionAndPublication);
 
         ExceptionSummaryCatalog = Features.Includes(AnalyzerFeatures.Exceptions) &&

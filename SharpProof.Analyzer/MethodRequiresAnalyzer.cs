@@ -82,7 +82,8 @@ internal static class MethodRequiresAnalyzer
 
         var queryService = new SymbolicQueryService();
         var source = SymbolicSourceInput.FromSyntaxTree(context.Node.SyntaxTree, context.SemanticModel.Compilation);
-        var options = new SymbolicQueryOptions(smtAnalysis: purityService.SmtAnalysis);
+        var options = new SymbolicQueryOptions(smtAnalysis: purityService.SmtAnalysis)
+            .WithAnalysisLimits(purityService.AnalysisLimits);
         var location = callSite.Value.Syntax.GetLocation();
         var lineSpan = location.GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
@@ -156,7 +157,8 @@ internal static class MethodRequiresAnalyzer
                     contract.Condition,
                     location,
                     FormatUnknownReason(proof),
-                    AdditionalLocations(contract.Location)));
+                    AdditionalLocations(contract.Location),
+                    proof.AnalysisTruncation));
         }
     }
 
@@ -202,6 +204,7 @@ internal static class MethodRequiresAnalyzer
             "RequiresCallSite",
             condition,
             RequiresContractHelpers.CreateEvidenceKey("not_proven", condition, location, proof.Reason));
+        properties = AnalysisTruncationDiagnosticProperties.Add(properties, proof.AnalysisTruncation);
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,
@@ -224,7 +227,8 @@ internal static class MethodRequiresAnalyzer
         string condition,
         Location? location,
         string reason,
-        IEnumerable<Location>? additionalLocations)
+        IEnumerable<Location>? additionalLocations,
+        SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         var properties = AddBaselineProperties(
@@ -238,6 +242,9 @@ internal static class MethodRequiresAnalyzer
             "RequiresUnsupported",
             condition,
             RequiresContractHelpers.CreateEvidenceKey("unsupported", condition, location, reason));
+        properties = AnalysisTruncationDiagnosticProperties.Add(
+            properties,
+            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
         properties = ExplainDiagnosticProperties.Add(
             properties,
             location,

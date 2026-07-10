@@ -187,7 +187,9 @@ internal static class MethodPurityAnalyzer
             if (diagnosticLocation != null)
             {
                 var properties = BaselineDiagnosticProperties.Add(
-                    purityResult.Evidence.ToDiagnosticProperties(),
+                    AnalysisTruncationDiagnosticProperties.Add(
+                        purityResult.Evidence.ToDiagnosticProperties(),
+                        purityResult.AnalysisTruncation),
                     methodSymbol,
                     context.Node.SyntaxTree,
                     purityResult.Evidence.OperationKind,

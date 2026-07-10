@@ -16,11 +16,18 @@ internal partial class PurityAnalysisEngine
 
         public PurityEvidence Evidence { get; }
 
-        private PurityAnalysisResult(bool isPure, SyntaxNode? impureSyntaxNode, PurityEvidence evidence)
+        public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+
+        private PurityAnalysisResult(
+            bool isPure,
+            SyntaxNode? impureSyntaxNode,
+            PurityEvidence evidence,
+            SymbolicAnalysisTruncationInfo? analysisTruncation = null)
         {
             IsPure = isPure;
             ImpureSyntaxNode = impureSyntaxNode;
             Evidence = evidence;
+            AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
         }
 
 
@@ -54,7 +61,9 @@ internal partial class PurityAnalysisEngine
 
         public PurityAnalysisResult WithEvidence(PurityEvidence evidence)
         {
-            return IsPure ? this : new PurityAnalysisResult(false, ImpureSyntaxNode, evidence);
+            return IsPure
+                ? this
+                : new PurityAnalysisResult(false, ImpureSyntaxNode, evidence, AnalysisTruncation);
         }
 
         public PurityAnalysisResult WithCallee(IMethodSymbol calleeSymbol, SyntaxNode? callSite)
@@ -64,7 +73,18 @@ internal partial class PurityAnalysisEngine
             var evidence = Evidence.IsEmpty
                 ? PurityEvidence.Create("impure_callee", symbol: calleeSymbol, syntaxNode: callSite)
                 : Evidence.WithCallee(calleeSymbol.ToDisplayString(_signatureFormat), callSite);
-            return new PurityAnalysisResult(false, ImpureSyntaxNode ?? callSite, evidence);
+            return new PurityAnalysisResult(false, ImpureSyntaxNode ?? callSite, evidence, AnalysisTruncation);
+        }
+
+        public PurityAnalysisResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
+        {
+            if (truncation == null) throw new ArgumentNullException(nameof(truncation));
+
+            return new PurityAnalysisResult(
+                IsPure,
+                ImpureSyntaxNode,
+                Evidence,
+                SymbolicAnalysisTruncationInfo.Combine(new[] { AnalysisTruncation, truncation }));
         }
     }
 
