@@ -3070,6 +3070,7 @@ public sealed class ArchitectureReductionTests
         var readmeSource = ReadFileCached(Path.Combine(repositoryRoot, "README.source.md"));
         var capabilityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "capability-analysis.md"));
         var complexityDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "complexity-queries.md"));
+        var coverageDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
@@ -3185,6 +3186,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(capabilityDoc, Does.Contain("--capabilities"));
         Assert.That(complexityDoc, Does.Contain("QueryComplexity"));
         Assert.That(complexityDoc, Does.Contain("--complexity"));
+        Assert.That(coverageDoc, Does.Contain("`Math.Min`"));
+        Assert.That(coverageDoc, Does.Contain("`Math.Max`"));
+        Assert.That(coverageDoc, Does.Contain("`Math.Abs`"));
+        Assert.That(coverageDoc, Does.Contain("`Math.Clamp`"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0033`"));

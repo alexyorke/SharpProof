@@ -49,6 +49,13 @@ completed async shapes: `Task.FromResult`, `ValueTask.FromResult`, the
 claim to predict arbitrary task scheduling, cancellation, faults, or custom
 awaiters.
 
+Known bounded-integral `System.Math` calls also lower to typed symbolic IR.
+`Math.Min` and `Math.Max` preserve their bound relationships, `Math.Abs`
+preserves non-negativity while exposing signed-minimum `OverflowException`
+hazards, and `Math.Clamp` preserves ordered constant, equal, or type-extremum
+bounds. Floating-point overloads and clamp bounds whose order is not
+intrinsically proven stay on the conservative compatibility path.
+
 Unknown candidates stay opt-in in analyzer builds. Set
 `sharpproof_runtime_hazard_mode = unknowns` for informational `SP0033` only,
 `sites-and-unknowns` for warning-level proven sites plus informational unknowns,
