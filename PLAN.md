@@ -120,10 +120,7 @@ grouped by their original feature area.
   spec, runtime assemblies, tool binary, and output resources are unchanged,
   support an explicit inner-loop opt-out, and capture tool failures as
   actionable build diagnostics instead of rebuilding summaries unconditionally.
-- Add analyzer-visible stale-summary evidence when supplied effect summaries are
-  ignored because assembly identity, module version, method token, method-body
-  hash, or the artifact spec's framework/package source no longer matches the
-  current compilation.
+
 #### Tooling, Packaging, And Verification
 - Decide whether `SharpProof.Symbolic` is a supported public library package or
   an analyzer-private implementation assembly. If public, ship it as a real

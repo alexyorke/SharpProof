@@ -217,6 +217,14 @@ dotnet run --project Tools\SharpProof.EffectSummary -- --assembly "C:\Program Fi
 
 The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build.
 
+Outputs produced from an artifact spec also preserve their input provenance.
+Each assembly report, and each flattened generated-purity entry derived from
+it, contains an `ArtifactSource` object. Runtime artifacts record the requested
+`Framework`; NuGet artifacts record `PackageId`, `PackageVersion`, and
+`PackageAssemblyRelativePath`. This keeps the source selection attached to the
+rows that the analyzer later validates instead of relying on the artifact file
+name or its storage directory.
+
 When purity classification is enabled, schema version `3` adds:
 
 - per-method `PurityClassification`
@@ -236,6 +244,28 @@ Summary files are also self-validating enough to cache and share:
 - each method includes a stable `CacheKey` made from module version ID, metadata token, and IL hash
 
 Consumers can use those fields to reject summaries generated from a different runtime, SDK, package build, or project assembly. For source or project-specific libraries, regenerate the summary after rebuilds and compare the cache key before trusting a row.
+
+SharpProof performs that rejection automatically for explicitly supplied
+additional summaries when `sharpproof_enable_effect_summary_json = true`. If a
+referenced summary row has the right symbol but its assembly SHA-256, module
+version ID, metadata token, method-body SHA-256, framework source, or NuGet
+package source does not match the resolved compilation assembly, the row stays
+untrusted and the analyzer reports `SP0032`. The diagnostic has no source
+location because it describes an AdditionalFile, but it carries:
+
+- `sharpproof.additional_file.path`
+- `sharpproof.additional_file.reason`
+- `sharpproof.additional_file.reason_code`
+
+Compatibility reason codes are stable lower-snake-case values such as
+`effect_summary_assembly_hash_mismatch`,
+`effect_summary_module_version_mismatch`,
+`effect_summary_metadata_token_mismatch`,
+`effect_summary_method_body_hash_mismatch`,
+`effect_summary_framework_source_mismatch`, and
+`effect_summary_package_source_mismatch`. Reporting happens on the exact lookup
+path, so an unrelated row for an assembly or method the compilation never uses
+does not create noise.
 
 ## Remaining work tracking
 

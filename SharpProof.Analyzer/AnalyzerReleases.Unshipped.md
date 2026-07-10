@@ -10,7 +10,7 @@ SP0028 | Contracts | Warning | Reports `[Requires]` preconditions that could not
 SP0029 | Usage | Error | Reports `[Requires]` attributes applied to non-method-like declarations.
 SP0030 | ExceptionFlow | Warning | Reports escaping exceptions that violate `[DoesNotThrow]` or `[AllowedExceptions]` contracts.
 SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` attributes applied to non-method-like declarations.
-SP0032 | Configuration | Warning | Reports malformed, empty, unsupported, or partially ignored SharpProof analyzer AdditionalFiles.
+SP0032 | Configuration | Warning | Reports malformed, empty, unsupported, partially ignored, or stale SharpProof analyzer AdditionalFiles, including exact effect-summary identity and artifact-source mismatches.
 
 ### Changed Rules
 

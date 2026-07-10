@@ -116,6 +116,11 @@ command. Contract diagnostics also include
 `sharpproof.explain.contract`; proof diagnostics include
 `sharpproof.explain.proof_status` and, when available,
 `sharpproof.explain.unknown_reason` normalized as lower snake case.
+`SP0032` analyzer-input diagnostics include
+`sharpproof.additional_file.path`, `sharpproof.additional_file.reason`, and
+`sharpproof.additional_file.reason_code`; stale effect-summary reason codes
+distinguish assembly, module, method, method-body, framework, and package-source
+mismatches.
 
 ## Configuration
 
