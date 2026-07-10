@@ -29,7 +29,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
@@ -42,7 +43,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             smtAnalysis,
             references,
             cancellationToken,
-            options);
+            options,
+            compilationProfile);
     }
 
     public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsLine(
@@ -51,7 +53,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
@@ -65,7 +68,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             smtAnalysis,
             references,
             cancellationToken,
-            options);
+            options,
+            compilationProfile);
     }
 
     public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsSpan(
@@ -75,7 +79,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
@@ -90,7 +95,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             smtAnalysis,
             references,
             cancellationToken,
-            options);
+            options,
+            compilationProfile);
     }
 
     public SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
@@ -99,7 +105,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,
@@ -107,7 +114,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             "SharpProof.Symbolic.RuntimeHazards.cs",
             "SharpProof.Symbolic.RuntimeHazards",
             references,
-            cancellationToken);
+            cancellationToken,
+            compilationProfile);
         return QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
@@ -123,7 +131,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,
@@ -131,7 +140,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             "SharpProof.Symbolic.RuntimeHazards.cs",
             "SharpProof.Symbolic.RuntimeHazards",
             references,
-            cancellationToken);
+            cancellationToken,
+            compilationProfile);
         return QuerySyntaxTreeRuntimeHazardsLine(
             syntaxTree,
             compilation,
@@ -149,7 +159,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         IEnumerable<MetadataReference>? references = null,
         CancellationToken cancellationToken = default,
-        SymbolicRuntimeHazardQueryOptions? options = null)
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
             sourceText,
@@ -157,7 +168,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             "SharpProof.Symbolic.RuntimeHazards.cs",
             "SharpProof.Symbolic.RuntimeHazards",
             references,
-            cancellationToken);
+            cancellationToken,
+            compilationProfile);
         return QuerySyntaxTreeRuntimeHazardsSpan(
             syntaxTree,
             compilation,

@@ -14,6 +14,105 @@ namespace SharpProof.Test;
 public sealed class SymbolicSourceQueryLineTests
 {
     [Test]
+    public void SymbolicSourceCompilationProfile_AppliesEveryCompilerSetting()
+    {
+        var profile = new SymbolicSourceCompilationProfile(
+            LanguageVersion.CSharp12,
+            new[] { "PROFILE", "PROFILE" },
+            NullableContextOptions.Enable,
+            true,
+            DocumentationMode.Diagnose,
+            Platform.X64,
+            OptimizationLevel.Release,
+            "Profile.Assembly");
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+            "#if PROFILE\npublic unsafe class C { public int* Pointer; }\n#endif\n",
+            "Profile.cs",
+            "Default.cs",
+            "Default.Assembly",
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            CancellationToken.None,
+            profile);
+
+        var parseOptions = (CSharpParseOptions)syntaxTree.Options;
+        var compilationOptions = (CSharpCompilationOptions)compilation.Options;
+        Assert.That(parseOptions.LanguageVersion, Is.EqualTo(LanguageVersion.CSharp12));
+        Assert.That(parseOptions.PreprocessorSymbolNames, Is.EqualTo(new[] { "PROFILE" }));
+        Assert.That(parseOptions.DocumentationMode, Is.EqualTo(DocumentationMode.Diagnose));
+        Assert.That(compilationOptions.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
+        Assert.That(compilationOptions.AllowUnsafe, Is.True);
+        Assert.That(compilationOptions.Platform, Is.EqualTo(Platform.X64));
+        Assert.That(compilationOptions.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
+        Assert.That(compilation.AssemblyName, Is.EqualTo("Profile.Assembly"));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+            Is.Empty);
+    }
+
+    [Test]
+    public void SymbolicQueryService_CompilationProfileFlowsThroughEveryStandaloneMode()
+    {
+        const string source = """
+                              #if PROFILE
+                              using System;
+
+                              public static class Profiled
+                              {
+                                  public static int Identity(int value) => value;
+
+                                  public static void Hazard()
+                                  {
+                                      throw new InvalidOperationException();
+                                  }
+
+                                  public static void Capability()
+                                  {
+                                      Console.WriteLine("profiled");
+                                  }
+
+                                  public static int Complexity(int count)
+                                  {
+                                      var total = 0;
+                                      for (var index = 0; index < count; index++) total += index;
+                                      return total;
+                                  }
+                              }
+                              #endif
+                              """;
+        var profile = new SymbolicSourceCompilationProfile(preprocessorSymbols: new[] { "PROFILE" });
+        var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Profiled.cs");
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var options = new SymbolicQueryOptions(
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis);
+        var service = new SymbolicQueryService();
+
+        var invariants = service.Query(new SymbolicQueryRequest(
+            input,
+            SymbolicQueryTarget.AllLines(),
+            options));
+        Assert.That(invariants.ProgramPoints.Any(static point =>
+            point.MethodName?.Contains("Identity", StringComparison.Ordinal) == true), Is.True);
+
+        var hazards = service.QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(
+            input,
+            SymbolicQueryTarget.Line(FindLine(source, "throw new InvalidOperationException")),
+            options));
+        Assert.That(hazards.Hazards, Has.Some.Property("Kind").EqualTo(SymbolicRuntimeHazardKind.DirectThrow));
+
+        var capabilities = service.QueryCapabilities(new SymbolicCapabilityRequest(
+            input,
+            SymbolicQueryTarget.Line(FindLine(source, "Console.WriteLine")),
+            options));
+        Assert.That(capabilities.CapabilityText, Does.Contain("Console"));
+
+        var complexity = service.QueryComplexity(new SymbolicComplexityRequest(
+            input,
+            SymbolicQueryTarget.Line(FindLine(source, "for (var index")),
+            options));
+        Assert.That(complexity.MethodDisplayName, Does.Contain("Complexity"));
+    }
+
+    [Test]
     public void SymbolicQueryService_RoutesFileTextSyntaxTreeAndNodeQueries()
     {
         const string source = @"

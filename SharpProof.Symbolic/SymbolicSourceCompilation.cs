@@ -26,25 +26,38 @@ internal static class SymbolicSourceCompilation
         string defaultFilePath,
         string assemblyName,
         IEnumerable<MetadataReference>? references,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SymbolicSourceCompilationProfile? profile = null)
     {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
         if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
 
+        var normalizedProfile = profile ?? SymbolicSourceCompilationProfile.Default;
+        var parseOptions = new CSharpParseOptions(
+            normalizedProfile.LanguageVersion,
+            normalizedProfile.DocumentationMode,
+            SourceCodeKind.Regular,
+            normalizedProfile.PreprocessorSymbols);
         var syntaxTree = CSharpSyntaxTree.ParseText(
             sourceText,
-            new CSharpParseOptions(LanguageVersion.Preview),
+            parseOptions,
             filePath,
             cancellationToken: cancellationToken);
         var referenceArray = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
         if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
 
+        var compilationOptions = new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary,
+            optimizationLevel: normalizedProfile.OptimizationLevel,
+            allowUnsafe: normalizedProfile.AllowUnsafe,
+            platform: normalizedProfile.Platform,
+            nullableContextOptions: normalizedProfile.NullableContext);
         var compilation = CSharpCompilation.Create(
-            assemblyName,
+            normalizedProfile.AssemblyName ?? assemblyName,
             new[] { syntaxTree },
             referenceArray,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            compilationOptions);
         return (syntaxTree, compilation);
     }
 }

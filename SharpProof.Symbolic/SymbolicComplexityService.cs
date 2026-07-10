@@ -24,13 +24,19 @@ internal sealed class SymbolicComplexityService
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                return QueryFile(source.FilePath!, target, options.References, cancellationToken);
+                return QueryFile(
+                    source.FilePath!,
+                    target,
+                    options.References,
+                    source.CompilationProfile,
+                    cancellationToken);
             case SymbolicSourceInputKind.Text:
                 return QuerySource(
                     source.SourceText!,
                     source.FilePath ?? SymbolicSourceInput.DefaultFilePath,
                     target,
                     options.References,
+                    source.CompilationProfile,
                     cancellationToken);
             case SymbolicSourceInputKind.SyntaxTree:
                 return QuerySyntaxTree(
@@ -49,6 +55,7 @@ internal sealed class SymbolicComplexityService
         string filePath,
         SymbolicQueryTarget target,
         IEnumerable<MetadataReference>? references,
+        SymbolicSourceCompilationProfile? compilationProfile,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -61,6 +68,7 @@ internal sealed class SymbolicComplexityService
             Path.GetFullPath(filePath),
             target,
             references,
+            compilationProfile,
             cancellationToken);
     }
 
@@ -69,6 +77,7 @@ internal sealed class SymbolicComplexityService
         string filePath,
         SymbolicQueryTarget target,
         IEnumerable<MetadataReference>? references,
+        SymbolicSourceCompilationProfile? compilationProfile,
         CancellationToken cancellationToken)
     {
         var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
@@ -77,7 +86,8 @@ internal sealed class SymbolicComplexityService
             "SharpProof.Symbolic.Complexity.cs",
             "SharpProof.Symbolic.Complexity",
             references,
-            cancellationToken);
+            cancellationToken,
+            compilationProfile);
         return QuerySyntaxTree(syntaxTree, compilation, target, cancellationToken);
     }
 

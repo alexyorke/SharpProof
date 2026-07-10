@@ -71,7 +71,8 @@ public sealed class SymbolicQueryService
                     request.ConditionText,
                     options.SmtAnalysis,
                     options.References,
-                    cancellationToken);
+                    cancellationToken,
+                    source.CompilationProfile);
             case SymbolicSourceInputKind.Text:
                 return _sourceQueryService.ProveConditionAtSource(
                     source.SourceText!,
@@ -81,7 +82,8 @@ public sealed class SymbolicQueryService
                     request.ConditionText,
                     options.SmtAnalysis,
                     options.References,
-                    cancellationToken);
+                    cancellationToken,
+                    source.CompilationProfile);
             case SymbolicSourceInputKind.SyntaxTree:
                 return _sourceQueryService.ProveConditionAtSyntaxTree(
                     source.SyntaxTree!,
@@ -172,10 +174,17 @@ public sealed class SymbolicQueryService
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                return QueryFileRuntimeHazards(source.FilePath!, target, options, hazardOptions, cancellationToken);
+                return QueryFileRuntimeHazards(
+                    source.FilePath!,
+                    source.CompilationProfile,
+                    target,
+                    options,
+                    hazardOptions,
+                    cancellationToken);
             case SymbolicSourceInputKind.Text:
                 return QuerySourceRuntimeHazards(source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, target, options, hazardOptions,
+                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, source.CompilationProfile, target, options,
+                    hazardOptions,
                     cancellationToken);
             case SymbolicSourceInputKind.SyntaxTree:
                 return QuerySyntaxTreeRuntimeHazards(source.SyntaxTree!, source.Compilation!, target, options,
@@ -228,10 +237,16 @@ public sealed class SymbolicQueryService
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                return SymbolicQueryResult.From(QueryFile(source.FilePath!, target, options, cancellationToken));
+                return SymbolicQueryResult.From(QueryFile(
+                    source.FilePath!,
+                    source.CompilationProfile,
+                    target,
+                    options,
+                    cancellationToken));
             case SymbolicSourceInputKind.Text:
                 return SymbolicQueryResult.From(QuerySource(source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, target, options, cancellationToken));
+                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, source.CompilationProfile, target, options,
+                    cancellationToken));
             case SymbolicSourceInputKind.SyntaxTree:
                 return SymbolicQueryResult.From(QuerySyntaxTree(source.SyntaxTree!, source.Compilation!, target,
                     options, cancellationToken));
@@ -245,6 +260,7 @@ public sealed class SymbolicQueryService
 
     private object QueryFile(
         string filePath,
+        SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
@@ -261,7 +277,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Position:
                 return _sourceQueryService.QueryFileAtPosition(
                     filePath,
@@ -269,7 +286,8 @@ public sealed class SymbolicQueryService
                     options.References,
                     cancellationToken,
                     options.SmtAnalysis,
-                    options.ImpliedConditions);
+                    options.ImpliedConditions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Line:
                 return _sourceQueryService.QueryFileLine(
                     filePath,
@@ -279,7 +297,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Span:
                 return _sourceQueryService.QueryFileSpan(
                     filePath,
@@ -290,7 +309,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.LineSpan:
                 return _sourceQueryService.QueryFileLineSpan(
                     filePath,
@@ -303,7 +323,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.AllLines:
                 return _sourceQueryService.QueryFileAllLines(
                     filePath,
@@ -312,7 +333,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             default:
                 throw new NotSupportedException("Target kind is not supported for file queries.");
         }
@@ -321,6 +343,7 @@ public sealed class SymbolicQueryService
     private object QuerySource(
         string sourceText,
         string filePath,
+        SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
@@ -338,7 +361,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Position:
                 return _sourceQueryService.QuerySourceAtPosition(
                     sourceText,
@@ -347,7 +371,8 @@ public sealed class SymbolicQueryService
                     options.References,
                     cancellationToken,
                     options.SmtAnalysis,
-                    options.ImpliedConditions);
+                    options.ImpliedConditions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Line:
                 return _sourceQueryService.QuerySourceLine(
                     sourceText,
@@ -358,7 +383,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Span:
                 return _sourceQueryService.QuerySourceSpan(
                     sourceText,
@@ -370,7 +396,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.LineSpan:
                 return _sourceQueryService.QuerySourceLineSpan(
                     sourceText,
@@ -384,7 +411,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             case SymbolicQueryTargetKind.AllLines:
                 return _sourceQueryService.QuerySourceAllLines(
                     sourceText,
@@ -394,7 +422,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts,
+                    compilationProfile);
             default:
                 throw new NotSupportedException("Target kind is not supported for source queries.");
         }
@@ -567,6 +596,7 @@ public sealed class SymbolicQueryService
 
     private SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazards(
         string filePath,
+        SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         SymbolicRuntimeHazardQueryOptions hazardOptions,
@@ -582,7 +612,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Span:
                 return _runtimeHazardQueryService.QueryFileRuntimeHazardsSpan(
                     filePath,
@@ -591,14 +622,16 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.AllLines:
                 return _runtimeHazardQueryService.QueryFileRuntimeHazards(
                     filePath,
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             default:
                 throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
         }
@@ -607,6 +640,7 @@ public sealed class SymbolicQueryService
     private SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
         string sourceText,
         string filePath,
+        SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         SymbolicRuntimeHazardQueryOptions hazardOptions,
@@ -623,7 +657,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.Span:
                 return _runtimeHazardQueryService.QuerySourceRuntimeHazardsSpan(
                     sourceText,
@@ -633,7 +668,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             case SymbolicQueryTargetKind.AllLines:
                 return _runtimeHazardQueryService.QuerySourceRuntimeHazards(
                     sourceText,
@@ -641,7 +677,8 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis!,
                     options.References,
                     cancellationToken,
-                    hazardOptions);
+                    hazardOptions,
+                    compilationProfile);
             default:
                 throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
         }
@@ -859,7 +896,8 @@ public sealed class SymbolicSourceInput
         SyntaxTree? syntaxTree = null,
         Compilation? compilation = null,
         SyntaxNode? node = null,
-        SemanticModel? semanticModel = null)
+        SemanticModel? semanticModel = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
     {
         Kind = kind;
         FilePath = filePath;
@@ -868,6 +906,7 @@ public sealed class SymbolicSourceInput
         Compilation = compilation;
         Node = node;
         SemanticModel = semanticModel;
+        CompilationProfile = compilationProfile;
     }
 
     public SymbolicSourceInputKind Kind { get; }
@@ -884,22 +923,50 @@ public sealed class SymbolicSourceInput
 
     public SemanticModel? SemanticModel { get; }
 
+    public SymbolicSourceCompilationProfile? CompilationProfile { get; }
+
     public static SymbolicSourceInput FromFile(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path is required.", nameof(filePath));
 
-        return new SymbolicSourceInput(SymbolicSourceInputKind.File, filePath);
+        return FromFile(filePath, SymbolicSourceCompilationProfile.Default);
+    }
+
+    public static SymbolicSourceInput FromFile(
+        string filePath,
+        SymbolicSourceCompilationProfile compilationProfile)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path is required.", nameof(filePath));
+
+        return new SymbolicSourceInput(
+            SymbolicSourceInputKind.File,
+            filePath,
+            compilationProfile: compilationProfile ??
+                                throw new ArgumentNullException(nameof(compilationProfile)));
     }
 
     public static SymbolicSourceInput FromText(string sourceText, string? filePath = null)
     {
         if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
+        return FromTextWithProfile(sourceText, SymbolicSourceCompilationProfile.Default, filePath);
+    }
+
+    public static SymbolicSourceInput FromTextWithProfile(
+        string sourceText,
+        SymbolicSourceCompilationProfile compilationProfile,
+        string? filePath = null)
+    {
+        if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
+
         return new SymbolicSourceInput(
             SymbolicSourceInputKind.Text,
             string.IsNullOrWhiteSpace(filePath) ? DefaultFilePath : filePath,
-            sourceText);
+            sourceText,
+            compilationProfile: compilationProfile ??
+                                throw new ArgumentNullException(nameof(compilationProfile)));
     }
 
     public static SymbolicSourceInput FromSyntaxTree(SyntaxTree syntaxTree, Compilation compilation)
