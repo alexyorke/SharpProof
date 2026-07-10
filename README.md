@@ -643,6 +643,7 @@ Source Link symbols, and an executable sample under
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)
+- [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
 - [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
 - [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)

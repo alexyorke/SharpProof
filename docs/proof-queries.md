@@ -53,6 +53,11 @@ solver assignments and conservative input-domain summaries. See
 [solver witnesses and input domains](input-witnesses.md) for the status model,
 query properties, aggregation rules, and full-JSON behavior.
 
+Unknown and unsupported results carry stable cross-family codes in addition to
+their existing enums and raw reason strings. See the
+[unknown-reason taxonomy](unknown-reasons.md) before branching on solver,
+capability, complexity, hazard, purity, or contract failures.
+
 Every current query family now exposes its compact projection from the public
 library, not from CLI-only model classes:
 

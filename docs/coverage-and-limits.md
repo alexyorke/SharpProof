@@ -20,6 +20,10 @@ The analyzer combines:
 ## Current Limits
 
 - Unsupported C# and library shapes can remain unknown or unproven.
+- Unknown results distinguish unsupported syntax, unsupported operations,
+  missing library models, dynamic, external, and recursive boundaries, solver
+  disablement, budgets, timeouts, native failures, cancellation, and invalid
+  contract input through the [stable unknown-reason taxonomy](unknown-reasons.md).
 - Regex and string reasoning are partial.
 - Solver assignments are examples, not exhaustive input sets. Regex domains,
   opaque non-null references, disjunctions, and alternative-path merges are

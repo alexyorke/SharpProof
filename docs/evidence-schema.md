@@ -45,6 +45,11 @@ version even when a containing format is otherwise unchanged.
   token. The analyzer rejects mismatches with `SP0032`; baseline tooling throws
   `NotSupportedException` before generating or matching entries.
 
+Unknown results also expose an additive stable-code taxonomy. The code,
+category, source family, raw reason, and retry/configuration flags are described
+in [the unknown-reason registry](unknown-reasons.md). Existing family reason
+fields remain and are not replaced.
+
 Consumers should inspect the evidence version before interpreting proof fields.
 `SharpProofEvidenceSchema.IsReadCompatible(...)` accepts the legacy
 unversioned value and the current version; it rejects negative and future
