@@ -58,6 +58,30 @@ internal sealed class Z3FormulaEncoder : IDisposable
         return solver;
     }
 
+    public SmtSatisfyingWitness CreateWitness(
+        Model model,
+        IEnumerable<SmtVariable> variables,
+        SmtWitnessStatus status = SmtWitnessStatus.Exact,
+        string reason = "satisfying_model")
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        var assignments = variables
+            .Distinct()
+            .OrderBy(static variable => variable.Name, StringComparer.Ordinal)
+            .ThenBy(static variable => variable.Kind)
+            .Select(variable => CreateModelAssignment(model, variable))
+            .ToArray();
+        if (status == SmtWitnessStatus.Exact &&
+            assignments.Any(static assignment => assignment.Status == SmtWitnessStatus.Approximate))
+        {
+            status = SmtWitnessStatus.Approximate;
+            reason = "satisfying_model_contains_opaque_values";
+        }
+
+        return new SmtSatisfyingWitness(status, reason, assignments);
+    }
+
     public BoolExpr Negate(SmtFormula formula)
     {
         return _context.MkNot(EncodeCondition(formula));
@@ -519,6 +543,56 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
         _variables.Add(key, created);
         return created;
+    }
+
+    private SmtModelAssignment CreateModelAssignment(Model model, SmtVariable variable)
+    {
+        var evaluated = model.Evaluate(GetOrCreateVariable(variable), true);
+        switch (variable.Kind)
+        {
+            case SmtValueKind.Bool:
+                if (evaluated.IsTrue)
+                    return new SmtModelAssignment(variable.Name, variable.Kind, "true", BooleanValue: true);
+
+                if (evaluated.IsFalse)
+                    return new SmtModelAssignment(variable.Name, variable.Kind, "false", BooleanValue: false);
+
+                break;
+            case SmtValueKind.Int:
+                if (evaluated is IntNum integer)
+                {
+                    var text = integer.ToString();
+                    return long.TryParse(text, out var value)
+                        ? new SmtModelAssignment(variable.Name, variable.Kind, text, IntegerValue: value)
+                        : new SmtModelAssignment(variable.Name, variable.Kind, text);
+                }
+
+                break;
+            case SmtValueKind.String:
+                if (evaluated.IsString)
+                    return new SmtModelAssignment(
+                        variable.Name,
+                        variable.Kind,
+                        evaluated.String,
+                        StringValue: evaluated.String);
+
+                break;
+            case SmtValueKind.Reference:
+                var nullValue = model.Evaluate(_nullReference, true);
+                var isNull = evaluated.Equals(nullValue);
+                return new SmtModelAssignment(
+                    variable.Name,
+                    variable.Kind,
+                    isNull ? "null" : evaluated.ToString(),
+                    IsNull: isNull,
+                    Status: isNull ? SmtWitnessStatus.Exact : SmtWitnessStatus.Approximate);
+        }
+
+        return new SmtModelAssignment(
+            variable.Name,
+            variable.Kind,
+            evaluated.ToString(),
+            Status: SmtWitnessStatus.Approximate);
     }
 
     private enum RegexTranslationPrecision

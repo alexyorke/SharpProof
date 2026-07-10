@@ -25,6 +25,95 @@ public class SearchLibZ3SmokeTests
     }
 
     [Test]
+    public void SmtSolver_CheckSatisfiability_ExposesTypedExactAssignments()
+    {
+        using var solver = new SmtSolver();
+        var count = new SmtVariable("count", SmtValueKind.Int);
+        var enabled = new SmtVariable("enabled", SmtValueKind.Bool);
+        var text = new SmtVariable("text", SmtValueKind.String);
+        var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
+
+        var result = solver.CheckSatisfiability(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, count, new SmtIntegerConstant(3)),
+                enabled,
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("abc")),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, receiver, new SmtNullConstant())
+            },
+            TimeSpan.FromMilliseconds(100));
+
+        Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Exact));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "count").IntegerValue,
+                Is.EqualTo(3));
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "enabled").BooleanValue,
+                Is.True);
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "text").StringValue,
+                Is.EqualTo("abc"));
+            Assert.That(result.Witness.Assignments.Single(assignment => assignment.Name == "receiver").IsNull,
+                Is.True);
+        });
+    }
+
+    [Test]
+    public void SmtSolver_CheckSatisfiability_ExposesRangeModel()
+    {
+        using var solver = new SmtSolver();
+        var index = new SmtVariable("index", SmtValueKind.Int);
+
+        var result = solver.CheckSatisfiability(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, index, new SmtIntegerConstant(2)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, index, new SmtIntegerConstant(5))
+            },
+            TimeSpan.FromMilliseconds(100));
+
+        var assignment = result.Witness.Assignments.Single();
+        Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(assignment.IntegerValue, Is.InRange(2, 4));
+    }
+
+    [Test]
+    public void SmtSolver_CheckSatisfiability_MarksOpaqueReferenceModelApproximate()
+    {
+        using var solver = new SmtSolver();
+        var receiver = new SmtVariable("receiver", SmtValueKind.Reference);
+
+        var result = solver.CheckSatisfiability(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiver, new SmtNullConstant())
+            },
+            TimeSpan.FromMilliseconds(100));
+
+        Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Approximate));
+        Assert.That(result.Witness.Assignments.Single().IsNull, Is.False);
+    }
+
+    [Test]
+    public void SmtSolver_CheckSatisfiability_PreservesApproximateRegexCandidateModel()
+    {
+        using var solver = new SmtSolver();
+        var text = new SmtVariable("text", SmtValueKind.String);
+
+        var result = solver.CheckSatisfiability(
+            new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, "(?>ab)c")
+            },
+            TimeSpan.FromMilliseconds(100));
+
+        Assert.That(result.Feasibility, Is.EqualTo(Feasibility.Unknown));
+        Assert.That(result.Witness.Status, Is.EqualTo(SmtWitnessStatus.Approximate));
+        Assert.That(result.Witness.Assignments.Single().StringValue, Is.Not.Null);
+    }
+
+    [Test]
     public void SmtSolver_NonZeroGuardDoesNotImplyZero_IsSatisfiable()
     {
         using var solver = new SmtSolver();

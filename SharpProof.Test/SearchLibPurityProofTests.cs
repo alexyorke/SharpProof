@@ -66,6 +66,9 @@ public class SearchLibPurityProofTests
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
+        Assert.That(result.PathWitness, Is.Not.Null);
+        Assert.That(result.TriggerWitness, Is.Not.Null);
+        Assert.That(result.TriggerWitness!.Assignments.Single().IntegerValue, Is.EqualTo(0));
     }
 
     [Test]
@@ -119,6 +122,9 @@ public class SearchLibPurityProofTests
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
+        Assert.That(result.PathWitness, Is.Not.Null);
+        Assert.That(result.PathWitness!.Assignments.Single().IntegerValue, Is.Not.EqualTo(0));
+        Assert.That(result.TriggerWitness?.Status, Is.EqualTo(SmtWitnessStatus.None));
     }
 
     [Test]

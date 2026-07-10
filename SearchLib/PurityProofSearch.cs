@@ -13,7 +13,9 @@ public sealed record PurityProofResult(
     PurityProofOutcome Outcome,
     Feasibility PathFeasibility,
     Feasibility ImpurityFeasibility,
-    string Reason);
+    string Reason,
+    SmtSatisfyingWitness? PathWitness = null,
+    SmtSatisfyingWitness? TriggerWitness = null);
 
 public sealed class PurityProofSearch : IDisposable
 {
@@ -122,24 +124,27 @@ public sealed class PurityProofSearch : IDisposable
         string pureReason = "effect_not_caller_visible")
     {
         var normalizedPathConditions = pathConditions.ToArray();
-        var pathFeasibility = _solver.IsSatisfiable(normalizedPathConditions, timeout);
-        return pathFeasibility switch
+        var path = _solver.CheckSatisfiability(normalizedPathConditions, timeout);
+        return path.Feasibility switch
         {
             Feasibility.Unsatisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                pathFeasibility,
+                path.Feasibility,
                 Feasibility.Unsatisfiable,
-                "path_unsatisfiable"),
+                "path_unsatisfiable",
+                path.Witness),
             Feasibility.Unknown => new PurityProofResult(
                 PurityProofOutcome.Unknown,
-                pathFeasibility,
+                path.Feasibility,
                 Feasibility.Unknown,
-                "path_feasibility_unknown"),
+                "path_feasibility_unknown",
+                path.Witness),
             _ => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                pathFeasibility,
+                path.Feasibility,
                 Feasibility.Unsatisfiable,
-                pureReason)
+                pureReason,
+                path.Witness)
         };
     }
 
@@ -208,21 +213,29 @@ public sealed class PurityProofSearch : IDisposable
         string unknownReason)
     {
         var normalizedPathConditions = pathConditions.ToArray();
-        var (pathFeasibility, impurityFeasibility) =
-            _solver.CheckPathAndImpurity(normalizedPathConditions, impurityCondition, timeout);
+        var check = _solver.CheckPathAndImpurityWithWitness(
+            normalizedPathConditions,
+            impurityCondition,
+            timeout);
+        var pathFeasibility = check.Path.Feasibility;
+        var impurityFeasibility = check.Impurity.Feasibility;
         if (pathFeasibility == Feasibility.Unsatisfiable)
             return new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
                 pathFeasibility,
                 Feasibility.Unsatisfiable,
-                "path_unsatisfiable");
+                "path_unsatisfiable",
+                check.Path.Witness,
+                check.Impurity.Witness);
 
         if (pathFeasibility == Feasibility.Unknown)
             return new PurityProofResult(
                 PurityProofOutcome.Unknown,
                 pathFeasibility,
                 Feasibility.Unknown,
-                "path_feasibility_unknown");
+                "path_feasibility_unknown",
+                check.Path.Witness,
+                check.Impurity.Witness);
 
         return impurityFeasibility switch
         {
@@ -230,17 +243,23 @@ public sealed class PurityProofSearch : IDisposable
                 PurityProofOutcome.ProvablyPure,
                 pathFeasibility,
                 impurityFeasibility,
-                pureReason),
+                pureReason,
+                check.Path.Witness,
+                check.Impurity.Witness),
             Feasibility.Satisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyImpure,
                 pathFeasibility,
                 impurityFeasibility,
-                impureReason),
+                impureReason,
+                check.Path.Witness,
+                check.Impurity.Witness),
             _ => new PurityProofResult(
                 PurityProofOutcome.Unknown,
                 pathFeasibility,
                 impurityFeasibility,
-                unknownReason)
+                unknownReason,
+                check.Path.Witness,
+                check.Impurity.Witness)
         };
     }
 }

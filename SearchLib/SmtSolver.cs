@@ -63,6 +63,88 @@ public sealed class SmtSolver : IDisposable
         return IsSatisfiableRaw(preparedConditions, timeout);
     }
 
+    public SmtFeasibilityResult CheckSatisfiability(
+        IEnumerable<SmtFormula> pathConditions,
+        TimeSpan timeout)
+    {
+        return CheckSatisfiability(pathConditions, timeout, true);
+    }
+
+    private SmtFeasibilityResult CheckSatisfiability(
+        IEnumerable<SmtFormula> pathConditions,
+        TimeSpan timeout,
+        bool adjustApproximation)
+    {
+        var originalConditions = pathConditions.ToArray();
+        var preparedStatus = PrepareConcreteFacts(originalConditions, out var preparedConditions);
+        if (preparedStatus != ConcreteFactPreparationStatus.Ready)
+            return preparedStatus == ConcreteFactPreparationStatus.Unsatisfiable
+                ? new SmtFeasibilityResult(
+                    Feasibility.Unsatisfiable,
+                    SmtSatisfyingWitness.None("constraints_unsatisfiable"))
+                : new SmtFeasibilityResult(
+                    Feasibility.Unknown,
+                    SmtSatisfyingWitness.Unsupported("constraint_preparation_unknown"));
+
+        if (timeout <= TimeSpan.Zero)
+            return new SmtFeasibilityResult(
+                Feasibility.Unknown,
+                SmtSatisfyingWitness.Unsupported("solver_timeout"));
+
+        if (!ReferenceEquals(originalConditions, preparedConditions))
+            try
+            {
+                return CheckSatisfiabilityRawWithWitness(
+                    originalConditions,
+                    originalConditions,
+                    timeout,
+                    false,
+                    adjustApproximation);
+            }
+            catch (Exception ex) when (IsConservativeSolverFailure(ex))
+            {
+                // Some concrete facts are deliberately discharged before encoding,
+                // including .NET-only regex cases. Preserve the feasibility result
+                // and expose any remaining model as an explicitly approximate witness.
+            }
+
+        try
+        {
+            return CheckSatisfiabilityRawWithWitness(
+                preparedConditions,
+                preparedConditions,
+                timeout,
+                !ReferenceEquals(originalConditions, preparedConditions),
+                adjustApproximation);
+        }
+        catch (Exception ex) when (IsConservativeSolverFailure(ex))
+        {
+            return new SmtFeasibilityResult(
+                Feasibility.Unknown,
+                SmtSatisfyingWitness.Unsupported("solver_or_encoding_failure"));
+        }
+    }
+
+    public SmtPathAndImpurityCheckResult CheckPathAndImpurityWithWitness(
+        IEnumerable<SmtFormula> pathConditions,
+        SmtFormula impurityCondition,
+        TimeSpan timeout)
+    {
+        var normalizedPathConditions = pathConditions.ToArray();
+        var path = CheckSatisfiability(normalizedPathConditions, timeout, false);
+        if (path.Feasibility != Feasibility.Satisfiable)
+            return new SmtPathAndImpurityCheckResult(
+                path,
+                new SmtFeasibilityResult(
+                    Feasibility.Unknown,
+                    SmtSatisfyingWitness.None("path_not_satisfiable")));
+
+        var impurity = CheckSatisfiability(
+            normalizedPathConditions.Concat(new[] { impurityCondition }),
+            timeout);
+        return new SmtPathAndImpurityCheckResult(path, impurity);
+    }
+
     private Feasibility IsSatisfiableRaw(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero) return Feasibility.Unknown;
@@ -80,6 +162,48 @@ public sealed class SmtSolver : IDisposable
         {
             return Feasibility.Unknown;
         }
+    }
+
+    private SmtFeasibilityResult CheckSatisfiabilityRawWithWitness(
+        IReadOnlyList<SmtFormula> conditions,
+        IReadOnlyList<SmtFormula> modelConditions,
+        TimeSpan timeout,
+        bool preprocessedModel,
+        bool adjustApproximation)
+    {
+        var containsApproximateRegex = ContainsApproximateRegex(conditions);
+        using var solver = _encoder.CreateSolver(timeout);
+        foreach (var formula in conditions) solver.Assert(_encoder.EncodeCondition(formula));
+
+        var feasibility = ToFeasibility(CheckAndAccountResources(solver));
+        if (feasibility == Feasibility.Unsatisfiable)
+            return new SmtFeasibilityResult(
+                feasibility,
+                SmtSatisfyingWitness.None("constraints_unsatisfiable"));
+
+        if (feasibility != Feasibility.Satisfiable)
+            return new SmtFeasibilityResult(
+                feasibility,
+                SmtSatisfyingWitness.Unsupported("solver_unknown"));
+
+        var witnessStatus = containsApproximateRegex || preprocessedModel
+            ? SmtWitnessStatus.Approximate
+            : SmtWitnessStatus.Exact;
+        var witnessReason = containsApproximateRegex
+            ? "approximate_regex_model"
+            : preprocessedModel
+                ? "model_from_preprocessed_constraints"
+                : "satisfying_model";
+        var witness = _encoder.CreateWitness(
+            solver.Model,
+            CollectVariables(modelConditions),
+            witnessStatus,
+            witnessReason);
+        return new SmtFeasibilityResult(
+            adjustApproximation
+                ? AdjustForApproximation(feasibility, containsApproximateRegex)
+                : feasibility,
+            witness);
     }
 
     public Feasibility Implies(IEnumerable<SmtFormula> pathConditions, SmtFormula conclusion, TimeSpan timeout)
@@ -3201,6 +3325,68 @@ public sealed class SmtSolver : IDisposable
                 left.Substring(left.Length - minLength, minLength),
                 right.Substring(right.Length - minLength, minLength),
                 StringComparison.Ordinal);
+        }
+    }
+
+    private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas)
+    {
+        var variables = new HashSet<SmtVariable>();
+        foreach (var formula in formulas) Visit(formula, variables);
+
+        return variables.ToArray();
+    }
+
+    private static void Visit(SmtFormula formula, ISet<SmtVariable> variables)
+    {
+        switch (formula)
+        {
+            case SmtVariable variable:
+                variables.Add(variable);
+                break;
+            case SmtUnaryFormula unary:
+                Visit(unary.Operand, variables);
+                break;
+            case SmtBinaryFormula binary:
+                Visit(binary.Left, variables);
+                Visit(binary.Right, variables);
+                break;
+            case SmtIntegerUnaryTerm integerUnary:
+                Visit(integerUnary.Operand, variables);
+                break;
+            case SmtIntegerBinaryTerm integerBinary:
+                Visit(integerBinary.Left, variables);
+                Visit(integerBinary.Right, variables);
+                break;
+            case SmtStringLengthTerm stringLength:
+                Visit(stringLength.Value, variables);
+                break;
+            case SmtStringConcatTerm stringConcat:
+                Visit(stringConcat.Left, variables);
+                Visit(stringConcat.Right, variables);
+                break;
+            case SmtStringContainsFormula stringContains:
+                Visit(stringContains.Value, variables);
+                Visit(stringContains.Search, variables);
+                break;
+            case SmtStringStartsWithFormula stringStartsWith:
+                Visit(stringStartsWith.Value, variables);
+                Visit(stringStartsWith.Prefix, variables);
+                break;
+            case SmtStringEndsWithFormula stringEndsWith:
+                Visit(stringEndsWith.Value, variables);
+                Visit(stringEndsWith.Suffix, variables);
+                break;
+            case SmtRegexMatchFormula regexMatch:
+                Visit(regexMatch.Value, variables);
+                break;
+            case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                Visit(runtimeTypeTest.Value, variables);
+                break;
+            case SmtConditionalFormula conditional:
+                Visit(conditional.Condition, variables);
+                Visit(conditional.WhenTrue, variables);
+                Visit(conditional.WhenFalse, variables);
+                break;
         }
     }
 
