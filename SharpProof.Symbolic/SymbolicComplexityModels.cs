@@ -173,4 +173,9 @@ public sealed class SymbolicComplexityResult
     public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
 
     public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
+
+    public SymbolicCompactComplexityResult ToCompactResult()
+    {
+        return SymbolicCompactComplexityResult.FromResult(this);
+    }
 }

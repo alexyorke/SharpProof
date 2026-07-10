@@ -157,4 +157,9 @@ public sealed class SymbolicCapabilityResult
     public bool HasUnknowns => UnknownReasons.Count != 0 || Sites.Any(static site => site.IsUnknown);
 
     public bool IsConservative => HasUnknowns;
+
+    public SymbolicCompactCapabilityResult ToCompactResult()
+    {
+        return SymbolicCompactCapabilityResult.FromResult(this);
+    }
 }

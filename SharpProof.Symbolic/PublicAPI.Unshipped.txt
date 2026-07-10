@@ -1,4 +1,9 @@
 #nullable enable
+SharpProof.Symbolic.ISymbolicCompactResult
+SharpProof.Symbolic.ISymbolicCompactResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.ISymbolicCompactResult.EvidenceSchemaVersion.get -> int
+SharpProof.Symbolic.ISymbolicCompactResult.Kind.get -> string!
+SharpProof.Symbolic.ISymbolicCompactResult.SchemaVersion.get -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "additive-v1" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 1 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
@@ -26,3 +31,130 @@ static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaV
 static SharpProof.Symbolic.SymbolicSourceInput.FromFile(string! filePath, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile) -> SharpProof.Symbolic.SymbolicSourceInput!
 static SharpProof.Symbolic.SymbolicSourceInput.FromTextWithProfile(string! sourceText, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile, string? filePath = null) -> SharpProof.Symbolic.SymbolicSourceInput!
 static readonly SharpProof.Symbolic.SymbolicSourceCompilationProfile.Default -> SharpProof.Symbolic.SymbolicSourceCompilationProfile!
+const SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.DefaultMaxHazards = 250 -> int
+SharpProof.Symbolic.SymbolicCapabilityResult.ToCompactResult() -> SharpProof.Symbolic.SymbolicCompactCapabilityResult!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.Capabilities.get -> SharpProof.Symbolic.SymbolicCapability
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.CapabilityText.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.DeclarationKind.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.EndColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.EndLine.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.EvidenceSchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.FilePath.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.HasUnknowns.get -> bool
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.Kind.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.MethodDisplayName.get -> string!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.SchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.Sites.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>!
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.SpanEnd.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.SpanStart.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.StartColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.StartLine.get -> int
+SharpProof.Symbolic.SymbolicCompactCapabilityResult.UnknownReasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>!
+SharpProof.Symbolic.SymbolicCompactComplexityResult
+SharpProof.Symbolic.SymbolicCompactComplexityResult.CalleeSummaries.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityCalleeInfo!>!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.Complexity.get -> SharpProof.Symbolic.SymbolicComplexityInfo!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.DeclarationKind.get -> string!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.Drivers.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityDriverInfo!>!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.EndColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.EndLine.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.EvidenceSchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.FilePath.get -> string!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.Kind.get -> string!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.MethodDisplayName.get -> string!
+SharpProof.Symbolic.SymbolicCompactComplexityResult.SchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.SpanEnd.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.SpanStart.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.StartColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.StartLine.get -> int
+SharpProof.Symbolic.SymbolicCompactComplexityResult.UnknownReasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicComplexityUnknownReason>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Category.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Column.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.ExceptionType.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.FilePath.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Kind.get -> SharpProof.Symbolic.SymbolicRuntimeHazardKind
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Line.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.MergedInvariantText.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.NodeEndColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.NodeEndLine.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.NodeKind.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.NodeStartColumn.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.NodeStartLine.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.OperationText.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.PathConditionCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.PathConditions.get -> System.Collections.Generic.IReadOnlyList<string!>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Reachability.get -> SharpProof.Symbolic.SymbolicReachability
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.ReachabilityReason.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.SpanEnd.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.SpanLength.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.SpanStart.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Status.get -> SharpProof.Symbolic.SymbolicRuntimeHazardStatus
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.StatusReason.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.TriggerCondition.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.TriggerPrecondition.get -> SharpProof.Symbolic.SymbolicFactInfo?
+SharpProof.Symbolic.SymbolicCompactRuntimeHazard.Truncation.get -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardItemTruncation!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardItemTruncation
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardItemTruncation.PathConditions.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardItemTruncation.SymbolicCompactRuntimeHazardItemTruncation(bool pathConditions) -> void
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardOutputTruncation
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardOutputTruncation.Hazards.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardOutputTruncation.PathConditions.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardOutputTruncation.SymbolicCompactRuntimeHazardOutputTruncation(bool hazards, bool pathConditions) -> void
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.MaxConditions.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.MaxHazards.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.SymbolicCompactRuntimeHazardQueryOptions(int maxHazards = 250, int maxConditions = 50) -> void
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.AnalysisSummary.get -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.CategoryCounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.EvidenceSchemaCompatibility.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.EvidenceSchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.ExceptionTypeCounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.FilePath.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.HazardCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.Hazards.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCompactRuntimeHazard!>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.Kind.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.KindCounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.Line.get -> int?
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.LineCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.SchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.ScopeEnd.get -> int?
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.ScopeKind.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.ScopeLength.get -> int?
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.ScopeStart.get -> int?
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.SmtDiagnostics.get -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.StatusCounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.Truncation.get -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardOutputTruncation!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.CacheEntryCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.ExecutedQueryCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.IsConfigured.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.IsEnabled.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.MaxExpressionNodes.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.MaxPathConditions.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.MethodBudgetMs.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.Mode.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.QueryTimeoutMs.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.HasUnprovenHazards.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.HazardCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.ProvenCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.SmtConfigured.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.SmtEnabled.get -> bool
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.Status.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.Summary.get -> string!
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.UnknownCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.UnreachableCount.get -> int
+SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.UnsupportedCount.get -> int
+SharpProof.Symbolic.SymbolicComplexityResult.ToCompactResult() -> SharpProof.Symbolic.SymbolicCompactComplexityResult!
+SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult.ToCompactResult(SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions? options = null) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult!
+static readonly SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.Default -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions!
+static SharpProof.Symbolic.SymbolicCompactCapabilityResult.FromResult(SharpProof.Symbolic.SymbolicCapabilityResult! result) -> SharpProof.Symbolic.SymbolicCompactCapabilityResult!
+static SharpProof.Symbolic.SymbolicCompactComplexityResult.FromResult(SharpProof.Symbolic.SymbolicComplexityResult! result) -> SharpProof.Symbolic.SymbolicCompactComplexityResult!
+static SharpProof.Symbolic.SymbolicCompactRuntimeHazard.FromHazard(SharpProof.Symbolic.SymbolicRuntimeHazard! hazard, SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions! options) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazard!
+static SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult.FromResult(SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult! result, SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions? options = null) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryResult!
+static SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(SharpProof.Symbolic.SymbolicSmtDiagnostics! diagnostics) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics!
+static SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary.FromHazards(System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicRuntimeHazard!>! hazards, SharpProof.Symbolic.SymbolicSmtDiagnostics! smtDiagnostics) -> SharpProof.Symbolic.SymbolicCompactRuntimeHazardStatusSummary!

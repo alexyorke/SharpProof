@@ -226,6 +226,33 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void CompactDomainProjections_LiveInPublicSymbolicApi()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var cliSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "Tools",
+            "SharpProof.SymbolicCli",
+            "Program.cs"));
+        var publicSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicCompactDomainResults.cs"));
+
+        Assert.That(cliSource, Does.Contain("capabilityResult.ToCompactResult()"));
+        Assert.That(cliSource, Does.Contain("complexityResult.ToCompactResult()"));
+        Assert.That(cliSource, Does.Contain("hazardResult.ToCompactResult("));
+        Assert.That(cliSource, Does.Not.Contain("internal sealed class CompactSymbolic"));
+        Assert.That(cliSource, Does.Not.Contain("internal sealed class CompactRuntimeHazard"));
+        Assert.That(publicSource, Does.Contain("public interface ISymbolicCompactResult"));
+        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactCapabilityResult"));
+        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactComplexityResult"));
+        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactRuntimeHazardQueryResult"));
+        Assert.That(publicSource, Does.Contain("SharpProofEvidenceSchema.CurrentVersion"));
+        Assert.That(publicSource, Does.Contain("SharpProofEvidenceSchema.CompatibilityPolicy"));
+    }
+
+    [Test]
     public void SymbolicProofService_KeepsFormulaCompatibilityPrivate()
     {
         var repositoryRoot = FindRepositoryRoot();

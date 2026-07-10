@@ -3208,7 +3208,7 @@ public sealed class SymbolicInvariantQueryFocus
     }
 }
 
-public sealed class SymbolicCompactQueryResult
+public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 {
     private SymbolicCompactQueryResult(
         string kind,
@@ -3658,7 +3658,7 @@ public sealed class SymbolicCompactQueryResult
     }
 }
 
-public sealed class SymbolicInvariantQueryResult
+public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
 {
     private SymbolicInvariantQueryResult(
         string scopeKind,

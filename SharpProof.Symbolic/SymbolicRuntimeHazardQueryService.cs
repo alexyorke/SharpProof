@@ -601,6 +601,12 @@ public sealed class SymbolicRuntimeHazardQueryResult
     public int HazardCount => Hazards.Count;
 
     public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+    public SymbolicCompactRuntimeHazardQueryResult ToCompactResult(
+        SymbolicCompactRuntimeHazardQueryOptions? options = null)
+    {
+        return SymbolicCompactRuntimeHazardQueryResult.FromResult(this, options);
+    }
 }
 
 public sealed class SymbolicRuntimeHazard
