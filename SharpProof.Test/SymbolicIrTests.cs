@@ -1019,6 +1019,28 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
+    public void EncodeTerm_ArrayElementsWithDifferentSymbolicIndicesRemainDistinct()
+    {
+        var receiver = new SymbolicVariableTerm("values", SmtValueKind.Reference);
+        var first = new SymbolicElementTerm(
+            receiver,
+            new SymbolicVariableTerm("firstIndex", SmtValueKind.Int),
+            SmtValueKind.Int);
+        var second = new SymbolicElementTerm(
+            receiver,
+            new SymbolicVariableTerm("secondIndex", SmtValueKind.Int),
+            SmtValueKind.Int);
+
+        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(first, out var firstFormula), Is.True);
+        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(second, out var secondFormula), Is.True);
+        Assert.That(firstFormula, Is.TypeOf<SmtVariable>());
+        Assert.That(secondFormula, Is.TypeOf<SmtVariable>());
+        Assert.That(((SmtVariable)firstFormula).Name, Is.EqualTo("values[firstIndex]"));
+        Assert.That(((SmtVariable)secondFormula).Name, Is.EqualTo("values[secondIndex]"));
+        Assert.That(firstFormula, Is.Not.EqualTo(secondFormula));
+    }
+
+    [Test]
     public void KnownApiLowering_StringComparisonOverloadFallsBackToLegacyTranslator()
     {
         var context = CreateExpressionContext(

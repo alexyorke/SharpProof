@@ -372,8 +372,11 @@ internal static class SymbolicIrFormulaEncoder
 
     private static string CreateElementAccessIndexText(SmtFormula index)
     {
-        return index is SmtIntegerConstant constant
-            ? constant.Value.ToString(CultureInfo.InvariantCulture)
-            : "?";
+        return index switch
+        {
+            SmtIntegerConstant constant => constant.Value.ToString(CultureInfo.InvariantCulture),
+            SmtVariable variable => variable.Name,
+            _ => index.ToString()
+        };
     }
 }
