@@ -52,11 +52,6 @@ grouped by their original feature area.
 
 ### High Priority Features
 
-#### Symbolic Engine And Evidence Quality
-- Triage `POTENTIAL_BUGS.md` into prioritized issues or regression tests, then
-  delete or shrink entries once they are fixed, disproven, or intentionally
-  accepted as conservative behavior.
-
 #### Tooling, Packaging, And Verification
 - Add a project-aware symbolic CLI/API mode, such as `--project` or
   `--solution`, that loads MSBuild references, parse options, `.editorconfig`
