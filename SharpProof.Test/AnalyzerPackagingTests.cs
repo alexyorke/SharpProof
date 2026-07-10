@@ -1417,12 +1417,12 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("new SymbolicRuntimeHazardRequest("));
         Assert.That(source, Does.Contain("new SymbolicComplexityRequest("));
         Assert.That(source, Does.Contain("new SymbolicCapabilityRequest("));
-        Assert.That(source, Does.Contain("SymbolicSourceInput.FromFile(options.FilePath)"));
+        Assert.That(source, Does.Contain("options.CreateSourceInput()"));
         Assert.That(source, Does.Contain("options.CreateQueryTarget()"));
         Assert.That(source, Does.Contain("options.CreateRuntimeHazardTarget()"));
         Assert.That(source, Does.Contain("options.CreateComplexityTarget()"));
         Assert.That(source, Does.Contain("options.CreateCapabilityTarget()"));
-        Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis, includeResultFilter: true)"));
+        Assert.That(source, Does.Contain("options.CreateQueryOptions(smtAnalysis, true)"));
         Assert.That(source, Does.Contain("SymbolicFileQueryResult"));
         Assert.That(source, Does.Contain("SymbolicComplexityResult"));
         Assert.That(source, Does.Contain("SymbolicCapabilityResult"));
