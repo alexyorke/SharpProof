@@ -293,7 +293,7 @@ public sealed class StableCacheDerived : StaticFieldBase
                 .ToArray();
         }
 
-        private static async Task<JsonDocument> RunEffectSummaryAsync(
+        internal static async Task<JsonDocument> RunEffectSummaryAsync(
             string assemblyPath,
             bool includeTransitiveRoots,
             bool classifyPurity = false,
@@ -306,7 +306,7 @@ public sealed class StableCacheDerived : StaticFieldBase
                 compareManualCatalogs);
         }
 
-        private static async Task<JsonDocument> RunEffectSummaryAsync(
+        internal static async Task<JsonDocument> RunEffectSummaryAsync(
             string[] assemblyPaths,
             bool includeTransitiveRoots,
             bool classifyPurity = false,
@@ -363,7 +363,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
         }
 
-        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunEffectSummaryProcessAsync(params string[] arguments)
+        internal static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunEffectSummaryProcessAsync(params string[] arguments)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -663,7 +663,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             }
         }
 
-        private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(
+        internal static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(
             string assemblyName,
             string source,
             params MetadataReference[] additionalReferences)
@@ -693,7 +693,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             return new FixtureAssembly(tempDirectory, assemblyPath);
         }
 
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
             if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -710,7 +710,7 @@ public sealed class StableCacheDerived : StaticFieldBase
                 .ToImmutableArray();
         }
 
-        private static string GetRepositoryRoot()
+        internal static string GetRepositoryRoot()
         {
             return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
         }
@@ -785,7 +785,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             }
         }
 
-        private sealed class FixtureAssembly : IAsyncDisposable
+        internal sealed class FixtureAssembly : IAsyncDisposable
         {
             public FixtureAssembly(string directoryPath, string assemblyPath)
             {

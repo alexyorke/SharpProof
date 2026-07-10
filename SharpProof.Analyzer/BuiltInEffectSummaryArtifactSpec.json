@@ -4,6 +4,7 @@
     "Framework": "net8.0",
     "IncludeCallees": true,
     "MaxDepth": 1,
+    "MaxExceptionEdges": 4096,
     "IncludePurityClassification": true,
     "CompareManualCatalogs": true
   },

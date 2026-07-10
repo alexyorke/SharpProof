@@ -647,6 +647,10 @@
                              "path":  "SharpProof.Test/DynamicTypingTests.cs"
                          },
                          {
+                             "name":  "EffectSummaryScalabilityTests",
+                             "path":  "SharpProof.ToolingTest/EffectSummaryScalabilityTests.cs"
+                         },
+                         {
                              "name":  "EffectSummarySymbolKeyFactoryTests",
                              "path":  "SharpProof.Test/EffectSummarySymbolKeyFactoryTests.cs"
                          },
@@ -5018,6 +5022,7 @@
                                                   "StaticFieldInitializerValueKind",
                                                   "StaticFieldUsage",
                                                   "ThrownExceptionEdgeSummary",
+                                                  "ThrownExceptionTraversalResult",
                                                   "TrackedStackValue",
                                                   "TypeNameProvider"
                                               ],

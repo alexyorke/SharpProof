@@ -126,6 +126,14 @@ dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symb
 
 When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction. The tool also emits `TransitiveThrownExceptionEdges`, which preserve the recursive callee chain as structured records with `ExceptionType`, `SourcePath`, `CalleeExactSymbolKey`, and `Depth`.
 
+Exception-edge expansion is bounded per method by `--max-exception-edges` (default
+`4096`). This cap applies even when `--max-depth -1` is used, preventing a
+high-fan-out or cyclic exception graph from exhausting memory. If the cap is
+reached, that method emits `TransitiveThrownExceptionEdgesTruncated: true`; the
+edge and transitive exception arrays are then a bounded prefix rather than a
+complete closure. Artifact specs can set the same limit with
+`MaxExceptionEdges` in `Defaults` or an individual artifact.
+
 Add report-only purity classification to the JSON:
 
 ```powershell

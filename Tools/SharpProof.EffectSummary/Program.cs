@@ -63,7 +63,8 @@ internal static class EffectSummaryCli
                 options.ExactSymbolKeys,
                 options.IncludeCallees,
                 options.MaxDepth,
-                options.IncludeTransitiveRoots))
+                options.IncludeTransitiveRoots,
+                options.MaxExceptionEdges))
             .ToArray();
 
         if (options.ExcludedSymbolPrefixes.Count > 0)
@@ -150,6 +151,7 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
         Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
         Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
+        Console.Error.WriteLine("  --max-exception-edges <count> Maximum transitive thrown-exception edges retained per method. Default: 4096.");
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
         Console.Error.WriteLine("  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.");
@@ -162,6 +164,8 @@ internal static class EffectSummaryCli
 
 internal sealed class CliOptions
 {
+    public const int DefaultMaxExceptionEdges = 4096;
+
     public List<string> AssemblyPaths { get; } = new();
 
     public List<string> SymbolPrefixes { get; } = new();
@@ -185,6 +189,8 @@ internal sealed class CliOptions
     public bool IncludeCallees { get; private set; }
 
     public int MaxDepth { get; private set; } = 1;
+
+    public int MaxExceptionEdges { get; private set; } = DefaultMaxExceptionEdges;
 
     public bool IncludeTransitiveRoots { get; private set; }
 
@@ -230,6 +236,9 @@ internal sealed class CliOptions
                 case "--max-depth":
                     options.MaxDepth = int.Parse(ReadRequiredValue(args, ref i, arg));
                     break;
+                case "--max-exception-edges":
+                    options.MaxExceptionEdges = ReadPositiveInt(args, ref i, arg);
+                    break;
                 case "--transitive-roots":
                     options.IncludeTransitiveRoots = true;
                     break;
@@ -259,6 +268,11 @@ internal sealed class CliOptions
             }
         }
 
+        if (!options.ShowHelp)
+        {
+            options.Validate();
+        }
+
         return options;
     }
 
@@ -275,6 +289,7 @@ internal sealed class CliOptions
             Limit = artifact.Limit ?? defaults?.Limit,
             IncludeCallees = artifact.IncludeCallees ?? defaults?.IncludeCallees ?? false,
             MaxDepth = artifact.MaxDepth ?? defaults?.MaxDepth ?? 1,
+            MaxExceptionEdges = artifact.MaxExceptionEdges ?? defaults?.MaxExceptionEdges ?? DefaultMaxExceptionEdges,
             IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
             IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
@@ -343,7 +358,17 @@ internal sealed class CliOptions
             options.IncludePurityClassification = true;
         }
 
+        options.Validate();
+
         return options;
+    }
+
+    private void Validate()
+    {
+        if (MaxExceptionEdges <= 0)
+        {
+            throw new ArgumentException("MaxExceptionEdges must be greater than zero.");
+        }
     }
 
     private static bool HasPackageAssembly(ArtifactSpecEntry artifact)
@@ -564,6 +589,17 @@ internal sealed class CliOptions
         index++;
         return args[index];
     }
+
+    private static int ReadPositiveInt(string[] args, ref int index, string option)
+    {
+        var value = int.Parse(ReadRequiredValue(args, ref index, option));
+        if (value <= 0)
+        {
+            throw new ArgumentException($"{option} must be greater than zero.");
+        }
+
+        return value;
+    }
 }
 
 internal sealed class ArtifactSpecDocument
@@ -611,6 +647,8 @@ internal sealed class ArtifactSpecDefaults
 
     public int? MaxDepth { get; set; }
 
+    public int? MaxExceptionEdges { get; set; }
+
     public bool? IncludeTransitiveRoots { get; set; }
 
     public bool? IncludePurityClassification { get; set; }
@@ -649,6 +687,8 @@ internal sealed class ArtifactSpecEntry
     public bool? IncludeCallees { get; set; }
 
     public int? MaxDepth { get; set; }
+
+    public int? MaxExceptionEdges { get; set; }
 
     public bool? IncludeTransitiveRoots { get; set; }
 
@@ -1197,7 +1237,8 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyList<string> exactSymbolKeys,
         bool includeCallees,
         int maxDepth,
-        bool includeTransitiveRoots)
+        bool includeTransitiveRoots,
+        int maxExceptionEdges)
     {
         var assemblySha256 = ComputeFileSha256(assemblyPath);
         using var stream = File.OpenRead(assemblyPath);
@@ -1285,7 +1326,7 @@ internal static class AssemblyEffectSummarizer
 
         if (includeTransitiveRoots)
         {
-            allSummaries = AddTransitiveRootCandidates(allSummaries);
+            allSummaries = AddTransitiveRootCandidates(allSummaries, maxExceptionEdges);
         }
 
         var summaries = SelectSummaries(
@@ -1737,7 +1778,9 @@ internal static class AssemblyEffectSummarizer
         return Convert.ToHexString(sha256.ComputeHash(bytes)).ToLowerInvariant();
     }
 
-    private static List<MethodEffectSummary> AddTransitiveRootCandidates(IReadOnlyList<MethodEffectSummary> summaries)
+    private static List<MethodEffectSummary> AddTransitiveRootCandidates(
+        IReadOnlyList<MethodEffectSummary> summaries,
+        int maxExceptionEdges)
     {
         var bySymbol = summaries
             .GroupBy(summary => summary.ExactSymbolKey, StringComparer.Ordinal)
@@ -1745,17 +1788,19 @@ internal static class AssemblyEffectSummarizer
 
         var rootMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var rootVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var exceptionMemo = new Dictionary<string, ThrownExceptionEdgeSummary[]>(StringComparer.Ordinal);
+        var exceptionMemo = new Dictionary<string, ThrownExceptionTraversalResult>(StringComparer.Ordinal);
         var exceptionVisiting = new HashSet<string>(StringComparer.Ordinal);
 
         return summaries
             .Select(summary =>
             {
-                var transitiveExceptionEdges = VisitThrownExceptionEdges(
+                var transitiveExceptionResult = VisitThrownExceptionEdges(
                     summary.ExactSymbolKey,
                     bySymbol,
                     exceptionMemo,
-                    exceptionVisiting).Result;
+                    exceptionVisiting,
+                    maxExceptionEdges);
+                var transitiveExceptionEdges = transitiveExceptionResult.Result;
                 var transitiveExceptionSources = OrderExceptionSourcePaths(
                     transitiveExceptionEdges
                         .Select(edge => new ExceptionSourcePath(edge.ExceptionType, edge.SourcePath))
@@ -1770,6 +1815,7 @@ internal static class AssemblyEffectSummarizer
                         .ToArray(),
                     TransitiveThrownExceptionSourcePaths = transitiveExceptionSources,
                     TransitiveThrownExceptionEdges = transitiveExceptionEdges,
+                    TransitiveThrownExceptionEdgesTruncated = transitiveExceptionResult.IsTruncated,
                 };
             })
             .ToList();
@@ -1818,23 +1864,28 @@ internal static class AssemblyEffectSummarizer
         return (result, dependsOnCycle);
     }
 
-    private static (ThrownExceptionEdgeSummary[] Result, bool DependsOnCycle) VisitThrownExceptionEdges(
+    private static ThrownExceptionTraversalResult VisitThrownExceptionEdges(
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        Dictionary<string, ThrownExceptionEdgeSummary[]> memo,
-        HashSet<string> visiting)
+        Dictionary<string, ThrownExceptionTraversalResult> memo,
+        HashSet<string> visiting,
+        int maxExceptionEdges)
     {
         if (memo.TryGetValue(symbol, out var cached))
         {
-            return (cached, false);
+            return cached;
         }
 
         if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
         {
-            return (Array.Empty<ThrownExceptionEdgeSummary>(), false);
+            return new ThrownExceptionTraversalResult(
+                Array.Empty<ThrownExceptionEdgeSummary>(),
+                DependsOnCycle: false,
+                IsTruncated: false);
         }
 
         var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
+        var isTruncated = false;
         foreach (var directSource in summary.ThrownExceptionSourcePaths)
         {
             var directEdge = new ThrownExceptionEdgeSummary(
@@ -1842,12 +1893,19 @@ internal static class AssemblyEffectSummarizer
                 directSource.SourcePath,
                 CalleeExactSymbolKey: null,
                 Depth: 0);
-            thrownSources[CreateThrownExceptionEdgeKey(directEdge)] = directEdge;
+            TryAddThrownExceptionEdge(
+                thrownSources,
+                directEdge,
+                maxExceptionEdges,
+                ref isTruncated);
         }
 
         if (!visiting.Add(symbol))
         {
-            return (OrderThrownExceptionEdges(thrownSources.Values), true);
+            return new ThrownExceptionTraversalResult(
+                OrderThrownExceptionEdges(thrownSources.Values),
+                DependsOnCycle: true,
+                IsTruncated: isTruncated);
         }
 
         var dependsOnCycle = false;
@@ -1855,8 +1913,14 @@ internal static class AssemblyEffectSummarizer
         {
             if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol, out var resolvedPropagationKey, out _))
             {
-                var nestedResult = VisitThrownExceptionEdges(resolvedPropagationKey, bySymbol, memo, visiting);
+                var nestedResult = VisitThrownExceptionEdges(
+                    resolvedPropagationKey,
+                    bySymbol,
+                    memo,
+                    visiting,
+                    maxExceptionEdges);
                 dependsOnCycle |= nestedResult.DependsOnCycle;
+                isTruncated |= nestedResult.IsTruncated;
                 foreach (var nestedSource in nestedResult.Result)
                 {
                     if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType))
@@ -1872,7 +1936,11 @@ internal static class AssemblyEffectSummarizer
                             chainedSourcePath,
                             nestedSource.CalleeExactSymbolKey,
                             nestedSource.Depth + 1);
-                        thrownSources[CreateThrownExceptionEdgeKey(inheritedEdge)] = inheritedEdge;
+                        TryAddThrownExceptionEdge(
+                            thrownSources,
+                            inheritedEdge,
+                            maxExceptionEdges,
+                            ref isTruncated);
                     }
                     else
                     {
@@ -1881,7 +1949,11 @@ internal static class AssemblyEffectSummarizer
                             chainedSourcePath,
                             CalleeExactSymbolKey: propagationSite.ExactSymbolKey,
                             Depth: 1);
-                        thrownSources[CreateThrownExceptionEdgeKey(immediateCalleeEdge)] = immediateCalleeEdge;
+                        TryAddThrownExceptionEdge(
+                            thrownSources,
+                            immediateCalleeEdge,
+                            maxExceptionEdges,
+                            ref isTruncated);
                     }
                 }
             }
@@ -1889,12 +1961,34 @@ internal static class AssemblyEffectSummarizer
 
         visiting.Remove(symbol);
         var result = OrderThrownExceptionEdges(thrownSources.Values);
+        var traversalResult = new ThrownExceptionTraversalResult(result, dependsOnCycle, isTruncated);
         if (!dependsOnCycle)
         {
-            memo[symbol] = result;
+            memo[symbol] = traversalResult;
         }
 
-        return (result, dependsOnCycle);
+        return traversalResult;
+    }
+
+    private static void TryAddThrownExceptionEdge(
+        Dictionary<string, ThrownExceptionEdgeSummary> thrownSources,
+        ThrownExceptionEdgeSummary edge,
+        int maxExceptionEdges,
+        ref bool isTruncated)
+    {
+        var key = CreateThrownExceptionEdgeKey(edge);
+        if (thrownSources.ContainsKey(key))
+        {
+            return;
+        }
+
+        if (thrownSources.Count >= maxExceptionEdges)
+        {
+            isTruncated = true;
+            return;
+        }
+
+        thrownSources[key] = edge;
     }
 
     private static string CreateExceptionSourcePathKey(ExceptionSourcePath sourcePath)
@@ -5155,6 +5249,9 @@ internal sealed record MethodEffectSummary(
 
     public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } = Array.Empty<ThrownExceptionEdgeSummary>();
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool TransitiveThrownExceptionEdgesTruncated { get; init; }
+
     public MethodPurityClassification? PurityClassification { get; init; }
 
     [JsonIgnore]
@@ -5179,6 +5276,11 @@ internal sealed record ThrownExceptionEdgeSummary(
     string SourcePath,
     string? CalleeExactSymbolKey,
     int Depth);
+
+internal readonly record struct ThrownExceptionTraversalResult(
+    ThrownExceptionEdgeSummary[] Result,
+    bool DependsOnCycle,
+    bool IsTruncated);
 
 internal sealed record CallSiteSummary(string ExactSymbolKey)
 {
