@@ -129,6 +129,30 @@ public sealed class TestClass
         }
 
         [Test]
+        public void AnalyzerConfiguration_DoesNotExposeInertDebugLogging()
+        {
+            const string removedKey = "sharpproof_enable_debug_logging";
+            var repositoryRoot = FindRepositoryRoot();
+            var analyzerDirectory = Path.Combine(repositoryRoot, "SharpProof.Analyzer");
+            var configurationType = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
+            var logCallFiles = Directory
+                .EnumerateFiles(analyzerDirectory, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+                               !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+                               File.ReadAllText(path).Contains("LogDebug(", StringComparison.Ordinal))
+                .Select(path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'))
+                .ToArray();
+            var contractsDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "contracts.md"));
+
+            Assert.That(GetConfigKeys(), Does.Not.Contain(removedKey));
+            Assert.That(GetRegisteredOptionKeys(), Does.Not.Contain(removedKey));
+            Assert.That(configurationType.GetProperty("EnableDebugLogging"), Is.Null);
+            Assert.That(contractsDoc, Does.Not.Contain(removedKey));
+            Assert.That(logCallFiles, Is.Empty);
+        }
+
+        [Test]
         public void AnalyzerConfigurationOptions_AreNotConsumedAsAdHocStringLiterals()
         {
             var repositoryRoot = FindRepositoryRoot();

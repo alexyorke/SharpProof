@@ -211,7 +211,6 @@ namespace SharpProof.Analyzer
             {
 
                 Location? diagnosticLocation = GetIdentifierLocation(context.Node);
-                PurityAnalysisEngine.LogDebug($"[MPA] Method '{methodSymbol.Name}' determined impure. Reporting SP0002 on identifier.");
 
                 if (diagnosticLocation != null)
                 {
@@ -274,12 +273,10 @@ namespace SharpProof.Analyzer
                         }
                     }
 
-                    PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic SP0002 for {methodSymbol.Name} at {diagnosticLocation}.");
                 }
                 else
                 {
 
-                    PurityAnalysisEngine.LogDebug($"[MPA] Could not get identifier location for diagnostic on impure method {methodSymbol.Name}.");
                 }
             }
 
@@ -301,7 +298,6 @@ namespace SharpProof.Analyzer
                     if (setterNode.Body == null && setterNode.ExpressionBody == null)
                     {
                         isCompilerGeneratedSetter = true;
-                        PurityAnalysisEngine.LogDebug($"[MPA] Method '{methodSymbol.Name}' is an auto-property setter. Not a candidate for SP0004.");
                     }
                 }
 
@@ -309,7 +305,6 @@ namespace SharpProof.Analyzer
                 {
 
                     Location? diagnosticLocation = GetIdentifierLocation(context.Node);
-                    PurityAnalysisEngine.LogDebug($"[MPA] Method '{methodSymbol.Name}' determined pure but lacks [EnforcePure]. Reporting SP0004 on identifier.");
 
                     if (diagnosticLocation != null)
                     {
@@ -336,11 +331,9 @@ namespace SharpProof.Analyzer
                         {
                             context.ReportDiagnostic(diagnostic);
                         }
-                        PurityAnalysisEngine.LogDebug($"[MPA] Reported diagnostic SP0004 for {methodSymbol.Name} at {diagnosticLocation}.");
                     }
                     else
                     {
-                        PurityAnalysisEngine.LogDebug($"[MPA] Could not get identifier location for diagnostic SP0004 on pure method {methodSymbol.Name}.");
                     }
                 }
             }
@@ -353,7 +346,6 @@ namespace SharpProof.Analyzer
         {
             if (!ShouldSuggestMissingEnforcePure(methodSymbol))
             {
-                PurityAnalysisEngine.LogDebug($"[MPA] Method '{methodSymbol.Name}' participates in instance dispatch. Skipping SP0004 suggestion.");
                 return false;
             }
 

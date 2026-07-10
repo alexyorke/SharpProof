@@ -20,25 +20,20 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (!(operation is IAwaitOperation awaitOperation))
             {
 
-                PurityAnalysisEngine.LogDebug($"AwaitPurityRule: Unexpected operation type {operation.Kind}. Assuming Pure (Defensive).");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"AwaitPurityRule: Analyzing awaited operation {awaitOperation.Operation.Kind}");
-            PurityAnalysisEngine.LogDebug($"  [AwaitRule] Checking Await Operation: {awaitOperation.Syntax}");
 
 
             var awaitedExpressionResult = PurityAnalysisEngine.CheckSingleOperation(awaitOperation.Operation, context, currentState);
 
             if (!awaitedExpressionResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"AwaitPurityRule: Awaited operation {awaitOperation.Operation.Kind} is impure.");
 
                 return awaitedExpressionResult;
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"AwaitPurityRule: Awaited operation {awaitOperation.Operation.Kind} is pure.");
                 return CheckAwaitPatternMembers(awaitOperation, context);
             }
         }

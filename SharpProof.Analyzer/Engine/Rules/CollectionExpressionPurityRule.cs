@@ -13,18 +13,15 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (!(operation is ICollectionExpressionOperation collectionExpression))
             {
-                PurityAnalysisEngine.LogDebug($"WARNING: CollectionExpressionPurityRule called with unexpected operation type: {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"CollectionExpressionRule: Analyzing {collectionExpression.Syntax}");
 
             ITypeSymbol? targetType = collectionExpression.Type;
 
             if (targetType != null)
             {
                 string targetTypeName = targetType.OriginalDefinition.ToDisplayString();
-                PurityAnalysisEngine.LogDebug($" CollectionExpressionRule: Target Type is {targetTypeName}");
 
                 var isFreshLocalArrayInitialization =
                     targetType is IArrayTypeSymbol &&
@@ -33,7 +30,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 if (!IsPureCollectionExpressionTargetType(targetType) &&
                     !isFreshLocalArrayInitialization)
                 {
-                    PurityAnalysisEngine.LogDebug($" CollectionExpressionRule: Target type '{targetTypeName}' is not a known pure collection-expression target. Marking IMPURE.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         collectionExpression.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -47,12 +43,10 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (isFreshLocalArrayInitialization)
                 {
-                    PurityAnalysisEngine.LogDebug($" CollectionExpressionRule: Array collection expression '{collectionExpression.Syntax}' initializes a fresh local array. Treating allocation as PURE.");
                 }
             }
             else
             {
-                PurityAnalysisEngine.LogDebug(" CollectionExpressionRule: Target type unknown — classifying by element operations only.");
             }
 
             foreach (var element in collectionExpression.Elements)
@@ -64,12 +58,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                 if (!elementResult.IsPure)
                 {
                     var node = elementResult.ImpureSyntaxNode ?? collectionExpression.Syntax;
-                    PurityAnalysisEngine.LogDebug($" CollectionExpressionRule: Impure element. Marking IMPURE at {node}.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(node, elementResult.Evidence);
                 }
             }
 
-            PurityAnalysisEngine.LogDebug(" CollectionExpressionRule: Target and elements accepted. Final Result: PURE.");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 

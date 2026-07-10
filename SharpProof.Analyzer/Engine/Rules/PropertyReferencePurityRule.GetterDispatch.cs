@@ -182,13 +182,10 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (propertySymbol.GetMethod is not { } getter)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] {missingGetterMessage ?? $"Property '{propertySymbol.Name}' has no accessible getter to analyze"}. Read is Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
             }
 
-            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Checking getter purity for {getterDescription} via service/recursion.");
             var getterResult = PurityAnalysisEngine.GetCalleePurity(getter, context);
-            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter purity result for {getterDescription}: IsPure={getterResult.IsPure}");
             return GetterResultOrPure(getterResult, propertySymbol, getter, propertyReferenceOperation);
         }
 

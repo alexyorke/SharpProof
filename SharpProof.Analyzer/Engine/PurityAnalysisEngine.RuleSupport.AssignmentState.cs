@@ -25,7 +25,6 @@ namespace SharpProof.Analyzer.Engine
     {
         private static PurityAnalysisState UpdateDelegateMapForOperation(IOperation op, Rules.PurityAnalysisContext context, PurityAnalysisState currentState)
         {
-            LogDebug($"  [UpdMap] Trying Update: OpKind={op.Kind}, CurrentImpure={currentState.HasPotentialImpurity}");
 
             PurityAnalysisState nextState = currentState;
             var operationToTrack = op is IExpressionStatementOperation expressionStatementOperation
@@ -67,18 +66,15 @@ namespace SharpProof.Analyzer.Engine
                         {
                             var mergedTargets = PotentialTargets.Merge(currentTargets, valueTargets.Value);
                             nextState = nextState.WithDelegateTarget(targetSymbol, mergedTargets);
-                            LogDebug($"    [ATF-DEL-COMPOUND] Merged delegate targets for {targetSymbol.Name}. New Map Count: {nextState.DelegateTargetMap.Count}");
                         }
                         else
                         {
                             nextState = nextState.WithDelegateTarget(targetSymbol, PotentialTargets.Unresolved);
-                            LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved because compound add target state is incomplete.");
                         }
                     }
                     else
                     {
                         nextState = nextState.WithDelegateTarget(targetSymbol, PotentialTargets.Unresolved);
-                        LogDebug($"    [ATF-DEL-COMPOUND] Marked map for {targetSymbol.Name} unresolved after delegate compound assignment.");
                     }
                 }
             }
@@ -320,7 +316,6 @@ namespace SharpProof.Analyzer.Engine
                                 if (valueTargets != null)
                                 {
                                     nextState = nextState.WithDelegateTarget(declaredSymbol, valueTargets.Value);
-                                    LogDebug($"    [ATF-DEL-VAR] Updated map for {declaredSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
                                 }
                             }
 

@@ -38,7 +38,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             result = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
             if (result.IsPure)
             {
-                PurityAnalysisEngine.LogDebug("  [MIR] Compiler-generated interpolated-string handler invocation is treated as pure.");
             }
 
             return true;
@@ -103,7 +102,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     result = inputResult;
                 }
 
-                PurityAnalysisEngine.LogDebug("  [MIR] Array.AsReadOnly view construction is treated as pure; escape analysis decides whether the backing array can leak.");
                 return true;
             }
 
@@ -126,7 +124,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     result = inputResult;
                 }
 
-                PurityAnalysisEngine.LogDebug("  [MIR] MemoryExtensions.AsSpan array view construction is treated as pure; escape analysis decides whether the backing array can leak.");
                 return true;
             }
 
@@ -138,7 +135,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     result = inputResult;
                 }
 
-                PurityAnalysisEngine.LogDebug("  [MIR] Span/Memory slice view operation is treated as pure.");
                 return true;
             }
 

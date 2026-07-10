@@ -68,7 +68,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (!hasConcreteImplementationCandidate)
                 {
-                    PurityAnalysisEngine.LogDebug($"  [MIR] Method {invokedMethodSymbol.ContainingType?.Name}.{invokedMethodSymbol.Name} can dispatch to unknown external targets; treating as impure conservatively.");
                     return PurityAnalysisEngine.ImpureResult(
                         invocationOperation,
                         "unknown_external_call",
@@ -79,7 +78,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (candidateMethods.Count == 0)
             {
-                PurityAnalysisEngine.LogDebug($"  [MIR] No concrete dispatch candidates found for {invokedMethodSymbol.Name}; treating unresolved closed-world dispatch as impure conservatively.");
                 return PurityAnalysisEngine.ImpureResult(
                     invocationOperation,
                     "dynamic_dispatch",
@@ -89,19 +87,16 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             foreach (var candidateMethod in candidateMethods)
             {
-                PurityAnalysisEngine.LogDebug($"  [MIR]   Evaluating dispatch candidate: {candidateMethod.ToDisplayString()}");
                 if (SymbolEqualityComparer.Default.Equals(
                         candidateMethod.OriginalDefinition,
                         context.ContainingMethodSymbol.OriginalDefinition))
                 {
-                    PurityAnalysisEngine.LogDebug("  [MIR]   Direct self-recursive dispatch candidate is purity-neutral.");
                     continue;
                 }
 
                 var candidatePurity = PurityAnalysisEngine.GetCalleePurity(candidateMethod, context);
                 if (!candidatePurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"  [MIR] --> IMPURE dispatch candidate found: {candidateMethod.ToDisplayString()}");
                     return candidatePurity.WithCallee(candidateMethod, invocationOperation.Syntax);
                 }
             }

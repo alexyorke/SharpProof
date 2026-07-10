@@ -21,7 +21,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"[ObjInitRule] Checking Initializer: {initializer.Syntax}");
 
 
 
@@ -37,12 +36,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var targetResult = CheckAssignmentTargetPurity(assignment, context, currentState);
                     if (!targetResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"[ObjInitRule]  -> Initializer assignment target IMPURE: {assignment.Target.Syntax}");
                         return targetResult;
                     }
 
                     valueToCheck = assignment.Value;
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  - Checking Assignment Value: {valueToCheck?.Syntax}");
                 }
 
                 else if (initOp is IInvocationOperation invocation && invocation.TargetMethod.MethodKind == MethodKind.Constructor)
@@ -51,12 +48,10 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
                     valueToCheck = initOp;
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  - Checking Collection Element Constructor: {valueToCheck?.Syntax}");
                 }
 
                 else if (initOp is IMemberInitializerOperation)
                 {
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  -> Nested member initializer mutates an existing member object: {initOp.Syntax}");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         initOp.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -70,7 +65,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
                     valueToCheck = initOp;
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  - Checking Other Initializer Op: {valueToCheck?.Syntax}");
                 }
 
                 if (valueToCheck != null)
@@ -78,19 +72,15 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var valueResult = PurityAnalysisEngine.CheckSingleOperation(valueToCheck, context, currentState);
                     if (!valueResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"[ObjInitRule]  -> Initializer value IMPURE: {valueToCheck.Syntax}");
                         return valueResult;
                     }
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  -> Initializer value PURE.");
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($"[ObjInitRule]  - Could not determine value to check for initializer: {initOp.Syntax}. Assuming impure for safety.");
                     return PurityAnalysisEngine.ImpureResult(initOp.Syntax);
                 }
             }
 
-            PurityAnalysisEngine.LogDebug($"[ObjInitRule] All initializer values pure for: {initializer.Syntax}");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 

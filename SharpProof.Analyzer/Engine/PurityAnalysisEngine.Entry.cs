@@ -47,7 +47,6 @@ namespace SharpProof.Analyzer.Engine
                 }
             }
 
-            LogDebug($">> Enter DeterminePurity: {methodSymbol.ToDisplayString(_signatureFormat)}");
 
 
             var result = DeterminePurityRecursiveInternal(
@@ -63,8 +62,6 @@ namespace SharpProof.Analyzer.Engine
                 _purityService
             );
 
-            LogDebug($"<< Exit DeterminePurity ({GetPuritySource(result)}): {methodSymbol.ToDisplayString(_signatureFormat)}, Final IsPure={result.IsPure}");
-            LogDebug($"-- Removed Walker for: {methodSymbol.ToDisplayString(_signatureFormat)}");
 
 
             purityCache[methodSymbol] = result;

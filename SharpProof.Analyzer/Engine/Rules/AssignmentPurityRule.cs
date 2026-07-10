@@ -44,15 +44,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"AssignmentPurityRule: Unexpected operation type {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"AssignmentPurityRule: Analyzing Target {targetOperation?.Kind} in operation {operation.Kind}");
 
             if (targetOperation == null)
             {
-                PurityAnalysisEngine.LogDebug("AssignmentPurityRule: Target operation is null. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -60,11 +57,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (valueOperation != null)
             {
-                PurityAnalysisEngine.LogDebug($"    [AssignRule] Checking assignment value (RHS): {valueOperation.Syntax} ({valueOperation.Kind})");
                 var valueResult = PurityAnalysisEngine.CheckSingleOperation(valueOperation, context, currentState);
                 if (!valueResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [AssignRule] Assignment value (RHS) itself is IMPURE. Assignment is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         valueResult.ImpureSyntaxNode ?? valueOperation.Syntax,
                         valueResult.Evidence);
@@ -89,7 +84,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         SymbolEqualityComparer.Default.Equals(topLevelConv.Type, targetType))
                     {
                         conversionOp = topLevelConv;
-                        PurityAnalysisEngine.LogDebug("    [AssignRule] Found implicit conversion as top-level value operation.");
                     }
                     else
                     {
@@ -102,19 +96,16 @@ namespace SharpProof.Analyzer.Engine.Rules
                                                                SymbolEqualityComparer.Default.Equals(conv.Operand.Type, valueType));
                         if (conversionOp != null)
                         {
-                            PurityAnalysisEngine.LogDebug("    [AssignRule] Found implicit conversion in descendants of value operation.");
                         }
                     }
 
 
                     if (conversionOp != null)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule] Checking implicit conversion operation: {conversionOp.Syntax}");
                         var conversionResult = PurityAnalysisEngine.CheckSingleOperation(conversionOp, context, currentState);
                         if (!conversionResult.IsPure)
                         {
 
-                            PurityAnalysisEngine.LogDebug("    [AssignRule] Implicit conversion operation reported IMPURE.");
                             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                                 conversionResult.ImpureSyntaxNode ?? conversionOp.Operand?.Syntax ?? valueOperation.Syntax,
                                 conversionResult.Evidence);
@@ -129,18 +120,15 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var operatorResult = CheckCompoundAssignmentOperatorPurity(compoundOperatorMethod, operation, context);
                 if (!operatorResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [AssignRule] Compound assignment operator '{compoundOperatorMethod.Name}' is IMPURE.");
                     return operatorResult;
                 }
             }
 
 
-            PurityAnalysisEngine.LogDebug($"    [AssignRule] Checking assignment target (LHS): {targetOperation.Syntax} ({targetOperation.Kind})");
             var targetResult = PurityAnalysisEngine.CheckSingleOperation(targetOperation, context, currentState);
             if (!targetResult.IsPure)
             {
 
-                PurityAnalysisEngine.LogDebug($"AssignmentPurityRule: Target check failed (Kind: {targetOperation.Kind}, RefKind: {(targetOperation as IParameterReferenceOperation)?.Parameter.RefKind}). Reporting impurity on the whole operation: {operation.Syntax}");
                 if (TryCreateMutableBorrowConflictEvidence(
                         operation,
                         TryResolveSymbol(targetOperation),
@@ -160,7 +148,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             var setterResult = CheckPropertySetterPurity(targetOperation, context, currentState);
             if (!setterResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"    [AssignRule] Property/indexer setter is IMPURE for assignment target {targetOperation.Syntax}.");
                 return setterResult;
             }
 
@@ -181,7 +168,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (!isPureAssignment)
             {
-                PurityAnalysisEngine.LogDebug($"    [AssignRule] Assignment target itself is considered impure for assignment. Assignment is Impure.");
                 if (TryCreateMutableBorrowConflictEvidence(
                         operation,
                         targetSymbol,
@@ -218,7 +204,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
 
-            PurityAnalysisEngine.LogDebug("AssignmentPurityRule: Both target and value (if applicable) are pure. Result: Pure");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 

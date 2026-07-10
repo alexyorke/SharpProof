@@ -28,7 +28,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (returnOperation.ReturnedValue == null)
             {
-                PurityAnalysisEngine.LogDebug("    [ReturnRule] No returned value - Pure");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -36,11 +35,9 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (returnOperation.ReturnedValue != null)
             {
                 var sourceReturnedValue = GetSourceReturnedValueOperation(returnOperation, context.SemanticModel, context.CancellationToken) ?? returnOperation.ReturnedValue;
-                PurityAnalysisEngine.LogDebug($"    [ReturnRule] Checking returned value: {returnOperation.ReturnedValue.Syntax} ({returnOperation.ReturnedValue.Kind})");
                 var valueResult = PurityAnalysisEngine.CheckSingleOperation(returnOperation.ReturnedValue, context, currentState);
                 if (!valueResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value is IMPURE. Return statement is Impure.");
                     return valueResult;
                 }
                 else if (IsAwaiterFactoryReturn(
@@ -48,12 +45,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                              sourceReturnedValue,
                              context.SemanticModel.Compilation))
                 {
-                    PurityAnalysisEngine.LogDebug("    [ReturnRule] Returned value is a fresh awaiter produced by GetAwaiter(). Defer await-protocol purity to AwaitPurityRule.");
                     return valueResult;
                 }
                 else if (IsSpanToArrayReturn(sourceReturnedValue, out var spanToArrayMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes a mutable array produced from span method '{spanToArrayMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -67,12 +62,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                               context.CancellationToken,
                               out var trustedArrayReturnSymbol))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value flows from trusted array-return source '{trustedArrayReturnSymbol.ToDisplayString()}'. Return statement is Pure.");
                     return valueResult;
                 }
                 else if (IsKnownPureArrayFactoryReturn(sourceReturnedValue, context.SemanticModel.Compilation, out var factoryMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure factory '{factoryMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -82,7 +75,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsPureArrayReturningInvocationReturn(sourceReturnedValue, out var arrayReturningMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure method '{arrayReturningMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -92,7 +84,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsOwnedLocalArrayReturn(sourceReturnedValue, currentState, out var localSymbol))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes owned fresh local array '{localSymbol.Name}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -107,7 +98,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                              out var delegateCaptureSyntax,
                              out var delegateCapturedArrayLocal))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned delegate captures owned fresh local array '{delegateCapturedArrayLocal.Name}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         delegateCaptureSyntax,
@@ -122,7 +112,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                              out var objectDelegateCaptureSyntax,
                              out var objectDelegateCapturedLocal))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned delegate captures fresh mutable object '{objectDelegateCapturedLocal.Name}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         objectDelegateCaptureSyntax,
@@ -132,7 +121,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var readOnlyCollectionMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes read-only collection view over caller-owned array through '{readOnlyCollectionMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -142,7 +130,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsListAsReadOnlyReturn(sourceReturnedValue, out var listAsReadOnlyMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes a read-only view over mutable list storage through '{listAsReadOnlyMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -152,7 +139,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var spanMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes span view over caller-owned array through '{spanMethod.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -162,7 +148,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, context.CancellationToken, out var memoryConstructor))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes memory view over caller-owned array through '{memoryConstructor.ToDisplayString()}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         returnOperation.ReturnedValue.Syntax,
@@ -179,7 +164,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                               out var escapeSymbol,
                              out var catalogSource))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes mutable array through '{escapeSyntax}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         escapeSyntax,
@@ -195,7 +179,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                               out var nestedObjectEscapeSymbol,
                              out var nestedObjectCatalogSource))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes fresh mutable object through '{nestedObjectEscapeSyntax}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         nestedObjectEscapeSyntax,
@@ -211,7 +194,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                               out var collectionEscapeSymbol,
                              out var collectionCatalogSource))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable collection through '{collectionEscapeSyntax}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         collectionEscapeSyntax,
@@ -228,7 +210,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                              out var objectEscapeSymbol,
                              out var objectCatalogSource))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes fresh mutable object through '{objectEscapeSyntax}'. Return statement is Impure.");
                     return CreateMutableStateEscapeResult(
                         returnOperation,
                         objectEscapeSyntax,
@@ -238,7 +219,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value is pure. Return statement is Pure.");
                     return valueResult;
                 }
             }

@@ -45,12 +45,6 @@ namespace SharpProof.Analyzer.Configuration
                 "Purity strictness profile.",
                 ImmutableArray.Create("strict", "balanced", "pragmatic")),
             new AnalyzerConfigurationOption(
-                ConfigKeys.EnableDebugLogging,
-                AnalyzerConfigurationScope.GlobalOnly,
-                AnalyzerConfigurationValueKind.Bool,
-                "false",
-                "Reserved debug logging switch."),
-            new AnalyzerConfigurationOption(
                 ConfigKeys.SuggestMissingEnforcePure,
                 AnalyzerConfigurationScope.GlobalAndTree,
                 AnalyzerConfigurationValueKind.Bool,

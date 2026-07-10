@@ -28,7 +28,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                 }
 
-                PurityAnalysisEngine.LogDebug("    [ObjCreateRule] Type parameter object creation cannot be verified; treating as impure.");
                 return PurityAnalysisResult.Impure(
                     typeParameterObjectCreationOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -47,7 +46,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (IsImplicitExhaustiveSwitchExpressionFallback(objectCreationOperation))
             {
-                PurityAnalysisEngine.LogDebug("    [ObjCreateRule] Ignoring compiler-generated SwitchExpressionException fallback for exhaustive switch expression.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -61,11 +59,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                 isReadOnlyCollectionConstructor = IsReadOnlyCollectionConstructor(objectCreationOperation);
                 isReadOnlyMemoryOrMemoryConstructor = IsReadOnlyMemoryOrMemoryConstructor(objectCreationOperation);
                 isSpanOrReadOnlySpanArrayConstructor = IsSpanOrReadOnlySpanArrayConstructor(objectCreationOperation);
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking {objectCreationOperation.Arguments.Length} constructor arguments...");
                 for (var argumentIndex = 0; argumentIndex < objectCreationOperation.Arguments.Length; argumentIndex++)
                 {
                     var argument = objectCreationOperation.Arguments[argumentIndex];
-                    PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Checking Argument: {argument.Syntax} ({argument.Value?.Kind})");
                     if (argument.Value == null)
                     {
                         return PurityAnalysisResult.Impure(objectCreationOperation.Syntax);
@@ -73,7 +69,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     if (IsPureTransientCharArrayForStringConstructor(objectCreationOperation, argument, context, currentState))
                     {
-                        PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating transient char[] materialization as PURE for string construction.");
                         continue;
                     }
 
@@ -81,7 +76,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     {
                         if (IsPureReadOnlyCollectionArrayConstructorArgument(objectCreationOperation, argument, currentState))
                         {
-                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating fresh array as PURE for ReadOnlyCollection construction.");
                             freshArrayForImmutableWrapper = true;
                             continue;
                         }
@@ -92,7 +86,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             return readOnlyCollectionArgumentResult;
                         }
 
-                        PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] ReadOnlyCollection source is not analyzer-owned. Treating wrapper construction as IMPURE.");
                         return PurityAnalysisResult.Impure(
                             objectCreationOperation.Syntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -114,7 +107,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                         if (argumentIndex == 0)
                         {
-                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating array-backed ReadOnlyMemory/Memory construction as PURE; escape analysis decides whether the backing array can leak.");
                             freshArrayForImmutableWrapper = true;
                         }
 
@@ -129,7 +121,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             return spanArgumentResult;
                         }
 
-                        PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating array-backed Span/ReadOnlySpan construction as PURE.");
                         freshArrayForImmutableWrapper = true;
                         continue;
                     }
@@ -137,24 +128,20 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
                     if (!argumentResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Argument '{argument.Syntax}' is IMPURE. Object creation is Impure.");
                         return argumentResult;
                     }
                 }
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] No arguments to check.");
             }
 
 
             if (objectCreationOperation.Initializer != null)
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking Initializer: {objectCreationOperation.Initializer.Syntax} ({objectCreationOperation.Initializer.Kind})");
                 var initializerResult = PurityAnalysisEngine.CheckSingleOperation(objectCreationOperation.Initializer, context, currentState);
                 if (!initializerResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Initializer expression is IMPURE. Object creation is Impure.");
                     return initializerResult;
                 }
             }
@@ -162,7 +149,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (freshArrayForImmutableWrapper)
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Immutable wrapper (ReadOnlyCollection/ReadOnlyMemory) with owned array argument is PURE.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -170,12 +156,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             var constructorWasProvenPure = false;
             if (constructorSymbol != null)
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking Constructor: {constructorSymbol.ToDisplayString()}");
 
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(constructorSymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor invocation IMPURE due to impure static constructor in {constructorSymbol.ContainingType?.Name}.");
                     return cctorResult;
                 }
 
@@ -188,7 +172,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (trustedMetadataPurity.HasConfiguredKnownImpureMember)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is configured known impure.");
                     return PurityAnalysisResult.Impure(
                         objectCreationOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -205,7 +188,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         constructorSymbol,
                         context.SemanticModel.Compilation))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
                     return PurityAnalysisResult.Pure;
                 }
 
@@ -213,13 +195,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     if (generatedPurity.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                         return PurityAnalysisResult.Pure;
                     }
 
 				if (!generatedPurity.IsPure)
 				{
-					PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
 					return PurityAnalysisEngine.PurityAnalysisResult.Impure(
 						objectCreationOperation.Syntax,
 						PurityAnalysisEngine.PurityEvidence.Create(
@@ -234,7 +214,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (knownImpureMemberSource != null)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is known impure.");
                     return PurityAnalysisResult.Impure(
                         objectCreationOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -259,7 +238,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         nameof(ObjectCreationPurityRule),
                         out var bclFallbackConstructorResult))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' has no trusted purity evidence; using BCL fallback guess.");
                     return bclFallbackConstructorResult;
                 }
 
@@ -268,20 +246,16 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (!constructorPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' determined IMPURE by recursive check. Result: Impure.");
                     return constructorPurity;
                 }
 
                 constructorWasProvenPure = true;
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' determined PURE by recursive check. Trusting result.");
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor symbol not resolved (e.g., implicit struct/default or generic construction). Falling back to conservative analysis.");
 
                 if (objectCreationOperation.Type?.TypeKind == TypeKind.TypeParameter)
                 {
-                    PurityAnalysisEngine.LogDebug("    [ObjCreateRule] Generic type construction cannot be verified; treating as impure.");
                     return PurityAnalysisResult.Impure(
                         objectCreationOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -297,7 +271,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (objectCreationOperation.Type is IArrayTypeSymbol)
             {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' is IMPURE because it creates an array.");
                 return PurityAnalysisResult.Impure(
                     objectCreationOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -317,7 +290,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (constructorWasProvenPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' has a constructor that was proven pure. Skipping impure namespace/type fallback.");
                     return PurityAnalysisResult.Pure;
                 }
 
@@ -328,11 +300,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                          context.EnforcePureAttributeSymbol,
                          context.PureAttributeSymbol)))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' has an explicit pure constructor boundary. Skipping impure namespace/type fallback.");
                     return PurityAnalysisResult.Pure;
                 }
 
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' is IMPURE because type '{objectCreationOperation.Type.ToDisplayString()}' is in a known impure namespace/type.");
                 return PurityAnalysisResult.Impure(
                     objectCreationOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -345,7 +315,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
 
-            PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' determined to be Pure (Arguments & Constructor pure, Type not known impure).");
             return PurityAnalysisResult.Pure;
         }
 

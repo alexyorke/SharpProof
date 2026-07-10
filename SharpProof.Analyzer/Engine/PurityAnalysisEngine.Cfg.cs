@@ -54,22 +54,18 @@ namespace SharpProof.Analyzer.Engine
             try
             {
                 cfg = ControlFlowGraph.Create(bodyNode, semanticModel);
-                LogDebug($"CFG created successfully for node: {bodyNode.Kind()}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                LogDebug($"Error creating ControlFlowGraph for {containingMethodSymbol.ToDisplayString()}: {ex.Message}. Assuming impure.");
                 return PurityAnalysisResult.Impure(bodyNode);
             }
 
             if (cfg == null || cfg.Blocks.IsEmpty)
             {
-                LogDebug($"CFG is null or empty for {containingMethodSymbol.ToDisplayString()}. Assuming pure (no operations).");
                 return PurityAnalysisResult.Pure;
             }
 
 
-            LogDebug($"  [CFG] Created CFG with {cfg.Blocks.Length} blocks for {containingMethodSymbol.ToDisplayString()}.");
 
 
             var blockStates = new Dictionary<BasicBlock, PurityAnalysisState>(cfg.Blocks.Length);
@@ -81,7 +77,6 @@ namespace SharpProof.Analyzer.Engine
             {
                 var entryBlock = cfg.Blocks.First();
 
-                LogDebug($"  [CFG] Adding Entry Block #{entryBlock.Ordinal} to worklist.");
                 blockStates[entryBlock] = CreateInitialRequiresState(
                     containingMethodSymbol,
                     bodyNode,
@@ -93,25 +88,19 @@ namespace SharpProof.Analyzer.Engine
             }
             else
             {
-                LogDebug("  [CFG] CFG has no blocks. Exiting analysis.");
                 return PurityAnalysisResult.Pure;
             }
 
 
-            LogDebug("  [CFG] Starting CFG dataflow analysis worklist loop.");
             int loopIterations = 0;
 
-            LogDebug($"  [CFG] BEFORE WHILE CHECK: worklist.Count = {worklist.Count}, loopIterations = {loopIterations}");
             while (worklist.Count > 0 && loopIterations < cfg.Blocks.Length * 50)
             {
 
-                LogDebug("  [CFG] ENTERED WHILE LOOP.");
                 loopIterations++;
 
-                LogDebug($"  [CFG] Worklist count: {worklist.Count}. Iteration: {loopIterations}");
                 var currentBlock = worklist.Dequeue();
                 inQueue.Remove(currentBlock);
-                LogDebug($"  [CFG] Processing CFG Block #{currentBlock.Ordinal}");
 
                 if (!blockStates.TryGetValue(currentBlock, out var stateBefore))
                 {
@@ -119,7 +108,6 @@ namespace SharpProof.Analyzer.Engine
                     blockStates[currentBlock] = stateBefore;
                 }
 
-                LogDebug($"  [CFG] StateBefore for Block #{currentBlock.Ordinal}: Impure={stateBefore.HasPotentialImpurity}");
 
 
                 var stateAfter = ApplyTransferFunction(
@@ -137,11 +125,9 @@ namespace SharpProof.Analyzer.Engine
                     cancellationToken);
 
                 exitBlockStates[currentBlock] = stateAfter;
-                LogDebug($"  [CFG] State after Block #{currentBlock.Ordinal}: Impure={stateAfter.HasPotentialImpurity}");
 
 
 
-                LogDebug($"  [CFG] Propagating stateAfter (Impure={stateAfter.HasPotentialImpurity}) to successors of Block #{currentBlock.Ordinal}.");
                 if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken, out var takeConditionalSuccessor))
                 {
                     var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
@@ -176,11 +162,9 @@ namespace SharpProof.Analyzer.Engine
 
             if (worklist.Count == 0)
             {
-                LogDebug("  [CFG] Finished CFG dataflow analysis worklist loop (worklist empty).");
             }
             else
             {
-                LogDebug($"  [CFG] WARNING: Exited CFG dataflow loop due to iteration limit ({loopIterations}). Potential incomplete merge; continuing with aggregated block states.");
             }
 
             mergedDelegateTargetsFromBlocks = MergeDelegateTargetMapsFromBlockStates(exitBlockStates.Values);
@@ -198,12 +182,10 @@ namespace SharpProof.Analyzer.Engine
                     finalResult = exitState.FirstImpureSyntaxNode != null
                         ? PurityAnalysisResult.Impure(exitState.FirstImpureSyntaxNode, exitState.FirstImpurityEvidence)
                         : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(exitState.FirstImpurityEvidence);
-                    LogDebug($"  [CFG] Final Result: IMPURE. Node={finalResult.ImpureSyntaxNode?.Kind()}");
                     return finalResult;
                 }
             }
 
-            LogDebug($"  [CFG] Final Result: PURE.");
             return finalResult;
         }
 
@@ -222,11 +204,9 @@ namespace SharpProof.Analyzer.Engine
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            LogDebug($"ApplyTransferFunction START for Block #{block.Ordinal} - Initial State: Impure={stateBefore.HasPotentialImpurity}");
 
             if (stateBefore.HasPotentialImpurity)
             {
-                LogDebug($"ApplyTransferFunction SKIP for Block #{block.Ordinal} - Already impure.");
                 return stateBefore;
             }
 
@@ -234,7 +214,6 @@ namespace SharpProof.Analyzer.Engine
             if (stateBefore.PathConditions.Length > 0 &&
                 ArePathConditionsUnsatisfiable(stateBefore, stateBefore.PathConditions, smtAnalysis, blockSourceNode))
             {
-                LogDebug($"ApplyTransferFunction SKIP for Block #{block.Ordinal} - SMT path conditions are unsatisfiable.");
                 return stateBefore;
             }
 
@@ -262,7 +241,6 @@ namespace SharpProof.Analyzer.Engine
             {
                 if (op == null) continue;
 
-                LogDebug($"    [ATF Block {block.Ordinal}] Checking Op Kind: {op.Kind}, Syntax: {op.Syntax.ToString().Replace("\r\n", " ").Replace("\n", " ")}");
 
                 if (op is IFlowCaptureOperation flowCap)
                 {
@@ -275,7 +253,6 @@ namespace SharpProof.Analyzer.Engine
                             continue;
                         }
 
-                        LogDebug($"ApplyTransferFunction IMPURE FlowCapture value in Block #{block.Ordinal}");
                         currentStateInBlock = currentStateInBlock.WithImpurity(valResult, flowCap.Syntax);
                         break;
                     }
@@ -293,7 +270,6 @@ namespace SharpProof.Analyzer.Engine
                         continue;
                     }
 
-                    LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Op: {op.Kind} ({op.Syntax})");
 
                     if (IsRecursivePlaceholderImpurity(opResult))
                     {
@@ -308,9 +284,7 @@ namespace SharpProof.Analyzer.Engine
                 }
 
 
-                LogDebug($"  [ApplyTF] Before UpdateDelegateMapForOperation: StateImpure={currentStateInBlock.HasPotentialImpurity}, MapCount={currentStateInBlock.DelegateTargetMap.Count}");
                 currentStateInBlock = UpdateDelegateMapForOperation(op, ruleContext, currentStateInBlock);
-                LogDebug($"  [ApplyTF] After UpdateDelegateMapForOperation: StateImpure={currentStateInBlock.HasPotentialImpurity}, MapCount={currentStateInBlock.DelegateTargetMap.Count}");
 
             }
 
@@ -335,14 +309,12 @@ namespace SharpProof.Analyzer.Engine
                 block.BranchValue != null &&
                 ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax))
             {
-                LogDebug($"    [ATF Block {block.Ordinal}] Checking Branch Value Kind: {block.BranchValue.Kind}, Syntax: {block.BranchValue.Syntax.ToString().Replace("\r\n", " ").Replace("\n", " ")}");
 
                 var branchValueResult = CheckSingleOperation(block.BranchValue, ruleContext, currentStateInBlock);
                 if (!branchValueResult.IsPure)
                 {
                     if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis, cancellationToken))
                     {
-                        LogDebug($"ApplyTransferFunction IMPURE DETECTED in Block #{block.Ordinal} by Branch Value: {block.BranchValue.Kind} ({block.BranchValue.Syntax})");
                         currentStateInBlock = currentStateInBlock.WithImpurity(branchValueResult, block.BranchValue.Syntax);
                     }
                 }
@@ -352,7 +324,6 @@ namespace SharpProof.Analyzer.Engine
                 }
             }
 
-            LogDebug($"ApplyTransferFunction END for Block #{block.Ordinal} - Final State: Impure={currentStateInBlock.HasPotentialImpurity}");
             return currentStateInBlock;
         }
 

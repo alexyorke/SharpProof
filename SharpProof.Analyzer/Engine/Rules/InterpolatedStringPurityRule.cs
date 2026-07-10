@@ -22,7 +22,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation)
             {
-                PurityAnalysisEngine.LogDebug($"InterpolatedStringPurityRule: Analyzing handler creation for {handlerCreation.Syntax}");
 
                 var handlerCreationResult = PurityAnalysisEngine.CheckSingleOperation(
                     handlerCreation.HandlerCreation,
@@ -41,24 +40,20 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (!(operation is IInterpolatedStringOperation interpolatedString))
             {
-                PurityAnalysisEngine.LogDebug($"WARNING: InterpolatedStringPurityRule called with unexpected operation type: {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"InterpolatedStringPurityRule: Analyzing {interpolatedString.Syntax}");
 
 
 
 
 
 
-            PurityAnalysisEngine.LogDebug($"InterpolatedStringPurityRule: Assuming interpolation operation itself is pure for {interpolatedString.Syntax}. Part purity handled elsewhere.");
 
             var isFormattableStringInvariantArgument = IsFormattableStringInvariantArgument(interpolatedString);
 
             foreach (var part in interpolatedString.Parts)
             {
-                PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Checking part: {part.Syntax} ({part.Kind})");
 
                 PurityAnalysisEngine.PurityAnalysisResult partResult;
 
@@ -70,7 +65,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 else if (part is IInterpolationOperation interpolation)
                 {
 
-                    PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Checking Interpolation Expression: {interpolation.Expression.Syntax}");
                     partResult = PurityAnalysisEngine.CheckSingleOperation(interpolation.Expression, context, currentState);
 
                     if (partResult.IsPure)
@@ -80,11 +74,9 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     if (partResult.IsPure && interpolation.Alignment != null)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Checking Interpolation Alignment: {interpolation.Alignment.Syntax}");
                         partResult = PurityAnalysisEngine.CheckSingleOperation(interpolation.Alignment, context, currentState);
                         if (partResult.IsPure && !isFormattableStringInvariantArgument)
                         {
-                            PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Non-null interpolation alignment implies formatting semantics. Marking impure.");
                             partResult = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                                 interpolation.Syntax,
                                 PurityAnalysisEngine.PurityEvidence.Create(
@@ -97,11 +89,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                     if (partResult.IsPure && interpolation.FormatString != null)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Checking Interpolation FormatString: {interpolation.FormatString.Syntax}");
                         partResult = PurityAnalysisEngine.CheckSingleOperation(interpolation.FormatString, context, currentState);
                         if (partResult.IsPure && !isFormattableStringInvariantArgument)
                         {
-                            PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Non-null interpolation format string implies formatting semantics. Marking impure.");
                             partResult = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                                 interpolation.Syntax,
                                 PurityAnalysisEngine.PurityEvidence.Create(
@@ -116,13 +106,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 else
                 {
 
-                    PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Unexpected part kind: {part.Kind}. Checking generically.");
                     partResult = PurityAnalysisEngine.CheckSingleOperation(part, context, currentState);
                 }
 
                 if (!partResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [InterpStrRule] Part is IMPURE. Interpolated string is Impure.");
                     return PurityAnalysisEngine.ImpureResult(
                         partResult.ImpureSyntaxNode ?? part.Syntax,
                         partResult.Evidence);

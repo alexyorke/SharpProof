@@ -16,11 +16,9 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (!(operation is ILoopOperation loopOperation))
             {
-                PurityAnalysisEngine.LogDebug($"WARNING: LoopPurityRule called with unexpected operation type: {operation.Kind}. Assuming Impure for safety.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
             }
 
-            PurityAnalysisEngine.LogDebug($"    [LoopRule] Analyzing loop body for: {loopOperation.Syntax}");
 
             if (loopOperation is IForLoopOperation forLoopOperation)
             {
@@ -29,7 +27,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var beforeResult = PurityAnalysisEngine.CheckSingleOperation(beforeOperation, context, currentState);
                     if (!beforeResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to for-loop initializer: {beforeOperation.Syntax}");
                         return beforeResult;
                     }
                 }
@@ -39,7 +36,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var conditionResult = PurityAnalysisEngine.CheckSingleOperation(forLoopOperation.Condition, context, currentState);
                     if (!conditionResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to for-loop condition: {forLoopOperation.Condition.Syntax}");
                         return conditionResult;
                     }
                 }
@@ -50,14 +46,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var conditionResult = PurityAnalysisEngine.CheckSingleOperation(whileLoopOperation.Condition, context, currentState);
                 if (!conditionResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to while-loop condition: {whileLoopOperation.Condition.Syntax}");
                     return conditionResult;
                 }
             }
 
             if (HasStaticallyUnreachableBody(loopOperation))
             {
-                PurityAnalysisEngine.LogDebug($"    [LoopRule] Skipping unreachable loop body for: {loopOperation.Syntax}");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -66,14 +60,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var collectionResult = PurityAnalysisEngine.CheckSingleOperation(forEachLoopOperation.Collection, context, currentState);
                 if (!collectionResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to foreach collection expression: {forEachLoopOperation.Collection.Syntax}");
                     return collectionResult;
                 }
 
                 var enumeratorResult = CheckForEachEnumeratorPurity(forEachLoopOperation.Collection, context);
                 if (!enumeratorResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to foreach GetEnumerator implementation: {forEachLoopOperation.Collection.Syntax}");
                     return enumeratorResult;
                 }
             }
@@ -87,7 +79,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var opResult = PurityAnalysisEngine.CheckSingleOperation(bodyOp, context, currentState);
                     if (!opResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to operation in loop body: {bodyOp.Kind} at {bodyOp.Syntax.GetLocation()?.GetLineSpan().StartLinePosition}");
                         return opResult;
                     }
                 }
@@ -100,7 +91,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var atLoopBottomResult = PurityAnalysisEngine.CheckSingleOperation(atLoopBottomOperation, context, currentState);
                     if (!atLoopBottomResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [LoopRule] IMPURE due to for-loop incrementor: {atLoopBottomOperation.Syntax}");
                         return atLoopBottomResult;
                     }
                 }
@@ -109,7 +99,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
 
 
-            PurityAnalysisEngine.LogDebug($"    [LoopRule] Loop body analyzed as pure for: {loopOperation.Syntax}");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 

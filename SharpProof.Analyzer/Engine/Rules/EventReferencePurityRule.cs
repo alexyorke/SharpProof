@@ -17,7 +17,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 				return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 			}
 
-			PurityAnalysisEngine.LogDebug($"  [EventRefRule] Checking EventReference: {eventReference.Event?.Name} on {eventReference.Event?.ContainingType?.ToDisplayString()}");
 
 			return PurityAnalysisEngine.PurityAnalysisResult.Impure(
 				eventReference.Syntax,

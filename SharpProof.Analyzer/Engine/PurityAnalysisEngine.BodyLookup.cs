@@ -28,18 +28,15 @@ namespace SharpProof.Analyzer.Engine
         {
 
             var declaringSyntaxes = methodSymbol.DeclaringSyntaxReferences;
-            LogDebug($"  [GetBody] Checking {declaringSyntaxes.Length} declaring syntax refs for {methodSymbol.Name}");
             foreach (var syntaxRef in declaringSyntaxes)
             {
                 var syntaxNode = syntaxRef.GetSyntax(cancellationToken);
-                LogDebug($"  [GetBody]   SyntaxRef {syntaxRef.Span} yielded SyntaxNode of Kind: {syntaxNode?.Kind()}");
 
 
                 if (syntaxNode is ArrowExpressionClauseSyntax arrowExpressionClauseSyntax &&
                     (arrowExpressionClauseSyntax.Parent is PropertyDeclarationSyntax ||
                      arrowExpressionClauseSyntax.Parent is IndexerDeclarationSyntax))
                 {
-                    LogDebug($"  [GetBody]   Found property/indexer arrow body node of Kind: {syntaxNode.Kind()}");
                     return syntaxNode;
                 }
 
@@ -51,11 +48,9 @@ namespace SharpProof.Analyzer.Engine
                     syntaxNode is OperatorDeclarationSyntax ||
                     syntaxNode is ConversionOperatorDeclarationSyntax)
                 {
-                    LogDebug($"  [GetBody]   Found usable body node of Kind: {syntaxNode.Kind()}");
                     return syntaxNode;
                 }
             }
-            LogDebug($"  [GetBody] No usable body node found for {methodSymbol.Name}.");
             return null;
         }
 

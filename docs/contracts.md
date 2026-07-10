@@ -141,7 +141,6 @@ Scope is explicit:
 | `sharpproof_known_impure_types` | Global-only | `;`, `,`, or newline-delimited type names | empty | Treat matching types as impure. |
 | `sharpproof_attribute_stub_namespaces` | Global-only | `;`, `,`, or newline-delimited namespaces; `<global>` for global namespace | `SharpProof.Attributes` | Accept source-only SharpProof attribute stubs from configured namespaces. |
 | `sharpproof_purity_profile` | Global-only | `strict`, `balanced`, `pragmatic` | `balanced` | Controls purity strictness for shared purity analysis. |
-| `sharpproof_enable_debug_logging` | Global-only | boolean | `false` | Reserved for analyzer-host-safe debug logging. |
 | `sharpproof_enable_effect_summary_json` | Global-only | boolean | `false` | Loads `*.SharpProof.EffectSummary.json` AdditionalFiles. |
 | `sharpproof_smt_mode` | Global-only | `disabled`, `bounded`, `deep`, or boolean | `bounded` | Controls shared SMT proof mode. |
 | `sharpproof_smt_timeout_ms` | Global-only | positive integer | mode default | Per-query SMT timeout in milliseconds. |

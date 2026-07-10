@@ -23,7 +23,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
-            PurityAnalysisEngine.LogDebug(CreateLogMessage(operation));
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 

@@ -399,7 +399,6 @@ namespace SharpProof.Analyzer.Engine
                 foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
                 {
                     nextState = nextState.WithDelegateTarget(writtenTargetSymbol, valueTargets.Value);
-                    LogDebug($"    {logScope} Updated map for {writtenTargetSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
                 }
             }
             else
@@ -407,7 +406,6 @@ namespace SharpProof.Analyzer.Engine
                 foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
                 {
                     nextState = nextState.WithDelegateTarget(writtenTargetSymbol, PotentialTargets.Unresolved);
-                    LogDebug($"    {logScope} Marked map for {writtenTargetSymbol.Name} unresolved because {unresolvedReason}. New Map Count: {nextState.DelegateTargetMap.Count}");
                 }
             }
 

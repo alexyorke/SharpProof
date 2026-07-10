@@ -19,18 +19,15 @@ namespace SharpProof.Analyzer.Engine.Rules
             switch (targetOperation.Kind)
             {
                 case OperationKind.Discard:
-                    PurityAnalysisEngine.LogDebug(" Assignment Target: Discard - Pure Target");
                     return true;
 
                 case OperationKind.LocalReference:
                     if (targetOperation is ILocalReferenceOperation localRef &&
                         IsRefLocalAliasToExternallyVisibleStorage(localRef.Local, context, currentState))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [AssignRule-Target] Target: Ref LocalReference '{targetSymbol?.Name ?? "Unknown"}' aliases caller-visible storage - Impure Target");
                         return false;
                     }
 
-                    PurityAnalysisEngine.LogDebug($"    [AssignRule-Target] Target: LocalReference '{targetSymbol?.Name ?? "Unknown"}' - Pure Target Location");
                     return true;
 
                 case OperationKind.ParameterReference:
@@ -39,12 +36,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                         if (paramRef.Parameter.RefKind == RefKind.Ref || paramRef.Parameter.RefKind == RefKind.Out ||
                             paramRef.Parameter.RefKind == RefKind.In || paramRef.Parameter.RefKind == RefKind.RefReadOnly)
                         {
-                            PurityAnalysisEngine.LogDebug($" Assignment Target: ParameterReference ({paramRef.Parameter.RefKind}) modification attempt - Impure Target");
                             return false;
                         }
                         else
                         {
-                            PurityAnalysisEngine.LogDebug(" Assignment Target: ParameterReference (value) - Pure Target");
                             return true;
                         }
                     }
@@ -54,56 +49,46 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var fieldRefOp = (IFieldReferenceOperation)targetOperation;
                     if (fieldRefOp.Field.IsStatic)
                     {
-                        PurityAnalysisEngine.LogDebug($" Assignment Target: Static FieldReference '{fieldRefOp.Field.Name}' - Impure Target");
                         return false;
                     }
                     if (IsFreshObjectInitializerFieldAssignment(fieldRefOp, context))
                     {
-                        PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' within fresh object initializer - Allowed (Target is Pure)");
                         return true;
                     }
                     if (IsValueTypeWithInitializerAssignment(fieldRefOp, context))
                     {
-                        PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' within value-type 'with' initializer - Allowed (Target is Pure)");
                         return true;
                     }
                     if (fieldRefOp.Instance is IInstanceReferenceOperation instanceRef &&
                         instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
                         context.ContainingMethodSymbol.MethodKind == MethodKind.Constructor)
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: Instance FieldReference 'this.Field' within Constructor - Allowed (Target is Pure)");
                         return true;
                     }
                     if (IsPureLocalValueTypeFieldRefTarget(fieldRefOp))
                     {
-                        PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on by-value local value-type receiver - Allowed (Target is Pure)");
                         return true;
                     }
                     if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(fieldRefOp.Instance, fieldRefOp.Syntax, context, currentState))
                     {
-                        PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on fresh local object receiver - Allowed (Target is Pure)");
                         return true;
                     }
-                    PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' (Non-Static, Non-Constructor 'this.Field') - Impure Target");
                     return false;
 
                 case OperationKind.PropertyReference:
                     var propRefOp = (IPropertyReferenceOperation)targetOperation;
                     if (propRefOp.Property.IsStatic)
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: Static PropertyReference - Impure Target");
                         return false;
                     }
 
 
                     if (propRefOp.Property.SetMethod != null && propRefOp.Property.SetMethod.IsInitOnly)
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: Init-only PropertyReference - Allowed (Target is Pure by IsAssignmentTargetPure)");
                         return true;
                     }
                     if (IsValueTypeWithInitializerAssignment(propRefOp, context))
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: PropertyReference within value-type 'with' initializer - Allowed (Target is Pure)");
                         return true;
                     }
 
@@ -113,7 +98,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     {
                         if (context.ContainingMethodSymbol.MethodKind == MethodKind.Constructor)
                         {
-                            PurityAnalysisEngine.LogDebug(" Assignment Target: Instance PropertyReference 'this.Prop' (non-init) within Constructor - Allowed (Target is Pure)");
                             return true;
                         }
 
@@ -124,11 +108,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                                 context.EnforcePureAttributeSymbol,
                                 context.PureAttributeSymbol))
                         {
-                            PurityAnalysisEngine.LogDebug(" Assignment Target: Instance PropertyReference 'this.Prop' (non-init) within [EnforcePure] Record Struct Method - Target is Impure for this method context");
                             return false;
                         }
 
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: Instance PropertyReference 'this.Prop' (non-init, Non-Constructor/Special Record) - Impure Target due to 'this' modification");
                         return false;
                     }
 
@@ -136,37 +118,30 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                     if (OwnedFreshMutableObjectClassifier.IsOwnedFreshMutableObjectReference(propRefOp.Instance, propRefOp.Syntax, context, currentState))
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: PropertyReference on fresh local object receiver - Allowed (Target is Pure)");
                         return true;
                     }
 
-                    PurityAnalysisEngine.LogDebug($" Assignment Target: PropertyReference on local/param for non-init prop ('{propRefOp.Instance?.Syntax}') - Impure Target by IsAssignmentTargetPure rule.");
                     return false;
 
                 case OperationKind.ArrayElementReference:
                     if (targetOperation is IArrayElementReferenceOperation arrayElementReference &&
                         IsOwnedLocalArrayReference(arrayElementReference.ArrayReference, currentState))
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: ArrayElementReference on fresh local array - Pure Target");
                         return true;
                     }
 
-                    PurityAnalysisEngine.LogDebug(" Assignment Target: ArrayElementReference - Impure Target");
                     return false;
 
                 case OperationKind.InlineArrayAccess:
                     if (targetOperation is IInlineArrayAccessOperation inlineArrayAccess &&
                         IsPureInlineArrayTarget(inlineArrayAccess, context))
                     {
-                        PurityAnalysisEngine.LogDebug(" Assignment Target: InlineArrayAccess on local/by-value storage - Pure Target");
                         return true;
                     }
 
-                    PurityAnalysisEngine.LogDebug(" Assignment Target: InlineArrayAccess - Impure Target");
                     return false;
 
                 default:
-                    PurityAnalysisEngine.LogDebug($" Assignment Target: Unhandled Kind {targetOperation.Kind} - Assuming Impure Target");
                     return false;
             }
         }

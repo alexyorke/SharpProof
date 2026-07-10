@@ -15,7 +15,6 @@ namespace SharpProof.Analyzer.Configuration
         public ImmutableHashSet<string> ExtraKnownImpureNamespaces { get; }
         public ImmutableHashSet<string> ExtraKnownImpureTypes { get; }
         public ImmutableHashSet<string> AttributeStubNamespaces { get; }
-        public bool EnableDebugLogging { get; }
         public bool SuggestMissingEnforcePure { get; }
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
         public bool EmitExplanations { get; }
@@ -34,7 +33,6 @@ namespace SharpProof.Analyzer.Configuration
             ImmutableHashSet<string> extraImpureNamespaces,
             ImmutableHashSet<string> extraImpureTypes,
             ImmutableHashSet<string> attributeStubNamespaces,
-            bool enableDebugLogging,
             bool suggestMissingEnforcePure,
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
@@ -52,7 +50,6 @@ namespace SharpProof.Analyzer.Configuration
             ExtraKnownImpureNamespaces = extraImpureNamespaces;
             ExtraKnownImpureTypes = extraImpureTypes;
             AttributeStubNamespaces = attributeStubNamespaces;
-            EnableDebugLogging = enableDebugLogging;
             SuggestMissingEnforcePure = suggestMissingEnforcePure;
             MissingPuritySuggestions = missingPuritySuggestions;
             EmitExplanations = emitExplanations;
@@ -74,7 +71,6 @@ namespace SharpProof.Analyzer.Configuration
             var impureTypes = GetValues(options, ConfigKeys.KnownImpureTypes);
             var attributeStubNamespaces = GetValues(options, ConfigKeys.AttributeStubNamespaces);
             var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
-            bool debug = GetBool(options, ConfigKeys.EnableDebugLogging);
             bool suggestMissing = GetBoolOrDefaultTrue(options, ConfigKeys.SuggestMissingEnforcePure);
             var missingPuritySuggestions = new MissingPuritySuggestionOptions(
                 suggestMissing,
@@ -95,7 +91,6 @@ namespace SharpProof.Analyzer.Configuration
                 impureNamespaces,
                 impureTypes,
                 attributeStubNamespaces,
-                debug,
                 suggestMissing,
                 missingPuritySuggestions,
                 emitExplanations,

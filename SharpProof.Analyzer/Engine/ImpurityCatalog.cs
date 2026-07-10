@@ -62,19 +62,16 @@ namespace SharpProof.Analyzer.Engine
 
 			if (IsInConfiguredImpureNamespaceOrType(symbol) && !IsConfiguredKnownPureMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Configured impure namespace/type suppresses known-pure catalog for {symbol.ToDisplayString()}");
 				return false;
 			}
 
 			if (IsMutableImmutableBuilderMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Skipping mutable immutable-builder member: {symbol.ToDisplayString()}");
 				return false;
 			}
 
 			if (IsImmutableInterlockedMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Skipping ImmutableInterlocked member: {symbol.ToDisplayString()}");
 				return false;
 			}
 
@@ -83,13 +80,11 @@ namespace SharpProof.Analyzer.Engine
 			if (TryGetGeneratedMethodPurity(methodSymbol, compilation, out var generatedSignature, out var generatedClassification) &&
 				generatedClassification.IsPure)
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Known pure based on generated catalog match '{generatedSignature}' for {symbol.ToDisplayString()}");
 				return true;
 			}
 
 			if (IsSemanticallyPureMathMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Semantic Math/MathF purity match for {symbol.ToDisplayString()}");
 				return true;
 			}
 
@@ -99,13 +94,10 @@ namespace SharpProof.Analyzer.Engine
 				if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
 				{
 					signature += ".get";
-					PurityAnalysisEngine.LogDebug($"    [IsKnownPure] Appended .get to property signature: \"{signature}\"");
 				}
 			}
 
-			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] Checking HashSet.Contains for signature: \"{signature}\"");
 			bool isKnownPure = MatchesConfiguredKnownPureSignature(signature);
-			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] HashSet.Contains result: {isKnownPure}");
 
 			if (!isKnownPure && symbol is IMethodSymbol genericMethod && genericMethod.IsGenericMethod)
 			{
@@ -127,7 +119,6 @@ namespace SharpProof.Analyzer.Engine
 
 			if (isKnownPure)
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Match found for {symbol.ToDisplayString()} using signature '{signature}'");
 			}
 
 			return isKnownPure;
@@ -357,7 +348,6 @@ namespace SharpProof.Analyzer.Engine
 
 			if (symbol is IPropertySymbol property && IsInImpureNamespaceOrType(property.ContainingType))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Property access {symbol.ToDisplayString()} on known impure type {property.ContainingType.ToDisplayString()}.");
 			}
 
 			return false;
@@ -369,13 +359,11 @@ namespace SharpProof.Analyzer.Engine
 
 			if (IsMutableImmutableBuilderMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Mutable immutable-builder member detected: {symbol.ToDisplayString()}");
 				return "known_impure";
 			}
 
 			if (IsImmutableInterlockedMember(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: ImmutableInterlocked member detected: {symbol.ToDisplayString()}");
 				return "known_impure";
 			}
 
@@ -384,7 +372,6 @@ namespace SharpProof.Analyzer.Engine
 				objectEqualsMethodSymbol.Name == nameof(object.Equals) &&
 				objectEqualsMethodSymbol.Parameters.Length == 1)
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Virtual System.Object.Equals dispatch is considered impure: {symbol.ToDisplayString()}");
 				return "known_impure";
 			}
 
@@ -394,7 +381,6 @@ namespace SharpProof.Analyzer.Engine
 				staticObjectEqualsSymbol.IsStatic &&
 				staticObjectEqualsSymbol.Parameters.Length == 2)
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Static System.Object.Equals is considered impure due dispatch to virtual instance Equals: {symbol.ToDisplayString()}");
 				return "known_impure";
 			}
 
@@ -405,55 +391,46 @@ namespace SharpProof.Analyzer.Engine
 				staticTypeGetTypeSymbol.Parameters.Length >= 1 &&
 				staticTypeGetTypeSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Static Type.GetType overload detected as impure: {symbol.ToDisplayString()}");
 				return "known_impure";
 			}
 
 			if (IsRandomSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Random semantic rule matched: {symbol.ToDisplayString()}");
 				return "random_semantic_rule";
 			}
 
 			if (IsStringBuilderSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: StringBuilder semantic rule matched: {symbol.ToDisplayString()}");
 				return "string_builder_semantic_rule";
 			}
 
 			if (IsArrayMutationSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Array mutation semantic rule matched: {symbol.ToDisplayString()}");
 				return "array_mutation_semantic_rule";
 			}
 
 			if (IsThreadingSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Threading semantic rule matched: {symbol.ToDisplayString()}");
 				return "threading_semantic_rule";
 			}
 
 			if (IsXmlLinqSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: XML LINQ semantic rule matched: {symbol.ToDisplayString()}");
 				return "xml_linq_semantic_rule";
 			}
 
 			if (IsDiagnosticsTracingSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Diagnostics tracing semantic rule matched: {symbol.ToDisplayString()}");
 				return "diagnostics_tracing_semantic_rule";
 			}
 
 			if (IsIoStreamTextSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: IO stream/text semantic rule matched: {symbol.ToDisplayString()}");
 				return "io_stream_text_semantic_rule";
 			}
 
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
 				return "assembly_load_context_semantic_rule";
 			}
 
@@ -463,20 +440,16 @@ namespace SharpProof.Analyzer.Engine
 				if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
 				{
 					signature += ".get";
-					PurityAnalysisEngine.LogDebug($"    [IsKnownImpure] Appended .get to property signature: \"{signature}\"");
 				}
 			}
 
-			PurityAnalysisEngine.LogDebug($"    [IsKnownImpure] Checking HashSet.Contains for signature: \"{signature}\"");
 			if (ExtraImpureMethods.Contains(signature))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Match found for {symbol.ToDisplayString()} using configured full signature '{signature}'");
 				return "config_known_impure";
 			}
 
 			if (Constants.KnownImpureMethods.Contains(signature))
 			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Match found for {symbol.ToDisplayString()} using full signature '{signature}'");
 				return "known_impure";
 			}
 
@@ -485,16 +458,13 @@ namespace SharpProof.Analyzer.Engine
 			if (symbol.ContainingType != null)
 			{
 				string simplifiedName = $"{symbol.ContainingType.Name}.{symbol.Name}";
-				PurityAnalysisEngine.LogDebug($"    [IsKnownImpure] Checking HashSet.Contains for simplified name: \"{simplifiedName}\"");
 				if (ExtraImpureMethods.Contains(simplifiedName))
 				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Match found for {symbol.ToDisplayString()} using configured simplified name '{simplifiedName}'");
 					return "config_known_impure";
 				}
 
 				if (Constants.KnownImpureMethods.Contains(simplifiedName))
 				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Match found for {symbol.ToDisplayString()} using simplified name '{simplifiedName}'");
 					return "known_impure";
 				}
 			}
@@ -504,13 +474,11 @@ namespace SharpProof.Analyzer.Engine
 				signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
 				if (ExtraImpureMethods.Contains(signature))
 				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Generic match found for {symbol.ToDisplayString()} using configured signature '{signature}'");
 					return "config_known_impure";
 				}
 
 				if (Constants.KnownImpureMethods.Contains(signature))
 				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Generic match found for {symbol.ToDisplayString()} using signature '{signature}'");
 					return "known_impure";
 				}
 			}
@@ -522,16 +490,12 @@ namespace SharpProof.Analyzer.Engine
 		{
 			if (symbol == null) return false;
 
-			PurityAnalysisEngine.LogDebug($"    [INOT] Checking symbol: {symbol.ToDisplayString()}");
 			INamedTypeSymbol? containingType = symbol as INamedTypeSymbol ?? symbol.ContainingType;
 			while (containingType != null)
 			{
 				string typeName = containingType.OriginalDefinition.ToDisplayString();
-				PurityAnalysisEngine.LogDebug($"    [INOT] Checking type: {typeName}");
-				PurityAnalysisEngine.LogDebug($"    [INOT] Comparing '{typeName}' against KnownImpureTypeNames...");
 				if (Constants.KnownImpureTypeNames.Contains(typeName) || ExtraImpureTypes.Contains(typeName))
 				{
-					PurityAnalysisEngine.LogDebug($"    [INOT] --> Match found for impure type: {typeName}");
 					return true;
 				}
 
@@ -539,20 +503,16 @@ namespace SharpProof.Analyzer.Engine
 				while (ns != null && !ns.IsGlobalNamespace)
 				{
 					string namespaceName = ns.ToDisplayString();
-					PurityAnalysisEngine.LogDebug($"    [INOT] Checking namespace: {namespaceName}");
 					if (Constants.KnownImpureNamespaces.Contains(namespaceName) || ExtraImpureNamespaces.Contains(namespaceName))
 					{
-						PurityAnalysisEngine.LogDebug($"    [INOT] --> Match found for impure namespace: {namespaceName}");
 						return true;
 					}
 					ns = ns.ContainingNamespace;
 				}
 
-				PurityAnalysisEngine.LogDebug($"    [INOT] Checking containing type of {containingType.Name}");
 				containingType = containingType.ContainingType;
 			}
 
-			PurityAnalysisEngine.LogDebug($"    [INOT] No impure type or namespace match found for: {symbol.ToDisplayString()}");
 			return false;
 		}
 

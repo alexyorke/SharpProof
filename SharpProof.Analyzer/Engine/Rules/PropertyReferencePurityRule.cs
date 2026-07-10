@@ -24,11 +24,9 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             IPropertySymbol propertySymbol = propertyReferenceOperation.Property;
-            PurityAnalysisEngine.LogDebug($"  [PropRefRule] Checking PropertyReference: {propertySymbol.Name} on Type: {propertySymbol.ContainingType?.ToDisplayString()}");
 
             if (IsCompilerGeneratedArrayForeachCurrent(propertyReferenceOperation, context))
             {
-                PurityAnalysisEngine.LogDebug("    [PropRefRule] Compiler-generated array foreach Current is treated as pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -52,7 +50,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     nameof(PropertyReferencePurityRule),
                     out var useAfterDisposeEvidence))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property '{propertySymbol.Name}' reads a resource already marked disposed by symbolic ownership facts.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     useAfterDisposeEvidence);
@@ -60,13 +57,11 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (IsArrayLengthProperty(propertyReferenceOperation))
             {
-                PurityAnalysisEngine.LogDebug("    [PropRefRule] System.Array.Length is treated as a pure property read after its receiver is analyzed.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (IsPartOfAssignmentTarget(propertyReferenceOperation))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Skipping property read {propertySymbol.Name} as it's an assignment target.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -106,14 +101,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (isPureEnforcedProperty && !requiresDispatchCheck)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} has [EnforcePure]. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) ||
                 (getterSymbol != null && PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is configured known pure. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -122,17 +115,14 @@ namespace SharpProof.Analyzer.Engine.Rules
                 generatedPurity.IsPure &&
                 IsTrustedGeneratedMetadataGetter(getterSymbol))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Metadata getter '{getterSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
 
 
             string impureSig = propertySymbol.OriginalDefinition.ToDisplayString();
-            PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownImpure for property: '{impureSig}'");
             if (hasConfiguredKnownImpureMember)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is configured known impure. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -148,7 +138,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 hasTrustedGeneratedPurity &&
                 generatedPurity.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol?.ToDisplayString() ?? propertySymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -158,7 +147,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 !hasTrustedGeneratedPurity &&
                 string.Equals(GetCatalogHitCategory(propertySymbol), "reflection_environment_source", StringComparison.Ordinal))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Metadata-backed reflection-sensitive property '{propertySymbol.ToDisplayString()}' has no trusted generated summary. Classifying as reflection/environment impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -174,7 +162,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 !PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) &&
                 (getterSymbol == null || !PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is in a known impure namespace or type. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -188,7 +175,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (knownImpureMemberSource != null && !hasTrustedGeneratedPurity)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is built-in known impure. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -204,7 +190,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             {
                 if (!generatedPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol?.ToDisplayString() ?? propertySymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         propertyReferenceOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -219,7 +204,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol, context.CancellationToken))
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is a source auto-property getter. Treating read as pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -228,13 +212,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 containingType.IsAnonymousType &&
                 propertySymbol.IsReadOnly)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is an anonymous-type readonly property. Treating read as pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (requiresDispatchCheck)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} may dispatch. Checking getter candidates.");
                 var dispatchResult = CheckDispatchedGetterPurity(
                     propertyReferenceOperation,
                     context,
@@ -247,7 +229,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 dispatchGetterWasProvenPure = true;
                 if (isPureEnforcedProperty)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} has [EnforcePure] and dispatched getter candidates were pure. Assuming Pure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
             }
@@ -256,12 +237,10 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (propertySymbol.IsStatic)
             {
 
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property access: {propertySymbol.Name}");
 
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(propertySymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' access IMPURE due to impure static constructor in {propertySymbol.ContainingType?.Name}.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         cctorResult.ImpureSyntaxNode ?? propertyReferenceOperation.Syntax,
                         cctorResult.Evidence);
@@ -271,11 +250,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                 string staticPureSig = propertySymbol.OriginalDefinition.ToDisplayString();
                 bool staticKnownPure = allowsKnownPureFallback &&
                     PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol, context.SemanticModel.Compilation);
-                PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for static property: '{staticPureSig}' -> {staticKnownPure}");
 
                 if (staticKnownPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' is a known pure BCL member. Read is Pure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
@@ -287,7 +264,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         nameof(PropertyReferencePurityRule),
                         out var staticBclFallbackResult))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' has no trusted purity evidence; using BCL fallback guess.");
                     return staticBclFallbackResult;
                 }
 
@@ -295,18 +271,15 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property access: {propertySymbol.Name}");
                 IOperation? instanceOperation = propertyReferenceOperation.Instance;
 
 
                 string instanceKind = instanceOperation?.Kind.ToString() ?? "null";
                 string instanceSyntax = instanceOperation?.Syntax.ToString() ?? "null";
-                PurityAnalysisEngine.LogDebug($"      [PropRefRule] Instance Operation Kind: {instanceKind}, Syntax: {instanceSyntax}");
 
                 if (instanceOperation == null)
                 {
 
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance operation is null for property '{propertySymbol.Name}'. Assuming Impure for safety.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
                 }
 
@@ -317,7 +290,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                      paramRef.Parameter.RefKind == (RefKind)4))
                 {
                     bool isValueStruct = paramRef.Parameter.Type.IsValueType && !paramRef.Parameter.Type.IsReferenceType;
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is ParameterReference '{paramRef.Parameter.Name}', RefKind={paramRef.Parameter.RefKind}, IsValueStruct={isValueStruct}");
 
                     if (dispatchGetterWasProvenPure)
                     {
@@ -350,7 +322,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     }
                     else
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is 'this', property '{propertySymbol.Name}' is not readonly and has no accessible getter to analyze. Read is Impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
                     }
                 }
@@ -359,7 +330,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var instanceExprResult = PurityAnalysisEngine.CheckSingleOperation(instanceOperation, context, currentState);
                     if (!instanceExprResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance expression for '{propertySymbol.Name}' is impure. Propagating.");
                         return instanceExprResult;
                     }
 
@@ -371,11 +341,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                     string instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();
                     bool instanceKnownPure = allowsKnownPureFallback &&
                         PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol, context.SemanticModel.Compilation);
-                    PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for instance property: '{instancePureSig}' -> {instanceKnownPure}");
 
                     if (instanceKnownPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property '{propertySymbol.Name}' is known pure BCL. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
 
@@ -387,7 +355,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             nameof(PropertyReferencePurityRule),
                             out var instanceBclFallbackResult))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property '{propertySymbol.Name}' has no trusted purity evidence; using BCL fallback guess.");
                         return instanceBclFallbackResult;
                     }
 
@@ -409,12 +376,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                             context.PurityCache.TryGetValue(propertySymbol.GetMethod.OriginalDefinition, out var cachedGetterResult) &&
                             !cachedGetterResult.IsPure)
                         {
-                            PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is complex, property {propertySymbol.Name} known pure BCL, but getter is known impure from cache. Returning Impure.");
                             return cachedGetterResult.WithCallee(propertySymbol.GetMethod, propertyReferenceOperation.Syntax);
                         }
 
 
-                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property '{propertySymbol.Name}' is known pure BCL. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
                 }

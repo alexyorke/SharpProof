@@ -26,13 +26,10 @@ namespace SharpProof.Analyzer.Engine
 
         internal static PurityAnalysisResult CheckSingleOperation(IOperation operation, Rules.PurityAnalysisContext context, PurityAnalysisState currentState)
         {
-            LogDebug($"    [CSO] Enter CheckSingleOperation for Kind: {operation.Kind}, Syntax: '{operation.Syntax.ToString().Trim()}'");
-            LogDebug($"    [CSO] Current DFA State: Impure={currentState.HasPotentialImpurity}, MapCount={currentState.DelegateTargetMap.Count}");
 
             if (currentState.PathConditions.Length > 0 &&
                 ArePathConditionsUnsatisfiable(currentState, currentState.PathConditions, context.SmtAnalysis, operation.Syntax))
             {
-                LogDebug($"    [CSO] Current SMT path conditions are unsatisfiable. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -45,7 +42,6 @@ namespace SharpProof.Analyzer.Engine
                     currentState.GetSmtSymbolVersion,
                     context.SmtAnalysis))
             {
-                LogDebug($"    [CSO] Operation evaluation path is SMT-unreachable in current state. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -55,7 +51,6 @@ namespace SharpProof.Analyzer.Engine
                     context.CancellationToken,
                     context.SmtAnalysis))
             {
-                LogDebug($"    [CSO] Operation is in a statically unreachable branch. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -63,17 +58,14 @@ namespace SharpProof.Analyzer.Engine
             {
                 if (currentState.FlowCaptures.TryGetValue(flowRef.Id, out var capturedPurity))
                 {
-                    LogDebug($"    [CSO] FlowCaptureReference resolved from CFG state: IsPure={capturedPurity.IsPure}");
                     return capturedPurity;
                 }
 
-                LogDebug($"    [CSO] FlowCaptureReference without CFG capture entry. Treating as Pure.");
                 return PurityAnalysisResult.Pure;
             }
 
             if (operation is IFlowCaptureOperation flowCap)
             {
-                LogDebug($"    [CSO] FlowCapture: analyzing captured value subtree");
                 return CheckSingleOperation(flowCap.Value, context, currentState);
             }
 
@@ -83,7 +75,6 @@ namespace SharpProof.Analyzer.Engine
 
             if (operation is IBinaryOperation binaryOp && binaryOp.IsChecked)
             {
-                LogDebug($"    [CSO] Found Checked Binary Operation: {operation.Syntax}");
                 isChecked = true;
                 operatorMethod = binaryOp.OperatorMethod;
 
@@ -91,20 +82,17 @@ namespace SharpProof.Analyzer.Engine
                 var leftResult = CheckSingleOperation(binaryOp.LeftOperand, context, currentState);
                 if (!leftResult.IsPure)
                 {
-                    LogDebug($"    [CSO] Left operand of checked operation is Impure: {binaryOp.LeftOperand.Syntax}");
                     return leftResult;
                 }
 
                 var rightResult = CheckSingleOperation(binaryOp.RightOperand, context, currentState);
                 if (!rightResult.IsPure)
                 {
-                    LogDebug($"    [CSO] Right operand of checked operation is Impure: {binaryOp.RightOperand.Syntax}");
                     return rightResult;
                 }
             }
             else if (operation is IUnaryOperation unaryOp && unaryOp.IsChecked)
             {
-                LogDebug($"    [CSO] Found Checked Unary Operation: {operation.Syntax}");
                 isChecked = true;
                 operatorMethod = unaryOp.OperatorMethod;
 
@@ -112,14 +100,12 @@ namespace SharpProof.Analyzer.Engine
                 var operandResult = CheckSingleOperation(unaryOp.Operand, context, currentState);
                 if (!operandResult.IsPure)
                 {
-                    LogDebug($"    [CSO] Operand of checked operation is Impure: {unaryOp.Operand.Syntax}");
                     return operandResult;
                 }
             }
 
             if (isChecked)
             {
-                LogDebug($"    [CSO] Processing checked operation: {operation.Syntax}");
 
 
                 if (operatorMethod != null)
@@ -129,10 +115,8 @@ namespace SharpProof.Analyzer.Engine
                     {
                         if (!cachedResult.IsPure)
                         {
-                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is IMPURE (cached). Operation is Impure.");
                             return PurityAnalysisResult.Impure(operation.Syntax);
                         }
-                        LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is Pure (cached).");
                         return PurityAnalysisResult.Pure;
                     }
 
@@ -146,13 +130,11 @@ namespace SharpProof.Analyzer.Engine
                     {
                         if (generatedPurity.IsPure)
                         {
-                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted pure from generated purity summary.");
                             return PurityAnalysisResult.Pure;
                         }
 
                         if (!generatedPurity.IsPure)
                         {
-                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted impure from generated purity summary.");
                             return PurityAnalysisResult.Impure(
                                 operation.Syntax,
                                 PurityEvidence.Create(
@@ -165,13 +147,11 @@ namespace SharpProof.Analyzer.Engine
 
                     if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
                     {
-                        LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is known pure BCL member.");
                         return PurityAnalysisResult.Pure;
                     }
 
                     if (IsKnownImpure(operatorMethod))
                     {
-                        LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is known impure. Operation is Impure.");
                         return PurityAnalysisResult.Impure(operation.Syntax);
                     }
 
@@ -180,14 +160,11 @@ namespace SharpProof.Analyzer.Engine
 
                     if (!operatorPurity.IsPure)
                     {
-                        LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is IMPURE. Operation is Impure.");
                         return PurityAnalysisResult.Impure(operation.Syntax);
                     }
 
-                    LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is Pure.");
                 }
 
-                LogDebug($"    [CSO] Checked operation is Pure.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -195,13 +172,11 @@ namespace SharpProof.Analyzer.Engine
             if (operation.Kind == OperationKind.InterpolatedStringText ||
                 operation.Kind == OperationKind.Interpolation)
             {
-                LogDebug($"    [CSO] {operation.Kind} is parent-handled by InterpolatedStringPurityRule.");
                 return PurityAnalysisResult.Pure;
             }
 
             if (operation.Kind == OperationKind.Discard)
             {
-                LogDebug("    [CSO] Discard is parent-handled by assignment, deconstruction, or argument analysis.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -210,34 +185,27 @@ namespace SharpProof.Analyzer.Engine
             if (applicableRule != null)
             {
 
-                LogDebug($"    [CSO] Applying Rule '{applicableRule.GetType().Name}' to Kind: {operation.Kind}, Syntax: '{operation.Syntax.ToString().Trim()}'");
 
                 var ruleResult = applicableRule.CheckPurity(operation, context, currentState);
 
-                LogDebug($"    [CSO] Rule '{applicableRule.GetType().Name}' Result: IsPure={ruleResult.IsPure}");
                 if (!ruleResult.IsPure)
                 {
 
                     if (ruleResult.ImpureSyntaxNode == null)
                     {
-                        LogDebug($"    [CSO] Rule '{applicableRule.GetType().Name}' returned impure result without syntax node. Using current operation syntax: {operation.Syntax}");
 
                         return operation.Syntax != null
                                ? PurityAnalysisResult.Impure(operation.Syntax)
                                : PurityAnalysisResult.ImpureUnknownLocation;
                     }
-                    LogDebug($"    [CSO] Exit CheckSingleOperation (Impure from rule)");
                     return ruleResult;
                 }
 
-                LogDebug($"    [CSO] Exit CheckSingleOperation (Pure from rule)");
                 return PurityAnalysisResult.Pure;
             }
             else
             {
 
-                LogDebug($"    [CSO] No rule found for operation kind {operation.Kind}. Defaulting to impure. Syntax: '{operation.Syntax.ToString().Trim()}'");
-                LogDebug($"    [CSO] Exit CheckSingleOperation (Impure default)");
                 return ImpureResult(operation.Syntax, CreateUnsupportedOperationEvidence(operation));
             }
         }
@@ -281,7 +249,6 @@ namespace SharpProof.Analyzer.Engine
 
             if (stateChanged)
             {
-                LogDebug($"PropagateToSuccessor: State changed for Block #{successor.Ordinal} from Impure={existingState.HasPotentialImpurity} to Impure={mergedState.HasPotentialImpurity}. Updating state.");
                 blockStates[successor] = mergedState;
             }
             else
@@ -292,7 +259,6 @@ namespace SharpProof.Analyzer.Engine
                     blockStates[successor] = mergedState;
                 }
 
-                LogDebug($"PropagateToSuccessor: State unchanged for Block #{successor.Ordinal} (Impure={existingState.HasPotentialImpurity}).");
             }
 
 
@@ -301,7 +267,6 @@ namespace SharpProof.Analyzer.Engine
             {
                 if (!inQueue.Contains(successor))
                 {
-                    LogDebug($"PropagateToSuccessor: Enqueuing Block #{successor.Ordinal} (State Changed: {stateChanged}).");
                     worklist.Enqueue(successor);
                     inQueue.Add(successor);
                 }
@@ -311,17 +276,14 @@ namespace SharpProof.Analyzer.Engine
 
                     if (stateChanged)
                     {
-                        LogDebug($"PropagateToSuccessor: Block #{successor.Ordinal} already in queue, state changed. Will reprocess.");
                     }
                     else
                     {
-                        LogDebug($"PropagateToSuccessor: Block #{successor.Ordinal} already in queue, state unchanged.");
                     }
                 }
             }
             else
             {
-                LogDebug($"PropagateToSuccessor: Block #{successor.Ordinal} already in queue and state unchanged. No enqueue needed.");
             }
         }
     }

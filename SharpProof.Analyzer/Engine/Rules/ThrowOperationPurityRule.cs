@@ -14,7 +14,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (!(operation is IThrowOperation throwOperation))
             {
 
-                PurityAnalysisEngine.LogDebug($"  [ThrowRule] WARNING: Incorrect operation type {operation.Kind}. Assuming Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
             }
 
@@ -23,21 +22,16 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (throwOperation.Exception != null)
             {
-                PurityAnalysisEngine.LogDebug($"    [ThrowRule] Checking exception expression: {throwOperation.Exception.Syntax} ({throwOperation.Exception.Kind})");
                 var exceptionResult = PurityAnalysisEngine.CheckSingleOperation(throwOperation.Exception, context, currentState);
                 if (!exceptionResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ThrowRule] Exception expression is IMPURE. Throw is Impure.");
                     return exceptionResult;
                 }
-                PurityAnalysisEngine.LogDebug($"    [ThrowRule] Exception expression is PURE.");
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"  [ThrowRule] Found re-throw operation (exception is null). Treating throw as impure.");
             }
 
-            PurityAnalysisEngine.LogDebug($"  [ThrowRule] Throw operation is IMPURE.");
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 operation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(

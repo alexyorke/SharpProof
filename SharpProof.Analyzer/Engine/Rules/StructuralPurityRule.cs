@@ -30,7 +30,6 @@ namespace SharpProof.Analyzer.Engine.Rules
         public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
         {
 
-            PurityAnalysisEngine.LogDebug($"    [StructuralRule] Structural operation ({operation.Kind}) - Pure");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
     }

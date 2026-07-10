@@ -14,23 +14,19 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (!(operation is ISwitchOperation switchOperation))
             {
-                PurityAnalysisEngine.LogDebug($"WARNING: SwitchStatementPurityRule called with unexpected operation type: {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"SwitchStatementPurityRule: Analyzing {switchOperation.Syntax}");
 
 
             var valueResult = PurityAnalysisEngine.CheckSingleOperation(switchOperation.Value, context, currentState);
             if (!valueResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"SwitchStatementPurityRule: Switch value is impure: {switchOperation.Value.Syntax}");
                 return valueResult;
             }
 
 
 
-            PurityAnalysisEngine.LogDebug($"SwitchStatementPurityRule: Assuming switch statement structure itself is pure for {switchOperation.Syntax}. Case/Value purity handled elsewhere.");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
     }

@@ -97,7 +97,6 @@ namespace SharpProof.Analyzer.Engine
 
         private static PurityAnalysisState MergeStates(PurityAnalysisState state1, PurityAnalysisState state2)
         {
-            LogDebug($"  [Merge] Merging States: S1(Impure={state1.HasPotentialImpurity}, MapCount={state1.DelegateTargetMap.Count}) + S2(Impure={state2.HasPotentialImpurity}, MapCount={state2.DelegateTargetMap.Count})");
             var mergedImpurity = state1.HasPotentialImpurity || state2.HasPotentialImpurity;
             var (firstImpureNode, firstImpurityEvidence) = SelectFirstImpurity(state1, state2);
 

@@ -56,17 +56,6 @@ namespace SharpProof.Analyzer.Engine
                 ? PurityAnalysisResult.ImpureUnknownLocation
                 : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(evidence);
         }
-
-
-        internal static void LogDebug(string message)
-        {
-#if DEBUG
-            // Intentionally no-op in Release builds; keep minimal in Debug.
-#endif
-        }
-
-
-
         internal static bool HasAttribute(ISymbol symbol, INamedTypeSymbol attributeSymbol)
         {
             if (attributeSymbol == null) return false;
@@ -87,18 +76,15 @@ namespace SharpProof.Analyzer.Engine
 
             if (staticConstructor == null)
             {
-                LogDebug($"    [CctorCheck] Type {typeSymbol.Name} has no static constructor. Pure.");
                 return PurityAnalysisResult.Pure;
             }
 
-            LogDebug($"    [CctorCheck] Found static constructor for {typeSymbol.Name}. Checking purity recursively...");
 
 
 
 
             var cctorResult = GetCalleePurity(staticConstructor, context);
 
-            LogDebug($"    [CctorCheck] Static constructor purity result for {typeSymbol.Name}: IsPure={cctorResult.IsPure}");
 
 
 

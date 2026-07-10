@@ -37,7 +37,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            PurityAnalysisEngine.LogDebug("  [MIR] Dispose invoked on a resource already marked disposed by symbolic ownership facts.");
             result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 invocationOperation.Syntax,
                 evidence);
@@ -69,7 +68,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            PurityAnalysisEngine.LogDebug("  [MIR] Instance invocation uses a resource already marked disposed by symbolic ownership facts.");
             result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 invocationOperation.Syntax,
                 evidence);
@@ -102,7 +100,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     continue;
                 }
 
-                PurityAnalysisEngine.LogDebug($"  [MIR]   By-reference argument '{argument.Syntax}' mutates a symbol with an active mutable borrow.");
                 result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     argument.Syntax,
                     borrowConflictEvidence);

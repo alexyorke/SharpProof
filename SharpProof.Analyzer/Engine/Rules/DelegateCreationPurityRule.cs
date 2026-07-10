@@ -21,7 +21,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (!(operation is IDelegateCreationOperation delegateCreation))
             {
 
-                PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Unexpected operation kind {operation.Kind}. Assuming impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
             }
 
@@ -45,22 +44,18 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (target is IAnonymousFunctionOperation anonymousFunction)
             {
-                PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Found AnonymousFunctionOperation. Analyzing its body.");
 
 
                 IMethodSymbol lambdaSymbol = anonymousFunction.Symbol;
                 if (lambdaSymbol != null)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Recursively checking lambda: {lambdaSymbol.ToDisplayString()}");
 
                     var bodyResult = PurityAnalysisEngine.GetCalleePurity(lambdaSymbol, context);
 
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Lambda body analysis result: IsPure={bodyResult.IsPure}");
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
                         TryFindCapturedLocalMutation(anonymousFunction, context.CancellationToken, out var mutationSyntax, out var mutatedLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda mutates captured local '{mutatedLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             mutationSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -82,7 +77,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             out var captureSyntax,
                             out var capturedArrayLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             captureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -105,7 +99,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             objectCaptureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -123,27 +116,22 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Could not get symbol for anonymous function. Assuming impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(anonymousFunction.Syntax);
                 }
             }
             else if (target is IFlowAnonymousFunctionOperation flowAnonymousFunction)
             {
-                PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Found FlowAnonymousFunctionOperation. Analyzing its body.");
 
                 IMethodSymbol lambdaSymbol = flowAnonymousFunction.Symbol;
                 if (lambdaSymbol != null)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Recursively checking flow lambda: {lambdaSymbol.ToDisplayString()}");
 
                     var bodyResult = PurityAnalysisEngine.GetCalleePurity(lambdaSymbol, context);
 
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Flow lambda body analysis result: IsPure={bodyResult.IsPure}");
                     if (bodyResult.IsPure &&
                         IsEscapingDelegateCreation(delegateCreation) &&
                         TryFindCapturedLocalMutation(flowAnonymousFunction, context.CancellationToken, out var mutationSyntax, out var mutatedLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda mutates captured local '{mutatedLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             mutationSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -165,7 +153,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             out var captureSyntax,
                             out var capturedArrayLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             captureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -188,7 +175,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             objectCaptureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -206,14 +192,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Could not get symbol for flow anonymous function. Assuming impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(flowAnonymousFunction.Syntax);
                 }
             }
             else if (target is IMethodReferenceOperation methodReference)
             {
 
-                PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Found MethodReferenceOperation: {methodReference.Method.ToDisplayString()}. Analyzing target method.");
                 IMethodSymbol targetMethodSymbol = methodReference.Method;
 
                 if (methodReference.Instance != null)
@@ -221,7 +205,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var instanceResult = PurityAnalysisEngine.CheckSingleOperation(methodReference.Instance, context, currentState);
                     if (!instanceResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Method group receiver is impure: {methodReference.Instance.Syntax}");
                         return instanceResult;
                     }
                 }
@@ -233,7 +216,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context.SemanticModel);
                 if (potentialTargets == null || potentialTargets.Value.IsUnresolved)
                 {
-                    PurityAnalysisEngine.LogDebug("    [DelegateCreationRule] Delegate target could dispatch to unresolved runtime target. Assuming impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         delegateCreation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -247,7 +229,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 {
                     var methodResult = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
 
-                    PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Referenced method analysis result for {targetMethod.ToDisplayString()}: IsPure={methodResult.IsPure}");
                     if (!methodResult.IsPure)
                     {
                         return methodResult.WithCallee(targetMethod, delegateCreation.Syntax);
@@ -257,7 +238,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         targetMethod.MethodKind == MethodKind.LocalFunction &&
                         TryFindLocalFunctionCapturedLocalMutation(targetMethod, context, out var mutationSyntax, out var mutatedLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping local function delegate mutates captured local '{mutatedLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             mutationSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -273,7 +253,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                         targetMethod.MethodKind == MethodKind.LocalFunction &&
                         TryFindLocalFunctionCapturedOwnedLocalArray(targetMethod, context, currentState, out var captureSyntax, out var capturedArrayLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping local function delegate captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             captureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -295,7 +274,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                             out var objectCaptureSyntax,
                             out var capturedObjectLocal))
                     {
-                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping local function delegate captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             objectCaptureSyntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
@@ -313,7 +291,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             else
             {
 
-                PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Unexpected DelegateCreation target kind: {target.Kind}. Assuming impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(target.Syntax);
             }
         }

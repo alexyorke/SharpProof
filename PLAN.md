@@ -242,10 +242,6 @@ grouped by their original feature area.
   failures: distinguish missing `[AllowSynchronization]`, unsupported lock
   targets under `[AllowSynchronization]`, volatile/interlocked/threading
   operations, and redundant allowances, with fixable guidance for each case.
-- Either remove the currently inert `sharpproof_enable_debug_logging` surface or
-  replace it with a host-safe structured trace path, such as opt-in trace
-  diagnostics, compact JSON from the CLI, or test-only trace capture, rather
-  than no-op `LogDebug` calls that users cannot observe in analyzer hosts.
 
 #### Purity Rule Precision Targets
 - Add specialized handling for custom interpolated-string handlers so handlers

@@ -17,7 +17,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 				return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 			}
 
-			PurityAnalysisEngine.LogDebug($"  [EventAssignRule] Checking event assignment: {eventAssignment.Syntax}");
 
 			// Subscribing or unsubscribing to an event mutates the event's invocation list (stateful) => impure.
 			return PurityAnalysisEngine.PurityAnalysisResult.Impure(

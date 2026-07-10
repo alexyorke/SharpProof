@@ -15,21 +15,17 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (!(operation is IBinaryOperation binaryOperation))
             {
-                PurityAnalysisEngine.LogDebug($"  [BinaryOpRule] WARNING: Incorrect operation type {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"  [BinaryOpRule] Checking Binary Operation: {binaryOperation.Syntax} (Operator: {binaryOperation.OperatorKind})");
 
 
             var leftResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.LeftOperand, context, currentState);
             if (!leftResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Left Operand is Impure: {binaryOperation.LeftOperand.Syntax}");
                 return leftResult;
             }
 
-            PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Left Operand is Pure.");
 
             if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd &&
                 PurityAnalysisEngine.TryGetKnownConditionValueFromPathFacts(
@@ -41,7 +37,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     out var leftAnd) &&
                 !leftAnd)
             {
-                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven false && skips right operand. Binary operation is Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -55,7 +50,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     out var leftOr) &&
                 leftOr)
             {
-                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven true || skips right operand. Binary operation is Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -72,7 +66,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context.CancellationToken,
                     out rightState))
                 {
-                    PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable && right operand. Binary operation is Pure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
             }
@@ -87,7 +80,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     context.CancellationToken,
                     out rightState))
                 {
-                    PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable || right operand. Binary operation is Pure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
             }
@@ -95,17 +87,14 @@ namespace SharpProof.Analyzer.Engine.Rules
             var rightResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.RightOperand, context, rightState);
             if (!rightResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Right Operand is Impure: {binaryOperation.RightOperand.Syntax}");
                 return rightResult;
             }
 
-            PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Right Operand is Pure.");
 
             if (binaryOperation.LeftOperand.Type?.TypeKind == TypeKind.Dynamic ||
                 binaryOperation.RightOperand.Type?.TypeKind == TypeKind.Dynamic ||
                 binaryOperation.Type?.TypeKind == TypeKind.Dynamic)
             {
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Dynamic binary operation detected. Conservatively treating as Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     binaryOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -121,7 +110,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var operatorMethod = binaryOperation.OperatorMethod;
                 if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.UserDefinedOperator))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Static abstract interface operator '{operatorMethod.Name}' has unresolved dispatch targets. Binary operation is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         binaryOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -135,15 +123,12 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (!operatorPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{operatorMethod.Name}' is IMPURE. Binary operation is Impure.");
                     return operatorPurity.WithCallee(operatorMethod, binaryOperation.Syntax);
                 }
 
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{operatorMethod.Name}' is Pure.");
             }
 
 
-            PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Binary operation is Pure.");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
     }

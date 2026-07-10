@@ -25,17 +25,14 @@ namespace SharpProof.Analyzer.Engine.Rules
                 resourceOperation = usingOperation.Resources;
                 bodyOperation = usingOperation.Body;
                 impureSyntaxNode = usingOperation.Syntax;
-                PurityAnalysisEngine.LogDebug($"UsingStatementPurityRule: Analyzing Using Statement");
             }
             else if (operation is IUsingDeclarationOperation usingDeclarationOperation)
             {
                 resourceOperation = usingDeclarationOperation.DeclarationGroup;
                 impureSyntaxNode = usingDeclarationOperation.Syntax;
-                PurityAnalysisEngine.LogDebug($"UsingStatementPurityRule: Analyzing Using Declaration");
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"UsingStatementPurityRule: Unexpected operation kind {operation.Kind}. Assuming pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -44,12 +41,10 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (resourceOperation != null)
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Checking Resource operation {resourceOperation.Kind}");
                 PurityAnalysisEngine.PurityAnalysisResult resourceResult = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
                 if (resourceOperation is IVariableDeclarationGroupOperation declarationGroup)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource is VariableDeclarationGroup. Checking initializers.");
                     resourceResult = CheckDeclaratorInitializers(
                         declarationGroup.Declarations.SelectMany(static declaration => declaration.Declarators),
                         context,
@@ -57,39 +52,31 @@ namespace SharpProof.Analyzer.Engine.Rules
                 }
                 else if (resourceOperation is IVariableDeclarationOperation variableDeclaration)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource is VariableDeclaration. Checking initializers.");
                     resourceResult = CheckDeclaratorInitializers(variableDeclaration.Declarators, context, currentState);
                 }
                 else if (resourceOperation is ILocalReferenceOperation localReferenceOperation)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource is a reference to existing local '{localReferenceOperation.Local.Name}'. Resource acquisition is pure; implicit Dispose will be checked.");
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource is an expression {resourceOperation.Kind}. Checking expression directly.");
                     resourceResult = PurityAnalysisEngine.CheckSingleOperation(resourceOperation, context, currentState);
                 }
 
 
                 if (!resourceResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource operation is IMPURE.");
                     return resourceResult;
                 }
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Resource operation is Pure.");
             }
 
 
             if (bodyOperation != null)
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Checking Body operation {bodyOperation.Kind}");
                 var bodyResult = PurityAnalysisEngine.CheckSingleOperation(bodyOperation, context, currentState);
                 if (!bodyResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Body operation is IMPURE.");
                     return bodyResult;
                 }
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Body operation is Pure.");
             }
 
 
@@ -103,11 +90,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing, context.CancellationToken);
                 if (disposeReceiverType == null)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' has no resolvable Dispose receiver type. Skipping Dispose check.");
                     continue;
                 }
 
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Checking implicit Dispose() for local '{local.Name}' of type {disposeReceiverType.Name}");
 
 
                 IMethodSymbol? disposeMethod = FindDisposalMethod(disposeReceiverType, context.SemanticModel.Compilation, isAwaitUsing);
@@ -115,14 +100,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 if (disposeMethod == null)
                 {
 
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Could not find Dispose or DisposeAsync method for type {disposeReceiverType.Name}. Assuming impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(disposalSyntax);
                 }
 
                 if (localWasReassigned &&
                     (disposeReceiverType.TypeKind == TypeKind.Interface || IsOverridableDispatchTarget(disposeMethod)))
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' was reassigned before using and has unstable Dispose dispatch. Treating implicit Dispose dispatch as impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         disposalSyntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -151,13 +134,11 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var expressionDisposeReceiverType = ResolveExpressionDisposeReceiverType(resourceOperation);
                 if (expressionDisposeReceiverType != null)
                 {
-                    PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Checking implicit Dispose() for expression resource of type {expressionDisposeReceiverType.Name}");
 
                     IMethodSymbol? disposeMethod = FindDisposalMethod(expressionDisposeReceiverType, context.SemanticModel.Compilation, isAwaitUsing);
 
                     if (disposeMethod == null)
                     {
-                        PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Could not find Dispose or DisposeAsync method for expression resource type {expressionDisposeReceiverType.Name}. Skipping Dispose check.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
 
@@ -175,7 +156,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
 
-            PurityAnalysisEngine.LogDebug($"UsingStatementPurityRule: Resource, Body (if applicable), and Dispose() calls are all pure. Result: Pure.");
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
@@ -186,15 +166,12 @@ namespace SharpProof.Analyzer.Engine.Rules
             bool isAwaitUsing,
             string resourceDescription)
         {
-            PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Checking callee purity of {disposeMethod.ToDisplayString()}");
             var disposeResult = PurityAnalysisEngine.GetCalleePurity(disposeMethod, context);
             if (!disposeResult.IsPure)
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Implicit Dispose() call on {resourceDescription} ({disposeMethod.Name}) is IMPURE.");
                 return disposeResult.WithCallee(disposeMethod, syntaxNode);
             }
 
-            PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Implicit Dispose() call on {resourceDescription} ({disposeMethod.Name}) was analyzed as Pure.");
             return isAwaitUsing
                 ? AwaitPurityRule.CheckAwaitablePatternMembers(disposeMethod.ReturnType, syntaxNode, context)
                 : PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -211,19 +188,15 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var initVal = declarator.Initializer?.Value;
                 if (initVal == null)
                 {
-                    PurityAnalysisEngine.LogDebug($"  UsingStatementPurityRule: No initializer for {declarator.Symbol.Name}. Assuming pure acquisition.");
                     continue;
                 }
 
-                PurityAnalysisEngine.LogDebug($"  UsingStatementPurityRule: Checking initializer for {declarator.Symbol.Name}: {initVal.Syntax}");
                 var initializerResult = PurityAnalysisEngine.CheckSingleOperation(initVal, context, currentState);
                 if (!initializerResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"  UsingStatementPurityRule: Initializer for {declarator.Symbol.Name} is IMPURE.");
                     return initializerResult;
                 }
 
-                PurityAnalysisEngine.LogDebug($"  UsingStatementPurityRule: Initializer for {declarator.Symbol.Name} is Pure.");
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -262,14 +235,12 @@ namespace SharpProof.Analyzer.Engine.Rules
                 currentState.LocalConcreteTypes.TryGetValue(local, out var concreteType) &&
                 FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' Dispose receiver resolved from tracked concrete type {concreteType.Name}.");
                 return concreteType;
             }
 
             var initializerType = TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel, cancellationToken);
             if (initializerType != null && FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' Dispose receiver resolved from initializer type {initializerType.Name}.");
                 return initializerType;
             }
 
@@ -316,7 +287,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
             if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax, declaratorSyntax, semanticModel, cancellationToken))
             {
-                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' is reassigned before using; using declared type for Dispose resolution.");
                 return null;
             }
 

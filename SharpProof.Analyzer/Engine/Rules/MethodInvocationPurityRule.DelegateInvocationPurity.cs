@@ -31,12 +31,9 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return false;
             }
 
-            PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] === Simplified Delegate Invocation Check Start ===");
-            PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Invoked Symbol: {invokedMethodSymbol.ContainingType.Name}.Invoke()");
 
             if (invocationOperation.Instance == null)
             {
-                PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] Instance is NULL (static delegate?). Assuming impure.");
                 result = PurityAnalysisEngine.ImpureResult(
                     invocationOperation,
                     "unresolved_delegate_target",
@@ -46,7 +43,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
 
             IOperation delegateInstanceOp = invocationOperation.Instance;
-            PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Analyzing Delegate Instance Op: {delegateInstanceOp.Kind} | Syntax: {delegateInstanceOp.Syntax}");
 
             var potentialTargets = PurityAnalysisEngine.ResolvePotentialTargets(
                 delegateInstanceOp,
@@ -55,10 +51,8 @@ namespace SharpProof.Analyzer.Engine.Rules
                 context.SemanticModel);
             if (potentialTargets != null)
             {
-                PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Resolved {potentialTargets.Value.MethodSymbols.Count} target(s) for delegate invocation.");
                 if (potentialTargets.Value.IsUnresolved || potentialTargets.Value.MethodSymbols.IsEmpty)
                 {
-                    PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> Resolved target set is empty or explicitly unresolved. Treating as unresolved delegate target.");
                     result = PurityAnalysisEngine.ImpureResult(
                         delegateInstanceOp,
                         "unresolved_delegate_target",
@@ -70,18 +64,14 @@ namespace SharpProof.Analyzer.Engine.Rules
                     result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
                     {
-                        PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Checking Potential Target: {targetMethod.ToDisplayString()}");
                         var targetPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
-                        PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Potential Target Purity Result: IsPure={targetPurity.IsPure}");
                         if (!targetPurity.IsPure)
                         {
                             if (CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(targetMethod, targetPurity))
                             {
-                                PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> PURE target deferred to caller return/ownership analysis.");
                                 continue;
                             }
 
-                            PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> IMPURE target found. Invocation is impure.");
                             result = targetPurity.WithCallee(targetMethod, invocationOperation.Syntax);
                             break;
                         }
@@ -90,7 +80,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             }
             else
             {
-                PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] --> IMPURE (Could not resolve delegate targets for {delegateInstanceOp.Kind}). Fallback to SP0002 at instance op.");
                 result = PurityAnalysisEngine.ImpureResult(
                     delegateInstanceOp,
                     "unresolved_delegate_target",
@@ -98,8 +87,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     invokedMethodSymbol);
             }
 
-            PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Final Result for Delegate Invocation: IsPure={result.IsPure}");
-            PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] === Simplified Delegate Invocation Check End ===");
             if (result.IsPure)
             {
                 foreach (var argument in invocationOperation.Arguments)
@@ -107,7 +94,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
                     if (!argumentResult.IsPure)
                     {
-                        PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> IMPURE (Delegate invocation argument is impure)");
                         result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
                             argumentResult.ImpureSyntaxNode ?? argument.Value.Syntax,
                             argumentResult.Evidence);
@@ -178,7 +164,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var delegateTargetResult = CheckDelegateArgumentTargetPurity(argument, context, currentState);
                 if (!delegateTargetResult.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (delegate-invoking BCL argument target was impure or unresolved)");
                     result = delegateTargetResult;
                     return true;
                 }

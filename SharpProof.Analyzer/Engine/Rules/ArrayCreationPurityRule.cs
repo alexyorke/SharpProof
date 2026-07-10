@@ -20,7 +20,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 return PurityAnalysisResult.Pure;
             }
 
-            LogDebug($"ArrayCreationRule: Analyzing {arrayCreation.Syntax}");
 
 
             bool isParamsArray = arrayCreation.Parent is IArgumentOperation argumentOperation &&
@@ -44,7 +43,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                     return paramsInitializerResult;
                 }
 
-                LogDebug($"    [ArrCreateRule] 'params' array creation itself treated as PURE.");
                 return PurityAnalysisResult.Pure;
             }
             else
@@ -63,17 +61,14 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (RuleAnalysisHelper.IsFreshLocalArrayInitialization(arrayCreation))
                 {
-                    LogDebug($"    [ArrCreateRule] Array creation '{arrayCreation.Syntax}' assigned to a fresh local array. Treating as PURE.");
                     return PurityAnalysisResult.Pure;
                 }
 
                 if (IsTransientImmutableArrayFactoryArgument(arrayCreation))
                 {
-                    LogDebug($"    [ArrCreateRule] Array creation '{arrayCreation.Syntax}' is a transient immutable-array factory source. Treating as PURE.");
                     return PurityAnalysisResult.Pure;
                 }
 
-                LogDebug($"    [ArrCreateRule] Array creation '{arrayCreation.Syntax}' is IMPURE (mutable allocation, not for params).");
                 return PurityAnalysisResult.Impure(
                     arrayCreation.Syntax,
                     PurityEvidence.Create(
@@ -116,7 +111,6 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var dimensionResult = CheckSingleOperation(dimensionSize, context, currentState);
                 if (!dimensionResult.IsPure)
                 {
-                    LogDebug($"    [ArrCreateRule] Array dimension '{dimensionSize.Syntax}' is IMPURE. Operation is Impure.");
                     return dimensionResult;
                 }
             }
@@ -132,7 +126,6 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (arrayCreation.Initializer == null)
             {
-                LogDebug($"    [ArrCreateRule] {description} has no initializer elements to check.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -141,12 +134,10 @@ namespace SharpProof.Analyzer.Engine.Rules
                 var elementPurity = CheckSingleOperation(elementValue, context, currentState);
                 if (!elementPurity.IsPure)
                 {
-                    LogDebug($"    [ArrCreateRule] {description} initializer element '{elementValue.Syntax}' is IMPURE. Operation is Impure.");
                     return elementPurity;
                 }
             }
 
-            LogDebug($"    [ArrCreateRule] All {description} initializer elements are Pure.");
             return PurityAnalysisResult.Pure;
         }
 

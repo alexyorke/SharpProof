@@ -15,20 +15,16 @@ namespace SharpProof.Analyzer.Engine.Rules
         {
             if (operation is not IConversionOperation conversionOperation)
             {
-                PurityAnalysisEngine.LogDebug($"WARNING: ConversionPurityRule called with unexpected operation type: {operation.Kind}. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"    [ConversionRule] Checking operand of type {conversionOperation.Operand?.Kind} for conversion: {operation.Syntax}");
             if (conversionOperation.Operand == null)
             {
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Conversion operand is null. Assuming Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             var operandResult = PurityAnalysisEngine.CheckSingleOperation(conversionOperation.Operand, context, currentState);
 
-            PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operand Result: IsPure={operandResult.IsPure}");
 
 
             if (!operandResult.IsPure)
@@ -39,7 +35,6 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (conversionOperation.Operand.Type?.TypeKind == TypeKind.Dynamic ||
                 conversionOperation.Type?.TypeKind == TypeKind.Dynamic)
             {
-                PurityAnalysisEngine.LogDebug("    [ConversionRule] Dynamic conversion detected. Conservatively treating as Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     conversionOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -52,14 +47,7 @@ namespace SharpProof.Analyzer.Engine.Rules
             if (conversionOperation.Conversion.IsUserDefined && conversionOperation.Conversion.MethodSymbol != null)
             {
                 IMethodSymbol operatorMethod = conversionOperation.Conversion.MethodSymbol;
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] User-defined conversion found: {operatorMethod.ToDisplayString()}");
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Conversion Syntax: {conversionOperation.Syntax}");
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Conversion Op Kind: {conversionOperation.Kind}");
 
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Checking operator method: {operatorMethod.ToDisplayString()}");
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Containing Type: {operatorMethod.ContainingType?.ToDisplayString()}");
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Return Type: {operatorMethod.ReturnType?.ToDisplayString()}");
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Param Count: {operatorMethod.Parameters.Length}");
 
                 if (IsPurityNeutralIntrinsicConversion(operatorMethod))
                 {
@@ -68,7 +56,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.Conversion))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ConversionRule] Static abstract interface conversion '{operatorMethod.Name}' has unresolved dispatch targets. Conversion is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         conversionOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
@@ -80,7 +67,6 @@ namespace SharpProof.Analyzer.Engine.Rules
 
                 var operatorResult = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
 
-                PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Result: IsPure={operatorResult.IsPure}");
                 if (!operatorResult.IsPure)
                 {
                     return operatorResult.WithCallee(operatorMethod, conversionOperation.Syntax);
