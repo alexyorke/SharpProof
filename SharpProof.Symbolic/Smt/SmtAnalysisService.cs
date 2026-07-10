@@ -15,6 +15,7 @@ namespace SharpProof.Symbolic.Smt
         private const int SharedQueryCacheEntryLimit = 4096;
         private static readonly ConcurrentDictionary<string, PurityProofResult> s_sharedQueryCache = new(StringComparer.Ordinal);
         private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
+        private static readonly ConcurrentDictionary<string, SharedQueryFlight> s_sharedQueryFlights = new(StringComparer.Ordinal);
 
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
         [ThreadStatic]
@@ -29,11 +30,6 @@ namespace SharpProof.Symbolic.Smt
         public SmtAnalysisService(SmtAnalysisOptions options)
         {
             Options = options ?? throw new ArgumentNullException(nameof(options));
-        }
-
-        ~SmtAnalysisService()
-        {
-            Dispose(disposing: false);
         }
 
         public SmtAnalysisOptions Options { get; }
@@ -136,14 +132,77 @@ namespace SharpProof.Symbolic.Smt
                 return sharedResult;
             }
 
+            if (Options.UseSharedResultCache)
+            {
+                return ClassifyWithSharedQueryFlight(normalizedQuery, key);
+            }
+
+            return ClassifyLocally(normalizedQuery, key);
+        }
+
+        private PurityProofResult ClassifyWithSharedQueryFlight(
+            PurityProofQuery query,
+            string queryKey)
+        {
+            var sharedKey = CreateSharedQueryKey(Options, queryKey);
+            var candidate = new SharedQueryFlight(() =>
+            {
+                if (TryGetSharedResult(queryKey, out var racedSharedResult))
+                {
+                    return racedSharedResult;
+                }
+
+                return IsMethodBudgetExceeded()
+                    ? Unknown("smt_method_budget_exceeded")
+                    : ClassifyCore(query);
+            });
+            var flight = s_sharedQueryFlights.GetOrAdd(sharedKey, candidate);
+            var ownsFlight = ReferenceEquals(flight, candidate);
+            PurityProofResult result;
+            try
+            {
+                result = flight.Result.Value;
+                if (ownsFlight)
+                {
+                    _queryCache.TryAdd(queryKey, result);
+                    AddSharedResult(queryKey, result);
+                }
+                else if (IsShareableResult(result))
+                {
+                    _queryCache.TryAdd(queryKey, result);
+                }
+            }
+            finally
+            {
+                if (ownsFlight)
+                {
+                    s_sharedQueryFlights.TryRemove(sharedKey, out _);
+                }
+            }
+
+            return ownsFlight || IsShareableResult(result)
+                ? result
+                : ClassifyLocally(query, queryKey);
+        }
+
+        private PurityProofResult ClassifyLocally(
+            PurityProofQuery query,
+            string queryKey)
+        {
+            if (TryGetSharedResult(queryKey, out var sharedResult))
+            {
+                _queryCache.TryAdd(queryKey, sharedResult);
+                return sharedResult;
+            }
+
             if (IsMethodBudgetExceeded())
             {
                 return Unknown("smt_method_budget_exceeded");
             }
 
-            var result = ClassifyCore(normalizedQuery);
-            _queryCache.TryAdd(key, result);
-            AddSharedResult(key, result);
+            var result = ClassifyCore(query);
+            _queryCache.TryAdd(queryKey, result);
+            AddSharedResult(queryKey, result);
             return result;
         }
 
@@ -194,12 +253,6 @@ namespace SharpProof.Symbolic.Smt
         }
 
         public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
-
-        private void Dispose(bool disposing)
         {
             if (_disposed)
             {
@@ -526,6 +579,18 @@ namespace SharpProof.Symbolic.Smt
             }
 
             return true;
+        }
+
+        private sealed class SharedQueryFlight
+        {
+            public SharedQueryFlight(Func<PurityProofResult> classify)
+            {
+                Result = new Lazy<PurityProofResult>(
+                    classify,
+                    LazyThreadSafetyMode.ExecutionAndPublication);
+            }
+
+            public Lazy<PurityProofResult> Result { get; }
         }
     }
 }

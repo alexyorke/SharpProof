@@ -10,6 +10,7 @@ using SharpProof.Symbolic.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public sealed class PathSensitiveSmtInvariantTests
     {
         [Test]

@@ -11,6 +11,7 @@ using SearchLib.Smt;
 namespace SharpProof.Test
 {
     [TestFixture]
+    [Category("SmtHeavy")]
     public class SmtAnalysisServiceTests
     {
         [Test]
@@ -669,6 +670,52 @@ namespace SharpProof.Test
             Assert.That(firstService.ExecutedQueryCount, Is.EqualTo(1));
             Assert.That(secondService.ExecutedQueryCount, Is.EqualTo(0));
             Assert.That(secondService.CacheEntryCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task Classify_SharedResultCacheEnabled_CoalescesConcurrentQueries()
+        {
+            var variableName = "shared_concurrent_" + Guid.NewGuid().ToString("N");
+            var x = new SmtVariable(variableName, SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1000),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32,
+                useSharedResultCache: true);
+            var query = CreateQuery(new[] { xIsZero }, xIsZero);
+            const int serviceCount = 8;
+            var services = Enumerable.Range(0, serviceCount)
+                .Select(_ => new SmtAnalysisService(options))
+                .ToArray();
+            using var startGate = new Barrier(serviceCount);
+
+            try
+            {
+                var tasks = services
+                    .Select(service => Task.Run(() =>
+                    {
+                        startGate.SignalAndWait();
+                        return service.Classify(query);
+                    }))
+                    .ToArray();
+                var results = await Task.WhenAll(tasks);
+
+                Assert.That(
+                    results.Select(result => result.Outcome),
+                    Is.All.EqualTo(PurityProofOutcome.ProvablyImpure));
+                Assert.That(services.Sum(service => service.ExecutedQueryCount), Is.EqualTo(1));
+                Assert.That(services.Sum(service => service.CacheEntryCount), Is.EqualTo(serviceCount));
+            }
+            finally
+            {
+                foreach (var service in services)
+                {
+                    service.Dispose();
+                }
+            }
         }
 
         [Test]
