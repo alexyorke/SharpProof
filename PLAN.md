@@ -53,13 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Symbolic Engine And Evidence Quality
-- Centralize nullable-flow facts from Roslyn null-state analysis and
-  `System.Diagnostics.CodeAnalysis` attributes such as `AllowNull`,
-  `DisallowNull`, `MaybeNull`, `NotNull`, `MaybeNullWhen`, `NotNullWhen`,
-  `NotNullIfNotNull`, `MemberNotNull`, `MemberNotNullWhen`, `DoesNotReturn`,
-  and `DoesNotReturnIf`, then feed the same facts into `[Ensures]`,
-  runtime-hazard, reachability, and purity evidence instead of maintaining
-  parallel partial implementations.
 - Make bounded-analysis truncation observable and configurable where it affects
   proof quality: path-condition merges, if/switch/try fact merges, foreach
   element facts, structural null-state depth, and state-merge fact caps should
