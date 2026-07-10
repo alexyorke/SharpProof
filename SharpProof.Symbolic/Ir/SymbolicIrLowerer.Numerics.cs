@@ -6,6 +6,38 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerIntegralMathAbsInvocation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (!method.IsStatic ||
+            method.Parameters.Length != 1 ||
+            !IsIntegerSmtType(method.ReturnType) ||
+            !IsIntegerSmtType(method.Parameters[0].Type) ||
+            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
+                IInvocationOperation operation ||
+            !TryLowerIntegralMathArgument(operation, 0, context, out var value))
+            return false;
+
+        var nonNegative = CreateRelationCondition(
+            SymbolicRelationOperator.GreaterThanOrEqual,
+            value,
+            new SymbolicIntegerConstantTerm(0),
+            invocation,
+            "ir.known-api.math.abs.non-negative");
+        term = new SymbolicConditionalTerm(
+            nonNegative,
+            value,
+            new SymbolicBinaryTerm(
+                SymbolicBinaryTermOperator.Subtract,
+                new SymbolicIntegerConstantTerm(0),
+                value));
+        return true;
+    }
+
     private static bool TryLowerIntegralMathMinMaxInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,

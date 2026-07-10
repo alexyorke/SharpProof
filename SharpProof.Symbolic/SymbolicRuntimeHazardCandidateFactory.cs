@@ -191,6 +191,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
                 break;
             case InvocationExpressionSyntax invocation:
+                if (TryCreateMathAbsOverflowCandidate(invocation, semanticModel, cancellationToken,
+                        out var mathAbsOverflowCandidate))
+                    yield return mathAbsOverflowCandidate;
+
                 if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken,
                         out var guardCandidate)) yield return guardCandidate;
 
@@ -233,6 +237,43 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
                 break;
         }
+    }
+
+    private static bool TryCreateMathAbsOverflowCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
+            !operation.TargetMethod.IsStatic ||
+            !string.Equals(operation.TargetMethod.Name, nameof(Math.Abs), StringComparison.Ordinal) ||
+            !string.Equals(
+                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
+                "System.Math",
+                StringComparison.Ordinal) ||
+            operation.TargetMethod.Parameters.Length != 1 ||
+            !TryGetCheckedIntegralRange(operation.TargetMethod.ReturnType, out var minValue, out _) ||
+            minValue >= 0 ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 0, out var operand) ||
+            !TryCreateCheckedEqualityOverflowTrigger(
+                invocation,
+                operand,
+                minValue,
+                "ir.runtime-hazard.math.abs-overflow",
+                semanticModel,
+                cancellationToken,
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            invocation,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        return true;
     }
 
     private static RuntimeHazardCandidate CreateThrowCandidate(

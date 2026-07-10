@@ -162,6 +162,22 @@ public class TestClass
 
         yield return new TestCaseData(
                 @"
+using System;
+
+public class TestClass
+{
+    public int MathAbsOverflow()
+    {
+        return Math.Abs(int.MinValue);
+    }
+}",
+                "Math.Abs(int.MinValue)",
+                "System.OverflowException",
+                "definite_checked_integral_overflow")
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportMathAbsOverflowWithoutEnforcePure");
+
+        yield return new TestCaseData(
+                @"
 public class TestClass
 {
     public int IndexOutOfRange()
@@ -426,6 +442,24 @@ public class TestClass
     }
 }")
             .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedDivideByZero");
+
+        yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public int GuardedMathAbsOverflow(int value)
+    {
+        if (value != int.MinValue)
+        {
+            return Math.Abs(value);
+        }
+
+        return 0;
+    }
+}")
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedMathAbsOverflow");
 
         yield return new TestCaseData(
                 @"

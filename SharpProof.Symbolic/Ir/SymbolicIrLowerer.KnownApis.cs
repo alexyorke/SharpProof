@@ -51,7 +51,11 @@ internal static partial class SymbolicIrLowerer
             new KnownApiTermLoweringDescriptor(
                 "System.Math",
                 nameof(Math.Max),
-                TryLowerIntegralMathMinMaxInvocation));
+                TryLowerIntegralMathMinMaxInvocation),
+            new KnownApiTermLoweringDescriptor(
+                "System.Math",
+                nameof(Math.Abs),
+                TryLowerIntegralMathAbsInvocation));
 
     private static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,

@@ -3143,6 +3143,67 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesMathAbsMinimumOverflow()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return Math.Abs(int.MinValue);
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return Math.Abs(int.MinValue);", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Provenance,
+            Is.EqualTo("ir.runtime-hazard.math.abs-overflow"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_GuardedMathAbsOverflowIsPruned()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value != int.MinValue)
+        {
+            return Math.Abs(value);
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            "return Math.Abs(value);",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedIntegralOverflowCandidate()
     {
         const string source = @"

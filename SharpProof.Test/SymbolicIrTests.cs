@@ -779,6 +779,41 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
+    public void KnownApiLowering_IntegralMathAbsUsesTypedConditionalTerm()
+    {
+        var context = CreateExpressionContext(
+            "int value",
+            "System.Math.Abs(value) >= 0");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
+        var conditional = (SymbolicConditionalTerm)term;
+
+        Assert.That(
+            AssertFactCondition<SymbolicRelationAtom>(conditional.Condition).Operator,
+            Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
+        Assert.That(conditional.WhenTrue, Is.TypeOf<SymbolicVariableTerm>());
+        Assert.That(conditional.WhenFalse, Is.TypeOf<SymbolicBinaryTerm>());
+        Assert.That(
+            ((SymbolicBinaryTerm)conditional.WhenFalse).Operator,
+            Is.EqualTo(SymbolicBinaryTermOperator.Subtract));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(conditional, out var formula), Is.True);
+        Assert.That(formula, Is.TypeOf<SmtConditionalFormula>());
+    }
+
+    [Test]
+    public void KnownApiLowering_FloatingMathAbsStaysOnLegacyPath()
+    {
+        var context = CreateExpressionContext(
+            "double value",
+            "System.Math.Abs(value) >= 0");
+        var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
+
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
+    }
+
+    [Test]
     public void LowerTerm_InstanceReferencePropertyUsesSharedMemberTerm()
     {
         var context = CreateExpressionContext(

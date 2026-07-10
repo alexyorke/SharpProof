@@ -134,6 +134,28 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
         }
 
+        foreach (var checkedInvocationOverflowHazard in CollectProvenInvocationCheckedIntegralOverflowHazards(
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     smtAnalysis))
+        {
+            var invocationNode = FindHazardSiteNode(methodNode, checkedInvocationOverflowHazard);
+            var entry = TryCreateProvenExceptionSiteEntry(
+                invocationNode,
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                methodSymbol,
+                smtAnalysis,
+                ExceptionTypes.OverflowException,
+                ExceptionCategories.DefiniteCheckedIntegralOverflow,
+                ExceptionSources.CheckedOperator);
+            if (entry == null) continue;
+
+            yield return entry;
+        }
+
         foreach (var negativeArrayLengthNode in ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(methodNode,
                      semanticModel, cancellationToken, smtAnalysis))
         {

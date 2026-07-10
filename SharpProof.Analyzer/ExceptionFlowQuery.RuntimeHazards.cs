@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
@@ -39,6 +40,21 @@ internal static partial class ExceptionFlowQuery
             cancellationToken,
             smtAnalysis,
             SymbolicRuntimeHazardKind.NegativeStackAllocLength);
+    }
+
+    private static IEnumerable<SymbolicRuntimeHazard> CollectProvenInvocationCheckedIntegralOverflowHazards(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return CollectProvenRuntimeHazards(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                SymbolicRuntimeHazardKind.CheckedIntegralOverflow)
+            .Where(hazard => FindHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax);
     }
 
     private static IEnumerable<SymbolicRuntimeHazard> CollectProvenCountIndexOutOfRangeHazards(
