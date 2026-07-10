@@ -115,12 +115,6 @@ grouped by their original feature area.
   accepted as conservative behavior.
 
 #### Tooling, Packaging, And Verification
-- Decide whether `SharpProof.Symbolic` is a supported public library package or
-  an analyzer-private implementation assembly. If public, ship it as a real
-  NuGet `lib` asset with XML docs, nullable annotations, samples, Source Link,
-  and package/API compatibility baselines; if private, hide or internalize the
-  accidental public query DTO surface so consumers do not build against a DLL
-  that is only delivered under `analyzers/dotnet/cs`.
 - Add a project-aware symbolic CLI/API mode, such as `--project` or
   `--solution`, that loads MSBuild references, parse options, `.editorconfig`
   analyzer configuration, baselines, and effect-summary AdditionalFiles so
