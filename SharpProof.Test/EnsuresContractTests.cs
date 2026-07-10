@@ -125,6 +125,33 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task Ensures_KnownIntegralMathResults_Proven()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Ensures(""result <= 10"")]
+    public int Minimum(int value) => Math.Min(value, 10);
+
+    [Ensures(""result >= 0"")]
+    public int Maximum(int value) => Math.Max(value, 0);
+
+    [Ensures(""result >= 0"")]
+    public int Absolute(int value) => Math.Abs(value);
+
+    [Ensures(""result >= 0"")]
+    [Ensures(""result <= 10"")]
+    public int Clamped(int value) => Math.Clamp(value, 0, 10);
+}";
+
+        Assert.That(await GetEnsuresDiagnosticsAsync(test), Is.Empty);
+    }
+
+    [Test]
     public async Task Ensures_ResultCanReferenceParameter_Proven()
     {
         var test = @"
